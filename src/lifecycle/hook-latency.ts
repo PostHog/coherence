@@ -18,7 +18,7 @@ import { TOOL_HOOKS } from "./hook-events.ts";
 
 /** Not .coherence/hooks, which holds the project's own hook voice and is committed; these are regenerated. */
 export const HOOK_TIMES_DIR = join(".coherence", "hook-times");
-/** The latency budget when the config declares none: the most seconds a tool hook may take. */
+/** The latency budget when the config declares none: the most seconds a tool hook or a stop may take. */
 export const DEFAULT_LATENCY_BUDGET = 3;
 
 /** How far back orient reads. */
@@ -105,13 +105,19 @@ function summary(over: readonly HookTime[], all: readonly HookTime[], budgetSeco
   return `Hook latency: ${over.length} tool hook call${over.length === 1 ? "" : "s"} ${span} took longer than the ${budgetSeconds} s latency budget (slowest ${slowest.event} ${seconds(slowest.ms)}); the ${tool.length} tool hook calls took ${seconds(total)} in all, ${seconds(total / Math.max(tool.length, 1))} each.`;
 }
 
-/** Regulate's line: this session's tool hook calls over the budget, with what the tool hooks cost in all; "" when none was over. */
+function stopSummary(all: readonly HookTime[], budgetSeconds: number): string {
+  const over = all.filter((t) => t.event === "Stop" && t.ms > budgetSeconds * 1000);
+  if (over.length === 0) return "";
+  return `Hook latency: ${over.length} stop${over.length === 1 ? "" : "s"} this session took longer than the ${budgetSeconds} s latency budget (slowest ${seconds(Math.max(...over.map((t) => t.ms)))}).`;
+}
+
+/** Regulate's line: this session's tool hook calls over the budget, with what the tool hooks cost in all, and its stops over it; "" when none was over. */
 export function hookLatencyStopText(root: string, session: string | undefined): string {
   if (session === undefined) return "";
   const budget = latencyBudget(root);
   const all = hookTimes(root, session);
   const over = all.filter((t) => TOOL_HOOKS.has(t.event) && t.ms > budget * 1000);
-  return over.length === 0 ? "" : summary(over, all, budget, "this session");
+  return [over.length === 0 ? "" : summary(over, all, budget, "this session"), stopSummary(all, budget)].filter((line) => line !== "").join("\n");
 }
 
 /** Orient's line: the last week's tool hook calls over the budget, across sessions; "" when none was. */

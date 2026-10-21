@@ -26,7 +26,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   isTestPath,
   outsideOfFolder,
@@ -49,7 +49,7 @@ import {
 } from "./adapter.ts";
 import { locateServer as locateInstalled, locateTsserver, type ServerLocation } from "./installed.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
-import { horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
+import { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 const SERVER_BIN = "typescript-language-server";
 const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
@@ -264,6 +264,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private client: JsonRpcClient | undefined;
   private starting: Promise<{ ok: true } | { ok: false; reason: string }> | undefined;
   private readonly opened = new Set<string>();
+  private readonly documents = new Map<string, { identity: string | undefined; hash: string }>();
   private readonly symbolCache = new Map<string, DocumentSymbol[]>();
   private readonly lineCache = new Map<string, string[]>();
   /** The document version last sent per open file; a change carries the next one. */
@@ -349,6 +350,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
       this.starting = undefined;
       this.opened.clear();
       this.versions.clear();
+      this.documents.clear();
       const again = await this.ready();
       if (!again.ok) throw new Error(again.reason);
     }
@@ -372,25 +374,29 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return lines;
   }
 
-  private open(file: string, text?: string): void {
+  private open(file: string, text?: string, identity?: string): void {
     if (this.opened.has(file)) return;
+    const currentIdentity = identity ?? fileIdentity(join(this.root, file));
     const content = text ?? readFileSync(join(this.root, file), "utf8");
     this.client!.notify("textDocument/didOpen", { textDocument: { uri: this.uri(file), languageId: languageIdOf(file), version: 1, text: content } });
     this.opened.add(file);
     this.versions.set(file, 1);
+    this.documents.set(file, { identity: currentIdentity, hash: createHash("sha256").update(content).digest("hex") });
   }
 
   /** Replace an open document's whole text; the version only ever climbs, so the server never discards a change as old. */
-  private change(file: string, text: string): void {
+  private change(file: string, text: string, identity = fileIdentity(join(this.root, file))): void {
     const version = (this.versions.get(file) ?? 1) + 1;
     this.versions.set(file, version);
     this.client!.notify("textDocument/didChange", { textDocument: { uri: this.uri(file), version }, contentChanges: [{ text }] });
+    this.documents.set(file, { identity, hash: createHash("sha256").update(text).digest("hex") });
   }
 
   private closeDocument(file: string): void {
     if (!this.opened.has(file)) return;
     this.client!.notify("textDocument/didClose", { textDocument: { uri: this.uri(file) } });
     this.opened.delete(file);
+    this.documents.delete(file);
   }
 
   private async documentSymbols(file: string): Promise<DocumentSymbol[]> {
@@ -420,40 +426,61 @@ export class TypeScriptAdapter implements LanguageAdapter {
    * from disk only when it does not own the text, and a didOpen carrying the
    * text it already loaded leaves it owning the text, so a close after that
    * leaves the edit to its file watcher, which is late under load and blind to
-   * an excluded file. So every open document, every file touched since the
-   * last forget, and every file the caller names gets its whole current text
-   * (didChange for an open document, didOpen for one not yet open, and it
-   * stays open), and the forget waits for a documentSymbol answer per file,
-   * which the server cannot give before the change is applied. A file that
-   * no longer exists is closed.
+   * an excluded file. So every open document whose disk text differs from the
+   * text last sent, every file touched since the last forget that is not open
+   * yet, and every file the caller names gets its whole current text (didChange
+   * for an open document, didOpen for one not yet open, and it stays open), and
+   * the forget waits for one documentSymbol answer after the last change, which
+   * the server cannot give before every change is applied. A file that no
+   * longer exists is closed.
    */
   async forget(files: readonly string[] = []): Promise<void> {
-    this.symbolCache.clear();
-    this.lineCache.clear();
     this.wildcards = undefined;
     this.walked = undefined;
     this.listing = undefined;
     this.diagnostics.clear();
-    if (this.client === undefined) return;
+    if (this.client === undefined) {
+      this.symbolCache.clear();
+      this.lineCache.clear();
+      return;
+    }
     // A named file that is not the project's (a nested checkout's copy, an ignored file) is never opened:
     // opening it would load another project into the instrument, whose references would then answer as this one's.
     const named = keepProjectFiles(this.root, files);
-    const refresh = new Set([...this.touched, ...files.filter((f) => named.has(f)), ...this.opened]);
+    const forced = new Set(files.filter((file) => named.has(file)));
+    const refresh = new Set([...this.touched, ...forced, ...this.opened]);
     this.touched.clear();
-    const synced: string[] = [];
+    let lastSyncedFile: string | undefined;
+    const unchangedFiles = new Set<string>();
     for (const file of refresh) {
-      const path = join(this.root, file);
-      if (!existsSync(path) || !statSync(path).isFile()) {
+      const identity = fileIdentity(join(this.root, file));
+      if (identity === undefined) {
         this.closeDocument(file);
         continue;
       }
-      const text = readFileSync(path, "utf8");
-      if (this.opened.has(file)) this.change(file, text);
-      else this.open(file, text);
-      synced.push(file);
+      const isForced = forced.has(file);
+      if (!isForced && this.documents.get(file)?.identity === identity) {
+        unchangedFiles.add(file);
+        continue;
+      }
+      const text = readFileSync(join(this.root, file), "utf8");
+      const hash = createHash("sha256").update(text).digest("hex");
+      if (!isForced && this.documents.get(file)?.hash === hash) {
+        this.documents.set(file, { identity, hash });
+        unchangedFiles.add(file);
+        continue;
+      }
+      lastSyncedFile = file;
+      if (this.opened.has(file)) {
+        this.change(file, text, identity);
+        continue;
+      }
+      this.open(file, text, identity);
     }
-    // The acknowledgment: one answer per changed document, each ordered after its change.
-    for (const file of synced) await this.documentSymbols(file);
+    // An open document whose text the server already holds keeps its symbols and lines; every other file is read again.
+    for (const file of [...this.symbolCache.keys()]) if (!unchangedFiles.has(file)) this.symbolCache.delete(file);
+    for (const file of [...this.lineCache.keys()]) if (!unchangedFiles.has(file)) this.lineCache.delete(file);
+    if (lastSyncedFile !== undefined) await this.documentSymbols(lastSyncedFile);
   }
 
   async resolve(name: string, hint: ResolveHint): Promise<Resolved> {

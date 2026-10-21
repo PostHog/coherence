@@ -146,7 +146,8 @@ The hooks around every tool call are the cost every session pays, and a call
 cycle that feels sluggish is how a check gets switched off. Each hook call's
 time is kept. A tool hook (PreToolUse, PostToolUse) over the latency budget,
 3 s unless `latencyBudget` says otherwise, says so in its own answer, and
-regulate and orient name the calls over it. A tool use that writes nothing
+regulate and orient name the calls over it; regulate also names the stops
+over it. A tool use that writes nothing
 reads no vocabulary, a prompt over an unchanged tree reads none either, and
 a command or edit outside every adopted project costs a constant: on this
 repository a tool hook takes about 0.3 s, and 0.4 to 2.4 s in the PostHog

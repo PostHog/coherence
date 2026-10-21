@@ -138,7 +138,7 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 | `chokepointFrom` | `anywhere` | Which references a chokepoint governs when its bullet has no `from:` line: `anywhere`, `outside the component`, or `outside <folder>`. A bullet's own `from:` overrides it, and every run entry records which governed and who said it. Any other value is refused. See [spec.md](spec.md#which-references-a-chokepoint-governs). |
 | `interfaceBudget` | `{ "seconds": 600, "memoryMB": 12288 }` | The most time and memory the Structure reading's interface pass may take; when it runs out, the reading says it is partial. |
 | `telemetry` | none | `false` refuses fleet telemetry for this project, whatever each user chose with `coherence telemetry on`; a registry's `false` refuses for every leaf. Telemetry is off unless a user opts in; see the README's [Telemetry](../README.md#telemetry) section for what is sent. |
-| `latencyBudget` | `3` | The latency budget: the most seconds a tool hook (PreToolUse, PostToolUse) may take, counted from its process's start. A tool hook over it says so in its own answer; regulate names the session's calls over it, and orient the last week's. These hooks run around every tool call, and a call cycle that feels sluggish is how a hook gets switched off. |
+| `latencyBudget` | `3` | The latency budget: the most seconds a tool hook (PreToolUse, PostToolUse) or a stop may take, counted from its process's start. A tool hook over it says so in its own answer; regulate names the session's calls and stops over it, and orient the last week's calls. These hooks run around every tool call, and a call cycle that feels sluggish is how a hook gets switched off. |
 
 ## Tests: how a totality oracle is run
 

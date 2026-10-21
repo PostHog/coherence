@@ -58,7 +58,7 @@ import { isSourceFile } from "../../economy/source.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { decide } from "../../journal/verbs.ts";
 import { parseSpec } from "../../spec/grammar.ts";
-import { loadSpecModel } from "../../spec/model.ts";
+import { loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import { loadSpec } from "./build.ts";
 import { boundsOf, withinBounds } from "./component-interfaces.ts";
 import type { InterfaceReading, ShellState } from "./model.ts";
@@ -142,8 +142,7 @@ export function gapsOf(state: Pick<ShellState, "spec">, model: FlowModel): GapSt
  * a trust: line, a crossing or a totality oracle leaves it standing, and the
  * gaps derived from it show the change at once.
  */
-function specShape(root: string): string {
-  const model = loadSpecModel(root, { runs: false });
+function specShape(root: string, model = loadSpecModel(root, { runs: false })): string {
   return JSON.stringify(
     model.components.map((c) => [
       c.folder,
@@ -162,11 +161,11 @@ const MANIFESTS: ReadonlySet<string> = new Set(["coherence.config.json", "packag
  * manifests, by path and content, and the specs' shape as the reading
  * depends on it. Equal fingerprints mean the reading still describes the tree.
  */
-export function structureFingerprint(root: string): string {
+export function structureFingerprint(root: string, model?: SpecModel): string {
   const languages = readEnforcementConfig(root).languages;
   const skip = boundsOf(root, configIgnore(root));
   const hash = createHash("sha256");
-  hash.update(specShape(root)).update("\u0000");
+  hash.update(specShape(root, model)).update("\u0000");
   for (const file of projectFiles(root)) {
     // The manifests too: the entrances the reading detects include what package.json and pyproject.toml run.
     const counted = MANIFESTS.has(file) || (withinBounds(file, skip) && languages.some((language) => isSourceFile(file, language)));
@@ -243,10 +242,10 @@ export function freshReading(root: string, fingerprint: string = structureFinger
  * as they stand now. flowOf reads the spec, the runs, the reading, the zoom
  * and the journal's escalations; the views' own fields are left at rest.
  */
-export function structureState(root: string, reading: InterfaceReading): ShellState {
+export function structureState(root: string, reading: InterfaceReading, model?: SpecModel): ShellState {
   const runs = loadRuns(root);
   const state = {
-    spec: loadSpec(root),
+    spec: loadSpec(root, model),
     runs: { records: runs.records, damaged: runs.damaged },
     // Escalations only color the health strip; the gaps never read them.
     journal: { records: [], damaged: [], work: { kind: "absent", because: "not read for the gaps" } },
@@ -257,10 +256,10 @@ export function structureState(root: string, reading: InterfaceReading): ShellSt
 }
 
 /** The gaps now, from the recorded reading when it still describes the tree; undefined when the state is stale or unknown. */
-export function currentGaps(root: string, fingerprint?: string): (GapState & { at: string }) | undefined {
+export function currentGaps(root: string, fingerprint?: string, model?: SpecModel): (GapState & { at: string }) | undefined {
   const fresh = freshReading(root, fingerprint);
   if (fresh === undefined) return undefined;
-  const state = structureState(root, fresh.reading);
+  const state = structureState(root, fresh.reading, model);
   return { ...gapsOf(state, flowOf(state)), at: fresh.at };
 }
 
@@ -315,33 +314,44 @@ function refreshPath(root: string): string {
   return join(root, STRUCTURE_DIR, "refresh.json");
 }
 
-function readMark(root: string): RefreshMark | undefined {
+/** Where a background run keeps its mark, and the end of the command line that runs it: one slot per kind of run. */
+export interface RefreshSlot {
+  path: string;
+  command: RegExp;
+}
+
+// The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
+const STRUCTURE_QUERY = /(?:^|\s)query\s+structure\s*$/;
+
+function readMark(path: string): RefreshMark | undefined {
   try {
-    return JSON.parse(readFileSync(refreshPath(root), "utf8")) as RefreshMark;
+    return JSON.parse(readFileSync(path, "utf8")) as RefreshMark;
   } catch {
     return undefined;
   }
 }
 
-/** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */
-export function refreshUnderWay(root: string, now: () => number = Date.now): RefreshMark | undefined {
-  const mark = readMark(root);
+function markUnderWay(mark: RefreshMark | undefined, now: () => number): RefreshMark | undefined {
   if (mark === undefined) return undefined;
   return alive(mark.pid) && now() - Date.parse(mark.at) < REFRESH_STALE_MS ? mark : undefined;
+}
+
+/** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */
+export function refreshUnderWay(root: string, now: () => number = Date.now): RefreshMark | undefined {
+  return markUnderWay(readMark(refreshPath(root)), now);
 }
 
 /**
  * Stop a refresh reading a tree that is no longer the tree: its reading could
  * never be kept (recordReading refuses a tree that moved), so it only holds
- * the one slot. Only a process whose command line is a structure query is
- * signalled, so a reused pid is never touched; its whole group goes, the
- * language server with it.
+ * the one slot. Only a process whose command line ends as the slot's own
+ * run does is signalled, so a reused pid is never touched; its whole group
+ * goes, the language server with it.
  */
-function supersede(pid: number): boolean {
+function supersede(pid: number, ownCommand: RegExp): boolean {
   try {
     const command = execFileSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 2000 });
-    // The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
-    if (!/(?:^|\s)query\s+structure\s*$/.test(command)) return false;
+    if (!ownCommand.test(command)) return false;
   } catch {
     return false;
   }
@@ -364,16 +374,16 @@ function supersede(pid: number): boolean {
  * older tree is superseded (df-84db9e4f: the tree a session leaves at its stop
  * is the one the next session starts on). Never twice for the same tree (a
  * reading that could not finish is not retried until the tree changes).
- * `command` is the argv that records a reading (the CLI's query structure).
- * Returns whether one started.
+ * `command` is the argv that records a reading (the CLI's query structure);
+ * `slot` is the structure refresh's own unless another kind of run passes its
+ * mark and command line. Returns whether one started.
  */
-export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now): boolean {
-  const path = refreshPath(root);
+export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now, slot: RefreshSlot = { path: refreshPath(root), command: STRUCTURE_QUERY }): boolean {
   try {
-    const mark = readMark(root);
+    const mark = readMark(slot.path);
     if (mark !== undefined) {
       if (mark.fingerprint === fingerprint) return false;
-      if (refreshUnderWay(root, now) !== undefined && !supersede(mark.pid)) return false;
+      if (markUnderWay(mark, now) !== undefined && !supersede(mark.pid, slot.command)) return false;
     }
     const [program, ...args] = command;
     if (program === undefined) return false;
@@ -381,7 +391,7 @@ export function refreshInBackground(root: string, command: readonly string[], fi
     child.on("error", () => {});
     child.unref();
     if (child.pid === undefined) return false;
-    writeAtomically(path, JSON.stringify({ pid: child.pid, at: new Date(now()).toISOString(), fingerprint } satisfies RefreshMark));
+    writeAtomically(slot.path, JSON.stringify({ pid: child.pid, at: new Date(now()).toISOString(), fingerprint } satisfies RefreshMark));
     return true;
   } catch {
     return false;

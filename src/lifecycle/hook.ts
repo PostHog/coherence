@@ -82,10 +82,11 @@ import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-eve
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { tsserverNotice } from "../adapters/installed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
+import { escapeRegExp } from "../enforcement/totality.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
-import { recordReadTrace, recordWriteTrace, sessionPatch, snapshotTrace, type Snapshot } from "../economy/trace.ts";
+import { filesRead, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotSession, snapshotTrace, traceFile, type Snapshot } from "../economy/trace.ts";
 import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
@@ -435,6 +436,11 @@ function specModelOrNull(root: string): SpecModel | { error: string } {
   return model;
 }
 
+function loadedSpecModel(root: string): SpecModel | undefined {
+  const model = specModelOrNull(root);
+  return "error" in model ? undefined : model;
+}
+
 /** Requirements still short of invariant, and grammar problems, for orient. */
 /** How long the invariant floor may go without a run that grades before orient names it. */
 export const FLOOR_QUIET_DAYS = 14;
@@ -726,8 +732,9 @@ export function mayHaveGaps(root: string, given?: SpecModel): boolean {
 export async function gapReading(root: string, options: { waitMs?: number } = {}): Promise<GapReading> {
   if (!mayHaveGaps(root)) return { fingerprint: undefined, now: undefined };
   try {
-    const fingerprint = structureFingerprint(root);
-    const now = currentGaps(root, fingerprint) ?? (options.waitMs ? await awaitRefresh(root, fingerprint, options.waitMs) : undefined);
+    const model = loadedSpecModel(root);
+    const fingerprint = structureFingerprint(root, model);
+    const now = currentGaps(root, fingerprint, model) ?? (options.waitMs ? await awaitRefresh(root, fingerprint, options.waitMs) : undefined);
     if (now !== undefined) return { fingerprint, now };
     return { fingerprint, now: undefined, last: lastGaps(root), refreshing: refreshUnderWay(root) !== undefined };
   } catch {
@@ -912,6 +919,13 @@ export interface HookOptions {
    */
   mirrors?: ((root: string) => void) | undefined;
   /**
+   * Start the session's read-trace snapshot detached at a stop, never waited
+   * on: the stop reports the newest one already recorded. The command line
+   * passes ECONOMY_SNAPSHOT; absent (a test), the stop takes it in-process.
+   * An empty patch is always taken in-process: it predicts nothing, so it needs no instrument.
+   */
+  snapshot?: ((root: string, session: string, fingerprint: string) => void) | undefined;
+  /**
    * Told the verdict of an edit's chokepoint check as data, besides the text
    * the agent reads: the warm hook process (hook-serve.ts) hands it to a host
    * that marks the tool call's row for the user. Absent (the command line), nothing is told.
@@ -938,26 +952,29 @@ export interface EditVerdict {
 export function refreshAtStop(root: string, options: HookOptions): void {
   if (options.refresh === undefined || !mayHaveGaps(root)) return;
   try {
-    const fingerprint = structureFingerprint(root);
-    if (currentGaps(root, fingerprint) === undefined) options.refresh(root, fingerprint);
+    const model = loadedSpecModel(root);
+    const fingerprint = structureFingerprint(root, model);
+    if (currentGaps(root, fingerprint, model) === undefined) options.refresh(root, fingerprint);
   } catch {
     // A refresh that cannot start only means the next session reads the last reading, labeled.
   }
 }
 
-/**
- * The read-trace snapshot at a stop, with an instrument. A test hands its own
- * adapter in; production has none of its own, so the snapshot goes through
- * enforcement's one door to the warm server and the closure it predicts is
- * computed through references rather than skipped. A door that cannot connect
- * hands back its reason, which the snapshot records as the instrument it had.
- */
-async function snapshotAtStop(root: string, session: string, options: HookOptions): Promise<Snapshot | undefined> {
-  // The session's own patch: what its tool uses wrote, outside every ignored folder; another session's or a person's edits are not predicted for.
-  const changed = sessionPatch(root, session);
-  if (options.adapter !== undefined) return snapshotTrace(root, session, { adapter: options.adapter, changed });
-  const door = options.door ?? WARM_DOOR;
-  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed }));
+async function snapshotAtStop(root: string, session: string, patch: readonly string[], fingerprint: string, options: HookOptions): Promise<void> {
+  if (patch.length === 0) {
+    await snapshotTrace(root, session, { changed: patch });
+    return;
+  }
+  if (options.snapshot !== undefined) {
+    options.snapshot(root, session, fingerprint);
+    return;
+  }
+  const model = loadedSpecModel(root);
+  if (options.adapter === undefined) {
+    await snapshotSession(root, session, options.door ?? WARM_DOOR, model, patch);
+    return;
+  }
+  await snapshotTrace(root, session, { adapter: options.adapter, changed: patch, model });
 }
 
 /**
@@ -965,7 +982,7 @@ async function snapshotAtStop(root: string, session: string, options: HookOption
  * the session wrote (who relies on them, what they rely on), and which of
  * those the session never read; advisory, nothing when there are none.
  */
-export function economyStopText(snapshot: Snapshot | undefined): string {
+export function economyStopText(snapshot: Snapshot | undefined, currentFingerprint?: string): string {
   if (snapshot === undefined || snapshot.changed.length === 0) return "";
   const changed = new Set(snapshot.changed);
   const others = snapshot.predicted.filter((f) => !changed.has(f));
@@ -973,7 +990,8 @@ export function economyStopText(snapshot: Snapshot | undefined): string {
   const read = new Set(snapshot.read);
   const unread = others.filter((f) => !read.has(f));
   const files = (n: number, one: string): string => `${n} ${one}${n === 1 ? "" : "s"}`;
-  const head = `Economy: this session wrote ${files(changed.size, "file")}; the prediction names ${files(others.length, "other file")} that rely on them or that they rely on, and the session read ${others.length - unread.length} of them.`;
+  const label = currentFingerprint === undefined || snapshot.fingerprint === currentFingerprint ? "Economy" : "Economy (as of an earlier patch)";
+  const head = `${label}: this session wrote ${files(changed.size, "file")}; the prediction names ${files(others.length, "other file")} that rely on them or that they rely on, and the session read ${others.length - unread.length} of them.`;
   if (unread.length === 0) return head;
   return `${head} Not read: ${unread.slice(0, 6).join(", ")}${unread.length > 6 ? `, and ${unread.length - 6} more` : ""}.`;
 }
@@ -1000,6 +1018,19 @@ export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
   refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure"], fingerprint);
 };
 
+/**
+ * The snapshot the command line starts at a stop: this checkout's economy
+ * --snapshot, one per session, a newer patch superseding an older one. It
+ * starts the warm server when none listens, so COHERENCE_NO_WARM_UP=1 starts
+ * nothing here either.
+ */
+export const ECONOMY_SNAPSHOT = (root: string, session: string, fingerprint: string): void => {
+  if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
+  const mark = traceFile(root, session).replace(/\.jsonl$/, ".snapshot.json");
+  const ownCommand = new RegExp(`(?:^|\\s)economy\\s+--snapshot\\s+${escapeRegExp(session)}\\s*$`);
+  refreshInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "economy", "--snapshot", session], fingerprint, Date.now, { path: mark, command: ownCommand });
+};
+
 /** The mirror refresh the command line starts: this checkout's query mirrors --refresh, which reads only when the kept reading is of another commit. */
 export const MIRROR_REFRESH = (root: string): void => {
   refreshMirrorsInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "query", "mirrors", "--refresh"]);
@@ -1010,10 +1041,10 @@ export async function gapStopText(root: string, input: HookInput, changed: reado
   if (changed.length === 0 || !mayHaveGaps(root)) return "";
   try {
     const session = sessionOf(input);
-    const now = currentGaps(root);
+    const model = loadedSpecModel(root);
+    const now = currentGaps(root, undefined, model);
     const start = session === undefined ? undefined : sessionGaps(root, session);
-    const model = specModelOrNull(root);
-    const spec = loadSpec(root, "error" in model ? undefined : model);
+    const spec = loadSpec(root, model);
     const declared = declaredThisSession(root, changed, spec);
     return regulateGapText({ changed, now, start, declared, spec, cli: await cliName(root) });
   } catch {
@@ -1394,7 +1425,10 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const changed = await changedFiles(root);
         const report = await checkChanged(root, changed.files);
         const session=sessionOf(input);
-        const snapshot = session ? await snapshotAtStop(root, session, options) : undefined;
+        const patch = session ? sessionPatch(root, session) : [];
+        const fingerprint = session ? patchFingerprint(root, patch, filesRead(root, session).length) : undefined;
+        if (session && fingerprint !== undefined) await snapshotAtStop(root, session, patch, fingerprint, options);
+        const snapshot = session ? lastSnapshot(root, session) : undefined;
         const walls = unableWalls(root, input);
         const spec = specStopText(root, changed.files, walls);
         const lexicon = lexiconStopText(report, walls);
@@ -1411,7 +1445,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const heldModel = specModelOrNull(root);
         keepMirrorsFromModel(root);
         const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input), "error" in heldModel ? undefined : heldModel);
-        const economyText = economyStopText(snapshot);
+        const economyText = economyStopText(snapshot, fingerprint);
         const latencyText = hookLatencyStopText(root, session);
         const parts: string[] = [];
         if (changedText !== "") parts.push(changedText);

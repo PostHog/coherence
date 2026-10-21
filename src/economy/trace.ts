@@ -23,7 +23,8 @@ import { execFileSync } from "../lifecycle/work-meter.ts";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
-import { configIgnore, keepProjectFiles, projectListing, underIgnored } from "../adapters/project-files.ts";
+import { withWarmAdapter } from "../enforcement/run.ts";
+import { configIgnore, fileIdentity, keepProjectFiles, projectListing, underIgnored } from "../adapters/project-files.ts";
 import type { HookInput } from "../lifecycle/hook.ts";
 import { readerNaming } from "../lifecycle/host-tools.ts";
 import type { SpecModel } from "../spec/model.ts";
@@ -55,6 +56,8 @@ export interface Snapshot {
   predicted: string[];
   tokens: number;
   instrument: Instrument;
+  /** The patch's fingerprint when the snapshot read it; a stop whose fingerprint differs reports this snapshot as of an earlier patch. */
+  fingerprint?: string;
 }
 
 /** Files one tool use wrote: the session's own patch, as the hook saw it, never another session's or a person's edits. */
@@ -240,6 +243,14 @@ export function filesRead(root: string, session: string): string[] {
   return [...found].sort();
 }
 
+/** The newest snapshot a session's trace holds, or undefined when it holds none. */
+export function lastSnapshot(root: string, session: string): Snapshot | undefined {
+  const file = traceFile(root, session);
+  if (!existsSync(file)) return undefined;
+  const lines = readFileSync(file, "utf8").split("\n").filter((line) => line.trim() !== "").map(parseLine);
+  return lines.findLast((line): line is Snapshot => typeof line !== "string" && line.kind === "snapshot");
+}
+
 export interface SnapshotOptions extends TraceOptions {
   adapter?: LanguageAdapter | undefined;
   server?: "cold" | "warm" | undefined;
@@ -255,7 +266,8 @@ export interface SnapshotOptions extends TraceOptions {
  * nor changed a file; the snapshot is returned otherwise.
  */
 export async function snapshotTrace(root: string, session: string, options: SnapshotOptions = {}): Promise<Snapshot | undefined> {
-  const changed = [...(options.changed ?? sessionPatch(root, session))].filter((f) => {
+  const patch = options.changed ?? sessionPatch(root, session);
+  const changed = patch.filter((f) => {
     try {
       return statSync(resolve(root, f)).isFile();
     } catch {
@@ -264,6 +276,7 @@ export async function snapshotTrace(root: string, session: string, options: Snap
   });
   const read = filesRead(root, session);
   if (changed.length === 0 && read.length === 0) return undefined;
+  const fingerprint = patchFingerprint(root, patch, read.length);
   let predicted: string[] = [];
   let tokens = 0;
   let instrument: Instrument = { language: "unknown", server: "none", reason: options.instrumentReason ?? "no adapter" };
@@ -278,7 +291,18 @@ export async function snapshotTrace(root: string, session: string, options: Snap
     }
   }
   const at = (options.now ?? (() => new Date()))().toISOString();
-  const snapshot: Snapshot = { kind: "snapshot", at, session, commit: git(root, ["rev-parse", "--short", "HEAD"]), changed, read, predicted, tokens, instrument };
+  const snapshot: Snapshot = { kind: "snapshot", at, session, commit: git(root, ["rev-parse", "--short", "HEAD"]), changed, read, predicted, tokens, instrument, fingerprint };
   append(root, snapshot);
   return snapshot;
+}
+
+/** What a snapshot is current for: each patch file's identity and how many files the session has read. */
+export function patchFingerprint(root: string, patch: readonly string[], filesReadCount: number): string {
+  const identities = patch.map((file) => `${file}@${fileIdentity(join(root, file)) ?? "gone"}`);
+  return `${identities.join("\n")}\nread ${filesReadCount}`;
+}
+
+/** A session's snapshot through the warm instrument's one door; a door that cannot connect hands back its reason, which the snapshot records. */
+export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel, changed: readonly string[] = sessionPatch(root, session)): Promise<Snapshot | undefined> {
+  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }));
 }
