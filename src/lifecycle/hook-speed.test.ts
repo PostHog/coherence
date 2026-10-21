@@ -11,7 +11,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { recordWriteTrace, sessionPatch, traceFile, type Snapshot } from "../economy/trace.ts";
+import { patchFingerprint, recordWriteTrace, sessionPatch, traceFile, type Snapshot } from "../economy/trace.ts";
 import { economyStopText, editContext, runHook } from "./hook.ts";
 import { TypeScriptAdapter } from "../adapters/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
@@ -61,7 +61,7 @@ test("a stop starts the snapshot detached, with a fingerprint that moves only wi
   try {
     writeFileSync(join(root, "src/a.ts"), "export const a = 2;\n");
     recordWriteTrace(root, "s1", ["src/a.ts"]);
-    const recorded: Snapshot = { kind: "snapshot", at: "2026-10-20T00:00:00.000Z", session: "s1", commit: null, changed: ["src/a.ts"], read: [], predicted: ["src/a.ts", "src/b.ts"], tokens: 0, instrument: { language: "typescript", server: "warm" } };
+    const recorded: Snapshot = { kind: "snapshot", at: "2026-10-20T00:00:00.000Z", session: "s1", commit: null, changed: ["src/a.ts"], read: [], predicted: ["src/a.ts", "src/b.ts"], tokens: 0, instrument: { language: "typescript", server: "warm" }, fingerprint: patchFingerprint(root, ["src/a.ts"], 0) };
     appendFileSync(traceFile(root, "s1"), `${JSON.stringify(recorded)}\n`);
     const started: string[] = [];
     const options = { snapshot: (r: string, session: string, fingerprint: string) => void started.push(`${session} ${fingerprint}`), door: (() => assert.fail("the stop never waits on the instrument")) as never };
@@ -69,7 +69,8 @@ test("a stop starts the snapshot detached, with a fingerprint that moves only wi
     assert.match(stop.stdout, /Economy: this session wrote 1 file; the prediction names 1 other file .* Not read: src\/b\.ts\./);
     await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
     writeFileSync(join(root, "src/a.ts"), "export const a = 3;\n");
-    await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    const edited = await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    assert.match(edited.stdout, /Economy \(as of an earlier patch\): /, "the same file edited again leaves the recorded snapshot stale");
     assert.equal(started.length, 3);
     assert.equal(started[0], started[1], "an unchanged patch keeps its fingerprint, so no second closure starts");
     assert.notEqual(started[1], started[2], "an edit moves it, so the newer patch supersedes");

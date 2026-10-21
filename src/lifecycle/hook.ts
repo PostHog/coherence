@@ -83,10 +83,10 @@ import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLi
 import { tsserverNotice } from "../adapters/installed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { escapeRegExp } from "../enforcement/totality.ts";
-import { fileIdentity, keepProjectFiles } from "../adapters/project-files.ts";
+import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
-import { filesRead, lastSnapshot, recordReadTrace, recordWriteTrace, sessionPatch, snapshotSession, snapshotTrace, traceFile, type Snapshot } from "../economy/trace.ts";
+import { filesRead, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotSession, snapshotTrace, traceFile, type Snapshot } from "../economy/trace.ts";
 import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
@@ -960,18 +960,13 @@ export function refreshAtStop(root: string, options: HookOptions): void {
   }
 }
 
-function snapshotFingerprint(root: string, session: string, patch: readonly string[]): string {
-  const identities = patch.map((file) => `${file}@${fileIdentity(join(root, file)) ?? "gone"}`);
-  return `${identities.join("\n")}\nread ${filesRead(root, session).length}`;
-}
-
-async function snapshotAtStop(root: string, session: string, patch: readonly string[], options: HookOptions): Promise<void> {
+async function snapshotAtStop(root: string, session: string, patch: readonly string[], fingerprint: string, options: HookOptions): Promise<void> {
   if (patch.length === 0) {
     await snapshotTrace(root, session, { changed: patch });
     return;
   }
   if (options.snapshot !== undefined) {
-    options.snapshot(root, session, snapshotFingerprint(root, session, patch));
+    options.snapshot(root, session, fingerprint);
     return;
   }
   const model = loadedSpecModel(root);
@@ -982,16 +977,12 @@ async function snapshotAtStop(root: string, session: string, patch: readonly str
   await snapshotTrace(root, session, { adapter: options.adapter, changed: patch, model });
 }
 
-function samePatch(recorded: readonly string[], current: readonly string[]): boolean {
-  return recorded.length === current.length && recorded.every((file, index) => file === current[index]);
-}
-
 /**
  * Regulate's economy line: the files the prediction names besides the ones
  * the session wrote (who relies on them, what they rely on), and which of
  * those the session never read; advisory, nothing when there are none.
  */
-export function economyStopText(snapshot: Snapshot | undefined, currentPatch?: readonly string[]): string {
+export function economyStopText(snapshot: Snapshot | undefined, currentFingerprint?: string): string {
   if (snapshot === undefined || snapshot.changed.length === 0) return "";
   const changed = new Set(snapshot.changed);
   const others = snapshot.predicted.filter((f) => !changed.has(f));
@@ -999,7 +990,7 @@ export function economyStopText(snapshot: Snapshot | undefined, currentPatch?: r
   const read = new Set(snapshot.read);
   const unread = others.filter((f) => !read.has(f));
   const files = (n: number, one: string): string => `${n} ${one}${n === 1 ? "" : "s"}`;
-  const label = currentPatch === undefined || samePatch(snapshot.changed, currentPatch) ? "Economy" : "Economy (as of an earlier patch)";
+  const label = currentFingerprint === undefined || snapshot.fingerprint === currentFingerprint ? "Economy" : "Economy (as of an earlier patch)";
   const head = `${label}: this session wrote ${files(changed.size, "file")}; the prediction names ${files(others.length, "other file")} that rely on them or that they rely on, and the session read ${others.length - unread.length} of them.`;
   if (unread.length === 0) return head;
   return `${head} Not read: ${unread.slice(0, 6).join(", ")}${unread.length > 6 ? `, and ${unread.length - 6} more` : ""}.`;
@@ -1435,7 +1426,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const report = await checkChanged(root, changed.files);
         const session=sessionOf(input);
         const patch = session ? sessionPatch(root, session) : [];
-        if (session) await snapshotAtStop(root, session, patch, options);
+        const fingerprint = session ? patchFingerprint(root, patch, filesRead(root, session).length) : undefined;
+        if (session && fingerprint !== undefined) await snapshotAtStop(root, session, patch, fingerprint, options);
         const snapshot = session ? lastSnapshot(root, session) : undefined;
         const walls = unableWalls(root, input);
         const spec = specStopText(root, changed.files, walls);
@@ -1453,7 +1445,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const heldModel = specModelOrNull(root);
         keepMirrorsFromModel(root);
         const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input), "error" in heldModel ? undefined : heldModel);
-        const economyText = economyStopText(snapshot, patch);
+        const economyText = economyStopText(snapshot, fingerprint);
         const latencyText = hookLatencyStopText(root, session);
         const parts: string[] = [];
         if (changedText !== "") parts.push(changedText);
