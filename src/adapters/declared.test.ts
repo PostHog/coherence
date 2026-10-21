@@ -24,6 +24,7 @@ import { DEFAULT_TEST_FOLDERS, readEnforcementConfig } from "../enforcement/conf
 import { enforcementLanguages, performRun } from "../enforcement/run.ts";
 import { loadRuns } from "../enforcement/record.ts";
 import { DECLARED_NOT_READ, languagesReadLine, scannedLanguagesRead } from "../readings/scope/languages-read.ts";
+import { cli } from "../lifecycle/cli-fixture.ts";
 
 const STUB = fileURLToPath(new URL("./declared-stub-server.ts", import.meta.url));
 
@@ -179,4 +180,61 @@ test("a run routes a declared language's chokepoint to its adapter and records w
   assert.deepEqual(read.read, ["typescript"]);
   assert.deepEqual(read.unread, [{ language: "toy", because: DECLARED_NOT_READ }]);
   assert.equal(languagesReadLine(read), `languages read: typescript; NOT READ: toy (${DECLARED_NOT_READ})`);
+});
+
+test("a declared language's server that misses a file's references never passes: a server answering only from open documents is handed every file, and a file whose text names the thing with no reported site makes the check not run, naming the file", async () => {
+  const input = { protects: "SECRET", chokepoint: "seal", ...hint, root };
+  const openOnly = new DeclaredAdapter(root, { ...TOY, server: [...TOY.server, "--open-only"] });
+  const blind = new DeclaredAdapter(root, { ...TOY, server: [...TOY.server, "--blind=api/"] });
+  try {
+    const missed = await checkChokepoint(blind, input);
+    assert.equal(missed.verdict, "not run", `a server blind to api/ must never grade a pass: ${missed.reason}`);
+    assert.equal(missed.refutation, "missing");
+    assert.match(missed.reason, /but no reference in api\/render\.toy:3, whose text names SECRET/);
+    // Before the adapter opened every file, this server saw only the seed it opens at start, the definition and the probe: a bypass in any
+    // other file went unseen. web/leak.toy sorts after the seed (api/render.toy), so nothing but the adapter's own opening reaches it.
+    write("web/leak.toy", "def leak\n  SECRET\n");
+    const opened = await checkChokepoint(openOnly, input);
+    assert.equal(opened.grade, "broken", opened.reason);
+    assert.deepEqual(opened.bypasses, [{ file: "api/render.toy", line: 3, symbol: "render" }, { file: "web/leak.toy", line: 2, symbol: "leak" }]);
+  } finally {
+    await openOnly.close();
+    await blind.close();
+    rmSync(join(root, "web"), { recursive: true, force: true });
+  }
+});
+
+test("run --no-server checks a declared language's chokepoints in process, alone or beside a built-in, never leaving them to a server it was told not to start", async () => {
+  const project = mkdtempSync(join(tmpdir(), "coherence-declared-cli-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(project, path)), { recursive: true });
+    writeFileSync(join(project, path), text, "utf8");
+  };
+  try {
+    put("Toy.spec.md", SPEC);
+    put("store/secrets.toy", SECRETS);
+    put("api/render.toy", RENDER_BYPASS);
+    execFileSync("git", ["init", "-q"], { cwd: project });
+    const declaration = { toy: { extensions: TOY.extensions, server: TOY.server, refute: TOY.refute } };
+    for (const language of [["typescript", "toy"], ["toy"]]) {
+      put("coherence.config.json", JSON.stringify({ language, languages: declaration }));
+      const ran = await cli(["run", "--no-server", "--form", "chokepoint", "--session", `cli-${language.length}`, "--agent", "test"], { cwd: project });
+      assert.doesNotMatch(ran.stdout + ran.stderr, /no toy adapter was handed/, `${language.join("+")}: the declared language had an adapter`);
+      assert.match(ran.stdout, /chokepoint seal protects SECRET: broken/, `${language.join("+")}: ${ran.stdout}${ran.stderr}`);
+      const record = loadRuns(project).records.at(-1)!;
+      assert.equal(record.instrument.server, "cold", `${language.join("+")}: an in-process adapter, never the warm server --no-server refuses`);
+    }
+  } finally {
+    rmSync(project, { recursive: true, force: true });
+  }
+});
+
+test("a JavaScript project that names javascript as its language is pointed at typescript, which reads its files", () => {
+  const project = mkdtempSync(join(tmpdir(), "coherence-declared-js-"));
+  try {
+    writeFileSync(join(project, "coherence.config.json"), JSON.stringify({ language: "javascript" }));
+    assert.throws(() => readEnforcementConfig(project), /language names "javascript".*typescript also reads JavaScript \(\.js, \.mjs, \.cjs, \.jsx\)/);
+  } finally {
+    rmSync(project, { recursive: true, force: true });
+  }
 });

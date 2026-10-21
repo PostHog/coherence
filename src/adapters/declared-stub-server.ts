@@ -7,7 +7,10 @@
  * documents (didOpen, didChange) stand in for the disk until they close.
  *
  * Run: node src/adapters/declared-stub-server.ts (the project root is the
- * initialize request's rootUri).
+ * initialize request's rootUri). Two flags make it the server a test must
+ * not trust: --open-only answers references from open documents alone, as a
+ * server with no index of the files on disk does, and --blind=<text> never
+ * reports a site in a file whose path holds the text.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -21,6 +24,8 @@ interface Range {
 
 let root = process.cwd();
 const overlays = new Map<string, string>();
+const openOnly = process.argv.includes("--open-only");
+const blind = process.argv.find((a) => a.startsWith("--blind="))?.slice("--blind=".length);
 
 function send(message: object): void {
   const body = Buffer.from(JSON.stringify({ jsonrpc: "2.0", ...message }), "utf8");
@@ -95,7 +100,8 @@ function answer(method: string, params: Record<string, unknown>): unknown {
       const name = wordAt(textOf(uri), position.line, position.character);
       if (name === undefined) return [];
       const out: unknown[] = [];
-      for (const [doc, text] of documents()) {
+      for (const [doc, text] of openOnly ? overlays : documents()) {
+        if (blind !== undefined && doc.includes(blind)) continue;
         text.split("\n").forEach((row, line) => {
           if (new RegExp(`^def ${name}\\b`).test(row)) return;
           for (const m of row.matchAll(new RegExp(`\\b${name}\\b`, "g"))) out.push({ uri: doc, range: { start: { line, character: m.index! }, end: { line, character: m.index! + name.length } } });

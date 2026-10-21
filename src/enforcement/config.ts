@@ -158,7 +158,9 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   if (language !== undefined) {
     const listed = typeof language === "string" ? [language] : Array.isArray(language) ? language : [language];
     const unknown = listed.filter((l) => typeof l !== "string" || !known.includes(l));
-    if (unknown.length > 0 || listed.length === 0) throw new Error(`${path}: language ${listed.length === 0 ? "lists nothing" : `names ${unknown.map((l) => JSON.stringify(l)).join(", ")}`}; each is one of ${known.join(", ")}${declared.length === 0 ? " (or a language declared under languages)" : ""}`);
+    // JavaScript is TypeScript's: its adapter reads .js, .mjs, .cjs and .jsx, so the name a JavaScript project reaches for is pointed there.
+    const javascript = unknown.some((l) => typeof l === "string" && /^(?:javascript|js|jsx|node|nodejs)$/i.test(l)) ? `; typescript also reads JavaScript (.js, .mjs, .cjs, .jsx): name typescript for a JavaScript project` : "";
+    if (unknown.length > 0 || listed.length === 0) throw new Error(`${path}: language ${listed.length === 0 ? "lists nothing" : `names ${unknown.map((l) => JSON.stringify(l)).join(", ")}`}; each is one of ${known.join(", ")}${declared.length === 0 ? " (or a language declared under languages)" : ""}${javascript}`);
     config.enforced = [...new Set(listed as string[])];
   }
   // A declared language the language key does not name would be read by nothing: say so rather than leave it unread.

@@ -236,7 +236,11 @@ Its ladder has one rung:
 The refutation stages the config's `refute` template as an unsaved document
 beside the protected thing (outside the exempted folder when the chokepoint
 governs only references from outside one) and requires the server to report
-the reference it holds; the check must then call that site a bypass. Without
+the reference it holds; the check must then call that site a bypass. A server
+that answers only from open or indexed files would see the staged document and
+miss a bypass in a file it never opened, so the adapter opens every file of
+the language first, and a file whose text names the thing but holds no
+reported site makes the check not run, naming the file. Without
 a template the refutation is not run, and says so, so the chokepoint reads not
 run, never pass. Every verdict names what answered
 (`swift via sourcekit-lsp (declared in the config)`).

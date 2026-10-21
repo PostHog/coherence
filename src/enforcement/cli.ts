@@ -16,7 +16,7 @@
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { basename, relative, resolve, sep } from "node:path";
-import { adapterFor } from "../adapters/index.ts";
+import { instrumentFor } from "../adapters/index.ts";
 import { registryOf, type Registry } from "../adapters/project-config.ts";
 import { JournalError, parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
@@ -226,9 +226,11 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
   const session = parsed.one.get("session") ?? randomUUID();
   const agent = parsed.one.get("agent") ?? "main";
   const invariants = parsed.many.get("invariant");
-  const languages = readEnforcementConfig(root).languages;
+  const config = readEnforcementConfig(root);
+  // Every language a check may be written in, built-in or declared: a declared one left out would read not run in CI, where --no-server is the norm.
+  const languages = config.enforced;
   // In process, one adapter per language: each starts its server only when a check first asks it.
-  const directs = parsed.switches.has("no-server") ? languages.map((language) => adapterFor(language, root)) : [];
+  const directs = parsed.switches.has("no-server") ? languages.map((language) => instrumentFor(language, root, config.declared)) : [];
   const direct = languages.length === 1 ? directs[0] : undefined;
   const adapters = languages.length > 1 && directs.length > 0 ? Object.fromEntries(directs.map((a) => [a.language, a])) : undefined;
   try {

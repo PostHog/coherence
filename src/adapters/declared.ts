@@ -64,6 +64,14 @@ export const REFUTE_PLACEHOLDERS: Readonly<Record<string, string>> = {
   "{path}": "the protected thing's file, relative to the project root",
 };
 
+/**
+ * The most files of a declared language the adapter opens before asking for
+ * references: a server that answers only from open documents then sees the
+ * project's code. Past it the completeness check (unreportedFiles) still
+ * stands between an unseen bypass and a pass.
+ */
+const OPEN_LIMIT = 2000;
+
 /** The language names the built-in adapters answer to, which a declared language may not take. */
 const BUILT_IN = new Set(["typescript", "python", "rust"]);
 const NAME = /^[a-z][a-z0-9-]*$/;
@@ -421,6 +429,8 @@ export class DeclaredAdapter implements LanguageAdapter {
     const client = await this.live();
     this.open(definition.file);
     this.touched.add(definition.file);
+    // A server may answer only from the documents it has open (sourcekit-lsp with no index store does): every file of the language is opened first.
+    for (const file of this.files().slice(0, OPEN_LIMIT)) this.open(file);
     // A module's references are its top-level symbols' (the protocol has no reference to a file).
     const starts: Position[] = definition.kind === "module" ? (await this.documentSymbols(definition.file)).map((s) => s.selectionRange.start) : [definition.selection];
     const reported: Location[] = [];
@@ -505,14 +515,50 @@ export class DeclaredAdapter implements LanguageAdapter {
     try {
       const sites = await this.references(protectedThing);
       const hit = sites.find((s) => s.file === probe);
-      return hit === undefined
-        ? { seen: false, staged: [{ what }], account: `${declaredInstrument(this.declared)} did not report ${what} among ${sites.length} references; the check is vacuous` }
-        : { seen: true, staged: [{ what, site: hit }], account: `${declaredInstrument(this.declared)} reported ${what}` };
+      if (hit === undefined) return { seen: false, staged: [{ what }], account: `${declaredInstrument(this.declared)} did not report ${what} among ${sites.length} references; the check is vacuous` };
+      // Seeing the staged document proves the server reports an open one, not that it read every file: a file whose text names the
+      // thing with no site reported is a reference it may have missed, so the check proves nothing and reads not run, never pass.
+      const missed = await this.unreportedFiles(protectedThing, sites);
+      if (missed.length > 0) {
+        const named = missed.slice(0, 3).map((m) => `${m.file}:${m.line}`).join(", ") + (missed.length > 3 ? ` and ${missed.length - 3} more` : "");
+        return { seen: false, staged: [{ what, site: hit }], account: `${declaredInstrument(this.declared)} reported ${what}, but no reference in ${named}, whose text names ${name}; a server that answers only from the files it has open or indexed would miss a bypass there, so the check is vacuous` };
+      }
+      return { seen: true, staged: [{ what, site: hit }], account: `${declaredInstrument(this.declared)} reported ${what}, and a reference in every file whose text names it` };
     } finally {
       client.notify("textDocument/didClose", { textDocument: { uri: this.uri(probe) } });
       this.probes.delete(probe);
       this.symbolCache.delete(probe);
     }
+  }
+
+  /**
+   * The project's files of this language whose text names the protected thing
+   * (a module: any of its top-level symbols) as a whole word, past its own
+   * declaration, where the server reported no site: each with the first line
+   * that names it. A comment or a string naming it counts too, so the check
+   * errs toward not run.
+   */
+  private async unreportedFiles(definition: Definition, sites: readonly ReferenceSite[]): Promise<{ file: string; line: number }[]> {
+    const symbols = await this.documentSymbols(definition.file);
+    const named = definition.kind === "module" ? symbols : symbols.filter((s) => s.selectionRange.start.line === definition.selection.line && s.selectionRange.start.character === definition.selection.character);
+    const names = [...new Set(named.map((s) => s.name))];
+    if (names.length === 0) return [];
+    const declarations = new Set(named.map((s) => s.selectionRange.start.line));
+    const word = new RegExp(`(^|[^\\w$])(?:${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})([^\\w$]|$)`);
+    const reported = new Set(sites.map((s) => s.file));
+    const missed: { file: string; line: number }[] = [];
+    for (const file of this.files()) {
+      if (reported.has(file)) continue;
+      let lines: string[];
+      try {
+        lines = readFileSync(join(this.root, file), "utf8").split(/\r?\n/);
+      } catch {
+        continue;
+      }
+      const at = lines.findIndex((text, i) => !(file === definition.file && declarations.has(i)) && word.test(text));
+      if (at !== -1) missed.push({ file, line: at + 1 });
+    }
+    return missed;
   }
 
   async close(): Promise<void> {

@@ -310,7 +310,11 @@ broken with its bypasses, or reference-choked, enforced by Coherence's check at
 the edit and in CI. The refutation opens the `refute` template as an unsaved
 document (outside the exempted folder when the chokepoint governs only
 references from outside one) and passes only when the server reports the
-reference it holds. Each verdict names what answered, as
+reference it holds, and when every file of the language whose text names the
+thing holds a reported site: the adapter opens each file of the language
+first, since some servers answer only from open documents, and a file the
+server still reported nothing in makes the chokepoint read not run, naming the
+file, never pass. Each verdict names what answered, as
 `swift via sourcekit-lsp (declared in the config)`, and a run records the
 language as its instrument. The server runs in the warm server, as the
 built-in ones do, so an edit's check stays within the latency budget.
