@@ -18,10 +18,8 @@ import { TOOL_HOOKS } from "./hook-events.ts";
 
 /** Not .coherence/hooks, which holds the project's own hook voice and is committed; these are regenerated. */
 export const HOOK_TIMES_DIR = join(".coherence", "hook-times");
-/** The latency budget when the config declares none: the most seconds a tool hook may take. */
+/** The latency budget when the config declares none: the most seconds a tool hook or a stop may take. */
 export const DEFAULT_LATENCY_BUDGET = 3;
-/** The stop latency budget when the config declares none: a stop runs once a turn, so it may take longer than a tool hook, never as long as a turn. */
-export const DEFAULT_STOP_LATENCY_BUDGET = 10;
 
 /** How far back orient reads. */
 const ORIENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -59,15 +57,6 @@ export function latencyBudget(root: string): number {
     return readEnforcementConfig(root).latencyBudget ?? DEFAULT_LATENCY_BUDGET;
   } catch {
     return DEFAULT_LATENCY_BUDGET;
-  }
-}
-
-/** The stop latency budget in seconds: the config's, or the default. */
-export function stopLatencyBudget(root: string): number {
-  try {
-    return readEnforcementConfig(root).stopLatencyBudget ?? DEFAULT_STOP_LATENCY_BUDGET;
-  } catch {
-    return DEFAULT_STOP_LATENCY_BUDGET;
   }
 }
 
@@ -116,22 +105,21 @@ function summary(over: readonly HookTime[], all: readonly HookTime[], budgetSeco
   return `Hook latency: ${over.length} tool hook call${over.length === 1 ? "" : "s"} ${span} took longer than the ${budgetSeconds} s latency budget (slowest ${slowest.event} ${seconds(slowest.ms)}); the ${tool.length} tool hook calls took ${seconds(total)} in all, ${seconds(total / Math.max(tool.length, 1))} each.`;
 }
 
-function stopSummary(root: string, all: readonly HookTime[]): string {
-  const budget = stopLatencyBudget(root);
-  const over = all.filter((t) => t.event === "Stop" && t.ms > budget * 1000);
+function stopSummary(all: readonly HookTime[], budgetSeconds: number): string {
+  const over = all.filter((t) => t.event === "Stop" && t.ms > budgetSeconds * 1000);
   if (over.length === 0) return "";
   const slowest = over.reduce((a, b) => (b.ms > a.ms ? b : a));
-  return `Hook latency: ${over.length} stop${over.length === 1 ? "" : "s"} this session took longer than the ${budget} s stop latency budget (slowest ${seconds(slowest.ms)}).`;
+  return `Hook latency: ${over.length} stop${over.length === 1 ? "" : "s"} this session took longer than the ${budgetSeconds} s latency budget (slowest ${seconds(slowest.ms)}).`;
 }
 
-/** Regulate's line: this session's tool hook calls over the budget, with what the tool hooks cost in all, and its stops over the stop latency budget; "" when none was over. */
+/** Regulate's line: this session's tool hook calls over the budget, with what the tool hooks cost in all, and its stops over it; "" when none was over. */
 export function hookLatencyStopText(root: string, session: string | undefined): string {
   if (session === undefined) return "";
   const budget = latencyBudget(root);
   const all = hookTimes(root, session);
   const over = all.filter((t) => TOOL_HOOKS.has(t.event) && t.ms > budget * 1000);
   const toolText = over.length === 0 ? "" : summary(over, all, budget, "this session");
-  return [toolText, stopSummary(root, all)].filter((line) => line !== "").join("\n");
+  return [toolText, stopSummary(all, budget)].filter((line) => line !== "").join("\n");
 }
 
 /** Orient's line: the last week's tool hook calls over the budget, across sessions; "" when none was. */

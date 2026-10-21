@@ -110,7 +110,7 @@ test("a stop says each line once, blocks once for a practice owed, and carries t
   }
 });
 
-test("a tool hook over the latency budget says so in its own answer, regulate and orient name the calls over it, and regulate names stops over the stop latency budget", async () => {
+test("a tool hook over the latency budget says so in its own answer, regulate and orient name the calls over it, and regulate names stops over it", async () => {
   const root = repo();
   try {
     const input = { cwd: root, session_id: "s3", tool_name: "Read", tool_input: { file_path: join(root, "coherence.config.json") } };
@@ -129,9 +129,7 @@ test("a tool hook over the latency budget says so in its own answer, regulate an
     assert.equal(contextOf(allowed), "", "the config's own budget holds");
     assert.equal(hookLatencyStopText(root, "s3"), "", "and regulate reads the calls against it");
     recordHookTime(root, "s3", { at: new Date().toISOString(), event: "Stop", ms: 12_000 });
-    assert.equal(hookLatencyStopText(root, "s3"), "Hook latency: 1 stop this session took longer than the 10 s stop latency budget (slowest 12.0 s).", "a stop answers to its own budget, not the tool hooks'");
-    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "p", latencyBudget: 10, stopLatencyBudget: 15 }));
-    assert.equal(hookLatencyStopText(root, "s3"), "", "the config's stop latency budget holds");
+    assert.equal(hookLatencyStopText(root, "s3"), "Hook latency: 1 stop this session took longer than the 10 s latency budget (slowest 12.0 s).", "a stop answers to the same budget");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
