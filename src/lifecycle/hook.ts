@@ -82,6 +82,7 @@ import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-eve
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { tsserverNotice } from "../adapters/installed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
+import { escapeRegExp } from "../enforcement/totality.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
@@ -1041,7 +1042,7 @@ export const ECONOMY_SNAPSHOT = (root: string, session: string, fingerprint: str
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
   try {
     const mark = traceFile(root, session).replace(/\.jsonl$/, ".snapshot.json");
-    const ownCommand = new RegExp(`(?:^|\\s)economy\\s+--snapshot\\s+${session.replace(/\./g, "\\.")}\\s*$`);
+    const ownCommand = new RegExp(`(?:^|\\s)economy\\s+--snapshot\\s+${escapeRegExp(session)}\\s*$`);
     refreshInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "economy", "--snapshot", session], fingerprint, Date.now, { path: mark, command: ownCommand });
   } catch {
     // A snapshot that cannot start only means the next stop reports the last one recorded.
