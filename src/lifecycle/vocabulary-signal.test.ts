@@ -157,6 +157,7 @@ test("sense review is asked only where meaning is at risk: more than one recorde
     writeFileSync(join(root, "staff/notes.md"), "The scope of a shift is one day.\n");
     record(root, "d-1", "narrow the scope to one shift");
     record(root, "d-2", "drive the python language adapter");
+    record(root, "d-3", "keep the language adapter language adapter pairing");
     const report = await lexiconCoverage(root);
     const risk = (term: string, component: string): string | undefined =>
       report.terms.find((t) => t.term === term)?.contexts.find((c) => c.component === component)?.risk;
@@ -164,7 +165,7 @@ test("sense review is asked only where meaning is at risk: more than one recorde
     assert.match(risk("exposure", "sales") ?? "", /hazard/, "a name rejected for the concept beside its use puts the sense at risk");
     assert.match(risk("unit basis", "stock") ?? "", /more than one recorded sense/, "a name with two recorded senses is at risk");
     assert.equal(risk("adapter", "staff"), undefined, "a spelling the adopter's lexicon declares is the project's sense in its code and domain prose, whatever Coherence's lexicon records");
-    assert.equal(risk("adapter", "."), undefined, "a record writing Coherence's longer name (language adapter) does not write the adopter's adapter");
+    assert.equal(risk("adapter", "."), undefined, "a record writing Coherence's longer name (language adapter) does not write the adopter's adapter, even twice in a row");
     assert.equal(report.terms.find((t) => t.term === "language adapter")?.layer, "coherence", "Coherence's own name still resolves in a record");
     assert.match(risk("adapter", "stock") ?? "", /more than one recorded sense: language adapter, adapter/, "in a spec's grammar Coherence's sense speaks too, so the two senses meet");
     assert.equal(risk("scope", "staff"), undefined, "a Coherence concept the adopter's code declares is the project's sense in its code and its domain prose");
@@ -198,6 +199,24 @@ test("a Coherence name an adopter's code declares is the project's own sense: it
       assert.equal(risk(name), undefined, `${name}, declared in the adopter's code, written in its code, prose and spec sentences, is the project's sense`);
     }
     assert.match(risk("structure") ?? "", /Books\.spec\.md:7/, "a declared name in a spec's grammar (its ## structure heading) is where Coherence's sense speaks too");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an adopter's own name written bare in a record meets Coherence's sense of the same spelling, and a ruling on it holds for its component", async () => {
+  const root = project();
+  try {
+    record(root, "d-1", "retry the chase adapter after it broke");
+    const context = async () => (await lexiconCoverage(root)).terms.find((t) => t.term === "adapter")!.contexts.find((c) => c.component === ".")!;
+    const first = await context();
+    assert.match(first.risk ?? "", /more than one recorded sense: language adapter, adapter/, "a record is text Coherence reads as its own, so its sense of the spelling speaks there");
+    const who = { session: "ruling-test", agent: "test" };
+    await reviewLexicon(root, "adapter", ".", first.fingerprint, "not-domain", who, "a bank's importer", ["Coherence's language adapter"], "owner: a bank's importer");
+    record(root, "d-2", "rewrite the amex adapter");
+    const later = await context();
+    assert.equal(later.fingerprint, first.fingerprint, "the evidence is the term and component, not the uses");
+    assert.equal(later.disposition, "not-domain", "a new use of the same name keeps the ruling");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -266,6 +266,20 @@ function isLexiconDecision(line: string): boolean {
  */
 const ELIGIBLE = /^[a-z]{2,}(?: [a-z]{2,}){0,2}$/;
 
+/**
+ * Normalized, space-padded text with every occurrence of each phrase blanked,
+ * so a shorter name inside a longer one is not read as itself. A pass splits on
+ * the phrase with its spaces, so two occurrences sharing a space leave the
+ * second standing; masking repeats until none is left.
+ */
+function maskPhrases(text: string, phrases: readonly string[]): string {
+  return phrases.reduce((line, p) => {
+    let masked = line;
+    while (masked.includes(" " + p + " ")) masked = masked.split(" " + p + " ").join("   ");
+    return masked;
+  }, text);
+}
+
 function allCommon(term: string): boolean {
   return term.split(" ").every((w) => STOPLIST.has(w) || singular(w).some((s) => STOPLIST.has(s)));
 }
@@ -700,9 +714,7 @@ export async function lexiconReading(
       // Only prose a person can still edit puts a sense at risk: code shares words with the language (Promise), and a record is history.
       if (refused.length && f.kind === "prose") {
         // A rejected word inside a longer known name on the same line is that name, not the refusal.
-        const masked = spans
-          .filter((p) => !rejected.has(p))
-          .reduce((line, p) => line.split(" " + p + " ").join("   "), normalized);
+        const masked = maskPhrases(normalized, spans.filter((p) => !rejected.has(p)));
         const standing = refused.filter((p) => masked.includes(" " + p + " "));
         if (standing.length) {
           const byLine = rejectedLines.get(f.rel) ?? new Map<number, string[]>();
@@ -892,21 +904,23 @@ export async function lexiconReading(
       const writesInGrammar = (u: VocabularyUse): boolean => {
         const grammar = grammarOf.get(u);
         if (grammar === undefined) return false;
-        return holders.reduce((text, p) => text.split(" " + p + " ").join("   "), grammar).includes(" " + term + " ");
+        return maskPhrases(grammar, holders).includes(" " + term + " ");
       };
-      const multiple = (here: VocabularyUse[]): string | undefined => {
+      const multiple = (here: VocabularyUse[]): { risk: string; declared: boolean } | undefined => {
         if (alternatives && alternatives.length > 1)
-          return `more than one recorded sense: ${alternatives.map((a) => `${a.concept} (${a.layer})`).join(", ")}`;
+          return { risk: `more than one recorded sense: ${alternatives.map((a) => `${a.concept} (${a.layer})`).join(", ")}`, declared: false };
         // In an adopter, a name its lexicon declares is the project's sense; Coherence's sense of the same spelling counts only where Coherence's grammar speaks.
         const toolSpeaks = projectSense === undefined || here.some(writesInGrammar);
         const recorded = new Set([...(toolSpeaks ? (toolSense ?? []) : []), ...(projectSense ?? [])]);
-        return recorded.size > 1 ? `more than one recorded sense: ${[...recorded].join(", ")}` : undefined;
+        if (recorded.size <= 1) return undefined;
+        // Senses that meet only because Coherence's grammar writes the project's one-sense name are one question per term and component, as a code-declared name's are.
+        return { risk: `more than one recorded sense: ${[...recorded].join(", ")}`, declared: projectSense !== undefined && projectSense.size === 1 };
       };
       // Why a context's sense is at risk, and whether that reason is the declared sense alone, whose ruling is keyed to the term and component.
       const atRisk = (here: VocabularyUse[]): { risk: string; declared: boolean } | undefined => {
         if (candidate || refused || !item || (!item.concept && !alternatives?.length)) return undefined;
         const several = multiple(here);
-        if (several) return { risk: several, declared: false };
+        if (several) return several;
         const beside = item.concept ? near(here, item.concept.name) : undefined;
         if (beside) return { risk: beside, declared: false };
         // In an adopter a Coherence name its code declares is the project's sense: at risk only where Coherence's grammar writes it too.
