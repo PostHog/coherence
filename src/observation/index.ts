@@ -50,7 +50,7 @@ export interface RecordInput {
  * after the first run of a session would be dirty, and so stale.
  */
 export function codeDirty(root: string): boolean {
-  const status = spawnSync("git", ["status", "--porcelain", "--", ".", ":(exclude).coherence"], { cwd: root, encoding: "utf8" });
+  const status = spawnSync("git", ["--no-optional-locks", "status", "--porcelain", "--", ".", ":(exclude).coherence"], { cwd: root, encoding: "utf8" });
   return status.status === 0 && status.stdout.trim() !== "";
 }
 

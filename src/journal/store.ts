@@ -155,7 +155,8 @@ function parseLine(line: string): JournalRecord | string {
 export function gitState(cwd: string): { commit: string | null; dirty: boolean } {
   const commit = git(cwd, ["rev-parse", "--short", "HEAD"]);
   if (commit === null) return { commit: null, dirty: false };
-  const status = git(cwd, ["status", "--porcelain"]);
+  // --no-optional-locks: status never writes the index back, which would leave it newer than the shard and make the next append search it whole.
+  const status = git(cwd, ["--no-optional-locks", "status", "--porcelain"]);
   return { commit, dirty: status !== null && status !== "" };
 }
 

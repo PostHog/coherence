@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,7 +19,7 @@ import { parseLine as parseRunLine } from "../enforcement/record.ts";
 import { recordsOnOtherBranches } from "./branches.ts";
 import type { Decision, WorkOrderRecord } from "./record.ts";
 import { PACKED_BY_DEFAULT, SHARD_LIMIT_BYTES, packedWriting } from "./shards.ts";
-import { appendRecord, journalFileKeys, loadJournal } from "./store.ts";
+import { appendRecord, gitState, journalFileKeys, loadJournal } from "./store.ts";
 import { PACKED_EXTENSION, STORE_NAMES, isPacked, sessionOfStoreFile, storeDir, type RecordStore } from "./stores.ts";
 import { appendWork, loadWork } from "./work.ts";
 import { keepIgnore } from "../lifecycle/state-files.ts";
@@ -361,4 +361,17 @@ test("two checkouts of one session on parallel and stacked branches, landed by m
     }
   }
   assert.deepEqual(outcomes, [], "every landing is clean and keeps every record");
+});
+
+test("the tree's dirty check never rewrites git's index, so the next record's shard check does not read it", () => {
+  const root = repo("status-locks");
+  const index = join(root, ".git", "index");
+  // A file whose stat no longer matches the index entry but whose content does: git status refreshes such an entry and,
+  // unless told not to, writes the index back, which leaves it newer than any shard and makes the next append search it whole.
+  writeFileSync(join(root, "code.txt"), "base\n");
+  const before = statSync(index);
+  const state = gitState(root);
+  const after = statSync(index);
+  assert.equal(state.dirty, false, "the content is unchanged, so the tree is clean");
+  assert.deepEqual([after.ino, after.mtimeMs, after.size], [before.ino, before.mtimeMs, before.size], "the index is as git left it");
 });
