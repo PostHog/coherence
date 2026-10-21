@@ -49,7 +49,7 @@ import {
 } from "./adapter.ts";
 import { locateServer as locateInstalled, locateTsserver, type ServerLocation } from "./installed.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
-import { horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
+import { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 const SERVER_BIN = "typescript-language-server";
 const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
@@ -264,8 +264,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private client: JsonRpcClient | undefined;
   private starting: Promise<{ ok: true } | { ok: false; reason: string }> | undefined;
   private readonly opened = new Set<string>();
-  private readonly documentIdentities = new Map<string, string | undefined>();
-  private readonly documentHashes = new Map<string, string>();
+  private readonly documents = new Map<string, { identity: string | undefined; hash: string }>();
   private readonly symbolCache = new Map<string, DocumentSymbol[]>();
   private readonly lineCache = new Map<string, string[]>();
   /** The document version last sent per open file; a change carries the next one. */
@@ -351,8 +350,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
       this.starting = undefined;
       this.opened.clear();
       this.versions.clear();
-      this.documentIdentities.clear();
-      this.documentHashes.clear();
+      this.documents.clear();
       const again = await this.ready();
       if (!again.ok) throw new Error(again.reason);
     }
@@ -376,38 +374,29 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return lines;
   }
 
-  private documentIdentity(file: string): string | undefined {
-    const stats = statSync(join(this.root, file), { throwIfNoEntry: false });
-    if (stats === undefined || !stats.isFile()) return undefined;
-    return `${stats.dev}:${stats.ino}:${stats.size}:${stats.mtimeMs}:${stats.ctimeMs}`;
-  }
-
   private open(file: string, text?: string, identity?: string): void {
     if (this.opened.has(file)) return;
-    const currentIdentity = identity ?? this.documentIdentity(file);
+    const currentIdentity = identity ?? fileIdentity(join(this.root, file));
     const content = text ?? readFileSync(join(this.root, file), "utf8");
     this.client!.notify("textDocument/didOpen", { textDocument: { uri: this.uri(file), languageId: languageIdOf(file), version: 1, text: content } });
     this.opened.add(file);
     this.versions.set(file, 1);
-    this.documentIdentities.set(file, currentIdentity);
-    this.documentHashes.set(file, createHash("sha256").update(content).digest("hex"));
+    this.documents.set(file, { identity: currentIdentity, hash: createHash("sha256").update(content).digest("hex") });
   }
 
   /** Replace an open document's whole text; the version only ever climbs, so the server never discards a change as old. */
-  private change(file: string, text: string, identity = this.documentIdentity(file)): void {
+  private change(file: string, text: string, identity = fileIdentity(join(this.root, file))): void {
     const version = (this.versions.get(file) ?? 1) + 1;
     this.versions.set(file, version);
     this.client!.notify("textDocument/didChange", { textDocument: { uri: this.uri(file), version }, contentChanges: [{ text }] });
-    this.documentIdentities.set(file, identity);
-    this.documentHashes.set(file, createHash("sha256").update(text).digest("hex"));
+    this.documents.set(file, { identity, hash: createHash("sha256").update(text).digest("hex") });
   }
 
   private closeDocument(file: string): void {
     if (!this.opened.has(file)) return;
     this.client!.notify("textDocument/didClose", { textDocument: { uri: this.uri(file) } });
     this.opened.delete(file);
-    this.documentIdentities.delete(file);
-    this.documentHashes.delete(file);
+    this.documents.delete(file);
   }
 
   private async documentSymbols(file: string): Promise<DocumentSymbol[]> {
@@ -464,20 +453,20 @@ export class TypeScriptAdapter implements LanguageAdapter {
     let lastSyncedFile: string | undefined;
     const unchangedFiles = new Set<string>();
     for (const file of refresh) {
-      const identity = this.documentIdentity(file);
+      const identity = fileIdentity(join(this.root, file));
       if (identity === undefined) {
         this.closeDocument(file);
         continue;
       }
       const isForced = forced.has(file);
-      if (!isForced && this.documentIdentities.get(file) === identity) {
+      if (!isForced && this.documents.get(file)?.identity === identity) {
         unchangedFiles.add(file);
         continue;
       }
       const text = readFileSync(join(this.root, file), "utf8");
       const hash = createHash("sha256").update(text).digest("hex");
-      if (!isForced && this.documentHashes.get(file) === hash) {
-        this.documentIdentities.set(file, identity);
+      if (!isForced && this.documents.get(file)?.hash === hash) {
+        this.documents.set(file, { identity, hash });
         unchangedFiles.add(file);
         continue;
       }

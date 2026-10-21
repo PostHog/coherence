@@ -108,8 +108,7 @@ function summary(over: readonly HookTime[], all: readonly HookTime[], budgetSeco
 function stopSummary(all: readonly HookTime[], budgetSeconds: number): string {
   const over = all.filter((t) => t.event === "Stop" && t.ms > budgetSeconds * 1000);
   if (over.length === 0) return "";
-  const slowest = over.reduce((a, b) => (b.ms > a.ms ? b : a));
-  return `Hook latency: ${over.length} stop${over.length === 1 ? "" : "s"} this session took longer than the ${budgetSeconds} s latency budget (slowest ${seconds(slowest.ms)}).`;
+  return `Hook latency: ${over.length} stop${over.length === 1 ? "" : "s"} this session took longer than the ${budgetSeconds} s latency budget (slowest ${seconds(Math.max(...over.map((t) => t.ms)))}).`;
 }
 
 /** Regulate's line: this session's tool hook calls over the budget, with what the tool hooks cost in all, and its stops over it; "" when none was over. */
@@ -118,8 +117,7 @@ export function hookLatencyStopText(root: string, session: string | undefined): 
   const budget = latencyBudget(root);
   const all = hookTimes(root, session);
   const over = all.filter((t) => TOOL_HOOKS.has(t.event) && t.ms > budget * 1000);
-  const toolText = over.length === 0 ? "" : summary(over, all, budget, "this session");
-  return [toolText, stopSummary(all, budget)].filter((line) => line !== "").join("\n");
+  return [over.length === 0 ? "" : summary(over, all, budget, "this session"), stopSummary(all, budget)].filter((line) => line !== "").join("\n");
 }
 
 /** Orient's line: the last week's tool hook calls over the budget, across sessions; "" when none was. */

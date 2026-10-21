@@ -54,11 +54,7 @@ export async function economyFor(root: string, paths: readonly string[], change?
   return withWarmAdapter(root, (adapter, server, reason) => predictClosure(root, paths, { adapter, server, instrumentReason: reason, change }));
 }
 
-/**
- * A session's snapshot through the warm instrument's one door, for its own
- * patch: another session's or a person's edits are not predicted for. A door
- * that cannot connect hands back its reason, which the snapshot records.
- */
+/** A session's snapshot through the warm instrument's one door; a door that cannot connect hands back its reason, which the snapshot records. */
 export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel): Promise<Snapshot | undefined> {
   const changed = sessionPatch(root, session);
   return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }));
@@ -95,8 +91,7 @@ export async function economyCommand(argv: string[], io: Io, economy: EconomyOf 
     throw error;
   }
   const snapshotOf = parsed.one.get("snapshot");
-  const asksMoreThanSnapshot = parsed.positionals.length > 0 || parsed.switches.size > 0 || parsed.one.size > 1;
-  if (snapshotOf !== undefined) return snapshotCommand(io, snapshotOf, asksMoreThanSnapshot);
+  if (snapshotOf !== undefined) return snapshotCommand(io, snapshotOf, parsed.positionals.length > 0 || parsed.switches.size > 0 || parsed.one.size > 1);
   const fromGit = parsed.switches.has("changed") || parsed.one.has("since");
   if (parsed.positionals.length === 0 && !fromGit) {
     io.err(`economy: name at least one file, or --changed for the working change\n${ECONOMY_USAGE}`);

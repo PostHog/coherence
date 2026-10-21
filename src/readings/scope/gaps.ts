@@ -142,8 +142,7 @@ export function gapsOf(state: Pick<ShellState, "spec">, model: FlowModel): GapSt
  * a trust: line, a crossing or a totality oracle leaves it standing, and the
  * gaps derived from it show the change at once.
  */
-function specShape(root: string, held?: SpecModel): string {
-  const model = held ?? loadSpecModel(root, { runs: false });
+function specShape(root: string, model = loadSpecModel(root, { runs: false })): string {
   return JSON.stringify(
     model.components.map((c) => [
       c.folder,
@@ -324,10 +323,6 @@ export interface RefreshSlot {
 // The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
 const STRUCTURE_QUERY = /(?:^|\s)query\s+structure\s*$/;
 
-function structureSlot(root: string): RefreshSlot {
-  return { path: refreshPath(root), command: STRUCTURE_QUERY };
-}
-
 function readMark(path: string): RefreshMark | undefined {
   try {
     return JSON.parse(readFileSync(path, "utf8")) as RefreshMark;
@@ -383,10 +378,9 @@ function supersede(pid: number, ownCommand: RegExp): boolean {
  * `slot` is the structure refresh's own unless another kind of run passes its
  * mark and command line. Returns whether one started.
  */
-export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now, slot: RefreshSlot = structureSlot(root)): boolean {
-  const path = slot.path;
+export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now, slot: RefreshSlot = { path: refreshPath(root), command: STRUCTURE_QUERY }): boolean {
   try {
-    const mark = readMark(path);
+    const mark = readMark(slot.path);
     if (mark !== undefined) {
       if (mark.fingerprint === fingerprint) return false;
       if (markUnderWay(mark, now) !== undefined && !supersede(mark.pid, slot.command)) return false;
@@ -397,7 +391,7 @@ export function refreshInBackground(root: string, command: readonly string[], fi
     child.on("error", () => {});
     child.unref();
     if (child.pid === undefined) return false;
-    writeAtomically(path, JSON.stringify({ pid: child.pid, at: new Date(now()).toISOString(), fingerprint } satisfies RefreshMark));
+    writeAtomically(slot.path, JSON.stringify({ pid: child.pid, at: new Date(now()).toISOString(), fingerprint } satisfies RefreshMark));
     return true;
   } catch {
     return false;

@@ -83,7 +83,7 @@ import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLi
 import { tsserverNotice } from "../adapters/installed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { escapeRegExp } from "../enforcement/totality.ts";
-import { keepProjectFiles } from "../adapters/project-files.ts";
+import { fileIdentity, keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
 import { filesRead, lastSnapshot, recordReadTrace, recordWriteTrace, sessionPatch, snapshotTrace, traceFile, type Snapshot } from "../economy/trace.ts";
@@ -960,25 +960,11 @@ export function refreshAtStop(root: string, options: HookOptions): void {
   }
 }
 
-/**
- * What a session's snapshot would be taken from: its patch's file identities
- * and how many files it has read. A stop whose session neither wrote nor read
- * since the last one starts no closure.
- */
 function snapshotFingerprint(root: string, session: string): string {
-  const identities = sessionPatch(root, session).map((file) => {
-    const stats = statSync(join(root, file), { throwIfNoEntry: false });
-    return `${file}@${stats === undefined ? "gone" : `${stats.dev}:${stats.ino}:${stats.size}:${stats.mtimeMs}:${stats.ctimeMs}`}`;
-  });
+  const identities = sessionPatch(root, session).map((file) => `${file}@${fileIdentity(join(root, file)) ?? "gone"}`);
   return `${identities.join("\n")}\nread ${filesRead(root, session).length}`;
 }
 
-/**
- * The read-trace snapshot at a stop, with an instrument. The command line
- * starts it detached; a test takes it here, with its own adapter or through
- * enforcement's one door to the warm server, so the closure it predicts is
- * computed through references rather than skipped.
- */
 async function snapshotAtStop(root: string, session: string, options: HookOptions): Promise<void> {
   if (options.snapshot !== undefined) {
     options.snapshot(root, session, snapshotFingerprint(root, session));
@@ -1040,13 +1026,9 @@ export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
  */
 export const ECONOMY_SNAPSHOT = (root: string, session: string, fingerprint: string): void => {
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
-  try {
-    const mark = traceFile(root, session).replace(/\.jsonl$/, ".snapshot.json");
-    const ownCommand = new RegExp(`(?:^|\\s)economy\\s+--snapshot\\s+${escapeRegExp(session)}\\s*$`);
-    refreshInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "economy", "--snapshot", session], fingerprint, Date.now, { path: mark, command: ownCommand });
-  } catch {
-    // A snapshot that cannot start only means the next stop reports the last one recorded.
-  }
+  const mark = traceFile(root, session).replace(/\.jsonl$/, ".snapshot.json");
+  const ownCommand = new RegExp(`(?:^|\\s)economy\\s+--snapshot\\s+${escapeRegExp(session)}\\s*$`);
+  refreshInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "economy", "--snapshot", session], fingerprint, Date.now, { path: mark, command: ownCommand });
 };
 
 /** The mirror refresh the command line starts: this checkout's query mirrors --refresh, which reads only when the kept reading is of another commit. */

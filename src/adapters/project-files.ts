@@ -21,11 +21,17 @@
 
 import { spawnSync } from "../lifecycle/work-meter.ts";
 import { perProcess } from "../lifecycle/process-caches.ts";
-import { existsSync, lstatSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { configRecord, repositoryTop } from "./project-config.ts";
 import { HOST_FOLDER } from "../lifecycle/hosts.ts";
 export { repositoryTop };
+
+export function fileIdentity(path: string): string | undefined {
+  const stats = statSync(path, { throwIfNoEntry: false });
+  if (stats === undefined || !stats.isFile()) return undefined;
+  return `${stats.dev}:${stats.ino}:${stats.size}:${stats.mtimeMs}:${stats.ctimeMs}`;
+}
 
 /** The most bytes one git listing may carry; a larger project is a failure worth reporting, not a truncated answer. */
 const GIT_LISTING_LIMIT = 256 * 1024 * 1024;

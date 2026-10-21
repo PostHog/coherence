@@ -244,13 +244,8 @@ export function filesRead(root: string, session: string): string[] {
 export function lastSnapshot(root: string, session: string): Snapshot | undefined {
   const file = traceFile(root, session);
   if (!existsSync(file)) return undefined;
-  let newest: Snapshot | undefined;
-  for (const line of readFileSync(file, "utf8").split("\n")) {
-    if (line.trim() === "") continue;
-    const parsed = parseLine(line);
-    if (typeof parsed !== "string" && parsed.kind === "snapshot") newest = parsed;
-  }
-  return newest;
+  const lines = readFileSync(file, "utf8").split("\n").filter((line) => line.trim() !== "").map(parseLine);
+  return lines.findLast((line): line is Snapshot => typeof line !== "string" && line.kind === "snapshot");
 }
 
 export interface SnapshotOptions extends TraceOptions {
