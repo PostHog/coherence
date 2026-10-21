@@ -26,6 +26,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JournalError } from "./args.ts";
+import { LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
+import { readPlugins } from "../plugins/registry.ts";
 import { missingCommits } from "./commits.ts";
 import { CAUGHT, type Caught, type Decision, type Defect, type DefectOrigin, type JournalRecord, type Resolution } from "./record.ts";
 
@@ -53,28 +55,33 @@ function classesIn(path: string, families = false): string[] {
   }
 }
 
-/** The project's own lexicon: the config's lexicon key, else lexicon.json at the root. */
-function projectLexiconPath(root: string): string | undefined {
+/**
+ * The lexicon stack's files, in order: Coherence's, each plugin's layer
+ * (src/plugins/lexicon.ts), then the project's own (the config's lexicon key,
+ * else lexicon.json at the root). The config is read once for both keys.
+ */
+function stackFiles(root: string): string[] {
+  let config: { lexicon?: unknown; plugins?: unknown } = {};
   try {
-    const config = JSON.parse(readFileSync(join(root, "coherence.config.json"), "utf8")) as { lexicon?: unknown };
-    if (typeof config.lexicon === "string") return isAbsolute(config.lexicon) ? config.lexicon : join(root, config.lexicon);
+    config = JSON.parse(readFileSync(join(root, "coherence.config.json"), "utf8")) as typeof config;
   } catch {
-    // No config, or one that cannot be read: the default place.
+    // No config, or one that cannot be read: the default place, and no plugins.
   }
   const fallback = join(root, "lexicon.json");
-  return existsSync(fallback) ? fallback : undefined;
+  const project = typeof config.lexicon === "string" ? (isAbsolute(config.lexicon) ? config.lexicon : join(root, config.lexicon)) : existsSync(fallback) ? fallback : undefined;
+  const { plugins } = readPlugins(root, config.plugins, "coherence.config.json", LANGUAGES, (extension) => languageOfFile(`x${extension}`));
+  const layers = plugins.flatMap((p) => (p.manifest.lexicon === undefined ? [] : [resolve(p.dir, p.manifest.lexicon)]));
+  return [COHERENCE_LEXICON, ...layers, ...(project === undefined ? [] : [project])];
 }
 
-/** Every declared defect class, families included, from Coherence's lexicon and the project's own. */
+/** Every declared defect class, families included, from every layer of the lexicon stack. */
 export function declaredClasses(root: string): Set<string> {
-  const project = projectLexiconPath(root);
-  return new Set([...classesIn(COHERENCE_LEXICON), ...(project === undefined ? [] : classesIn(project))]);
+  return new Set(stackFiles(root).flatMap((path) => classesIn(path)));
 }
 
 /** The declared classes that are families: too broad for one guard, so none stands for the rest. */
 export function declaredFamilies(root: string): Set<string> {
-  const project = projectLexiconPath(root);
-  return new Set([...classesIn(COHERENCE_LEXICON, true), ...(project === undefined ? [] : classesIn(project, true))]);
+  return new Set(stackFiles(root).flatMap((path) => classesIn(path, true)));
 }
 
 /**

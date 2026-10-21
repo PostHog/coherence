@@ -439,7 +439,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   try {
     config = readEnforcementConfig(root);
     if (slot !== undefined && !config.enforced.includes(slot)) throw new Error(`${slot} is not one of this project's languages (${config.enforced.join(", ")})`);
-    adapter = instrumentFor(slot ?? config.language, root, config.declared);
+    adapter = instrumentFor(slot ?? config.language, root, config);
   } catch (error) {
     if (owns()) rmSync(paths.lock, { force: true });
     heldHere.delete(paths.lock);

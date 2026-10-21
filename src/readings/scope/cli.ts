@@ -92,7 +92,7 @@ async function snapshot(root: string, values: Map<string, string>, switches: Set
   const { bytes, state } = await writeScopePage(options, resolve(io.cwd, out));
   const first = state.lexicon.layers[0];
   const count = first?.kind === "present" ? first.lexicon.concepts.length : 0;
-  const layer = state.lexicon.layers[1]?.kind === "present" ? "with a domain lexicon" : "no domain lexicon";
+  const layer = state.lexicon.layers.find((l) => l.id === "domain")?.kind === "present" ? "with a domain lexicon" : "no domain lexicon";
   const c = state.spec.counts;
   io.out(`Scope: wrote ${out} (${bytes} bytes, ${count} concepts, ${layer}, ${c.components} components, ${c.bullets} bullets, ${state.runs.records.length} runs, ${state.journal.records.length} journal records).`);
   return 0;

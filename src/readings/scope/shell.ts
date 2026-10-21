@@ -77,7 +77,7 @@ export function renderConnection(state: ShellState): Markup | null {
  */
 export function renderMasthead(state: ShellState): Markup {
   // The project's own lexicon when it has one: the masthead counts the project, not the tool.
-  const first = state.lexicon.layers.find((layer) => layer.id !== "coherence" && layer.kind === "present") ?? state.lexicon.layers[0];
+  const first = state.lexicon.layers.find((layer) => layer.id === "domain" && layer.kind === "present") ?? state.lexicon.layers[0];
   const counts =
     first !== undefined && first.kind === "present"
       ? lexiconCounts(first.lexicon)

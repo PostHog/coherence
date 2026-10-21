@@ -25,6 +25,13 @@ import { latestSeeing } from "../enforcement/run-index.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
 import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles, type Walked } from "../adapters/project-files.ts";
 import { configuredName, effectiveConfig, lexiconFileOf, readConfigFile } from "../adapters/project-config.ts";
+import { LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
+import type { LoadedPlugin } from "../plugins/plugin.ts";
+import { readPlugins } from "../plugins/registry.ts";
+import { viaFormProblem } from "../plugins/verify.ts";
+import { clashText, composeStack, pluginLayers } from "../plugins/lexicon.ts";
+import { parseLexicon } from "../lifecycle/lexicon.ts";
+import { COHERENCE_LEXICON } from "../lifecycle/project.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
 import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
 import { declaredClasses, declaredFamilies, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
@@ -146,16 +153,24 @@ export interface SpecModel {
 interface Config {
   ignore: string[];
   entryDir: string;
+  /** The plugins the config runs (src/plugins), for the via forms they prove; empty when it runs none or names one it refuses. */
+  plugins: LoadedPlugin[];
+  /** Why the config's plugins were refused, each a problem on the config file. */
+  pluginProblems: string[];
 }
 
 function readConfig(root: string): Config {
-  const config: Config = { ignore: [], entryDir: "." };
+  const config: Config = { ignore: [], entryDir: ".", plugins: [], pluginProblems: [] };
   // The project's own config over its registry's keys (project-config.ts); a malformed file is refused with its path.
   const found = effectiveConfig(root);
   if (found === undefined) return config;
   const record = found.record;
   if (Array.isArray(record["ignore"])) config.ignore = record["ignore"].filter((v): v is string => typeof v === "string");
   if (typeof record["entryDir"] === "string") config.entryDir = record["entryDir"];
+  // Only the manifests are read: what a plugin proves is data, and no plugin code runs for the spec.
+  const plugins = readPlugins(root, record["plugins"], CONFIG_FILE, LANGUAGES, (extension) => languageOfFile(`x${extension}`));
+  config.plugins = plugins.plugins;
+  config.pluginProblems = plugins.problems;
   return config;
 }
 
@@ -240,6 +255,24 @@ function storedNameProblems(root: string): Problem[] {
   if (typeof stored !== "string" || stored.trim().toLowerCase() === name.toLowerCase()) return [];
   const line = readFileSync(path, "utf8").split("\n").findIndex((text) => text.includes('"project"')) + 1;
   return [{ file: relative(root, path).split(sep).join("/"), line: Math.max(line, 1), message: `the lexicon stores project "${stored}" and the config names the project "${name}"; the config's name is the one read, so drop the lexicon's project field or make it agree` }];
+}
+
+/**
+ * The lexicon stack's clashes, as problems on the config: a plugin concept
+ * whose name Coherence or another plugin already declares stays out of the
+ * stack until the project lexicon settles the name (src/plugins/lexicon.ts).
+ * Read only when the config runs a plugin with a lexicon layer.
+ */
+function lexiconStackProblems(root: string, plugins: readonly LoadedPlugin[]): Problem[] {
+  if (!plugins.some((p) => p.manifest.lexicon !== undefined)) return [];
+  try {
+    const own = parseLexicon(JSON.parse(readFileSync(COHERENCE_LEXICON, "utf8")), COHERENCE_LEXICON);
+    const path = lexiconFileOf(root);
+    const project = existsSync(path) && path !== COHERENCE_LEXICON ? parseLexicon(JSON.parse(readFileSync(path, "utf8")), path) : undefined;
+    return composeStack(own, pluginLayers(plugins), project).clashes.map((clash) => ({ file: CONFIG_FILE, line: 1, message: clashText(clash) }));
+  } catch (error) {
+    return [{ file: CONFIG_FILE, line: 1, message: error instanceof Error ? error.message : String(error) }];
+  }
 }
 
 /** Every spec file under the root, sorted by path. */
@@ -384,6 +417,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   // One walk of the project serves the specs, the practice files and the ignore list's check.
   const walked = walkedProjectFiles(walkBounds(root, config.ignore));
   problems.push(...ignoreProblems(root, walked));
+  for (const message of config.pluginProblems) problems.push({ file: CONFIG_FILE, line: 1, message });
+  problems.push(...lexiconStackProblems(root, config.plugins));
   const storedName = storedNameProblems(root)[0];
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
   for (const specPath of walked.files.filter((rel) => modelFileKind(rel) === "spec").map((rel) => join(root, rel)).sort()) {
@@ -449,6 +484,12 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
         problems.push({ file: specPath, line: invariant.line, message: `invariant ${invariant.name} declared twice in this component` });
       }
       seen.add(invariant.name);
+      // A via that names a form ([form] name) is proved by the plugin that declares it; a form none declares is never run as a test title.
+      for (const e of invariant.enforcements) {
+        if (e.form !== "totality oracle") continue;
+        const refused = viaFormProblem(e.via, config.plugins);
+        if (refused !== undefined) problems.push({ file: specPath, line: e.line, message: `invariant ${invariant.name}: ${refused}` });
+      }
       if (invariant.crossing !== undefined) {
         for (const end of [invariant.crossing.from, invariant.crossing.to]) {
           if (levelNames.has(end)) continue;

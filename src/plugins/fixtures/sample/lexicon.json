@@ -1,0 +1,19 @@
+{
+  "concepts": [
+    {
+      "name": "proof goal",
+      "definition": "A property the sample plugin's verifier is asked to prove for a bullet.",
+      "aliases": ["goal"],
+      "rejected": [{ "alternative": "lemma", "because": "the sample plugin's own refusal, which governs only its terms" }]
+    },
+    {
+      "name": "journal",
+      "definition": "The sample plugin's own sense of journal, which Coherence already declares."
+    },
+    {
+      "name": "defect",
+      "definition": "",
+      "properties": { "class sample-drift": "a proof goal that no longer matches the code it was proved over" }
+    }
+  ]
+}

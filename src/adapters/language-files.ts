@@ -6,7 +6,9 @@
  * imports only types, so any module can read it without a cycle.
  */
 
-import type { Language } from "./index.ts";
+/** The languages the core owns an adapter for; defined here, where nothing is imported, so any module can ask without loading an adapter. */
+export const LANGUAGES = ["typescript", "python", "rust"] as const;
+export type Language = (typeof LANGUAGES)[number];
 
 /**
  * The file names each language is written in, by extension; no two languages

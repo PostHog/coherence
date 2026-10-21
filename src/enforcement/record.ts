@@ -172,6 +172,10 @@ export interface RunEntry {
   enforces?: string[];
   /** Set on an edit's check, which derives no state (run.ts, grade: false): the invariant floor does not count the entry. */
   ungraded?: true;
+  /** The plugins that answered (src/plugins): a chokepoint graded through a plugin's adapter, or a via a plugin proved; absent when the core answered alone. */
+  plugins?: { name: string; version: string }[];
+  /** Totality oracle form, a via a plugin proved: what kind of evidence its pass is, as the plugin's manifest labels the form. */
+  evidence?: string;
 }
 
 export interface RunRecord {

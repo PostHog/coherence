@@ -82,6 +82,7 @@ import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-eve
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { tsserverNotice } from "../adapters/installed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
+import { viaForm } from "../plugins/verify.ts";
 import { escapeRegExp } from "../enforcement/totality.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
@@ -798,8 +799,30 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   // The practices ride beside the commands that record them, after the vocabulary.
   const practices = practiceOrientText(root, commands);
   const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await copyBlock(root)}\n${await sessionBlock(root, input)}`;
-  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root));
+  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root), pluginsInUse(root, coherence));
   return { text: head + text + tail, detail, coverage: reading };
+}
+
+/**
+ * Which plugin layers a session start carries: a plugin's vocabulary is in a
+ * session's way only when its surface is in use, a language it provides or
+ * extends among the project's, or a via form it proves on some bullet. The
+ * rest stays one command away (coherence lexicon prints every layer). With no
+ * plugin layer nothing is read: the config and the spec model only when one is.
+ */
+function pluginsInUse(root: string, coherence: Lexicon): (layer: string) => boolean {
+  const layers = coherence.layers ?? [];
+  if (layers.length === 0) return () => true;
+  let languages: string[] = [];
+  try {
+    languages = readEnforcementConfig(root).enforced;
+  } catch {
+    // A config the hook cannot read carries no plugin's vocabulary; the spec block says why.
+  }
+  const model = layers.some((l) => l.forms.length > 0) ? specModelOrNull(root) : undefined;
+  const forms = new Set(model === undefined || "error" in model ? [] : model.components.flatMap((c) => c.invariants.flatMap((i) => i.enforcements.flatMap((e) => (e.form === "totality oracle" ? [viaForm(e.via)?.form] : [])))));
+  const used = new Set(layers.filter((l) => l.languages.some((language) => languages.includes(language)) || l.forms.some((form) => forms.has(form))).map((l) => l.name));
+  return (layer) => used.has(layer);
 }
 
 /** How a term that recurs without a definition is settled, as every vocabulary line says it. */

@@ -47,7 +47,9 @@
     "docs/checklist-seed.json",
     "src/*/*.practice.md",
     "docs/config.md",
-    "docs/spec.md"
+    "docs/spec.md",
+    "docs/plugins.md",
+    "plugins"
   ],
   "optionalDependencies": {
     "pyright": "^1.1.414",

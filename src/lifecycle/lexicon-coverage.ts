@@ -82,6 +82,9 @@ export interface VocabularyContext {
   /** Why this context's sense is at risk; absent when nothing puts it at risk, and then no review is asked. */
   risk?: string;
 }
+/** The lexicon stack's layers a term's meaning can come from: Coherence's, a plugin's (src/plugins/lexicon.ts), or the project's. */
+export type LexiconLayer = "coherence" | "project" | `plugin ${string}`;
+
 export interface VocabularyTerm {
   term: string;
   state:
@@ -92,14 +95,14 @@ export interface VocabularyTerm {
     | "rejected"
     | "unresolved";
   concept: string | null;
-  layer: "coherence" | "project" | null;
+  layer: LexiconLayer | null;
   definition: string | null;
   properties: Record<string, unknown>;
   confusables: string[];
   /** Present when one observed spelling names properties owned by multiple concepts. */
   meaningAlternatives?: {
     concept: string;
-    layer: "coherence" | "project";
+    layer: LexiconLayer;
     definition: string;
     properties: Record<string, unknown>;
     confusables: string[];
@@ -185,15 +188,15 @@ function rulings(
 interface KnownMeaning {
   state: VocabularyTerm["state"];
   concept: Concept | null;
-  layer: "coherence" | "project";
-  propertyOwners?: { concept: Concept; layer: "coherence" | "project" }[];
+  layer: LexiconLayer;
+  propertyOwners?: { concept: Concept; layer: LexiconLayer }[];
 }
 
 function table(
   lexicon: Lexicon,
-  layer: "coherence" | "project",
+  given: LexiconLayer,
   into: Map<string, KnownMeaning>,
-  properties: Map<string, { concept: Concept; layer: "coherence" | "project" }[]>,
+  properties: Map<string, { concept: Concept; layer: LexiconLayer }[]>,
   senses: Map<string, Set<string>>,
 ): void {
   const sense = (name: string, c: Concept): void => {
@@ -204,8 +207,10 @@ function table(
   };
   // Project/trust-level declarations have no owning concept; property declarations are attached below.
   for (const name of acceptedNames(lexicon))
-    if (!into.has(clean(name))) into.set(clean(name), { state: "declared", concept: null, layer });
+    if (!into.has(clean(name))) into.set(clean(name), { state: "declared", concept: null, layer: given });
   for (const c of lexicon.concepts) {
+    // A plugin's concept, composed into the tool layer, answers as its own plugin's layer.
+    const layer = c.layer === undefined ? given : (`plugin ${c.layer}` as const);
     into.set(clean(c.name), { state: "concept", concept: c, layer });
     sense(clean(c.name), c);
     for (const name of c.instances ?? []) {
@@ -308,7 +313,7 @@ function declaredName(line: string): string | undefined {
 }
 
 /** How a code file's exported type bodies read, per adapter language (languageOfFile): the line that opens a body, the line that closes it, and a field inside. A file no language claims has no type bodies read. */
-interface MemberScan {
+export interface MemberScan {
   opens: RegExp;
   closes: RegExp;
   field: RegExp;
@@ -551,7 +556,7 @@ export async function lexiconReading(
   const known = new Map<string, KnownMeaning>();
   const coherenceSenses = new Map<string, Set<string>>();
   const projectSenses = new Map<string, Set<string>>();
-  const propertyOwners = new Map<string, { concept: Concept; layer: "coherence" | "project" }[]>();
+  const propertyOwners = new Map<string, { concept: Concept; layer: LexiconLayer }[]>();
   table(coherence, "coherence", known, propertyOwners, coherenceSenses);
   const rejected = new Map(
     rejectedNames(coherence).map((r) => [clean(r.name), r]),

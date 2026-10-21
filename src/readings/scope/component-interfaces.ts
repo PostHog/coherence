@@ -81,11 +81,11 @@ import { statementStartLine, type Definition, type LanguageAdapter, type Referen
 import { detectEntranceCandidates, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
 import { configRecord } from "../../adapters/project-config.ts";
-import { adapterFor, type Language } from "../../adapters/index.ts";
+import { instrumentFor, type Language } from "../../adapters/index.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
 import { KeptAnswers } from "./kept-answers.ts";
-import { DECLARED_NOT_READ, languagesRead, notScannedYet } from "./languages-read.ts";
+import { DECLARED_NOT_READ, languagesRead, notScannedYet, unscannedOf } from "./languages-read.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, KeptReport, ReachReference, ScopedReading } from "./model.ts";
@@ -247,8 +247,10 @@ export function withinBounds(file: string, skip: Bounds): boolean {
 
 /** The adapter the reading starts for itself: bounded to the config's ignore list, when it names one and the language's server can be bounded. */
 function boundedAdapter(language: Language, root: string, ignore: readonly string[], memoryMB: number): LanguageAdapter {
+  // Through the registry, so a plugin that provides or extends the language answers here as it does for a check; bounds reach the core's own adapter.
+  const config = readEnforcementConfig(root);
   // The server's heap sits above the reading's memory budget, so the budget stops the reading before the heap limit ends the server.
-  return ignore.length === 0 ? adapterFor(language, root) : adapterFor(language, root, { exclude: ignore, heapMB: memoryMB + HEAP_HEADROOM_MB });
+  return ignore.length === 0 ? instrumentFor(language, root, config) : instrumentFor(language, root, config, { exclude: ignore, heapMB: memoryMB + HEAP_HEADROOM_MB });
 }
 
 /** How far the bounded server's heap ceiling sits above the reading's memory budget. */
@@ -648,7 +650,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
   if (languages.length === 1) {
     // One language: the reading it always was, with the one language read.
     const reading = await readLanguage(root, languages[0]!, adapterOf(languages[0]!), options, { model, budget, started, owns: () => true });
-    return reading.kind === "read" ? { ...reading, languages: languagesRead(languages, new Map(), config.declared), candidates: candidates() } : reading;
+    return reading.kind === "read" ? { ...reading, languages: languagesRead(languages, new Map(), unscannedOf(config)), candidates: candidates() } : reading;
   }
   // Several languages: each one's component code is read through its own adapter, started only when the language has
   // component code or an entrance handled in its files. Each language's references are its own (no language server reports a
@@ -668,7 +670,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     const reading = await readLanguage(root, language, adapterOf(language), options, { model, budget, started, owns: (_component, entrance) => owner(entrance) === language });
     parts.push({ language, reading });
   }
-  return mergeLanguages(languages, parts, model, candidates(), config.declared);
+  return mergeLanguages(languages, parts, model, candidates(), unscannedOf(config));
 }
 
 /** An adapter for each language a multi-language reading asks, started by the caller (who closes it); undefined lets the reading start its own. */
@@ -695,7 +697,7 @@ const OTHER_LANGUAGE = "\u0000handled in another language";
  * entrance takes the resolution of the language its handler is written in.
  * No edge is drawn across languages: each language's references are its own.
  */
-function mergeLanguages(languages: readonly Language[], parts: readonly { language: Language; reading: InterfaceReading }[], model: SpecModel, candidates: EntranceCandidate[], declared: readonly { readonly name: string }[]): InterfaceReading {
+function mergeLanguages(languages: readonly Language[], parts: readonly { language: Language; reading: InterfaceReading }[], model: SpecModel, candidates: EntranceCandidate[], declared: readonly { readonly name: string; readonly because?: string }[]): InterfaceReading {
   const read = parts.flatMap((p) => (p.reading.kind === "read" ? [{ language: p.language, reading: p.reading }] : []));
   const unread = new Map(parts.flatMap((p) => (p.reading.kind === "unread" ? [[p.language, p.reading.because] as const] : [])));
   if (read.length === 0 && unread.size > 0) return { kind: "unread", because: [...unread.values()].join("; ") };

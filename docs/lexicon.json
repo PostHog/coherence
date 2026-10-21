@@ -932,7 +932,7 @@
     {
       "name": "orient",
       "status": "settled",
-      "definition": "The start-of-cycle reading. Before acting, the session sees where the project stands and what heading follows from it: escalations awaiting a human, structural defects, requirements stuck short of invariant, unreached mass, the session's own work order, and what peers recorded. One heading, derived from state; it also names the spec gaps beyond the adoption baseline.",
+      "definition": "The start-of-cycle reading. Before acting, the session sees where the project stands and what heading follows from it. It shows escalations awaiting a human, structural defects, requirements stuck short of invariant, unreached mass, the session's own work order, and what peers recorded. One heading, derived from state; it also names the spec gaps beyond the adoption baseline.",
       "rejected": [
         {
           "alternative": "orient and regulate as two competing machines over the same ledgers",
@@ -1517,6 +1517,24 @@
       "provenance": {
         "defined_by": "agent proposal, 2026-10-09 (session aba22a9624563d104), for an adopter's request that Coherence offer to run itself on pull requests with the mode presented to the user (df-7b885044, d-d0d83f59)",
         "because": "ci install, ci report, the hooks install offer and the adoption step need one name for what runs on a pull request"
+      }
+    },
+    {
+      "name": "plugin",
+      "definition": "What a project adds to Coherence through its config's plugins key: a folder whose plugin.json declares a language adapter, syntax tables, a verifier or a lexicon layer. The registry reads the manifest as data and imports the module only where its code runs; a plugin may take a built-in language's place or extend it, and docs/plugins.md is the author's guide.",
+      "not_to_be_confused_with": [
+        "Claude Code plugin: the agent host's extension, which the mod is"
+      ],
+      "related": [
+        "language adapter",
+        "config",
+        "lexicon",
+        "totality oracle"
+      ],
+      "status": "settled",
+      "provenance": {
+        "owner_words": "all language support is handled via plugins that ship with the product. if someone finds the existing language support wanting, they can pull it out and enhance it, swapping their enhancement for our implementation. then we ship other plugins, like Convex, Quint, etc.",
+        "defined_by": "owner, 2026-10-21 (session 8efd6465, d-5ec9a20a); the entry written by plugins1 (session aa8d6a63c971fba29)"
       }
     }
   ],

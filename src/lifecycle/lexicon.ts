@@ -28,6 +28,18 @@ export interface Concept {
   notToBeConfusedWith: string[];
   properties: Record<string, string>;
   related: string[];
+  /** The plugin whose lexicon layer brought the concept (src/plugins/lexicon.ts); absent for Coherence's own and the project's. */
+  layer?: string;
+}
+
+/** A plugin layer composed into the tool layer: who, and the surface that puts its vocabulary in a session's way. */
+export interface LayerInfo {
+  name: string;
+  version: string;
+  /** The languages it provides or extends. */
+  languages: string[];
+  /** The via forms it proves. */
+  forms: string[];
 }
 
 export interface Lexicon {
@@ -40,6 +52,8 @@ export interface Lexicon {
   rejected: RejectedAlternative[];
   /** The names of the trust levels a project declares; accepted names, never concepts. */
   trustLevels: string[];
+  /** The plugin layers composed into this one, in stack order; absent on a lexicon read from one file. */
+  layers?: LayerInfo[];
 }
 
 /** A name that must not appear, with the concept it was refused for and why. */
@@ -325,16 +339,31 @@ function capitalize(text: string): string {
  * it the project lexicon under its own header. Detail, provenance and
  * metaphors never appear.
  */
-export function renderCompact(coherence: Lexicon, project?: Lexicon, detail: DetailLevel = "full", coherenceDetail: "full" | "names" = "full", own = true): string {
+export function renderCompact(coherence: Lexicon, project?: Lexicon, detail: DetailLevel = "full", coherenceDetail: "full" | "names" = "full", own = true, shown: (layer: string) => boolean = () => true): string {
   const lines: string[] = [];
   // In Coherence's own repository its rejected names are defects everywhere; in an adopter they bind only where Coherence's concepts are named.
   const rule = own ? "rejected names are defects" : "use these names when you mean Coherence's concepts";
+  const mine = coherence.concepts.filter((c) => c.layer === undefined);
   if (coherenceDetail === "names") {
-    lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; names only here, ${rule}; full entries: coherence lexicon):`);
-    lines.push(coherence.concepts.map((c) => renderConcept(c, "names")).join(", "));
+    lines.push(`Coherence vocabulary (${mine.length} concepts; names only here, ${rule}; full entries: coherence lexicon):`);
+    lines.push(mine.map((c) => renderConcept(c, "names")).join(", "));
   } else {
-    lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; ${rule}):`);
-    for (const concept of coherence.concepts) lines.push(renderConcept(concept));
+    lines.push(`Coherence vocabulary (${mine.length} concepts; ${rule}):`);
+    for (const concept of mine) lines.push(renderConcept(concept));
+  }
+  // Each plugin's layer under its own header, between Coherence's and the project's; one whose surface the caller says is out of the way is left out.
+  for (const layer of coherence.layers ?? []) {
+    if (!shown(layer.name)) continue;
+    const theirs = coherence.concepts.filter((c) => c.layer === layer.name);
+    if (theirs.length === 0) continue;
+    lines.push("");
+    if (coherenceDetail === "names") {
+      lines.push(`Plugin ${layer.name} vocabulary (${theirs.length} concepts; names only here; full entries: coherence lexicon):`);
+      lines.push(theirs.map((c) => renderConcept(c, "names")).join(", "));
+    } else {
+      lines.push(`Plugin ${layer.name} vocabulary (${theirs.length} concepts, ${layer.version}):`);
+      for (const concept of theirs) lines.push(renderConcept(concept));
+    }
   }
   if (project !== undefined) {
     const title = capitalize(project.project ?? "Project");
@@ -365,13 +394,14 @@ export function renderCompactWithin(
   maxChars: number,
   cli = "coherence",
   own = true,
+  shown: (layer: string) => boolean = () => true,
 ): { text: string; detail: InjectionLevel } {
   const fits = (text: string): boolean => text.length <= maxChars;
   for (const detail of project === undefined ? ([DETAIL_LEVELS[0]] as const) : DETAIL_LEVELS) {
-    const text = renderCompact(coherence, project, detail, "full", own);
+    const text = renderCompact(coherence, project, detail, "full", own, shown);
     if (fits(text)) return { text, detail };
   }
-  const names = renderCompact(coherence, project, "names", "names", own);
+  const names = renderCompact(coherence, project, "names", "names", own, shown);
   if (fits(names)) return { text: names, detail: "coherence-names" };
   return { text: renderPointer(cli), detail: "pointer" };
 }

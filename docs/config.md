@@ -96,7 +96,7 @@ To opt in several folders and state their shared settings once, put a
 
   | Key | Rule |
   |---|---|
-  | `name`, `entryDir`, `lexicon`, `projects` | Never inherited. Each belongs to the leaf. |
+  | `name`, `entryDir`, `lexicon`, `projects`, `plugins` | Never inherited. Each belongs to the leaf; a plugin's path is the writer's. |
   | `ignore` | Combined. A folder name from the registry applies anywhere. A path from the registry is kept only if it lies inside the leaf, and is rewritten relative to it. |
   | `wellKnown` | Combined. |
   | `tests`, `test`, `testJson`, `testMatch`, `testFilterForm`, `testDir`, `testDirs` | One group. A leaf that sets any of them replaces the registry's whole group. An inherited setup's `cwd` is rewritten from the registry's folder to the leaf, so the registry's `"cwd": "."` runs the tests from the repository root. A setup without `cwd` runs in the leaf. |
@@ -129,8 +129,9 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 |---|---|---|
 | `projects` | none | At the repository root only: the folders opted in, which makes this file a registry. See [Several folders](#several-folders-a-registry). |
 | `name` | the folder's name | The project's name, as Scope and the lexicon's project layer show it. |
-| `language` | `typescript` | `typescript`, `python` or `rust`: which language server the chokepoint check asks (rust-analyzer for Rust; see [Rust](enforcement.md#rust)), or a language declared under `languages`. A list (`["python", "typescript"]`) for a project that spans more than one; see [More than one language](#more-than-one-language). Any other name is refused. |
+| `language` | `typescript` | `typescript`, `python` or `rust`: which language server the chokepoint check asks (rust-analyzer for Rust; see [Rust](enforcement.md#rust)), a language declared under `languages`, or one a plugin provides. A list (`["python", "typescript"]`) for a project that spans more than one; see [More than one language](#more-than-one-language). Any other name is refused. |
 | `languages` | none | Languages Coherence has no adapter for, each read through its own language server; see [A language Coherence has no adapter for](#a-language-coherence-has-no-adapter-for). Each must also be named in `language`. |
+| `plugins` | none | The plugins the project runs, each name mapped to `"bundled"` or a path to its folder: a language adapter (new, or wrapping a built-in), syntax tables, a verifier for `via: [form] name`, a lexicon layer. The project's own key, never inherited from a registry. See [plugins.md](plugins.md). |
 | `entryDir` | `.` | The folder holding the entry spec, the one that declares the trust levels. |
 | `ignore` | none | Folders that are not this project's code or prose: vendored code, generated output, fixtures, promo material. A name matches that folder anywhere; a path matches from the root. Every walk (the spec, the lexicon check, the reading) leaves them out. |
 | `lexicon` | `lexicon.json` | The project's lexicon file, relative to the root. |

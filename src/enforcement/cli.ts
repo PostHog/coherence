@@ -230,7 +230,7 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
   // Every language a check may be written in, built-in or declared: a declared one left out would read not run in CI, where --no-server is the norm.
   const languages = config.enforced;
   // In process, one adapter per language: each starts its server only when a check first asks it.
-  const directs = parsed.switches.has("no-server") ? languages.map((language) => instrumentFor(language, root, config.declared)) : [];
+  const directs = parsed.switches.has("no-server") ? languages.map((language) => instrumentFor(language, root, config)) : [];
   const direct = languages.length === 1 ? directs[0] : undefined;
   const adapters = languages.length > 1 && directs.length > 0 ? Object.fromEntries(directs.map((a) => [a.language, a])) : undefined;
   try {
