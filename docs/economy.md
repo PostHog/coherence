@@ -48,7 +48,11 @@ patch (the working tree against HEAD, plus untracked), the files read, and
 the closure predicted for the patch. The stop starts it detached
 (`economy --snapshot <session>`) and never waits, so its Economy line
 reports the newest snapshot already recorded and a session's last stop
-only records one. Traces are not committed: per session and larger than the journal, while the labels
+only records one. A snapshot's `at` is when the detached run finishes, 5–9 s
+or more after the stop, so calibrate does not count a defect recorded in
+that window against it. A snapshot that fails is not retried for the same
+patch: its mark keeps the fingerprint either way, as the structure refresh's
+does, and the next edit or read starts a new one. Traces are not committed: per session and larger than the journal, while the labels
 calibrate needs come from the journal and the runs, which are.
 
 ## Calibrate
