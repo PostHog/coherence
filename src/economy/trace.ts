@@ -293,7 +293,6 @@ export async function snapshotTrace(root: string, session: string, options: Snap
 }
 
 /** A session's snapshot through the warm instrument's one door; a door that cannot connect hands back its reason, which the snapshot records. */
-export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel): Promise<Snapshot | undefined> {
-  const changed = sessionPatch(root, session);
+export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel, changed: readonly string[] = sessionPatch(root, session)): Promise<Snapshot | undefined> {
   return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }));
 }

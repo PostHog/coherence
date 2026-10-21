@@ -922,6 +922,7 @@ export interface HookOptions {
    * Start the session's read-trace snapshot detached at a stop, never waited
    * on: the stop reports the newest one already recorded. The command line
    * passes ECONOMY_SNAPSHOT; absent (a test), the stop takes it in-process.
+   * An empty patch is always taken in-process: it predicts nothing, so it needs no instrument.
    */
   snapshot?: ((root: string, session: string, fingerprint: string) => void) | undefined;
   /**
@@ -959,22 +960,30 @@ export function refreshAtStop(root: string, options: HookOptions): void {
   }
 }
 
-function snapshotFingerprint(root: string, session: string): string {
-  const identities = sessionPatch(root, session).map((file) => `${file}@${fileIdentity(join(root, file)) ?? "gone"}`);
+function snapshotFingerprint(root: string, session: string, patch: readonly string[]): string {
+  const identities = patch.map((file) => `${file}@${fileIdentity(join(root, file)) ?? "gone"}`);
   return `${identities.join("\n")}\nread ${filesRead(root, session).length}`;
 }
 
-async function snapshotAtStop(root: string, session: string, options: HookOptions): Promise<void> {
+async function snapshotAtStop(root: string, session: string, patch: readonly string[], options: HookOptions): Promise<void> {
+  if (patch.length === 0) {
+    await snapshotTrace(root, session, { changed: patch });
+    return;
+  }
   if (options.snapshot !== undefined) {
-    options.snapshot(root, session, snapshotFingerprint(root, session));
+    options.snapshot(root, session, snapshotFingerprint(root, session, patch));
     return;
   }
   const model = loadedSpecModel(root);
   if (options.adapter === undefined) {
-    await snapshotSession(root, session, options.door ?? WARM_DOOR, model);
+    await snapshotSession(root, session, options.door ?? WARM_DOOR, model, patch);
     return;
   }
-  await snapshotTrace(root, session, { adapter: options.adapter, changed: sessionPatch(root, session), model });
+  await snapshotTrace(root, session, { adapter: options.adapter, changed: patch, model });
+}
+
+function samePatch(recorded: readonly string[], current: readonly string[]): boolean {
+  return recorded.length === current.length && recorded.every((file, index) => file === current[index]);
 }
 
 /**
@@ -982,7 +991,7 @@ async function snapshotAtStop(root: string, session: string, options: HookOption
  * the session wrote (who relies on them, what they rely on), and which of
  * those the session never read; advisory, nothing when there are none.
  */
-export function economyStopText(snapshot: Snapshot | undefined): string {
+export function economyStopText(snapshot: Snapshot | undefined, currentPatch?: readonly string[]): string {
   if (snapshot === undefined || snapshot.changed.length === 0) return "";
   const changed = new Set(snapshot.changed);
   const others = snapshot.predicted.filter((f) => !changed.has(f));
@@ -990,7 +999,8 @@ export function economyStopText(snapshot: Snapshot | undefined): string {
   const read = new Set(snapshot.read);
   const unread = others.filter((f) => !read.has(f));
   const files = (n: number, one: string): string => `${n} ${one}${n === 1 ? "" : "s"}`;
-  const head = `Economy: this session wrote ${files(changed.size, "file")}; the prediction names ${files(others.length, "other file")} that rely on them or that they rely on, and the session read ${others.length - unread.length} of them.`;
+  const label = currentPatch === undefined || samePatch(snapshot.changed, currentPatch) ? "Economy" : "Economy (as of an earlier patch)";
+  const head = `${label}: this session wrote ${files(changed.size, "file")}; the prediction names ${files(others.length, "other file")} that rely on them or that they rely on, and the session read ${others.length - unread.length} of them.`;
   if (unread.length === 0) return head;
   return `${head} Not read: ${unread.slice(0, 6).join(", ")}${unread.length > 6 ? `, and ${unread.length - 6} more` : ""}.`;
 }
@@ -1424,7 +1434,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const changed = await changedFiles(root);
         const report = await checkChanged(root, changed.files);
         const session=sessionOf(input);
-        if (session) await snapshotAtStop(root, session, options);
+        const patch = session ? sessionPatch(root, session) : [];
+        if (session) await snapshotAtStop(root, session, patch, options);
         const snapshot = session ? lastSnapshot(root, session) : undefined;
         const walls = unableWalls(root, input);
         const spec = specStopText(root, changed.files, walls);
@@ -1442,7 +1453,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const heldModel = specModelOrNull(root);
         keepMirrorsFromModel(root);
         const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input), "error" in heldModel ? undefined : heldModel);
-        const economyText = economyStopText(snapshot);
+        const economyText = economyStopText(snapshot, patch);
         const latencyText = hookLatencyStopText(root, session);
         const parts: string[] = [];
         if (changedText !== "") parts.push(changedText);
