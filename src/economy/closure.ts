@@ -39,6 +39,7 @@ import type { Definition, LanguageAdapter } from "../adapters/adapter.ts";
 import { projectListing, projectSites } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import { languageOfFile, readEnforcementConfig } from "../enforcement/config.ts";
+import { DECLARED_NOT_READ } from "../readings/scope/languages-read.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { describeChanged, type WorkingChange } from "./change.ts";
 import { componentOf, declarationsOf, importsOf, isTest, sourceFiles, toRelative } from "./source.ts";
@@ -154,7 +155,8 @@ export function spelledInGiven(value: string, given: readonly string[], texts: R
 export async function predictClosure(rootGiven: string, paths: readonly string[], options: ClosureOptions = {}): Promise<Closure> {
   const root = resolve(rootGiven);
   const config = readEnforcementConfig(root);
-  const language: Language = config.language;
+  // The built-in language a single-language reading reads; a language the config declares has no scan here (languages-read.ts).
+  const language: Language | undefined = config.languages[0];
   const model = options.model ?? loadSpecModel(root);
   const named = [...new Set(paths.map((p) => toRelative(root, p)).filter((p): p is string => p !== undefined))].sort();
   const working = options.change;
@@ -243,10 +245,19 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
 
   let instrument: Instrument;
   let hopped = false;
-  if (config.languages.length === 1) {
-    const adapter = options.adapter;
-    instrument = adapter === undefined ? { language, server: "none", reason: options.instrumentReason ?? "no adapter" } : { language: adapter.language, server: options.server ?? "cold" };
-    if (adapter !== undefined) {
+  if (config.languages.length <= 1) {
+    // The one built-in's instrument alone hops: an adapter for a language the config declares answers references, but no scan here reads its text.
+    const reached: Reached | undefined = options.adapter === undefined && options.adapterOf !== undefined && language !== undefined ? await options.adapterOf(language) : undefined;
+    if (reached !== undefined && reached.adapter !== undefined && reached.reason === undefined) options = { ...options, adapter: reached.adapter, server: reached.server ?? "cold" };
+    else if (reached !== undefined) options = { ...options, instrumentReason: reached.reason ?? `no ${language} adapter` };
+    const adapter = language !== undefined && options.adapter?.language === language ? options.adapter : undefined;
+    const reason = language === undefined
+      ? `the project names no built-in language: ${DECLARED_NOT_READ}`
+      : options.adapter !== undefined && adapter === undefined
+        ? `the instrument handed over reads ${options.adapter.language}, not ${language}: ${DECLARED_NOT_READ}`
+        : (options.instrumentReason ?? "no adapter");
+    instrument = adapter === undefined ? { language: language ?? config.language, server: "none", reason } : { language: adapter.language, server: options.server ?? "cold" };
+    if (adapter !== undefined && language !== undefined) {
       await hops(adapter, language, given);
       hopped = true;
     } else fromLatestRun();

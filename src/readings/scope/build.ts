@@ -28,7 +28,7 @@ import { configuredName, projectName } from "../../adapters/project-config.ts";
 import { stripTypeScriptTypes } from "node:module";
 import { dirname, extname, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { adapterFor } from "../../adapters/index.ts";
+import { instrumentFor } from "../../adapters/index.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
@@ -109,8 +109,9 @@ function domainTitle(options: BuildOptions, lexicon: Lexicon | undefined): strin
  * below are Coherence's own and the same for every language.
  */
 export function ladderFor(root: string): Ladder {
-  const language = readEnforcementConfig(root).language;
-  const adapter = adapterFor(language, root).ladder;
+  const config = readEnforcementConfig(root);
+  const language = config.language;
+  const adapter = instrumentFor(language, root, config.declared).ladder;
   const rungs: LadderRung[] = [];
   if (adapter.top === "visibility-choked") {
     rungs.push({ grade: "visibility-choked", enforcedBy: `the language itself: ${adapter.because}` });

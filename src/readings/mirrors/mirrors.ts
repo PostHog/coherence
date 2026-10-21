@@ -27,7 +27,9 @@
 import { execFileSync } from "../../lifecycle/work-meter.ts";
 import { basename, dirname, extname, posix } from "node:path";
 import type * as TS from "typescript";
+import { declaredLanguageOf, type DeclaredLanguage } from "../../adapters/declared.ts";
 import { languageOfFile } from "../../adapters/language-files.ts";
+import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { DERIVED, DOC_FORMS, type Finding, type Form, type Group, type MirrorHistory, type MirrorReading, type SetRef, type Verdict } from "./model.ts";
 
 export type { Finding, Group, MirrorReading, SetRef, Verdict };
@@ -946,7 +948,14 @@ export async function readMirrors(root: string, options: MirrorOptions = {}): Pr
   const wanted = paths.filter((p) => (CODE_FILE.test(p) && !p.endsWith(".d.ts")) || (DOC_FILE.test(p) && READ_DOC.test(p)));
   // No silent skip: a file in a language the reading does not parse is counted, so a Python project learns its code went unread.
   const unread: Record<string, number> = {};
-  for (const p of paths) if (!CODE_FILE.test(p) && languageOfFile(p) !== undefined) unread[extname(p)] = (unread[extname(p)] ?? 0) + 1;
+  // A language the config declares (its language server answers chokepoint checks) is code the reading leaves unread too.
+  let declared: readonly DeclaredLanguage[] = [];
+  try {
+    declared = readEnforcementConfig(root).declared;
+  } catch {
+    // An unreadable config is reported by the commands that read it; the count then names the built-in languages alone.
+  }
+  for (const p of paths) if (!CODE_FILE.test(p) && (languageOfFile(p) !== undefined || declaredLanguageOf(p, declared) !== undefined)) unread[extname(p)] = (unread[extname(p)] ?? 0) + 1;
   const texts = readAll(root, commit, wanted);
   phase("read");
 
