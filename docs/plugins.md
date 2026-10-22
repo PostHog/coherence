@@ -189,9 +189,21 @@ one wanting changes a copy of it:
    project's config. The copy imports Coherence only through
    `@posthog/coherence/plugin`: the bundled plugins import the core through
    that one module (`src/plugins/api.ts`), so the copy reads from the
-   installed package what it read bundled. Eject refuses, writing nothing,
-   when the folder exists, when it leaves the project, or when the config
-   already runs a plugin by that name.
+   installed package what it read bundled. The copy is TypeScript run as
+   written, its imports naming `.ts` files: it needs Node 22.18 or later
+   (which runs TypeScript without a flag), and a project that typechecks it
+   needs `"allowImportingTsExtensions": true` (with `noEmit`) in the
+   tsconfig that includes it. Eject edits only the config's `plugins` key,
+   every other byte kept. It refuses, writing nothing, when the folder
+   exists (a link there that leads nowhere included), when it leaves the
+   project once symbolic links are followed, when a link on the way leads
+   nowhere, or when the config already runs a plugin by that name.
+
+   The copy's folder is Coherence's instrument, not your code: no walk reads
+   it (specs, readings, mass, the lexicon's corpus), no reference found there
+   counts against a chokepoint, and a name it declares shadows none of yours.
+   Say `"gradePlugins": true` in the config to have your plugin folders
+   walked like any other.
 2. **Enhance**: change the copy. It answers for its language in the bundled
    plugin's place from the next command on; what it does not declare (a data
    field, a syntax slot) the bundled plugin still answers.
@@ -208,14 +220,26 @@ one wanting changes a copy of it:
 
    Each duty passes, fails with why, or is not run with why (the
    language server is absent). The command exits 0 only when every one
-   passes. Add cases to the copy's `check.json` as you enhance it: they are
-   its tests. `plugin check typescript` holds the bundled plugin to the same.
+   passes. The bundled plugin's `check.json` for the language, as the
+   installed package ships it, is the minimum: every plugin for that
+   language is held to it, whatever its own `check.json` says. Add cases to
+   the copy's `check.json` as you enhance it: they are its tests, held
+   besides the minimum, never in its place. A duty with no case fails as
+   "nothing to check", a `check.json` that is no check project (`{}`) is
+   refused naming each field it lacks, and a duty that throws fails with
+   what it threw while the others still report. `plugin check typescript`
+   holds the bundled plugin to the same.
 4. **Swap back**: remove the `plugins` entry, and the bundled plugin answers
    again.
 
 A plugin is pinned to the `pluginApi` it was written for. When Coherence moves
 on, the session start names the plugin and what changed since, so an ejected
-copy's author knows what to update.
+copy's author knows what to update. `pluginApi` 2 moved the syntax slots from
+the module's `syntax` export into `plugin.json`
+(`"syntax": { "<slot>": "<module>#<export>" }`), made the member scan
+`plugin.json` data (`members`), and added the `kept`, `declares`, `notice`,
+`topLevel` and `boundaries` slots. A module that still exports `syntax` is
+refused at load, by name, rather than read as having none.
 
 ## Roles
 

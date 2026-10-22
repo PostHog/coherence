@@ -54,7 +54,7 @@ export const OLDEST_PLUGIN_API = 1;
 
 /** What each interface version changed from the one before, for the line a session start says about a plugin written for an older one. */
 export const PLUGIN_API_CHANGES: Readonly<Record<number, string>> = {
-  2: "syntax slots are named in the manifest as module#export (a module's syntax export is not read), with new slots and manifest data fields (docs/plugins.md)",
+  2: 'syntax slots moved from the module\'s syntax export to plugin.json ("syntax": { slot: "module#export" }), the member scan became plugin.json data (members), and kept, declares, notice, topLevel and boundaries joined the slots',
 };
 
 /** What changed between the interface version a plugin was written for and the one this core runs, oldest first. */

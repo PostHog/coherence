@@ -21,6 +21,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { landsWithin } from "./within.ts";
 import { MANIFEST, OLDEST_PLUGIN_API, PLUGIN_API, SYNTAX_SLOTS, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -135,11 +136,6 @@ export function readManifest(name: string, dir: string, where: string): { manife
   return { manifest: raw as unknown as PluginManifest, problems };
 }
 
-/** Whether `path` is `root` or under it. */
-function within(root: string, path: string): boolean {
-  const from = relative(resolve(root), path);
-  return from === "" || (!from.startsWith("..") && !isAbsolute(from));
-}
 
 /** Where a config value puts a plugin's folder: the bundled one, or a path from the root. */
 function dirOf(root: string, name: string, value: string): string {
@@ -166,7 +162,13 @@ export function readPlugins(root: string, value: unknown, where: string, builtIn
     }
     // Plugin code runs with the project's privileges; a relative path that climbs out of the project is refused, and running code from
     // elsewhere is said explicitly, by writing the absolute path out.
-    if (source !== "bundled" && !isAbsolute(source) && !within(root, resolve(root, source))) {
+    // Followed through any symbolic link on the way: a folder inside the project that links outside it leaves it too.
+    const lands = source === "bundled" || isAbsolute(source) ? true : landsWithin(root, resolve(root, source));
+    if (lands === undefined) {
+      problems.push(`${where}: plugins.${name} is ${JSON.stringify(source)}, which passes through a symbolic link that leads nowhere`);
+      continue;
+    }
+    if (!lands) {
       problems.push(`${where}: plugins.${name} is ${JSON.stringify(source)}, which leaves the project; a plugin's code runs with the project's privileges, so write the absolute path out to run code from outside it`);
       continue;
     }
@@ -257,7 +259,8 @@ export function moduleOf(plugin: LoadedPlugin): Promise<PluginModule> {
   let loading = modules.get(key);
   if (loading === undefined) {
     loading = import(`${pathToFileURL(path).href}?v=${version}`).then((m: { default?: unknown }) => {
-      if (!isRecord(m.default)) throw new PluginRefused(`plugin ${plugin.name}'s module ${path} has no default export of its adapter, verify or syntax`);
+      if (!isRecord(m.default)) throw new PluginRefused(`plugin ${plugin.name}'s module ${path} has no default export of its adapter or verify`);
+      refuseModuleSyntax(plugin, m.default);
       return m.default as PluginModule;
     });
     // A failed import is never kept: the next ask tries again, so a fixed module is read once it is fixed.
@@ -285,5 +288,16 @@ export function moduleSyncOf(plugin: LoadedPlugin): PluginModule {
   const path = resolve(plugin.dir, module);
   const loaded = load(path) as { default?: unknown };
   if (!isRecord(loaded.default)) throw new PluginRefused(`plugin ${plugin.name}'s module ${path} has no default export of its adapter or verify`);
+  refuseModuleSyntax(plugin, loaded.default);
   return loaded.default as PluginModule;
+}
+
+/**
+ * A module written for pluginApi 1 exported its syntax tables as `syntax`;
+ * this core reads a syntax slot only where plugin.json names it, so such an
+ * export is refused by name at load rather than ignored.
+ */
+function refuseModuleSyntax(plugin: LoadedPlugin, module: Record<string, unknown>): void {
+  if (module["syntax"] === undefined) return;
+  throw new PluginRefused(`plugin ${plugin.name}'s module exports syntax, which this Coherence does not read: name each slot in plugin.json as "syntax": { "<slot>": "<module>#<export>" } (pluginApi 2)`);
 }

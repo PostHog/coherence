@@ -7,13 +7,14 @@
  */
 
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { cli } from "../lifecycle/cli-fixture.ts";
 import { checkPlugin } from "./check.ts";
-import { ejectPlugin, EjectError, PACKAGE_SPECIFIER, PLUGIN_SOURCES } from "./eject.ts";
+import { ejectedSource, ejectPlugin, EjectError, PACKAGE_SPECIFIER, PLUGIN_SOURCES } from "./eject.ts";
+import { readPlugins } from "./registry.ts";
 
 const fixtures: string[] = [];
 
@@ -73,10 +74,81 @@ test("plugin check holds a plugin to every duty, bundled or by path, and a plugi
   const deaf = await checkPlugin(root, "./deaf");
   const references = deaf.duties.find((o) => o.name === "references")!;
   assert.equal(references.verdict, "fail");
-  assert.match(references.reason, /^reports no references to SECRET_COLUMNS; 5 exist/);
+  assert.match(references.reason, /^the bundled minimum: reports no references to SECRET_COLUMNS; 5 exist/);
   assert.notEqual(deaf.duties.find((o) => o.name === "chokepoint")!.verdict, "pass", "and no chokepoint is graded clean through it");
 
   rmSync(join(root, "deaf", "check.json"));
   const untested = await checkPlugin(root, "./deaf");
-  assert.ok(untested.duties.every((o) => o.verdict === "fail" && /carries no check\.json/.test(o.reason)), "a plugin with no check project passes nothing");
+  assert.equal(untested.duties.find((o) => o.name === "references")!.verdict, "fail", "a plugin with no check.json of its own is still held to the bundled minimum for its language");
+});
+
+test("plugin check passes nothing over nothing: a check.json with no cases fails each duty as nothing to check, {} is refused by name, the bundled minimum stands under a copy's own, and a duty that throws is named while the others report", async () => {
+  const deafAdapter = (references: string): string =>
+    `export default { adapter: ({ base }) => ({ language: base.language, ladder: base.ladder, ready: () => base.ready(), resolve: (n, h) => base.resolve(n, h), references: ${references}, visibility: (d, c) => base.visibility(d, c), testFilter: (v) => base.testFilter(v), refute: (p, o, e) => base.refute(p, o, e), forget: (f) => base.forget(f), close: async () => {} }) };\n`;
+  const manifest = (name: string): string => JSON.stringify({ name, version: "0.1.0", pluginApi: 2, provides: { language: "typescript" }, extends: "typescript", module: "./index.ts" });
+  const root = project({
+    "honest/plugin.json": manifest("honest"),
+    "honest/index.ts": deafAdapter("(d) => base.references(d)"),
+    "throws/plugin.json": manifest("throws"),
+    "throws/index.ts": deafAdapter('async () => { throw new Error("deaf by design"); }'),
+  });
+  const minimum = JSON.parse(readFileSync(join(PLUGIN_SOURCES, "typescript", "check.json"), "utf8")) as Record<string, unknown>;
+
+  writeFileSync(join(root, "honest", "check.json"), JSON.stringify({ ...minimum, language: { files: [], not: [] }, declarations: [], references: [] }));
+  const empty = await checkPlugin(root, "./honest");
+  const byName = (name: string) => empty.duties.find((o) => o.name === name)!;
+  for (const name of ["file rule", "declarations", "references"]) {
+    assert.equal(byName(name).verdict, "fail", name);
+    assert.match(byName(name).reason, /plugin honest's own: nothing to check/, `${name}: ${byName(name).reason}`);
+    assert.match(byName(name).reason, /the bundled minimum: \d+ of \d+/, "the minimum is held besides it, never replaced");
+  }
+
+  writeFileSync(join(root, "honest", "check.json"), "{}");
+  const shapeless = await checkPlugin(root, "./honest");
+  assert.ok(shapeless.duties.every((o) => o.verdict === "fail" && /plugin honest's .*check\.json is no check project: it lacks files.*language.*declarations.*protects.*references/.test(o.reason)), JSON.stringify(shapeless.duties));
+
+  const thrown = await checkPlugin(root, "./throws");
+  assert.deepEqual(thrown.duties.map((o) => o.name), ["file rule", "declarations", "references", "chokepoint"], "every duty reported");
+  const failed = thrown.duties.find((o) => o.name === "references")!;
+  assert.equal(failed.verdict, "fail");
+  assert.match(failed.reason, /threw: deaf by design/);
+  assert.equal(thrown.duties.find((o) => o.name === "file rule")!.verdict, "pass", "the duties that did not throw still report");
+  assert.equal(thrown.duties.find((o) => o.name === "declarations")!.verdict, "pass");
+});
+
+test("plugin eject writes only the plugins key's text: every other byte of the config kept, a plugins key already there replaced in place", () => {
+  const inline = '{\n  "language": "typescript",\n  "ignore": ["generated", "vendor"],\n  "tests": [{ "command": "npm test" }]\n}\n';
+  const fresh = project({ "coherence.config.json": inline });
+  ejectPlugin(fresh, "typescript");
+  assert.equal(
+    readFileSync(join(fresh, "coherence.config.json"), "utf8"),
+    '{\n  "language": "typescript",\n  "ignore": ["generated", "vendor"],\n  "tests": [{ "command": "npm test" }],\n  "plugins": {\n    "typescript": "./coherence-plugins/typescript"\n  }\n}\n',
+  );
+  const placed = '{\n\t"plugins": { "rust": "bundled" },\n\t"language": ["typescript", "rust"]\n}';
+  const already = project({ "coherence.config.json": placed });
+  ejectPlugin(already, "typescript");
+  assert.equal(readFileSync(join(already, "coherence.config.json"), "utf8"), '{\n\t"plugins": {\n\t\t"rust": "bundled",\n\t\t"typescript": "./coherence-plugins/typescript"\n\t},\n\t"language": ["typescript", "rust"]\n}');
+});
+
+test("plugin eject and a config's plugin path stay inside the project once symbolic links are followed, and a link that leads nowhere is refused by name", () => {
+  const outside = project({ "keep.txt": "outside\n" });
+  const root = project({ "coherence.config.json": "{}\n" });
+  symlinkSync(outside, join(root, "escape"));
+  symlinkSync(join(outside, "gone"), join(root, "dangling"));
+  assert.throws(() => ejectPlugin(root, "typescript", "escape/ts"), (e: unknown) => e instanceof EjectError && /escape\/ts is not a folder inside the project/.test(e.message), "a folder inside the project that links out of it");
+  assert.throws(() => ejectPlugin(root, "typescript", "dangling"), (e: unknown) => e instanceof EjectError && /dangling exists as a symbolic link that leads nowhere/.test(e.message), "a link at the target that leads nowhere");
+  assert.throws(() => ejectPlugin(root, "typescript", "dangling/ts"), (e: unknown) => e instanceof EjectError && /dangling\/ts passes through a symbolic link that leads nowhere/.test(e.message), "a link on the way that leads nowhere");
+  assert.deepEqual(readdirSync(outside), ["keep.txt"], "nothing written outside");
+  assert.equal(readFileSync(join(root, "coherence.config.json"), "utf8"), "{}\n", "and nothing to the config");
+
+  const read = (source: string): string[] => readPlugins(root, { ts: source }, "coherence.config.json", [], () => undefined).problems;
+  assert.match(read("./escape/ts").join("\n"), /plugins\.ts is "\.\/escape\/ts", which leaves the project/);
+  assert.match(read("./dangling/ts").join("\n"), /plugins\.ts is "\.\/dangling\/ts", which passes through a symbolic link that leads nowhere/);
+});
+
+test("eject's guard reads every import with the parser: a dynamic import, a require or an export from that leaves the plugin's folder is refused, and the core's own import is rewritten in whatever quotes it is written", () => {
+  for (const text of ["const m = await import('../../src/adapters/adapter.ts');\n", 'const m = require("../../src/adapters/adapter.ts");\n', 'export * from "../python/python.ts";\n', "import type { A } from '../../src/adapters/adapter.ts';\n"]) {
+    assert.throws(() => ejectedSource("index.ts", text), (e: unknown) => e instanceof EjectError && /index\.ts imports \.\.\/.* which leaves the plugin's folder/.test(e.message), text);
+  }
+  assert.equal(ejectedSource("index.ts", "import { a } from '../../src/plugins/api.ts';\nconst b = await import('./b.ts');\n"), `import { a } from "${PACKAGE_SPECIFIER}";\nconst b = await import('./b.ts');\n`);
 });

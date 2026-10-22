@@ -22,8 +22,8 @@
 import { spawnSync } from "../lifecycle/work-meter.ts";
 import { perProcess } from "../lifecycle/process-caches.ts";
 import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { configRecord, repositoryTop } from "./project-config.ts";
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { CONFIG_FILE, configRecord, readConfigFile, repositoryTop } from "./project-config.ts";
 import { HOST_FOLDER } from "../lifecycle/hosts.ts";
 import { environmentFolders, markedFolders } from "../plugins/languages.ts";
 export { repositoryTop };
@@ -138,7 +138,8 @@ export function projectFiles(root: string): string[] {
   const base = resolve(root);
   const memo = new Map<string, boolean>();
   const listed = inRepository(base) ? gitList(base, []) : walkUnversioned(base, memo);
-  return [...new Set(listed)].filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel)).sort();
+  const plugins = pluginFolders(base);
+  return [...new Set(listed)].filter((rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && isFileOnDisk(base, rel)).sort();
 }
 
 /**
@@ -153,7 +154,8 @@ export function projectFilesUnder(root: string, folder: string): string[] {
   const base = resolve(root);
   if (!inRepository(base)) return projectFiles(base).filter((rel) => rel.startsWith(`${key}/`));
   const memo = new Map<string, boolean>();
-  return [...new Set(gitList(base, [key]))].filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel)).sort();
+  const plugins = pluginFolders(base);
+  return [...new Set(gitList(base, [key]))].filter((rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && isFileOnDisk(base, rel)).sort();
 }
 
 /**
@@ -168,9 +170,50 @@ export function projectFilesEnding(root: string, suffix: string): string[] {
   const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", `:(glob)**/*${suffix}`], { cwd: base, encoding: "utf8", maxBuffer: GIT_LISTING_LIMIT });
   if (listed.status !== 0) throw new Error(`the project's files are not known: git ls-files failed in ${base}: ${(listed.stderr ?? "").trim() || `exit ${listed.status}`}`);
   const memo = new Map<string, boolean>();
+  const plugins = pluginFolders(base);
   return [...new Set(listed.stdout.split("\0").filter((entry) => entry !== "" && !entry.endsWith("/") && entry.endsWith(suffix)))]
-    .filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel))
+    .filter((rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && isFileOnDisk(base, rel))
     .sort();
+}
+
+/**
+ * The folders the config names as plugins (`"plugins": { "typescript": "./coherence-plugins/typescript" }`),
+ * project-relative: a plugin's source is Coherence's instrument, not the project's code, so no walk reads it and no
+ * reference found there counts, as with a nested checkout. A project that wants its plugins graded says
+ * `"gradePlugins": true`. A plugin outside the project, bundled, or by an absolute path names no folder.
+ */
+export function pluginFolders(root: string): string[] {
+  // plugins is one of the config's own keys (OWN_KEYS), never a registry's; the answer is kept while the file holds still.
+  const path = join(resolve(root), CONFIG_FILE);
+  const identity = fileIdentity(path) ?? "";
+  const known = pluginFoldersSeen.get(path);
+  if (known !== undefined && known.identity === identity) return known.folders;
+  let record: Record<string, unknown>;
+  try {
+    record = readConfigFile(path) ?? {};
+  } catch {
+    record = {};
+  }
+  const folders = foldersNamed(record);
+  pluginFoldersSeen.set(path, { identity, folders });
+  return folders;
+}
+
+const pluginFoldersSeen = perProcess(new Map<string, { identity: string; folders: string[] }>());
+
+function foldersNamed(record: Record<string, unknown>): string[] {
+  const plugins = record["plugins"];
+  if (record["gradePlugins"] === true || typeof plugins !== "object" || plugins === null || Array.isArray(plugins)) return [];
+  return Object.values(plugins as Record<string, unknown>).flatMap((value) => {
+    if (typeof value !== "string" || value === "bundled" || isAbsolute(value)) return [];
+    const folder = folderKey(posix.normalize(value.split(sep).join("/")).replace(/\/plugin\.json$/, ""));
+    return folder === "" || folder === "." || folder.startsWith("..") ? [] : [folder];
+  });
+}
+
+/** Whether a project-relative path lies in one of the plugin folders. */
+function inPluginFolder(rel: string, folders: readonly string[]): boolean {
+  return folders.some((folder) => rel.startsWith(`${folder}/`));
 }
 
 /** A folder as the ignore list compares it: project-relative, forward slashes, no leading "./" and no trailing "/". */
@@ -340,8 +383,9 @@ export function exclusionSummary(excluded: readonly Exclusion[]): { reason: stri
 export function keepProjectFiles(root: string, paths: readonly string[], listing?: ProjectListing): Set<string> {
   const base = resolve(root);
   const memo = new Map<string, boolean>();
+  const plugins = pluginFolders(base);
   const candidates = [...new Set(paths.map((p) => projectRelative(base, p)).filter((rel): rel is string => rel !== undefined))].filter(
-    (rel) => !insideNested(base, rel, memo) && !isFolderOnDisk(base, rel) && !rel.split("/").includes(".git"),
+    (rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && !isFolderOnDisk(base, rel) && !rel.split("/").includes(".git"),
   );
   if (candidates.length === 0 || !inRepository(base)) {
     return new Set(inRepository(base) ? [] : candidates.filter((rel) => !rel.split("/").includes("node_modules")));

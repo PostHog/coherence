@@ -10,11 +10,12 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
-import { keepProjectFiles, nestedCheckouts, projectFiles } from "./project-files.ts";
+import { keepProjectFiles, nestedCheckouts, projectFiles, projectFilesEnding } from "./project-files.ts";
+import { ejectPlugin } from "../plugins/eject.ts";
 import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { checkChokepoint } from "../enforcement/check.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
@@ -148,4 +149,48 @@ test("only the project's own files are ever evidence: a nested checkout and an i
   assert.deepEqual(sourceFiles(root, "typescript"), ["src/api/render.ts", "src/store/secrets.ts"]);
   const mass = computeMass(root);
   assert.deepEqual(mass.files.map((f) => f.file).sort(), ["src/api/render.ts", "src/store/secrets.ts"], "mass counts only the project's files");
+});
+
+test("a folder the config names as a plugin is not the project's source: its files are walked by nothing and graded by nothing, its declarations shadow nothing, unless the config says gradePlugins", async () => {
+  const adopter = mkdtempSync(join(tmpdir(), "coherence-plugin-folder-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(adopter, path)), { recursive: true });
+    writeFileSync(join(adopter, path), text, "utf8");
+  };
+  let own: TypeScriptAdapter | undefined;
+  try {
+    assert.equal(spawnSync("git", ["init", "-q"], { cwd: adopter }).status, 0, "git init");
+    put("tsconfig.json", TSCONFIG.replace('"src/**/*.ts"', '"**/*.ts"'));
+    put("coherence.config.json", JSON.stringify({ language: "typescript" }, null, 2) + "\n");
+    put("Fixture.spec.md", SPEC);
+    put("src/store/secrets.ts", SECRETS);
+    put("src/api/render.ts", RENDER_CLEAN);
+    ejectPlugin(adopter, "typescript");
+    // The copy, enhanced: it declares a name the project's code declares too, and reaches the protected thing directly.
+    put("coherence-plugins/typescript/secrets.ts", SECRETS);
+    put("coherence-plugins/typescript/leak.ts", bypassFrom("../../src/store/secrets.ts"));
+    put("coherence-plugins/typescript/Plugin.spec.md", SPEC);
+
+    const files = projectFiles(adopter);
+    assert.ok(files.includes("src/store/secrets.ts"), files.join(", "));
+    assert.ok(!files.some((f) => f.startsWith("coherence-plugins/")), `no walk reads the plugin's folder: ${files.join(", ")}`);
+    assert.deepEqual(projectFilesEnding(adopter, ".spec.md"), ["Fixture.spec.md"], "a spec in the plugin's folder is not the project's");
+    assert.deepEqual([...keepProjectFiles(adopter, ["coherence-plugins/typescript/leak.ts", "src/api/render.ts"])], ["src/api/render.ts"], "a reference there is none of the project's");
+
+    own = new TypeScriptAdapter(adopter);
+    const hint = { component: ".", testFolders };
+    const resolved = await own.resolve("SECRET_COLUMNS", hint);
+    assert.ok(resolved.ok, resolved.ok ? "" : resolved.reason);
+    assert.equal(resolved.definition.file, "src/store/secrets.ts", "the copy's declaration of the same name shadows nothing");
+    const graded = await checkChokepoint(own, { protects: "SECRET_COLUMNS", chokepoint: "seal", root: adopter, ...hint });
+    assert.deepEqual(graded.bypasses, [], graded.reason);
+    assert.equal(graded.verdict, "pass", graded.reason);
+
+    const config = JSON.parse(readFileSync(join(adopter, "coherence.config.json"), "utf8")) as Record<string, unknown>;
+    put("coherence.config.json", JSON.stringify({ ...config, gradePlugins: true }, null, 2) + "\n");
+    assert.ok(projectFiles(adopter).includes("coherence-plugins/typescript/leak.ts"), "a project that opts its plugins in has them walked");
+  } finally {
+    await own?.close();
+    rmSync(adopter, { recursive: true, force: true });
+  }
 });
