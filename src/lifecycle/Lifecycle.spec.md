@@ -727,6 +727,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: the stop regulates with the economy prediction, which needs the warm server; it idles out after five minutes, and every turn begins with a prompt, so warming there makes the stop find it loaded without the hook ever waiting on it
   refuted: stopped warming the instrument at a prompt -> "a session start and every prompt warm the instrument without waiting for it, and no other event does" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
   kinds: none
+- a stop never waits on its snapshot: A stop with a non-empty patch starts the session's read-trace snapshot detached and reports the newest one already recorded, never asking the instrument itself; the same patch keeps its fingerprint, so a repeated stop starts no second closure.
+  over: Stop
+  via: a stop starts the snapshot detached, with a fingerprint that moves only with the patch, and reports the newest one already recorded
+  because: the snapshot recomputes the economy prediction through the warm server, which took 11-15 s on PostHog's posthog project and repeated the cost at every stop on an unchanged patch (df-237655bb); detached, the stop's own time stays within the latency budget
+  refuted: took the snapshot in-process at every stop, ignoring the detached start -> "a stop starts the snapshot detached, with a fingerprint that moves only with the patch, and reports the newest one already recorded" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-22)
+  kinds: budget
 - regulate reports the prediction: A stop names the files the prediction found beyond what the session wrote and which of them it never read, advisory; nothing when the prediction found none.
   over: a prediction with read and unread files beyond the session's own, one with none, and no snapshot
   via: regulate names the files the prediction found beyond what the session wrote, and which of them it never read
