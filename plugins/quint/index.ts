@@ -18,6 +18,7 @@
  */
 
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, posix } from "node:path";
 import { configRecord, type PluginModule, type VerifyRequest, type VerifyResult } from "../../src/plugins/api.ts";
@@ -82,13 +83,14 @@ export async function verify(request: VerifyRequest): Promise<VerifyResult> {
   const { property, model } = target;
   const config = quintConfig(request.root);
   const file = join(request.root, model);
-  // Two seconds short of the core's own deadline, so a step that runs out of time reads not run here rather than a killed verifier there.
-  const deadline = Date.now() + Math.max(1000, request.timeoutMs - 2000);
+  const deadline = Date.now() + verifierBudget(request.timeoutMs);
   const scratch = mkdtempSync(join(tmpdir(), "coherence-quint-"));
   try {
+    let last: QuintResult | undefined;
     const step = async (name: string, argv: string[]): Promise<VerifyResult | undefined> => {
       const left = deadline - Date.now();
       const result: QuintResult = left <= 0 ? { outcome: "timeout", command: `quint ${argv[0]}`, stdout: "", stderr: "", reason: "no time was left for it" } : await runQuint(argv, scratch, left);
+      last = result;
       if (result.outcome === "ok") return undefined;
       if (result.outcome === "unavailable") return { verdict: "not run", reason: `quint ${name} could not run: ${result.reason}` };
       if (result.outcome === "timeout") return { verdict: "not run", reason: `quint ${name} ${result.reason}; nothing it said counts` };
@@ -100,14 +102,48 @@ export async function verify(request: VerifyRequest): Promise<VerifyResult> {
     const run = ["run", file, "--invariant", property, "--max-samples", String(config.maxSamples), "--max-steps", String(config.maxSteps), "--backend", config.backend, ...(config.seed === undefined ? [] : ["--seed", config.seed])];
     const simulated = await step("run", run);
     if (simulated !== undefined) return simulated;
-    const sampled = `typechecked and simulated (${config.maxSamples} samples of ${config.maxSteps} steps, ${config.backend} backend)`;
-    if (request.form === "quint run") return { verdict: "pass", reason: `${property} holds in ${model}: ${sampled}` };
-    const checked = await step("verify", ["verify", file, "--invariant", property, "--max-steps", String(config.verifySteps)]);
+    // What the simulation reached, read from quint's own statistics: a run that never left its initial state, or never had one, proved nothing of later steps.
+    const lengths = traceLengths(last!.stdout);
+    if (lengths === undefined) return { verdict: "not run", reason: `quint run reported no trace length statistics for ${model}, so how deep it looked cannot be said` };
+    if (lengths.max === 0) return { verdict: "not run", reason: `no initial state: quint run found no state satisfying ${model}'s init, so ${property} was checked of nothing` };
+    const depth = lengths.max - 1;
+    const short = depth < config.maxSteps ? `, short of the ${config.maxSteps} steps asked: no trace went further, so nothing past step ${depth} was seen` : "";
+    const sampled = `no violation of ${property} in ${config.maxSamples} sampled traces of ${model} (max depth ${depth}${short}; ${config.backend} backend)`;
+    if (request.form === "quint run") return { verdict: "pass", reason: sampled };
+    const checked = await step("verify", ["verify", file, "--invariant", property, "--max-steps", String(config.verifySteps), "--server-endpoint", `localhost:${await freePort()}`]);
     if (checked !== undefined) return checked;
-    return { verdict: "pass", reason: `${property} holds in ${model}: ${sampled}, and model-checked by Apalache within ${config.verifySteps} steps, a bound, not every reachable state` };
+    return { verdict: "pass", reason: `${sampled}; and none in Apalache's bounded model check within ${config.verifySteps} steps, a bound, not every reachable state` };
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
+}
+
+/** Quint's trace length statistics (states per trace, the initial one included), or undefined when it printed none. */
+export function traceLengths(stdout: string): { max: number; min: number } | undefined {
+  const match = /Trace length statistics: max=(\d+), min=(\d+)/.exec(stdout);
+  return match === null ? undefined : { max: Number(match[1]), min: Number(match[2]) };
+}
+
+/**
+ * How much of the core's timeout the plugin spends, so its own deadline
+ * always falls inside the core's and a step out of time reads not run here:
+ * two seconds short, or a quarter short when the timeout is under eight.
+ */
+export function verifierBudget(timeoutMs: number): number {
+  return timeoutMs - Math.max(1, Math.min(2000, Math.floor(timeoutMs / 4)));
+}
+
+/** A port nothing listens on now, for an Apalache server of this proof's own: quint verify would otherwise reuse any server on the default port. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.unref();
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const port = (server.address() as { port: number }).port;
+      server.close(() => resolve(port));
+    });
+  });
 }
 
 /** The states quint printed for a violation, short enough for a reason. */

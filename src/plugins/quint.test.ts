@@ -17,7 +17,10 @@ import { after, test } from "node:test";
 import { performRun } from "../enforcement/run.ts";
 import { checkPlugin, checkText } from "./check.ts";
 import { BUNDLED_DIR } from "./registry.ts";
-import { resolveTarget, verify } from "../../plugins/quint/index.ts";
+import { resolveTarget, verifierBudget, verify } from "../../plugins/quint/index.ts";
+import { pluginAt } from "./check.ts";
+import { proveVia } from "./verify.ts";
+import { budget } from "../enforcement/test-budgets.ts";
 
 const roots: string[] = [];
 
@@ -35,7 +38,7 @@ function project(files: Record<string, string>): string {
   return root;
 }
 
-/** A quint that answers as 0.33 does: typecheck passes, run breaks a property named "breaks" or "small" and refuses "unknown" or "missing", verify needs Java unless STUB_JAVA says it is there; every call logged. */
+/** A quint that answers as 0.33 does: typecheck passes, run prints its trace length statistics, run breaks a property named "breaks" or "small" and refuses "unknown" or "missing", verify needs Java unless STUB_JAVA says it is there; every call logged. */
 const STUB = `#!/usr/bin/env node
 const fs = require("node:fs");
 const argv = process.argv.slice(2);
@@ -46,6 +49,13 @@ const invariant = argv[argv.indexOf("--invariant") + 1];
 if (argv[0] === "typecheck") process.exit(0);
 if (invariant === "unknown" || invariant === "missing") { console.error("error: [QNT404] Name '" + invariant + "' not found"); process.exit(1); }
 if (argv[0] === "run" && (invariant === "breaks" || invariant === "small")) { console.log("An example execution:\\n\\n[State 0] { count: 0 }\\n\\n[State 1] { count: 1 }\\n\\n[violation] Found an issue (3ms)."); console.error("error: Invariant violated"); process.exit(1); }
+if (argv[0] === "run") {
+  // Trace lengths count states, the initial one included: a model with no init reaches none, one whose step is never enabled reaches one.
+  const file = argv[1];
+  const max = file.endsWith("NoInit.qnt") ? 0 : file.endsWith("Stuck.qnt") ? 1 : Number(argv[argv.indexOf("--max-steps") + 1]) + 1;
+  console.log("[ok] No violation found (5ms at 2000 traces/second).\\nTrace length statistics: max=" + max + ", min=" + max + ", average=" + max + ".00");
+  process.exit(0);
+}
 if (argv[0] === "verify" && process.env.STUB_JAVA !== "present") { console.error("The operation couldn\\u2019t be completed. Unable to locate a Java Runtime.\\nPlease visit http://www.java.com for information on installing Java."); process.exit(1); }
 process.exit(0);
 `;
@@ -107,15 +117,18 @@ test("a Quint bullet is proved through the verifier role: graded like a test wit
   assert.equal(proved.verdict, "pass", proved.reason);
   assert.equal(proved.evidence, "bounded-model-checked");
   assert.deepEqual(proved.plugins, [{ name: "quint", version: "0.1.0" }]);
-  assert.match(proved.reason, /holds holds in src\/journal\/Journal\.qnt: typechecked and simulated .*model-checked by Apalache within 10 steps, a bound, not every reachable state/, "the folder's one model, and the bound said");
+  assert.match(proved.reason, /no violation of holds in 1000 sampled traces of src\/journal\/Journal\.qnt \(max depth 20; typescript backend\); and none in Apalache's bounded model check within 10 steps, a bound, not every reachable state$/, "the folder's one model, the depth reached and the bound said");
   const simulated = by.get("the simulation holds")!;
   assert.equal(simulated.verdict, "pass", simulated.reason);
   assert.equal(simulated.evidence, "simulated");
   const broken = by.get("the model breaks")!;
   assert.equal(broken.verdict, "fail");
   assert.match(broken.reason, /quint run found a state of src\/journal\/Journal\.qnt that breaks breaks: .*\[State 1\] \{ count: 1 \}/);
-  const calls = readFileSync(log, "utf8").trim().split("\n").map((l) => l.split(" ")[0]);
-  assert.equal(calls.filter((c) => c === "verify").length, 1, "only the [quint] bullet model-checks");
+  const calls = readFileSync(log, "utf8").trim().split("\n");
+  const verifies = calls.filter((c) => c.startsWith("verify "));
+  assert.equal(verifies.length, 1, "only the [quint] bullet model-checks");
+  const port = /--server-endpoint localhost:(\d+)$/.exec(verifies[0]!)?.[1];
+  assert.ok(port !== undefined && port !== "8822", `its own Apalache server on a free port, never one already on the default: ${verifies[0]}`);
 
   const { startReading } = await import("../lifecycle/hook.ts");
   assert.match((await startReading(root)).text, /Plugin quint vocabulary/, "a bullet proved by its form puts its vocabulary in the way");
@@ -140,7 +153,25 @@ test("Quint never passes what it could not run: no quint, a shell that found non
   assert.equal((await withQuint({}, () => ask("quint run"))).verdict, "pass", "simulation alone needs no Java");
   const late = await withQuint({ STUB_SLEEP: "1" }, () => ask("quint run", 3000));
   assert.equal(late.verdict, "not run");
-  assert.match(late.reason, /did not finish in 1 s; .*nothing it said counts/);
+  assert.match(late.reason, /did not finish in 2 s; .*nothing it said counts/);
+});
+
+test("a Quint simulation reads how deep it went: a model with no initial state is not run, one that stops early passes with the depth it reached said as a limit; and every verifier's time out is not run, the Quint plugin's deadline inside the core's", async () => {
+  const root = project({ "edge/NoInit.qnt": MODEL, "edge/Stuck.qnt": MODEL, "Journal.qnt": MODEL });
+  const ask = (name: string): Promise<{ verdict: string; reason: string }> => withQuint({}, () => verify({ root, component: ".", form: "quint run", name, timeoutMs: 60_000 }));
+  const empty = await ask("holds in edge/NoInit.qnt");
+  assert.equal(empty.verdict, "not run");
+  assert.match(empty.reason, /^no initial state: quint run found no state satisfying edge\/NoInit\.qnt's init, so holds was checked of nothing$/);
+  const stuck = await ask("holds in edge/Stuck.qnt");
+  assert.equal(stuck.verdict, "pass", stuck.reason);
+  assert.match(stuck.reason, /\(max depth 0, short of the 20 steps asked: no trace went further, so nothing past step 0 was seen;/);
+  assert.match((await ask("holds")).reason, /\(max depth 20; typescript backend\)$/, "a run that reached the bound says so without a limit");
+
+  for (const timeoutMs of [1, 2, 3, 100, 2999, 3000, 7999, 8000, 600_000]) assert.ok(verifierBudget(timeoutMs) < timeoutMs && verifierBudget(timeoutMs) >= 0, `${timeoutMs} ms: the plugin's deadline falls inside the core's`);
+  const hangs = project({ "plugins/hangs/plugin.json": JSON.stringify({ name: "hangs", version: "1.0.0", pluginApi: 2, module: "./index.ts", verifiers: [{ form: "hangs", evidence: "model-checked" }] }), "plugins/hangs/index.ts": "export default { verify: () => new Promise(() => {}) };\n" });
+  const late = await proveVia(hangs, [pluginAt(hangs, "./plugins/hangs")], "[hangs] forever", 50);
+  assert.equal(late.verdict, "not run", "a verifier the core gave up on proved nothing either way");
+  assert.match(late.reason, /did not answer in 0 s; nothing it said counts$/);
 });
 
 test("a Quint bullet names its model from its own folder: the file it names, else the folder's one model; none, several or a missing file is said, never guessed", () => {
@@ -162,8 +193,12 @@ test("plugin check holds a verifier plugin to its own proofs, one duty per form:
   assert.ok(withJava.duties.every((d) => d.verdict === "pass"), JSON.stringify(withJava.duties));
 });
 
-test("the real quint, when COHERENCE_QUINT names it: plugin check passes [quint run] and, with no Java here, reads [quint] not run naming Java", { skip: process.env["COHERENCE_QUINT"] === undefined ? "COHERENCE_QUINT names no quint binary here; set it to run quint 0.33 itself" : false }, async () => {
-  const checked = await checkPlugin(process.cwd(), "quint");
+test("the real quint, when COHERENCE_QUINT names it: plugin check passes [quint run] and, with no Java here, reads [quint] not run naming Java", { skip: process.env["COHERENCE_QUINT"] === undefined ? "COHERENCE_QUINT names no quint binary here; set it to run quint 0.33 itself" : false }, async (t) => {
+  budget(t, 120, "d-29601af5");
+  // Its own QUINT_HOME, so quint fetches Apalache into a temporary folder and never writes ~/.quint.
+  const home = mkdtempSync(join(tmpdir(), "coherence-quint-home-"));
+  roots.push(home);
+  const checked = await withQuint({ COHERENCE_QUINT: process.env["COHERENCE_QUINT"], QUINT_HOME: home }, () => checkPlugin(process.cwd(), "quint"));
   assert.equal(checked.duties.find((d) => d.name === "[quint run]")!.verdict, "pass", JSON.stringify(checked.duties));
   const model = checked.duties.find((d) => d.name === "[quint]")!;
   assert.notEqual(model.verdict, "fail", model.reason);

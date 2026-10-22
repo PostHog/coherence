@@ -2,18 +2,20 @@
   "files": {
     "Counter.qnt": "// A counter that only climbs: the check project the Quint plugin is held to.\nmodule Counter {\n  var count: int\n\n  action init = count' = 0\n  action step = count' = count + 1\n\n  // Holds in every state: the count never goes below where it started.\n  val nonNegative = count >= 0\n  // Broken within three steps: the count passes 2.\n  val small = count < 3\n}\n",
     "coherence.config.json": "{\"quint\": {\"maxSamples\": 100, \"maxSteps\": 10, \"verifySteps\": 5}}\n",
-    "README.md": "# A Quint check project\n"
+    "README.md": "# A Quint check project\n",
+    "edge/NoInit.qnt": "// A model with no initial state: init is never satisfied, so a simulation reaches nothing.\nmodule NoInit {\n  var count: int\n  action init = all { count' = 0, false }\n  action step = count' = count + 1\n  val nonNegative = count >= 0\n}\n",
+    "edge/Stuck.qnt": "// A model whose step is never enabled: every trace stops at its initial state.\nmodule Stuck {\n  var count: int\n  action init = count' = 0\n  action step = all { count > 5, count' = count + 1 }\n  val nonNegative = count >= 0\n}\n"
   },
   "proofs": [
     {
       "via": "[quint run] nonNegative in Counter.qnt",
       "verdict": "pass",
-      "reason": "nonNegative holds in Counter.qnt: typechecked and simulated"
+      "reason": "no violation of nonNegative in 100 sampled traces of Counter.qnt \\(max depth 10; typescript backend\\)"
     },
     {
       "via": "[quint run] nonNegative",
       "verdict": "pass",
-      "reason": "holds in Counter.qnt"
+      "reason": "of Counter.qnt \\(max depth 10"
     },
     {
       "via": "[quint run] small in Counter.qnt",
@@ -24,6 +26,18 @@
       "via": "[quint run] missing in Counter.qnt",
       "verdict": "fail",
       "reason": "refused Counter.qnt"
+    },
+    {
+      "via": "[quint run] nonNegative in NoInit.qnt",
+      "verdict": "not run",
+      "reason": "no initial state: quint run found no state satisfying edge/NoInit.qnt's init",
+      "component": "edge"
+    },
+    {
+      "via": "[quint run] nonNegative in Stuck.qnt",
+      "verdict": "pass",
+      "reason": "max depth 0, short of the 10 steps asked",
+      "component": "edge"
     },
     {
       "via": "[quint run] nonNegative in Absent.qnt",
@@ -41,7 +55,7 @@
     {
       "via": "[quint] nonNegative in Counter.qnt",
       "verdict": "pass",
-      "reason": "model-checked by Apalache within 5 steps"
+      "reason": "none in Apalache's bounded model check within 5 steps"
     },
     {
       "via": "[quint] small in Counter.qnt",

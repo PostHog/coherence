@@ -289,6 +289,9 @@ label. A bracket begins no test title, so the two never read as each other. A
 form no loaded plugin declares is a spec problem naming the forms that are,
 never a test run under that title. Two plugins that prove one form are refused.
 
+A verifier that does not answer within the run's timeout is not run: it
+proved nothing either way.
+
 `refute` stages a break and runs the bullet as `run` does, so a verifier's
 bullet is refuted like any other.
 
@@ -375,10 +378,14 @@ Coherence's that a Convex project has already).
 ```
 
 - `[quint run] <property>`: `quint typecheck`, then `quint run --invariant`
-  over sampled runs. Evidence `simulated`.
+  over sampled runs. Evidence `simulated`. The pass says what was checked:
+  no violation in so many sampled traces, and the deepest one reached, read
+  from quint's trace length statistics; a run that stopped short of the steps
+  asked says so as a limit, and a model with no initial state is not run.
 - `[quint] <property>`: the same, then `quint verify`, Apalache's bounded model
   check. Evidence `bounded-model-checked`; the reason states the bound, since
-  it is not every reachable state.
+  it is not every reachable state. Each proof starts its own Apalache server
+  on a free port (`--server-endpoint`), never one already running.
 - The model file is named from the bullet's spec folder, or with none named
   the folder's one `.qnt` model.
 - A state that breaks the property fails the bullet with the states quint
