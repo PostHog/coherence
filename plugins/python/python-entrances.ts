@@ -7,8 +7,8 @@
  */
 
 import { posix } from "node:path";
-import { languageOfFile } from "../../src/adapters/language-files.ts";
-import { escape, handlerName, spanOf, throughOf, type EntranceCandidate, type EntranceSyntax } from "../../src/adapters/entrance-candidates.ts";
+import { languageOfFile } from "../../src/plugins/api.ts";
+import { escape, handlerName, spanOf, throughOf, type EntranceCandidate, type EntranceSyntax } from "../../src/plugins/api.ts";
 
 function pythonCandidates(file: string, text: string, wrappers: readonly string[]): EntranceCandidate[] {
   const out: EntranceCandidate[] = [];

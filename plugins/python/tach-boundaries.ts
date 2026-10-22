@@ -7,9 +7,9 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { lineOf, parseToml, TomlError, type TomlTable, type TomlValue } from "../../src/adapters/toml.ts";
-import { readOwners, type BoundaryModule, type BoundarySource, type Exposure } from "../../src/scaffold/boundaries.ts";
-import { ScaffoldError } from "../../src/scaffold/scaffold.ts";
+import { tomlLineOf as lineOf, parseToml, TomlError, type TomlTable, type TomlValue } from "../../src/plugins/api.ts";
+import { readOwners, type BoundaryModule, type BoundarySource, type Exposure } from "../../src/plugins/api.ts";
+import { ScaffoldError } from "../../src/plugins/api.ts";
 
 const posix = (path: string): string => path.split(sep).join("/");
 

@@ -5,7 +5,7 @@
  * config's grammar for one).
  */
 
-import type { PluginModule } from "../../src/plugins/plugin.ts";
+import type { PluginModule } from "../../src/plugins/api.ts";
 import { DeclaredAdapter } from "./declared.ts";
 
 const declared: PluginModule = {

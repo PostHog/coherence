@@ -6,7 +6,7 @@
  */
 
 import { specifierCandidates } from "./typescript.ts";
-import type { InterfaceSyntax } from "../../src/readings/scope/component-interfaces.ts";
+import type { InterfaceSyntax } from "../../src/plugins/api.ts";
 
 /** A TypeScript import or export list: `import { a as b } from`, `export { a as b }`, `export type { … }`. */
 const TS_LIST = /\b(?:import|export)\s+(?:type\s+)?(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}/g;

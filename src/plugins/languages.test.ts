@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
 import ts from "typescript";
@@ -19,6 +19,7 @@ import { isTestPath } from "../adapters/adapter.ts";
 import { instrumentFor } from "../adapters/index.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { BUNDLED_DIR } from "./registry.ts";
+import { moduleSpecifiers } from "./specifiers.ts";
 import { forProject, LANGUAGES, languageOfFile, providerOf, serverExtensions, syntaxOf } from "./languages.ts";
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -60,6 +61,8 @@ function coreSources(dir: string, into: string[] = []): string[] {
 const ALLOWED: readonly { file: string; texts: readonly string[]; why: string }[] = [
   { file: "src/adapters/declared-config.ts", texts: ['"python"'], why: "the interpreter's program name, one of the runners a declared server is started through" },
   { file: "src/build.ts", texts: ['/(from\\s+["\']\\.{1,2}\\/[^"\']+)\\.ts(["\'])/g', "/\\.(test|e2e)\\.ts$/", '".ts"', '/((?:\\bfrom|\\bimport)\\s*\\(?\\s*["\']\\.{1,2}\\/[^"\']+)\\.ts(["\'])/g', "/\\.ts$/", '".js"', '/("[A-Za-z]+":\\s*"[^"#/]+)\\.ts(["#])/g'], why: "Coherence's own build compiles its own TypeScript sources" },
+  { file: "src/plugins/eject.ts", texts: ["/\\.[cm]?[jt]sx?$/"], why: "an eject rewrites the bundled plugins' sources, Coherence's own TypeScript" },
+  { file: "src/plugins/specifiers.ts", texts: ['"typescript"'], why: "the TypeScript compiler's package, which reads the imports of the bundled plugins' sources, Coherence's own TypeScript" },
   { file: "src/enforcement/code-fingerprint.ts", texts: ["/\\.(ts|mts|cts|js|mjs|cjs|json)$/", "/\\.js$/", "/\\.ts$/"], why: "the identity of Coherence's own code, its sources or the compiled modules" },
   { file: "src/readings/scope/build.ts", texts: ["/\\.ts$/", '".js"'], why: "the Scope page is built from Coherence's own TypeScript sources" },
   { file: "src/enforcement/check.ts", texts: ["/^(.*)\\/(?:__init__\\.py|mod\\.rs)$/", "/^((?:.*\\/)?src)\\/(?:lib|main)\\.rs$/", "/^(.*)\\.rs$/"], why: "not yet a plugin's: which files a module owns (a Python package's __init__, a Rust module's folder)" },
@@ -215,4 +218,47 @@ test("a session start names each plugin the project brings whose syntax code run
   assert.doesNotMatch((await startReading(adapterOnly)).text, /Plugin code in this session's hooks/, "a plugin whose code runs only in a run and the warm server");
   const bare = project({ "coherence.config.json": JSON.stringify({ language: ["typescript", "python", "rust"] }) });
   assert.doesNotMatch((await startReading(bare)).text, /Plugin code in this session's hooks/, "the bundled plugins are the package itself");
+});
+
+test("a session start names each plugin written for an older pluginApi with what changed since, in one line, and nothing for one on the current interface", async () => {
+  const { startReading } = await import("../lifecycle/hook.ts");
+  const { PLUGIN_API } = await import("./plugin.ts");
+  const at = (pluginApi: number): string =>
+    project({
+      "coherence.config.json": JSON.stringify({ language: "python", plugins: { pyx: "./plugins/pyx" } }),
+      ...swapPlugin("pyx", "python", { pluginApi }),
+    });
+  const older = (await startReading(at(PLUGIN_API - 1))).text;
+  assert.match(older, new RegExp(`^Plugins written for an older pluginApi \\(this Coherence runs ${PLUGIN_API}\\): pyx \\(${PLUGIN_API - 1}; since: ${PLUGIN_API}: syntax slots moved from the module's syntax export to plugin\\.json[^\\n]*\\)\\.$`, "m"), older);
+  assert.equal(older.match(/older pluginApi/g)?.length, 1, "one line");
+  assert.doesNotMatch((await startReading(at(PLUGIN_API))).text, /older pluginApi/, "a plugin on the interface this Coherence runs");
+});
+
+test("a module written for pluginApi 1 that exports its syntax is refused by name at load, never silently ignored", async () => {
+  const { pluginAt } = await import("./check.ts");
+  const { moduleOf, moduleSyncOf, PluginRefused } = await import("./registry.ts");
+  const root = project(swapPlugin("pyx", "python", {}));
+  writeFileSync(join(root, "plugins/pyx/index.ts"), "export default { adapter: () => undefined, syntax: { source: {} } };\n");
+  const plugin = pluginAt(root, "./plugins/pyx");
+  const named = (e: unknown): boolean => e instanceof PluginRefused && /plugin pyx's module exports syntax, which this Coherence does not read: name each slot in plugin\.json as "syntax"/.test(e.message);
+  assert.throws(() => moduleSyncOf(plugin), named);
+  await assert.rejects(moduleOf(plugin), named);
+});
+
+test("the bundled plugins reach the core only through the plugin interface, src/plugins/api.ts, which @posthog/coherence/plugin is", () => {
+  const reaching: string[] = [];
+  // Every specifier as the parser reads it (moduleSpecifiers): a static import, an export from, a dynamic import() and a require() alike.
+  for (const name of readdirSync(PLUGINS, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)) {
+    for (const file of readdirSync(join(PLUGINS, name), { recursive: true }).map(String).filter((f) => /\.[cm]?[jt]sx?$/.test(f))) {
+      const text = readFileSync(join(PLUGINS, name, file), "utf8");
+      const from = posix.dirname(file.split(sep).join("/"));
+      for (const { text: specifier } of moduleSpecifiers(file, text)) {
+        if (specifier === "../../src/plugins/api.ts" && from === ".") continue;
+        if (specifier.startsWith(".") && posix.normalize(posix.join(from, specifier)).startsWith("..")) reaching.push(`plugins/${name}/${file} imports ${specifier}`);
+      }
+    }
+  }
+  assert.deepEqual(reaching, [], "an ejected copy reaches Coherence only through the package's plugin interface; export what a plugin needs from src/plugins/api.ts");
+  const pkg = JSON.parse(readFileSync(join(PLUGINS, "..", "package.json"), "utf8")) as { exports: Record<string, { default: string }> };
+  assert.equal(pkg.exports["./plugin"]!.default, "./dist/plugins/api.js", "the package's plugin export is that module");
 });

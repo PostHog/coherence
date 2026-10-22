@@ -46,8 +46,26 @@ import type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts"
 import type { BoundarySource } from "../scaffold/boundaries.ts";
 import type { Verdict } from "../enforcement/record.ts";
 
-/** The interface version this core runs; a plugin written for another is refused, naming both. */
-export const PLUGIN_API = 1;
+/** The interface version this core runs. */
+export const PLUGIN_API = 2;
+
+/** The oldest interface version this core still reads: a plugin written for one from here to PLUGIN_API loads, and an older one is named at session start with what changed since; any other is refused, naming both. */
+export const OLDEST_PLUGIN_API = 1;
+
+/** What each interface version changed from the one before, for the line a session start says about a plugin written for an older one. */
+export const PLUGIN_API_CHANGES: Readonly<Record<number, string>> = {
+  2: 'syntax slots moved from the module\'s syntax export to plugin.json ("syntax": { slot: "module#export" }), the member scan became plugin.json data (members), and kept, declares, notice, topLevel and boundaries joined the slots',
+};
+
+/** What changed between the interface version a plugin was written for and the one this core runs, oldest first. */
+export function changesSince(pluginApi: number): string[] {
+  const changes: string[] = [];
+  for (let version = pluginApi + 1; version <= PLUGIN_API; version++) {
+    const said = PLUGIN_API_CHANGES[version];
+    if (said !== undefined) changes.push(`${version}: ${said}`);
+  }
+  return changes;
+}
 
 /** The manifest's file name in a plugin's folder. */
 export const MANIFEST = "plugin.json";

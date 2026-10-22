@@ -46,12 +46,12 @@ import {
   type SiteForm,
   type StagedSite,
   type Visibility,
-} from "../../src/adapters/adapter.ts";
-import { locateServer as locateInstalled, type ServerLocation } from "../../src/adapters/installed.ts";
+} from "../../src/plugins/api.ts";
+import { locateServer as locateInstalled, type ServerLocation } from "../../src/plugins/api.ts";
 import { locateTsserver } from "./tsserver.ts";
 import manifest from "./plugin.json" with { type: "json" };
-import { JsonRpcClient } from "../../src/adapters/jsonrpc.ts";
-import { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/adapters/project-files.ts";
+import { JsonRpcClient } from "../../src/plugins/api.ts";
+import { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
 
 const SERVER_BIN = "typescript-language-server";
 const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);

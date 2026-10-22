@@ -5,7 +5,7 @@
  * ENTRANCE_SYNTAX).
  */
 
-import type { EntranceSyntax } from "../../src/adapters/entrance-candidates.ts";
+import type { EntranceSyntax } from "../../src/plugins/api.ts";
 
 const NONE: ReadonlySet<string> = new Set();
 

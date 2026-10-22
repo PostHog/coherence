@@ -368,6 +368,12 @@ export function coreAdapter(language: string, root: string, bounds?: AdapterBoun
   return adapterModule(plugin).adapter!({ root, language, ...(bounds === undefined ? {} : { bounds }) });
 }
 
+/** The bundled plugin's own adapter for one of the core's languages, whatever a project swaps in: what a plugin extending that language wraps. */
+export function bundledAdapter(language: string, root: string): LanguageAdapter | undefined {
+  const plugin = bundledProvider(language);
+  return plugin === undefined ? undefined : adapterModule(plugin).adapter!({ root, language });
+}
+
 /** The adapter of a language a config declares, built by the declared plugin. */
 export function declaredAdapter(declared: DeclaredLanguage, root: string): LanguageAdapter {
   const plugin = declaredProvider();

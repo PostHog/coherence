@@ -49,12 +49,12 @@ import {
   type SiteForm,
   type StagedSite,
   type Visibility,
-} from "../../src/adapters/adapter.ts";
-import type { ServerLocation } from "../../src/adapters/installed.ts";
+} from "../../src/plugins/api.ts";
+import type { ServerLocation } from "../../src/plugins/api.ts";
 import { locateRustAnalyzer } from "./rust-analyzer.ts";
 import manifest from "./plugin.json" with { type: "json" };
-import { JsonRpcClient, RpcError } from "../../src/adapters/jsonrpc.ts";
-import { keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/adapters/project-files.ts";
+import { JsonRpcClient, RpcError } from "../../src/plugins/api.ts";
+import { keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control when the server is quiescent. */
 export interface RustLanguageClient {

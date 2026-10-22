@@ -1,0 +1,2 @@
+{"id":"wm-b8d0fc13","kind":"move","at":"2026-10-22T02:14:18.595Z","session":"ab818e56d384a196b","agent":"plugins4","commit":"d2fc6d1","dirty":true,"of":"w-e1e71dde","state":"active","because":"building eject, plugin check and the stale pluginApi line"}
+{"id":"wo-e770edf1","kind":"owner","at":"2026-10-22T02:14:23.464Z","session":"ab818e56d384a196b","agent":"plugins4","commit":"d2fc6d1","dirty":true,"of":"w-e1e71dde","owner":"ab818e56d384a196b","because":"plugin step 3 is built in this session, as the coordinator asked after #136"}

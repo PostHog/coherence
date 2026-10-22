@@ -1,0 +1,53 @@
+{
+  "files": {
+    "Cargo.toml": "[package]\nname = \"shop\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[lib]\npath = \"src/lib.rs\"\n",
+    "src/lib.rs": "pub mod store;\npub mod api;\n",
+    "src/store/mod.rs": "pub const SECRET_COLUMNS: &[&str] = &[\"token\"];\n\npub fn seal(row: &mut Vec<String>) {\n    row.retain(|c| !SECRET_COLUMNS.contains(&c.as_str()));\n}\n",
+    "src/api/mod.rs": "use crate::store::{seal, SECRET_COLUMNS};\n\npub fn render(row: &mut Vec<String>) -> usize {\n    seal(row);\n    SECRET_COLUMNS.len()\n}\n",
+    "README.md": "# A crate\n"
+  },
+  "language": {
+    "files": [
+      "src/lib.rs",
+      "src/store/mod.rs"
+    ],
+    "not": [
+      "README.md",
+      "Cargo.toml"
+    ]
+  },
+  "declarations": [
+    {
+      "file": "src/store/mod.rs",
+      "name": "SECRET_COLUMNS",
+      "declared": true
+    },
+    {
+      "file": "src/store/mod.rs",
+      "name": "seal",
+      "declared": true
+    },
+    {
+      "file": "src/lib.rs",
+      "name": "store",
+      "declared": true
+    },
+    {
+      "file": "src/api/mod.rs",
+      "name": "seal",
+      "declared": false
+    }
+  ],
+  "protects": "SECRET_COLUMNS",
+  "chokepoint": "seal",
+  "references": [
+    "src/api/mod.rs:1",
+    "src/api/mod.rs:5",
+    "src/store/mod.rs:4"
+  ],
+  "grade": "broken",
+  "bypasses": [
+    "src/api/mod.rs:1",
+    "src/api/mod.rs:5"
+  ]
+}
