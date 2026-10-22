@@ -513,6 +513,9 @@ test("the model: a handler an export list re-exports, or a destructuring across 
   assert.equal(declaresAtTop('import { GET } from "./auth";\n', "GET", "route.ts"), false, "an import declares nothing");
   assert.equal(declaresAtTop("export const {\n  a,\n  b: { c },\n}: Things = make();\n", "c", "route.ts"), true, "a typed destructuring across lines");
   assert.equal(declaresAtTop("const {\n  a,\n  b,\n};\n", "a", "route.ts"), false, "braces that assign nothing are no destructuring");
+  assert.equal(declaresAtTop("export const aXb = 1;\n", "a.b", "route.ts"), false, "a handler name is matched as written, not as a pattern");
+  assert.equal(declaresAtTop("aXb = 1\n", "a.b", "handlers.py"), false, "a Python handler name is matched as written, not as a pattern");
+  assert.equal(declaresAtTop("export const $x = 1;\n", "$x", "route.ts"), true, "a $ in a name is matched as written");
 });
 
 test("the model: an entrance's guard: line names a chokepoint an invariant declares, or a symbol of a chokepoint module", () => {

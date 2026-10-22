@@ -11,7 +11,7 @@
 
 /** Whether the text declares the name at its top level. */
 export function typescriptDeclaresAtTop(text: string, name: string): boolean {
-  const escaped = name.replace(/\$/g, "\\$");
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (destructuredAtTop(text).has(name) || exportListed(text).has(name)) return true;
   return new RegExp(`^(?:export\\s+)?(?:default\\s+)?(?:declare\\s+)?(?:abstract\\s+)?(?:async\\s+)?(?:function\\*?|const|let|var|class|interface|type|enum|namespace)\\s+${escaped}\\b`, "m").test(text);
 }
