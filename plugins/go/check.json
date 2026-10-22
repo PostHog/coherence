@@ -1,0 +1,61 @@
+{
+  "files": {
+    "go.mod": "module shop\n\ngo 1.22\n",
+    "store/secrets.go": "package store\n\n// SecretColumns is the protected thing.\nvar SecretColumns = []string{\"token\"}\n\n// Seal is the chokepoint: the one way a row leaves without its secrets.\nfunc Seal(row map[string]string) map[string]string {\n\tout := map[string]string{}\n\tfor k, v := range row {\n\t\tout[k] = v\n\t}\n\tfor _, column := range SecretColumns {\n\t\tdelete(out, column)\n\t}\n\treturn out\n}\n",
+    "api/render.go": "package api\n\nimport \"shop/store\"\n\n// Render seals the row, then reads the secret columns around the seal.\nfunc Render(row map[string]string) int {\n\tsealed := store.Seal(row)\n\treturn len(sealed) + len(store.SecretColumns)\n}\n",
+    "store/secrets_test.go": "package store\n\nimport \"testing\"\n\nfunc TestColumns(t *testing.T) {\n\tif len(SecretColumns) == 0 {\n\t\tt.Fatal(\"no secret columns\")\n\t}\n}\n",
+    "README.md": "# A module\n"
+  },
+  "language": {
+    "files": [
+      "store/secrets.go",
+      "api/render.go",
+      "store/secrets_test.go",
+      "cmd/shop/main.go"
+    ],
+    "not": [
+      "README.md",
+      "go.mod",
+      "go.sum",
+      "store/secrets.go.orig"
+    ]
+  },
+  "declarations": [
+    {
+      "file": "store/secrets.go",
+      "name": "SecretColumns",
+      "declared": true
+    },
+    {
+      "file": "store/secrets.go",
+      "name": "Seal",
+      "declared": true
+    },
+    {
+      "file": "store/secrets.go",
+      "name": "out",
+      "declared": false
+    },
+    {
+      "file": "api/render.go",
+      "name": "SecretColumns",
+      "declared": false
+    },
+    {
+      "file": "api/render.go",
+      "name": "Render",
+      "declared": true
+    }
+  ],
+  "protects": "SecretColumns",
+  "chokepoint": "Seal",
+  "references": [
+    "api/render.go:8",
+    "store/secrets.go:12",
+    "store/secrets_test.go:6"
+  ],
+  "grade": "broken",
+  "bypasses": [
+    "api/render.go:8"
+  ]
+}

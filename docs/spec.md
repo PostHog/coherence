@@ -213,6 +213,13 @@ module) and the chokepoint every reference passes through:
   checklist: encrypted-storage dismissed: the digest is the stored form; nothing is decrypted
 ```
 
+`protects` and `chokepoint` (and an entrance's `handler`) each name one thing,
+in one of three forms: a bare symbol (`seal`), a symbol in its file
+(`Write in internal/store/store.go`), or a module by its path (`api/render.ts`,
+or a package folder with a trailing slash, `posthog/query_cache/`). A dotted
+name (`store.Write`, `models.User`) is none of these: it reads as prose, which
+no adapter resolves, so write the symbol in its file instead.
+
 The totality oracle form, the compromise where structure is not practical,
 names the whole set the detector is total over and the test:
 

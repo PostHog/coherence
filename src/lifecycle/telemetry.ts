@@ -211,7 +211,8 @@ export interface ProjectFacts {
 export function projectFacts(root: string): ProjectFacts {
   let languages: string[] = [];
   try {
-    languages = [...readEnforcementConfig(root).languages];
+    // The core's languages alone: a language a plugin adds is named by whoever wrote the plugin, so it is never sent.
+    languages = readEnforcementConfig(root).languages.filter((l) => (LANGUAGES as readonly string[]).includes(l));
   } catch {
     languages = [];
   }

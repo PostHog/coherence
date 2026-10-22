@@ -25,10 +25,11 @@ import { latestSeeing } from "../enforcement/run-index.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
 import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles, type Walked } from "../adapters/project-files.ts";
 import { configuredName, effectiveConfig, lexiconFileOf, readConfigFile } from "../adapters/project-config.ts";
-import { LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
+import { coreLanguageOfExtension, LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
 import { syntaxOf } from "../plugins/languages.ts";
 import type { LoadedPlugin } from "../plugins/plugin.ts";
 import { readPlugins } from "../plugins/registry.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
 import { viaFormProblem } from "../plugins/verify.ts";
 import { clashText, composeStack, pluginLayers } from "../plugins/lexicon.ts";
 import { parseLexicon } from "../lifecycle/lexicon.ts";
@@ -157,21 +158,31 @@ interface Config {
   /** The plugins the config runs (src/plugins), for the via forms they prove; empty when it runs none or names one it refuses. */
   plugins: LoadedPlugin[];
   /** Why the config's plugins were refused, each a problem on the config file. */
-  pluginProblems: string[];
+  configProblems: string[];
 }
 
 function readConfig(root: string): Config {
-  const config: Config = { ignore: [], entryDir: ".", plugins: [], pluginProblems: [] };
+  const config: Config = { ignore: [], entryDir: ".", plugins: [], configProblems: [] };
   // The project's own config over its registry's keys (project-config.ts); a malformed file is refused with its path.
   const found = effectiveConfig(root);
   if (found === undefined) return config;
   const record = found.record;
   if (Array.isArray(record["ignore"])) config.ignore = record["ignore"].filter((v): v is string => typeof v === "string");
   if (typeof record["entryDir"] === "string") config.entryDir = record["entryDir"];
-  // Only the manifests are read: what a plugin proves is data, and no plugin code runs for the spec.
-  const plugins = readPlugins(root, record["plugins"], CONFIG_FILE, LANGUAGES, (extension) => languageOfFile(`x${extension}`));
+  // Only the manifests are read here: what a plugin proves is data. A syntax slot's module loads only where a reading asks for that slot
+  // (the check that a handler is declared at a file's top level), as every reading of a language does.
+  const plugins = readPlugins(root, record["plugins"], CONFIG_FILE, LANGUAGES, coreLanguageOfExtension);
   config.plugins = plugins.plugins;
-  config.pluginProblems = plugins.problems;
+  config.configProblems = plugins.problems;
+  // The config as a run reads it: a language key it refuses is the spec check's problem too, never passed here and refused there.
+  // Read once the plugins are, it registers them, so a file of a language a plugin adds is read by that plugin's syntax slots.
+  if (plugins.problems.length === 0) {
+    try {
+      readEnforcementConfig(root);
+    } catch (error) {
+      config.configProblems = [error instanceof Error ? error.message : String(error)];
+    }
+  }
   return config;
 }
 
@@ -418,7 +429,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   // One walk of the project serves the specs, the practice files and the ignore list's check.
   const walked = walkedProjectFiles(walkBounds(root, config.ignore));
   problems.push(...ignoreProblems(root, walked));
-  for (const message of config.pluginProblems) problems.push({ file: CONFIG_FILE, line: 1, message });
+  for (const message of config.configProblems) problems.push({ file: CONFIG_FILE, line: 1, message });
   problems.push(...lexiconStackProblems(root, config.plugins));
   const storedName = storedNameProblems(root)[0];
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();

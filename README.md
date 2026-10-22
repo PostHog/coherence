@@ -409,6 +409,10 @@ test setup per runner, as [docs/config.md](docs/config.md#more-than-one-language
 Rust chokepoints are graded through rust-analyzer, found on the machine rather
 than installed by npm ([docs/enforcement.md](docs/enforcement.md#rust)); the
 economy and Scope readings do not read Rust yet, and say so by name.
+Go is an opt-in bundled plugin, `"plugins": { "go": "bundled" }`, graded
+through gopls ([docs/plugins.md](docs/plugins.md#go)); a language Coherence
+lacks is a plugin you can write, held by `coherence plugin check` to what every
+language plugin owes.
 It works inside Claude Code and Codex. Where the project already runs a
 checker that refuses a boundary crossing, Coherence grades by it: Pyright's
 private-usage rule, an import-linter rule, or a `tach.toml` interface

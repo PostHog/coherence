@@ -94,6 +94,14 @@ test("ci install writes the fail mode for npm: spec --check and the chokepoint r
   assert.doesNotMatch(text, /working-directory/, "a project at the top runs there");
 });
 
+test("ci install sets up what a language plugin's adapter asks: the Go plugin's toolchain and gopls, pinned, after the install and before the checks", () => {
+  const top = repository({ "package.json": ADOPTER_PACKAGE, "package-lock.json": "{}\n", "coherence.config.json": JSON.stringify({ language: "go", plugins: { go: "bundled" } }) });
+  const text = workflowText(planWorkflow(top, "github", "fail"));
+  assertWellFormed(text);
+  assert.match(text, /- name: Install\n {8}run: npm ci\n\n {6}# The Go plugin grades through gopls[^\n]*\n\n {6}- name: "Go"\n {8}uses: actions\/setup-go@[0-9a-f]{40} # v\d[^\n]*\n {8}with:\n {10}go-version: "stable"\n\n {6}- name: "gopls"\n {8}run: "go install golang\.org\/x\/tools\/gopls@v[\d.]+"\n\n {6}- name: Spec check\n/);
+  assert.doesNotMatch(workflowText(planWorkflow(repository({ "package.json": ADOPTER_PACKAGE, "package-lock.json": "{}\n", "coherence.config.json": "{}\n" }), "github", "fail")), /setup-go|gopls/, "a project that does not run the plugin sets up none of it");
+});
+
 test("ci install writes the comment mode for pnpm: findings never fail the job, and one comment is posted or updated", () => {
   const top = repository({ "package.json": ADOPTER_PACKAGE, "pnpm-lock.yaml": "lockfileVersion: '9.0'\n" });
   const text = workflowText(planWorkflow(top, "github", "comment"));

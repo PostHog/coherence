@@ -47,7 +47,7 @@
 import { isAbsolute } from "node:path";
 import { isLanguage, LANGUAGES, type Language } from "../adapters/index.ts";
 import { declaredLanguageOf, readDeclaredLanguages, type DeclaredLanguage } from "../adapters/declared-config.ts";
-import { languageOfFile } from "../adapters/language-files.ts";
+import { coreLanguageOfExtension, languageOfFile } from "../adapters/language-files.ts";
 import { effectiveConfig, type SetupKey } from "../adapters/project-config.ts";
 import { FROM_FORM, parseFrom, type ChokepointFrom } from "../spec/grammar.ts";
 import type { LoadedPlugin } from "../plugins/plugin.ts";
@@ -77,7 +77,7 @@ export interface TestSetup {
 export interface EnforcementConfig {
   /** The primary language: the first of `enforced`; a built-in, or one the config declares. */
   language: string;
-  /** Every built-in language the project spans, in the config's order; empty when the project names only languages it declares. */
+  /** Every language the project spans that a plugin reads, a built-in or one a plugin it runs adds (Go), in the config's order; empty when the project names only languages it declares. */
   languages: Language[];
   /** The languages the config declares (its `languages` object), each read by the generic adapter (src/adapters/declared.ts). */
   declared: DeclaredLanguage[];
@@ -171,7 +171,7 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   const { record, path } = found;
   const declared = readDeclaredLanguages(record["languages"], path);
   // The plugins first: a language a plugin provides is one the language key may name.
-  const read = readPlugins(root, record["plugins"], path, LANGUAGES, (extension) => languageOfFile(`x${extension}`) ?? declaredLanguageOf(`x${extension}`, declared)?.name);
+  const read = readPlugins(root, record["plugins"], path, LANGUAGES, (extension) => coreLanguageOfExtension(extension) ?? declaredLanguageOf(`x${extension}`, declared)?.name);
   if (read.problems.length > 0) throw new Error(read.problems.join("; "));
   const provided = pluginLanguages(read.plugins, LANGUAGES);
   const twice = provided.filter((p) => declared.some((d) => d.name === p.name));
@@ -187,7 +187,7 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
     const unknown = listed.filter((l) => typeof l !== "string" || !known.includes(l));
     // JavaScript is TypeScript's: its adapter reads .js, .mjs, .cjs and .jsx, so the name a JavaScript project reaches for is pointed there.
     const javascript = unknown.some((l) => typeof l === "string" && /^(?:javascript|js|jsx|node|nodejs)$/i.test(l)) ? `; typescript also reads JavaScript (.js, .mjs, .cjs, .jsx): name typescript for a JavaScript project` : "";
-    if (unknown.length > 0 || listed.length === 0) throw new Error(`${path}: language ${listed.length === 0 ? "lists nothing" : `names ${unknown.map((l) => JSON.stringify(l)).join(", ")}`}; each is one of ${known.join(", ")}${declared.length === 0 ? " (or a language declared under languages)" : ""}${javascript}`);
+    if (unknown.length > 0 || listed.length === 0) throw new Error(`${path}: language ${listed.length === 0 ? "lists nothing" : `names ${unknown.map((l) => JSON.stringify(l)).join(", ")}`}; each is one of ${known.join(", ")}, a language declared under languages, or one a plugin named under plugins provides (docs/plugins.md)${javascript}`);
     config.enforced = [...new Set(listed as string[])];
   }
   // A declared language the language key does not name would be read by nothing: say so rather than leave it unread.
@@ -197,7 +197,8 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   const unlisted = provided.filter((p) => !config.enforced.includes(p.name));
   if (unlisted.length > 0) throw new Error(`${path}: ${unlisted.map((p) => `plugin ${p.plugin} provides ${p.name}`).join(", ")}, which language does not name; name each there (language: [${[...config.enforced, ...unlisted.map((p) => p.name)].map((l) => JSON.stringify(l)).join(", ")}]) or remove the plugin`);
   config.declared = declared;
-  config.languages = config.enforced.filter((l): l is Language => isLanguage(l));
+  // A language a plugin adds is read as a built-in is, by its plugin's manifest and syntax slots (src/plugins/languages.ts).
+  config.languages = config.enforced.filter((l): l is Language => isLanguage(l) || provided.some((p) => p.name === l));
   config.language = config.enforced[0]!;
   const budget = record["latencyBudget"];
   if (budget !== undefined) {

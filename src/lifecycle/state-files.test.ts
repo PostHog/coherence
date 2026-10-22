@@ -199,3 +199,18 @@ test("install and every session start keep .coherence/.gitattributes: written wh
   assert.equal(keepIgnore(none, true), "kept");
   assert.equal(readFileSync(join(none, IGNORE_FILE), "utf8"), "*.log\n");
 });
+
+test("a command that makes .coherence writes its git files with it, so a project without hooks commits only its records; one already there keeps what its adopter left", async () => {
+  const { cli } = await import("./cli-fixture.ts");
+  const root = fixture("first-command");
+  ok(root, "init", "-q");
+  writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ language: "typescript" }));
+  const decide = (n: string) => cli(["decide", `chose ${n}`, "--over", "the other", "--because", "a test", "--session", SESSION, "--agent", "test"], { cwd: root });
+  const first = await decide("one");
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(readFileSync(join(root, IGNORE_FILE), "utf8"), IGNORE_TEXT, "the first record wrote the ignore file beside it");
+  assert.equal(readFileSync(join(root, ATTRIBUTES_FILE), "utf8"), ATTRIBUTES_TEXT);
+  rmSync(join(root, IGNORE_FILE));
+  assert.equal((await decide("two")).status, 0);
+  assert.ok(!existsSync(join(root, IGNORE_FILE)), "a folder that was already there is its adopter's: a removed ignore file stays removed");
+});

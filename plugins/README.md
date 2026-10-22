@@ -16,6 +16,7 @@ Bundled but opt-in: a project runs these only by naming them,
 
 | Plugin | Adds |
 |---|---|
+| `go` | Go, through gopls: a language no default plugin provides, read as one is once a project names it |
 | `convex` | over TypeScript: a Convex function reached through the generated API as a reference, and a deployment's functions, HTTP routes and crons as entrances |
 | `quint` | a verifier: `via: [quint]` and `[quint run]` prove a property of a Quint model |
 
@@ -32,7 +33,9 @@ Each lives in its own folder, `plugins/<name>/plugin.json` beside its modules
 and its `check.json`, the project `coherence plugin check` holds it to. The
 modules import Coherence only through `src/plugins/api.ts`, which the package
 exports as `@posthog/coherence/plugin`, so `coherence plugin eject <name>`
-can copy one into a project unchanged but for that import.
+can copy one into a project unchanged but for that import. A plugin written
+outside this folder, read from these as an example, imports
+`@posthog/coherence/plugin` instead.
 The published package carries them compiled to JavaScript under
 `dist/bundled`, since Node strips no types under node_modules. The interface,
 the roles a plugin may take and the swap rule are in

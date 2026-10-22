@@ -319,6 +319,18 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: an upgrade is the adopter's next npm install and nothing more; the session start is the first thing of Coherence's that runs after it, so it is where an adopter that never reinstalls the hooks receives the merge rule
   refuted: made the session start's commit skip keepStateFiles -> "a session start in a project that adopted an earlier release writes the attributes file its records merge by and brings the earlier ignore file up so git commits it" went red in hook.test.ts; restored, green (2026-10-09)
   kinds: none
+- the command that makes the folder writes its git files: A command that makes .coherence in a project (a first run or journal record, with no hooks installed) writes .coherence/.gitignore and .gitattributes with it, so git never offers the regenerated state, the warm server's token among it, for a commit; a .coherence that was already there keeps whatever its adopter left, a removed ignore file staying removed.
+  over: a git project with a config and no .coherence, two decide commands with the ignore file removed between them
+  via: a command that makes .coherence writes its git files with it, so a project without hooks commits only its records; one already there keeps what its adopter left
+  because: only hooks install wrote the ignore file, so a project adopted without hooks was offered cache, run (with the warm server's token) and traces for its next commit (the blind Go plugin session, 2026-10-22)
+  refuted: skipped the write of the git files after a command that made .coherence (main in cli.ts) -> "a command that makes .coherence writes its git files with it, so a project without hooks commits only its records; one already there keeps what its adopter left" went red in state-files.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-22)
+  kinds: credential
+  checklist: capability-authorization dismissed: the files decide what git offers for a commit, not who may act
+  checklist: revalidated-permission dismissed: no permission is held over time here
+  checklist: message-authenticity dismissed: no message is received
+  checklist: encrypted-storage dismissed: the token stays on the machine that made it; the bullet keeps it out of the repository rather than storing it there
+  checklist: key-rotation-compatibility dismissed: the warm server makes its token anew at each start, so nothing is rotated
+  checklist: separation-of-duties dismissed: one command writes both files, with no approval between
 - check fails on any drift: The hook check exits non-zero, naming the event and the kind, whenever an agent host's installed hooks differ from what install would write: an event missing, an entry of ours stale in any field or shape, or an extra entry of ours; another tool's hook is never drift.
   over: every event install wires, every field and the shape of the entry install writes, and every entry of ours under any event, for both agent hosts
   via: the check names every drift from what install would write: missing, stale, and extra
@@ -1196,6 +1208,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: ci install writes the comment mode for pnpm: findings never fail the job, and one comment is posted or updated
   because: the adopter wanted a report comment, not a failed check (df-7b885044); a comment posted anew on every push buries the conversation, an exit that cannot tell findings from a crash would either fail on findings or pass a broken run, and a fork's read-only token failing quietly would read as a clean pull request
   refuted: the comment mode's spec check step swallowed every exit (|| true), so a crash of Coherence passed as findings -> "ci install writes the comment mode for pnpm: findings never fail the job, and one comment is posted or updated" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
+  kinds: none
+- the CI check sets up what a language plugin asks: ci install reads each project's plugins and writes, after the install and before the checks, the setup steps the plugin of each language the projects read declares, each action pinned to a commit with its release beside it; a project that runs no such plugin sets up none of it.
+  over: a project running the bundled Go plugin, and a bare one
+  via: ci install sets up what a language plugin's adapter asks: the Go plugin's toolchain and gopls, pinned, after the install and before the checks
+  because: the workflow installed only the lockfile, so a Go project's chokepoints would read not run in CI for want of gopls, and a new language's CI note was dropped (the blind Go plugin session, 2026-10-22)
+  refuted: dropped the plugin steps from workflowText (ci.ts), so the workflow sets up only the lockfile install -> "ci install sets up what a language plugin's adapter asks: the Go plugin's toolchain and gopls, pinned, after the install and before the checks" went red in ci.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-22)
   kinds: none
 - the CI check sets up Bun for a Bun lockfile: ci install for a project whose lockfile is bun.lock or bun.lockb writes a workflow that sets up Bun (the version packageManager or engines.bun names in the package.json beside the lockfile, else the latest, never a pin read elsewhere) and Node.js, installs with bun install --frozen-lockfile, and runs the installed Coherence through Node.js with npx --no, which never fetches a package of that name, whatever the Bun.
   over: a bun.lock at the repository top with no packageManager, with packageManager bun@1.4.2, and with only engines.bun, a bun.lockb, a bun.lock in a nested project whose package.json names bun@1.4.2, and a nested bun.lock below a top that pins bun@1.1.45

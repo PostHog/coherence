@@ -38,8 +38,8 @@
 
 // First, before any other module loads: every spawn this process makes is counted from here on (lifecycle/work-meter.ts).
 import "./lifecycle/work-meter.ts";
-import { realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEXICON_WORK_USAGE, lexiconWorkCommand } from "./lifecycle/lexicon-cli.ts";
 import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
@@ -60,7 +60,7 @@ import { scopeApp } from "./readings/scope/live.ts";
 import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
 import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 import { nestedFolder, repositoryTop } from "./adapters/project-files.ts";
-import { keepAttributes, keepIgnore } from "./lifecycle/state-files.ts";
+import { keepAttributes, keepIgnore, STATE_DIR } from "./lifecycle/state-files.ts";
 import { installMod, modInstalled, ownModLinked, uninstallMod, MOD_ID, MOD_REPOSITORY, OWN_MOD_LINK, type ModStep } from "./lifecycle/mod-install.ts";
 import { registryOf } from "./adapters/project-config.ts";
 import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
@@ -518,9 +518,27 @@ async function journalVet(root: string): Promise<(record: object) => string[]> {
 }
 
 export async function main(argv: string[], call: CommandCall): Promise<number> {
-  const [verb, ...rest] = argv;
   // Every command acts on the project, wherever in it the command was run.
   const root = projectRoot(call.cwd);
+  // A command that made Coherence's folder (a first run, a first journal record, without hooks install) writes its git files with it,
+  // so git never offers the regenerated state for a commit; a folder that was already there keeps whatever its adopter left.
+  const fresh = !existsSync(join(root, STATE_DIR));
+  try {
+    return await dispatch(argv, call, root);
+  } finally {
+    if (fresh && existsSync(join(root, STATE_DIR))) {
+      try {
+        keepIgnore(root, true);
+        keepAttributes(root);
+      } catch {
+        // An unwritable folder: hooks install and the next session start write both.
+      }
+    }
+  }
+}
+
+async function dispatch(argv: string[], call: CommandCall, root: string): Promise<number> {
+  const [verb, ...rest] = argv;
   const command = verb === undefined ? undefined : commands[verb];
   if (command !== undefined) {
     const io: Io = {

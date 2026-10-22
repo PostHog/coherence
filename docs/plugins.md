@@ -14,9 +14,8 @@ Plugins ship two ways:
   project runs without naming them (`plugins/defaults.json` lists them, with
   the default language). Coherence's core names no language: everything it
   knows of one is asked of the plugin that provides it. Others ship bundled
-  but run only for a project that names them, `"<name>": "bundled"`: Convex
-  and Quint
-  (below).
+  but run only for a project that names them, `"<name>": "bundled"`: Go,
+  Convex and Quint (below).
 - **By path**: a folder in the project (or anywhere the project names). This is
   how a project enhances a bundled plugin: copy it out, change it, and point
   the config at the copy.
@@ -74,11 +73,26 @@ work it did before plugins existed.
 sample/
   plugin.json     the manifest, read as data
   index.ts        the module, imported only where its code runs
+  check.json      the project plugin check holds it to (below)
+  package.json    { "type": "module", "private": true }
   lexicon.json    the lexicon layer (optional)
 ```
 
-The bundled plugins are the fullest examples: `plugins/typescript`,
-`plugins/python` (with tach), `plugins/rust` and `plugins/declared`.
+The modules are TypeScript run as written, as ES modules: Node 22.18 or later
+runs them without a flag. The folder's `package.json` says they are ES
+modules, so Node neither guesses nor warns at every load, whatever the
+project's own `package.json` says (`plugin eject` writes it). Code imports
+Coherence only through `@posthog/coherence/plugin`, whose types ship in the
+package as `dist/plugins/api.d.ts`; a tsconfig that typechecks the folder
+needs `"allowImportingTsExtensions": true` with `noEmit`, and `@types/node`
+as a dev dependency, since the interface names Node's types.
+
+The bundled plugins are the fullest examples, shipped in the package under
+`plugins/`: `go` for a language Coherence lacks, `rust` for an adapter over a
+language server with no npm package, `typescript`, `python` (with tach) and
+`declared`. Their sources import the core as `../../src/plugins/api.ts`, the
+same module the package exports as `@posthog/coherence/plugin`; an ejected
+copy names it the second way, and so should a plugin you write.
 
 ### plugin.json
 
@@ -104,7 +118,7 @@ The bundled plugins are the fullest examples: `plugins/typescript`,
 |---|---|
 | `name`, `version` | Who the plugin is. Every run entry its adapter or verifier answers names both. |
 | `pluginApi` | The interface version it was written for. This release runs `2` and reads plugins written for `1` to `2`: a plugin written for `1` loads, and the session start names it with what changed since. Any other version is refused, naming both. |
-| `provides.language` | The language its adapter answers for. A built-in name takes the built-in's place (see the swap rule). A new name needs `extensions`, and the config's `language` must name it. |
+| `provides.language` | The language its adapter answers for. A built-in name takes the built-in's place (see the swap rule). A new name needs `extensions` (or `files`), and the config's `language` must name it; the language is then read as a bundled one is, for that project: its files, test files and folders, its entrance rules, its CI steps and every syntax slot it fills. |
 | `extends` | The language whose adapter it is handed to wrap. |
 | `extensions` | The files a new language is written in. An extension a built-in, a declared language, or another plugin owns is refused. |
 | `module` | The module, relative to the manifest. Required for an adapter, and for a verifier with no `command`. |
@@ -121,7 +135,7 @@ The bundled plugins are the fullest examples: `plugins/typescript`,
 | `notScanned` | Why the text scans do not read the language yet (Rust's); absent when they do. |
 | `environmentFolders` | Folder names no project authors code in, wherever they sit (`node_modules`, `__pycache__`). |
 | `markedFolders` | Folders the language's tools make, left out by a `marker` inside (`pyvenv.cfg`) or by `name` beside a file (`target` beside `Cargo.toml`), each with its `reason`. |
-| `ci` | `note`: what the generated CI workflow says for a project that reads the language. |
+| `ci` | `note`: what the generated CI workflow says for a project that reads the language. `steps`: what it runs after the install to set up what the adapter asks (Go's toolchain and gopls), each `{ "name"?, "uses": "<owner/repo>@<40-hex commit>", "version": "<its release>", "with"? }` or `{ "name"?, "run": "<command>" }`. |
 | `wellKnown` | Names the plugin vouches for as well known, beside Coherence's own list. |
 
 The manifest is data so that a hook that only needs to know what a plugin
@@ -143,7 +157,8 @@ const plugin: PluginModule = {
 export default plugin;
 ```
 
-`adapter` returns a `LanguageAdapter` (`src/adapters/adapter.ts`). When the
+`adapter` returns a `LanguageAdapter`, exported from
+`@posthog/coherence/plugin` (below, writing an adapter). When the
 manifest extends a language, `base` is that language's adapter: delegate what
 you do not change. The core closes `base`; your adapter closes only what it
 started. A module that fails to load makes the adapter unready with the reason,
@@ -160,17 +175,17 @@ reading first asks for that slot:
 
 | Slot | Read by | Type |
 |---|---|---|
-| `entrances` | entrance detection | `EntranceSyntax` (`src/adapters/entrance-candidates.ts`) |
-| `interfaces` | the Structure reading | `InterfaceSyntax` (`src/readings/scope/component-interfaces.ts`) |
+| `entrances` | entrance detection | `EntranceSyntax` |
+| `interfaces` | the Structure reading | `InterfaceSyntax` |
 | `kept` | the Structure reading's kept answers | `(file, text) => string[]` |
-| `source` | the economy and mass | `SourceSyntax` (`src/economy/source.ts`) |
+| `source` | the economy and mass | `SourceSyntax` |
 | `declares` | the observation's interface map | `(line) => "type" \| "value" \| "body" \| "unknown"` |
 | `notice` | the session start | `(root) => string` |
 | `lists` | declared mirrors | `(text, name) => Literal \| undefined` |
 | `topLevel` | the spec model's check that a handler, guard or mirror is declared | `(text, name) => boolean` |
-| `boundaries` | `scaffold import` and adoption | `BoundarySource` (`src/scaffold/boundaries.ts`): a tool's declaration file read into modules, as tach's |
+| `boundaries` | `scaffold import` and adoption | `BoundarySource`: a tool's declaration file read into modules, as tach's |
 
-A slot a plugin leaves empty reads as "not read for <language>", never as
+Every type is exported from `@posthog/coherence/plugin`. A slot a plugin leaves empty reads as "not read for <language>", never as
 another language. A plugin answers for the project whose config names it
 alone: a process serving several projects asks each one's questions under
 `forProject(root, ...)`. A plugin that provides one of the bundled languages answers
@@ -178,6 +193,70 @@ each field and slot it declares, and the bundled plugin answers the rest, so
 an enhancement of the adapter alone keeps every reading of the language. Its
 file rule is one rule: a plugin that names its files, by `files` or
 `extensions`, owns them whole.
+
+## Writing a language adapter
+
+An adapter answers the questions a chokepoint check asks, about one language,
+over one project. Most drive a language server over the language server
+protocol on stdio (`JsonRpcClient`, exported from
+`@posthog/coherence/plugin`); `plugins/go/go.ts` drives gopls in about 600
+lines and is the shortest whole example. `docs/enforcement.md`, shipped
+beside this page, explains the grades, the ladder and refutation from the
+reader's side; this is the author's side.
+
+| Method | Owes |
+|---|---|
+| `ready()` | `{ ok: true }` once the instrument answers, else `{ ok: false, reason }` naming what is missing and how to get it (`gopls was not found (install it with ...)`). Never throws for a missing tool: every chokepoint then reads not run with the reason, never pass. |
+| `resolve(name, hint)` | A spec name to one `Definition`: a file, a range, and the position of the name. Read the name with `parseName`: a bare symbol, `Name in file`, or a module path. Several candidates are chosen among by `hint` (not in a test file, then under `hint.component`), and a name still ambiguous is refused with `candidates`, never guessed. |
+| `references(definition)` | Every site in the project's own files (`keepProjectFiles`) that names the thing, the declaration itself left out, as `{ file, line, character, symbol }`: the line 1-based, `symbol` the enclosing declaration's dotted path. Test files are recognized by the check from the manifest's `testFiles` and the test folders; report every site. |
+| `visibility(definition, chokepoint?)` | Whether the language itself refuses a reference from outside the thing's module (`enforced`), whether the thing is reachable from outside it (`visible`), the `evidence` read, and the `rung` a clean chokepoint earns on it, one of the manifest's `ladder.rungs`. |
+| `refute(protected, chokepoint?, exempt?)` | The refutation, below. |
+| `testFilter(via)` | A bullet's `via` as the project's test runner filters by it; most return it unchanged. |
+| `forget(files?)` | Make the instrument read the disk again: the named files, or all it may have open. Resolve only once the instrument has taken the change in, since the edit hook checks again right after. |
+| `close()` | Stop what the adapter started. The core closes a `base` it handed you. |
+| `serverPid()` | Optional: the server's process id, so a reading can bound its memory. |
+
+### The refutation
+
+A check that could never fail proves nothing, so every chokepoint run
+refutes itself: the adapter stages uses the check must catch, and the run
+reads what it saw. Nothing may touch disk: stage each use as an unsaved
+document (`textDocument/didOpen`, or `didChange` over a file the project
+has), and close or restore every one before `refute` returns, whatever it
+returns.
+
+- **When Coherence's check enforces the rung** (`reference-choked`), stage
+  the uses the check must call bypasses and return them as `staged`, each
+  with the site the instrument reported for it (`site`), absent when it
+  reported none:
+  - a use of the thing in the chokepoint's own file, past the chokepoint's
+    range, when the chokepoint is a symbol;
+  - a use from a new document beside the protected thing (a re-export, in a
+    language that has them);
+  - with `exempt`, the folder whose references the chokepoint does not
+    govern: no use inside it, and one from a new document outside it
+    (`outsideOfFolder`).
+
+  Never decide yourself whether a staged site is a bypass: the check
+  classifies each with the function it classifies every site with, and the
+  refutation fires only when it calls every one a bypass. `seen` is whether
+  the instrument reported every staged use. A use it did not report, or one
+  the check would not call a bypass, makes the check vacuous: the run says
+  which and why, and records not run, never pass.
+- **When the language enforces the rung** (`visibility-choked`: Go's
+  unexported names, Rust's privacy), Coherence's check can never be made to
+  fire, since the compiler refuses every outside use first. Stage a use from
+  outside the thing's module, pull the instrument's diagnostics on it, and
+  return the refusal's own text as `refused`, with `seen: true` and nothing
+  staged. Stage a control use from inside the module too, which must not be
+  refused: a refusal there means the name is wrong, not private, and the
+  refutation proves nothing (`seen: false`).
+- **When nothing can be staged** (no module path a new package could
+  import, an instrument that cannot open an unsaved document), return
+  `seen: false` with nothing staged.
+
+`account` says, in one line, what was staged and what was seen: the run
+prints it as the refutation's evidence.
 
 ## Eject, enhance and swap
 
@@ -199,7 +278,9 @@ one wanting changes a copy of it:
    every other byte kept. It refuses, writing nothing, when the folder
    exists (a link there that leads nowhere included), when it leaves the
    project once symbolic links are followed, when a link on the way leads
-   nowhere, or when the config already runs a plugin by that name.
+   nowhere, or when the config already runs a plugin by that name from a
+   path. A plugin the config runs bundled (`"go": "bundled"`) is the one
+   copied, and its copy takes that entry's place.
 
    The copy's folder is Coherence's instrument, not your code: no walk reads
    it (specs, readings, mass, the lexicon's corpus), no reference found there
@@ -231,6 +312,20 @@ one wanting changes a copy of it:
    refused naming each field it lacks, and a duty that throws fails with
    what it threw while the others still report. `plugin check typescript`
    holds the bundled plugin to the same.
+
+   A language plugin's `check.json` is one small project and what the
+   plugin must answer over it. `plugins/go/check.json` is a whole one for a
+   language Coherence does not bundle as a default:
+
+   | Field | Holds |
+   |---|---|
+   | `files` | The project: each file's text by its path from the root. The check writes them into a scratch folder, with a config that runs the plugin, and reads nothing else. |
+   | `language` | `{ "files": [...], "not": [...] }`: paths the file rule must take as the language's, and paths it must not. Only the names are read, so a path need not be in `files`. |
+   | `declarations` | `[{ "file", "name", "declared" }]`: what the `topLevel` slot must say of a name in one of `files`. |
+   | `protects`, `chokepoint` | The thing and its one way in, written as a spec bullet writes them (`Seal`, `Name in file.go`). |
+   | `references` | Every reference to `protects` as `file:line`, the line 1-based, test files' included: the adapter must report exactly these, none missed and none more. |
+   | `grade` | What the run grades the chokepoint (`broken`, `reference-choked`, `visibility-choked`). |
+   | `bypasses` | The references outside the chokepoint the run must name, as `file:line`; a test file's never is one. |
 4. **Swap back**: remove the `plugins` entry, and the bundled plugin answers
    again.
 
@@ -329,6 +424,33 @@ order, then the project's.
 
 ## Opt-in bundled plugins
 
+### Go
+
+`"plugins": { "go": "bundled" }` with `"language": "go"` (or a list naming
+it) reads a Go module through gopls:
+
+- **Names.** A spec names a Go thing as `Name in path/to/file.go`, or by its
+  name alone when the module declares it once. Go's own `store.Write` is
+  prose here: the package qualifier is no part of a spec name. A module is
+  one `.go` file; a package folder (`internal/audit/`) resolves only when it
+  holds one non-test file, since a definition is one file.
+- **Grades.** An unexported name is **visibility-choked**: the compiler
+  refuses it from any other package, and the refutation is gopls's own
+  refusal of a use from an unsaved new package, beside a use inside the
+  package that it must accept. An exported one is **reference-choked**:
+  every reference gopls reports in the module must be inside the
+  chokepoint, and the refutation stages a use beside the protected thing and
+  one in the chokepoint's own file past the chokepoint. A `_test.go` file is
+  test code.
+- **Read by the readings.** Go's files, tests and `vendor` folder, and its
+  top-level declarations, so the spec check reads an entrance's handler or
+  a guard in a Go file. Not yet: entrance detection (declare each under
+  `## entrances`) and the text scans mass and the economy read by.
+- **gopls** is found from `COHERENCE_GOPLS`, else the `PATH`, else
+  `go env GOPATH`/bin; with none, every Go chokepoint reads not run with
+  how to install it. `ci install` sets up Go and gopls in the workflow it
+  writes.
+
 ### Convex
 
 `"plugins": { "convex": "bundled" }` in a TypeScript project that deploys a
@@ -419,6 +541,9 @@ What the interface does not carry yet:
   are read in `src/enforcement/check.ts`; run routes pytest; the observation
   reads Python tracebacks. The structural test names each as an exception
   with its reason, and each is a table a language plugin should own.
+- **A package that is many files.** A definition is one file, so a Go
+  package folder stands for a chokepoint or a protected module only when it
+  holds one non-test file.
 - **Bullets about a plugin's code** still live in the core's specs
   (`src/adapters/Adapters.spec.md`): a bullet's witnessed refutation is keyed
   by its component, so moving one restages its refutation.

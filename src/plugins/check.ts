@@ -20,7 +20,7 @@
  * over a scratch copy of the check project.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
@@ -118,7 +118,7 @@ function checkProjects(plugin: LoadedPlugin, language: string): { label: string;
     return problem === undefined ? (value as CheckProject) : `${label} ${file} is no check project: ${problem}`;
   };
   const projects: { label: string; project: CheckProject; text: string }[] = [];
-  const bundled = bundledPlugins().find((p) => p.manifest.provides?.language === language);
+  const bundled = bundledProviderOf(language);
   const minimum = bundled === undefined ? undefined : join(bundled.dir, CHECK_FILE);
   if (minimum !== undefined && existsSync(minimum)) {
     const project = read(minimum, "the bundled minimum");
@@ -134,6 +134,29 @@ function checkProjects(plugin: LoadedPlugin, language: string): { label: string;
   }
   if (projects.length === 0) return { refusal: `plugin ${plugin.name} carries no ${CHECK_FILE}, and no bundled plugin's check project stands for ${language}: nothing to check` };
   return projects;
+}
+
+/** The bundled plugin that provides a language, a default or one a project opts into (Go): its check.json is the minimum for the language. */
+function bundledProviderOf(language: string): LoadedPlugin | undefined {
+  const found = bundledPlugins().find((p) => p.manifest.provides?.language === language);
+  if (found !== undefined) return found;
+  for (const name of readdirSync(BUNDLED_DIR).sort()) {
+    const dir = join(BUNDLED_DIR, name);
+    if (!existsSync(join(dir, "plugin.json"))) continue;
+    const { manifest } = readManifest(name, dir, `bundled plugin ${name}`);
+    if (manifest?.provides?.language === language) return { name, version: manifest.version, dir, source: "bundled", manifest };
+  }
+  return undefined;
+}
+
+const CONFIG = "coherence.config.json";
+
+/** The scratch project's config: its check.json's own, if it carries one, naming the language and, unless it is a bundled default, the plugin. */
+function checkConfig(project: CheckProject, plugin: LoadedPlugin, language: string): Record<string, unknown> {
+  const own = project.files[CONFIG];
+  const config = own === undefined ? {} : (JSON.parse(own) as Record<string, unknown>);
+  const plugins = { ...((config["plugins"] as Record<string, string> | undefined) ?? {}), ...(isDefault(plugin) ? {} : { [plugin.name]: plugin.source === "bundled" ? "bundled" : plugin.dir }) };
+  return { ...config, language: config["language"] ?? language, ...(Object.keys(plugins).length === 0 ? {} : { plugins }) };
 }
 
 /** Whether a plugin is one of the bundled defaults every project runs, rather than one a project names (an opt-in bundled plugin, or one by path). */
@@ -190,6 +213,9 @@ async function overProject(project: CheckProject, plugin: LoadedPlugin, language
       mkdirSync(dirname(join(scratch, path)), { recursive: true });
       writeFileSync(join(scratch, path), text);
     }
+    // The config a project that runs the plugin writes, so every reading of the scratch project (the run's own read of it among them)
+    // registers the plugin as the project's, never the bundled defaults alone.
+    writeFileSync(join(scratch, CONFIG), JSON.stringify(checkConfig(project, plugin, language), null, 2) + "\n");
     registerProjectPlugins(scratch, isDefault(plugin) ? [] : [plugin]);
     return await forProject(scratch, async () => [await guarded("file rule", () => fileRule(project, language)), await guarded("declarations", () => declarations(project, language)), ...(await instrument(scratch, project, plugin, language))]);
   } finally {

@@ -44,18 +44,15 @@ export interface DeclaredLanguages {
   readonly languages: readonly Language[];
   /** The languages the config declares under `languages`, which only their language server reads (src/adapters/declared.ts). */
   readonly declared?: readonly { readonly name: string }[];
-  /** The languages plugins provide that no built-in owns, which only the plugin's adapter reads (src/plugins). */
-  readonly provided?: readonly { readonly name: string; readonly plugin: string }[];
 }
 
-/** The reason every reading gives for a language a plugin provides: its adapter answers chokepoint checks, and no reading has its syntax tables yet. */
-export function providedNotRead(plugin: string): string {
-  return `a language plugin ${plugin} provides is read only by that plugin's adapter, for chokepoint checks; no reading scans its text yet`;
-}
-
-/** Every language a reading never scans, each with its reason: those the config declares and those plugins provide. */
+/**
+ * Every language a reading never scans, each with its reason: those the
+ * config declares. A language a plugin adds is among the config's languages,
+ * read as a built-in is, by what its plugin fills.
+ */
 export function unscannedOf(config: DeclaredLanguages): { name: string; because: string }[] {
-  return [...(config.declared ?? []).map((d) => ({ name: d.name, because: DECLARED_NOT_READ })), ...(config.provided ?? []).map((p) => ({ name: p.name, because: providedNotRead(p.plugin) }))];
+  return (config.declared ?? []).map((d) => ({ name: d.name, because: DECLARED_NOT_READ }));
 }
 
 /** The reason every reading gives for a language the config declares: its language server answers chokepoint checks, and no reading has a scan of its text. */

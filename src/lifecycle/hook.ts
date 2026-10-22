@@ -85,7 +85,7 @@ import { readEnforcementConfig } from "../enforcement/config.ts";
 import { viaForm } from "../plugins/verify.ts";
 import { readPlugins } from "../plugins/registry.ts";
 import { changesSince, PLUGIN_API } from "../plugins/plugin.ts";
-import { LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
+import { coreLanguageOfExtension, LANGUAGES } from "../adapters/language-files.ts";
 import { readConfigFile } from "../adapters/project-config.ts";
 import { escapeRegExp } from "../enforcement/totality.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
@@ -824,7 +824,7 @@ function pluginRefusalBlock(root: string): string {
     return "";
   }
   if (value === undefined) return "";
-  const { plugins, problems } = readPlugins(root, value, CONFIG_FILE, LANGUAGES, (extension) => languageOfFile(`x${extension}`));
+  const { plugins, problems } = readPlugins(root, value, CONFIG_FILE, LANGUAGES, coreLanguageOfExtension);
   if (problems.length > 0) return `Plugins refused (${problems.length}); every command that reads the config stops on this until it is fixed:\n${problems.map((p) => `✕ ${p}`).join("\n")}\n\n`;
   const lines: string[] = [];
   // A plugin written for an older interface still loads; what changed since is said once, so its author knows what to update.

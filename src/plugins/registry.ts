@@ -55,6 +55,22 @@ function compiles(value: unknown): value is string {
   }
 }
 
+/** Whether a value is one CI step: an action pinned to a full commit, or one command, never both, each value one line. */
+function ciStep(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const line = (v: unknown): boolean => typeof v === "string" && v !== "" && !/[\r\n]/.test(v);
+  const { name, uses, version, run } = value;
+  if ((uses === undefined) === (run === undefined)) return false;
+  // An action is pinned to a commit, and the release that commit is says so in the workflow's comment beside it.
+  if (uses !== undefined && !(typeof uses === "string" && /^[\w.-]+\/[\w./-]+@[0-9a-f]{40}$/.test(uses) && line(version))) return false;
+  if (run !== undefined && !line(run)) return false;
+  if (run !== undefined && (version !== undefined || value["with"] !== undefined)) return false;
+  if (name !== undefined && !line(name)) return false;
+  if (version !== undefined && !line(version)) return false;
+  const inputs = value["with"];
+  return inputs === undefined || (isRecord(inputs) && Object.entries(inputs).every(([k, v]) => /^[A-Za-z][\w-]*$/.test(k) && line(v)));
+}
+
 /** The faults in a manifest's data fields: the readings read them in a hook, so each is checked as the reading will use it. */
 function dataProblems(raw: Record<string, unknown>, who: string): string[] {
   const problems: string[] = [];
@@ -75,7 +91,7 @@ function dataProblems(raw: Record<string, unknown>, who: string): string[] {
   const mark = (m: unknown): boolean => isRecord(m) && typeof m["reason"] === "string" && m["reason"] !== "" && (typeof m["marker"] === "string" || (typeof m["name"] === "string" && typeof m["beside"] === "string"));
   if (marked !== undefined && !(Array.isArray(marked) && marked.every(mark))) problems.push(`${who}'s markedFolders is a list of { "marker" } or { "name", "beside" }, each with its "reason"`);
   const ci = raw["ci"];
-  if (ci !== undefined && (!isRecord(ci) || typeof ci["note"] !== "string" || ci["note"] === "")) problems.push(`${who}'s ci is { "note": "<what the workflow says>" }`);
+  if (ci !== undefined && (!isRecord(ci) || typeof ci["note"] !== "string" || ci["note"] === "" || (ci["steps"] !== undefined && !(Array.isArray(ci["steps"]) && ci["steps"].every(ciStep))))) problems.push(`${who}'s ci is { "note": "<what the workflow says>", "steps"?: [{ "name"?, "uses": "<owner/repo>@<40-hex commit>", "version": "<its release>", "with"?: { "<input>": "<value>" } } or { "name"?, "run": "<command>" }] }`);
   const syntax = raw["syntax"];
   if (syntax !== undefined) {
     if (!isRecord(syntax)) problems.push(`${who}'s syntax maps each slot to "<module>#<export>"`);
