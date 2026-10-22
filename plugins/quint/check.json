@@ -1,0 +1,60 @@
+{
+  "files": {
+    "Counter.qnt": "// A counter that only climbs: the check project the Quint plugin is held to.\nmodule Counter {\n  var count: int\n\n  action init = count' = 0\n  action step = count' = count + 1\n\n  // Holds in every state: the count never goes below where it started.\n  val nonNegative = count >= 0\n  // Broken within three steps: the count passes 2.\n  val small = count < 3\n}\n",
+    "coherence.config.json": "{\"quint\": {\"maxSamples\": 100, \"maxSteps\": 10, \"verifySteps\": 5}}\n",
+    "README.md": "# A Quint check project\n"
+  },
+  "proofs": [
+    {
+      "via": "[quint run] nonNegative in Counter.qnt",
+      "verdict": "pass",
+      "reason": "nonNegative holds in Counter.qnt: typechecked and simulated"
+    },
+    {
+      "via": "[quint run] nonNegative",
+      "verdict": "pass",
+      "reason": "holds in Counter.qnt"
+    },
+    {
+      "via": "[quint run] small in Counter.qnt",
+      "verdict": "fail",
+      "reason": "found a state of Counter.qnt that breaks small"
+    },
+    {
+      "via": "[quint run] missing in Counter.qnt",
+      "verdict": "fail",
+      "reason": "refused Counter.qnt"
+    },
+    {
+      "via": "[quint run] nonNegative in Absent.qnt",
+      "verdict": "not run",
+      "reason": "no model Absent.qnt"
+    },
+    {
+      "via": "[quint run] nonNegative in Counter.qnt",
+      "verdict": "not run",
+      "reason": "could not start",
+      "env": {
+        "COHERENCE_QUINT": "/nonexistent/quint"
+      }
+    },
+    {
+      "via": "[quint] nonNegative in Counter.qnt",
+      "verdict": "pass",
+      "reason": "model-checked by Apalache within 5 steps"
+    },
+    {
+      "via": "[quint] small in Counter.qnt",
+      "verdict": "fail",
+      "reason": "breaks small"
+    },
+    {
+      "via": "[quint] nonNegative in Counter.qnt",
+      "verdict": "not run",
+      "reason": "could not start",
+      "env": {
+        "COHERENCE_QUINT": "/nonexistent/quint"
+      }
+    }
+  ]
+}

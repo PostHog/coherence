@@ -15,6 +15,7 @@ Plugins ship two ways:
   the default language). Coherence's core names no language: everything it
   knows of one is asked of the plugin that provides it. Others ship bundled
   but run only for a project that names them, `"<name>": "bundled"`: Convex
+  and Quint
   (below).
 - **By path**: a folder in the project (or anywhere the project names). This is
   how a project enhances a bundled plugin: copy it out, change it, and point
@@ -278,7 +279,8 @@ A bullet proved by a plugin rather than a test writes its form in brackets:
 ```
 
 The bracketed form is one a loaded plugin declares. The plugin is asked to
-prove the name, by its `command` (the name in place of `{name}`, run from the
+prove the name (a module's `verify` is also told the folder of the bullet's
+spec, `component`, where a name without a file is looked for), by its `command` (the name in place of `{name}`, run from the
 project root; exit 0 is a pass, and with `match` only when the output matches
 too, an exit 0 whose output does not being a fail that names the expression)
 or its module's `verify`. The verdict is graded
@@ -289,6 +291,15 @@ never a test run under that title. Two plugins that prove one form are refused.
 
 `refute` stages a break and runs the bullet as `run` does, so a verifier's
 bullet is refuted like any other.
+
+`plugin check` holds a verifier plugin (one that provides no language) to its
+own `check.json`: `{ "files": {...}, "proofs": [{ "via", "verdict",
+"reason"?, "component"?, "env"? }] }`. Each proof is proved over a scratch copy
+as a run proves a bullet, with any environment it names set, and must read the
+verdict it expects (its reason matching `reason`). There is one duty per form:
+a form with no proof fails as nothing to check, and a proof expected to pass or
+fail that could not run leaves its duty not run with why, never pass. The
+report says `NOT RUN` when no duty failed but one did not pass.
 
 ### A lexicon layer
 
@@ -351,6 +362,36 @@ Convex backend. It extends TypeScript:
 
 It needs the TypeScript compiler (`typescript`, an optional dependency of
 Coherence's that a Convex project has already).
+
+### Quint
+
+`"plugins": { "quint": "bundled" }` proves properties of a
+[Quint](https://quint-lang.org) model:
+
+```
+- an ended order never moves: The model never reopens an ended order.
+  over: every state the model reaches within its bound
+  via: [quint] terminalNeverMoves in Journal.qnt
+```
+
+- `[quint run] <property>`: `quint typecheck`, then `quint run --invariant`
+  over sampled runs. Evidence `simulated`.
+- `[quint] <property>`: the same, then `quint verify`, Apalache's bounded model
+  check. Evidence `bounded-model-checked`; the reason states the bound, since
+  it is not every reachable state.
+- The model file is named from the bullet's spec folder, or with none named
+  the folder's one `.qnt` model.
+- A state that breaks the property fails the bullet with the states quint
+  printed; a refusal (a type error, an unknown name) fails it too.
+- **What could not run is not run, never a pass:** no quint (install
+  `@informalsystems/quint@0.33`, or set `COHERENCE_QUINT`), a shell that found
+  none, `quint verify` without the Java runtime Apalache needs or without
+  Apalache fetched, and a step out of time.
+- Tuned under `"quint"` in the config: `backend` (`typescript`, the default,
+  fetches nothing; `rust`), `maxSamples` (1000), `maxSteps` (20), `seed`,
+  `verifySteps` (10). Quint keeps what it fetches under `QUINT_HOME`.
+- Its vocabulary is its own lexicon layer (quint model, quint property, bounded
+  model check), carried only while a bullet proves by its forms.
 
 ## What a run records
 

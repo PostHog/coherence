@@ -86,7 +86,7 @@ function runCommand(root: string, argv: readonly string[], name: string, timeout
 }
 
 /** Prove a via that names a form through the plugin that declares it. */
-export async function proveVia(root: string, plugins: readonly LoadedPlugin[], via: string, timeoutMs: number): Promise<VerifierOutcome> {
+export async function proveVia(root: string, plugins: readonly LoadedPlugin[], via: string, timeoutMs: number, component = "."): Promise<VerifierOutcome> {
   const form = viaForm(via)!;
   const found = verifierOf(plugins, form.form);
   if (found === undefined) return { verdict: "not run", reason: viaFormProblem(via, plugins)!, command: undefined, tail: "", plugins: [], evidence: "none" };
@@ -104,7 +104,7 @@ export async function proveVia(root: string, plugins: readonly LoadedPlugin[], v
     const late = new Promise<{ verdict: "fail"; reason: string }>((resolve) => {
       timer = setTimeout(() => resolve({ verdict: "fail", reason: `did not answer in ${Math.round(timeoutMs / 1000)} s` }), timeoutMs);
     });
-    const answer = await Promise.race([module.verify({ root, form: form.form, name: form.name, timeoutMs }), late]).finally(() => clearTimeout(timer));
+    const answer = await Promise.race([module.verify({ root, component, form: form.form, name: form.name, timeoutMs }), late]).finally(() => clearTimeout(timer));
     return { verdict: answer.verdict, reason: `${label}: ${answer.reason}`, command: undefined, tail: "", ...who };
   } catch (error) {
     return { verdict: "not run", reason: `${label}: ${error instanceof Error ? error.message : String(error)}`, command: undefined, tail: "", ...who };
