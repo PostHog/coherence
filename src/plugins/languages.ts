@@ -94,19 +94,45 @@ const swapsByRoot = new Map<string, Map<string, LoadedPlugin>>();
 const scope = new AsyncLocalStorage<string>();
 let lastRoot: string | undefined;
 
+/**
+ * The project a question is asked for: the root forProject names around it,
+ * else the project whose config was read last. Every per-project store here
+ * (the swaps, the extending plugins, what is derived from them) is read
+ * through this one door, so none can answer for a different project than
+ * the others.
+ */
+function rootNow(): string | undefined {
+  return scope.getStore() ?? lastRoot;
+}
+
 /** The swaps of the project a question is asked for. */
 function swapsNow(): ReadonlyMap<string, LoadedPlugin> {
-  const root = scope.getStore() ?? lastRoot;
+  const root = rootNow();
   return (root === undefined ? undefined : swapsByRoot.get(root)) ?? NO_SWAPS;
 }
 
 const NO_SWAPS: ReadonlyMap<string, LoadedPlugin> = new Map();
 
+/**
+ * Plugins each project's config names that extend one of the core's
+ * languages without providing it (Convex over TypeScript), by project root,
+ * in the config's order: each adds its entrance rules and wraps the syntax
+ * slots it fills over the provider's, for that project alone. A project
+ * that names none pays nothing for them.
+ */
+const extendersByRoot = new Map<string, readonly LoadedPlugin[]>();
+
+/** The plugins that extend the language for the project a question is asked for, in the config's order. */
+function extendersOf(language: string): readonly LoadedPlugin[] {
+  const root = rootNow();
+  return ((root === undefined ? undefined : extendersByRoot.get(root)) ?? []).filter((p) => p.manifest.extends === language);
+}
+
 /** What is derived from the providers' data, per project root, kept until that project's plugins are registered again. */
 const derivedCache = new Map<string, unknown>();
 
 function cached<T>(key: string, make: () => T): T {
-  const scoped = `${scope.getStore() ?? lastRoot ?? ""}\u0000${key}`;
+  const scoped = `${rootNow() ?? ""}\u0000${key}`;
   if (!derivedCache.has(scoped)) derivedCache.set(scoped, make());
   return derivedCache.get(scoped) as T;
 }
@@ -122,11 +148,14 @@ export function registerProjectPlugins(root: string, plugins: readonly LoadedPlu
   const key = resolve(root);
   for (const cachedKey of [...derivedCache.keys()]) if (cachedKey.startsWith(`${key}\u0000`)) derivedCache.delete(cachedKey);
   const swaps = new Map<string, LoadedPlugin>();
+  const extenders: LoadedPlugin[] = [];
   for (const plugin of plugins) {
     const language = plugin.manifest.provides?.language;
     if (language !== undefined && LANGUAGES.includes(language) && plugin.source !== "bundled") swaps.set(language, plugin);
+    else if (language === undefined && plugin.manifest.extends !== undefined && LANGUAGES.includes(plugin.manifest.extends)) extenders.push(plugin);
   }
   swapsByRoot.set(key, swaps);
+  extendersByRoot.set(key, extenders);
   lastRoot = key;
   setLanguageData(languageDataTable());
 }
@@ -262,7 +291,7 @@ export function markedFolders(): readonly MarkedFolder[] {
 
 /** The language's entrance rules, each with its plural and what it detects; none for a language whose plugin lists none. */
 export function entranceRules(language: string): readonly EntranceRule[] {
-  return fieldOf(language, "entrances")?.rules ?? [];
+  return [...(fieldOf(language, "entrances")?.rules ?? []), ...extendersOf(language).flatMap((p) => p.manifest.entrances?.rules ?? [])];
 }
 
 /** What the language's entrance rules do not see. */
@@ -281,7 +310,7 @@ export function languageDataTable(): Record<string, { rules: EntranceRule[]; not
   for (const { language } of providers()) {
     const entrances = fieldOf(language, "entrances");
     const reason = fieldOf(language, "notScanned");
-    table[language] = { rules: [...(entrances?.rules ?? [])], ...(entrances === undefined ? {} : { notDetected: entrances.notDetected }), ...(reason === undefined ? {} : { notScanned: reason }) };
+    table[language] = { rules: [...entranceRules(language)], ...(entrances === undefined ? {} : { notDetected: entrances.notDetected }), ...(reason === undefined ? {} : { notScanned: reason }) };
   }
   return table;
 }
@@ -302,7 +331,7 @@ export function ciNotes(languages: readonly string[]): string[] {
 
 /** The names the core's language plugins vouch for as well known. */
 export function pluginWellKnown(): string[] {
-  return providers().flatMap(({ language }) => fieldOf(language, "wellKnown") ?? []);
+  return providers().flatMap(({ language }) => [...(fieldOf(language, "wellKnown") ?? []), ...extendersOf(language).flatMap((p) => p.manifest.wellKnown ?? [])]);
 }
 
 /** The boundary sources the core's language plugins supply (tach's, the Python plugin's), each once, by name: what scaffold import and adoption draft specs from. */
@@ -334,8 +363,23 @@ export function syntaxOf<S extends SyntaxSlot>(language: string, slot: S): Synta
   // The swap's slot when it fills it, else the bundled provider's: a plugin that replaces only the adapter keeps the readings.
   const swap = swapsNow().get(language);
   const plugin = swap?.manifest.syntax?.[slot] !== undefined ? swap : bundledProvider(language);
-  const at = plugin?.manifest.syntax?.[slot];
-  if (plugin === undefined || at === undefined) return undefined;
+  const provided = plugin === undefined ? undefined : (slotExport(plugin, slot) as SyntaxTables[S] | undefined);
+  const extenders = extendersOf(language).filter((p) => p.manifest.syntax?.[slot] !== undefined);
+  if (extenders.length === 0) return provided;
+  // Each extending plugin's export for the slot wraps the one beneath it, in the config's order, as its adapter wraps the adapter.
+  return cached(`syntax\u0000${language}\u0000${slot}`, () =>
+    extenders.reduce<SyntaxTables[S] | undefined>((beneath, extender) => {
+      const wrap = slotExport(extender, slot);
+      if (typeof wrap !== "function") throw new Error(`plugin ${extender.name} extends ${language}, so its syntax.${slot} names a function of the table beneath it, not a table`);
+      return (wrap as (beneath: SyntaxTables[S] | undefined) => SyntaxTables[S])(beneath);
+    }, provided),
+  );
+}
+
+/** The export a plugin's manifest names for a slot, loaded synchronously and once; undefined when it leaves the slot empty. */
+function slotExport(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
+  const at = plugin.manifest.syntax?.[slot];
+  if (at === undefined) return undefined;
   const key = `${plugin.dir}\u0000${at}`;
   if (!slots.has(key)) {
     const [file, name] = at.split("#") as [string, string];
@@ -343,7 +387,7 @@ export function syntaxOf<S extends SyntaxSlot>(language: string, slot: S): Synta
     if (!(name in module)) throw new Error(`plugin ${plugin.name}'s syntax.${slot} names ${at}, whose module exports no ${name}`);
     slots.set(key, module[name]);
   }
-  return slots.get(key) as SyntaxTables[S];
+  return slots.get(key);
 }
 
 /** Every module the core's language plugins answer from, by absolute path: their adapter modules and the modules their syntax slots name. */

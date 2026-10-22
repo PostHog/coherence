@@ -1,0 +1,75 @@
+{
+  "files": {
+    "tsconfig.json": "{ \"compilerOptions\": { \"target\": \"ES2022\", \"module\": \"ESNext\", \"moduleResolution\": \"Bundler\", \"strict\": true, \"noEmit\": true, \"allowJs\": true }, \"include\": [\"convex/**/*.ts\", \"src/**/*.ts\"] }\n",
+    "convex/_generated/api.d.ts": "/** As `convex dev` writes it, its types elided: the function references by module path. */\nexport declare const api: any;\nexport declare const internal: any;\n",
+    "convex/_generated/server.d.ts": "/** As `convex dev` writes it, its types elided: the builders a function is registered through. */\nexport declare const query: any;\nexport declare const mutation: any;\nexport declare const action: any;\nexport declare const internalQuery: any;\nexport declare const internalMutation: any;\nexport declare const internalAction: any;\nexport declare const httpAction: any;\n",
+    "convex/telemetry.ts": "import { internalAction } from \"./_generated/server\";\n\n/** The protected thing: the one function that sends telemetry out. */\nexport const send = internalAction({ handler: async () => {} });\n\n/** A namesake whose generated path is longer: never a reference to send. */\nexport const sendAll = internalAction({ handler: async () => {} });\n",
+    "convex/events.ts": "import { mutation } from \"./_generated/server\";\nimport { internal } from \"./_generated/api\";\n\n/** The chokepoint: every event is recorded here, and only here sent on. */\nexport const record = mutation({\n  handler: async (ctx: any) => {\n    await ctx.scheduler.runAfter(0, internal.telemetry.send, {});\n  },\n});\n",
+    "convex/leak.ts": "import { action } from \"./_generated/server\";\nimport { internal as generated } from \"./_generated/api\";\n\n// internal.telemetry.send in a comment is no reference.\nconst said = \"internal.telemetry.send\";\n\nexport const flush = action({\n  handler: async (ctx: any) => {\n    await ctx.runAction(generated.telemetry.sendAll, { said });\n    await ctx.runAction(\n      generated\n        .telemetry\n        .send,\n      {},\n    );\n  },\n});\n",
+    "convex/http.ts": "import { httpRouter } from \"convex/server\";\nimport { httpAction } from \"./_generated/server\";\nimport { webhook } from \"./webhooks\";\n\nconst http = httpRouter();\nhttp.route({ path: \"/webhook\", method: \"POST\", handler: webhook });\nhttp.route({\n  path: \"/health\",\n  method: \"GET\",\n  handler: httpAction(async () => new Response(\"ok\")),\n});\nexport default http;\n",
+    "convex/webhooks.ts": "import { httpAction } from \"./_generated/server\";\n\nexport const webhook = httpAction(async () => new Response(null));\n",
+    "convex/crons.ts": "import { cronJobs } from \"convex/server\";\nimport { internal } from \"./_generated/api\";\n\nconst crons = cronJobs();\ncrons.daily(\"flush telemetry\", { hourUTC: 3, minuteUTC: 0 }, internal.telemetry[\"send\"]);\nexport default crons;\n",
+    "src/client.ts": "/** A client outside the functions folder: its own module, never a Convex function. */\nexport const query = (name: string): string => name;\nexport const recent = query(\"recent\");\n",
+    "README.md": "# A Convex project\n",
+    "convex/alias.ts": "import { action } from \"./_generated/server\";\nimport { internal } from \"./_generated/api\";\n\n// A const holding part of the chain: followed.\nconst t = internal.telemetry;\nexport const viaAlias = action({ handler: async (ctx: any) => ctx.runAction(t.send, {}) });\n",
+    "src/lib/api.ts": "/** A module that hands the generated API on: followed, however it is imported. */\nexport { internal } from \"../../convex/_generated/api\";\n",
+    "src/relayed.ts": "import { internal } from \"./lib/api\";\n\nexport const relayed = internal.telemetry.send;\n",
+    "convex/namespace.ts": "import * as generated from \"./_generated/api\";\n\nexport const throughNamespace = generated.internal.telemetry.send;\n",
+    "convex/destructure.ts": "import { internal } from \"./_generated/api\";\n\nconst { send: s } = internal.telemetry;\nexport const destructured = s;\n",
+    "convex/byname.ts": "import { action } from \"./_generated/server\";\n\n// A function named by string: a gap the plugin names, never silence.\nexport const byName = action({ handler: async (ctx: any) => ctx.runAction(\"telemetry:send\", {}) });\n",
+    "convex/passed.ts": "import { internal } from \"./_generated/api\";\n\ndeclare function register(functions: unknown): void;\n// Part of the chain passed on: a gap.\nregister(internal.telemetry);\n"
+  },
+  "language": {
+    "files": [
+      "convex/telemetry.ts",
+      "convex/events.ts",
+      "src/client.ts"
+    ],
+    "not": [
+      "README.md",
+      "convex/_generated/api.d.ts",
+      "tsconfig.json"
+    ]
+  },
+  "declarations": [
+    {
+      "file": "convex/telemetry.ts",
+      "name": "send",
+      "declared": true
+    },
+    {
+      "file": "convex/events.ts",
+      "name": "record",
+      "declared": true
+    },
+    {
+      "file": "convex/events.ts",
+      "name": "send",
+      "declared": false
+    }
+  ],
+  "protects": "send",
+  "chokepoint": "record",
+  "references": [
+    "convex/alias.ts:6",
+    "convex/byname.ts:4",
+    "convex/crons.ts:5",
+    "convex/destructure.ts:3",
+    "convex/events.ts:7",
+    "convex/leak.ts:11",
+    "convex/namespace.ts:3",
+    "convex/passed.ts:5",
+    "src/relayed.ts:3"
+  ],
+  "grade": "broken",
+  "bypasses": [
+    "convex/alias.ts:6",
+    "convex/byname.ts:4",
+    "convex/crons.ts:5",
+    "convex/destructure.ts:3",
+    "convex/leak.ts:11",
+    "convex/namespace.ts:3",
+    "convex/passed.ts:5",
+    "src/relayed.ts:3"
+  ]
+}

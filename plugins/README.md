@@ -11,6 +11,13 @@ config declares, is the plugin's here that provides it.
 | `rust` | Rust, through rust-analyzer |
 | `declared` | every language a config declares under `languages`, through its language server alone |
 
+Bundled but opt-in: a project runs these only by naming them,
+`"plugins": { "<name>": "bundled" }`.
+
+| Plugin | Adds |
+|---|---|
+| `convex` | over TypeScript: a Convex function reached through the generated API as a reference, and a deployment's functions, HTTP routes and crons as entrances |
+
 `defaults.json` lists the plugins every project runs without naming them, and
 the language a config that names none reads. A project's config may name a
 plugin that provides one of these languages, which takes the bundled one's

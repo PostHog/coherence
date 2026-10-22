@@ -45,6 +45,7 @@ export { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, neste
 export { lineOf as tomlLineOf, parseToml, TomlError, type TomlTable, type TomlValue } from "../adapters/toml.ts";
 export { isSourceFile, toRelative, type SourceSyntax } from "../economy/source.ts";
 export { spawnSync } from "../lifecycle/work-meter.ts";
+export { typescriptCompiler } from "./specifiers.ts";
 export type { InterfaceSymbol } from "../observation/interfaces.ts";
 export type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
 export { readOwners, type BoundaryModule, type BoundarySource, type Exposure } from "../scaffold/boundaries.ts";

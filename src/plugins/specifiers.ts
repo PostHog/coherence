@@ -19,14 +19,19 @@ export interface Specifier {
 
 let compiler: typeof TS | undefined;
 
-function typescript(): typeof TS {
+/** The TypeScript compiler, loaded once; `why` says what needs its parser when it is not installed. */
+export function typescriptCompiler(why = "a plugin's imports are read with its parser"): typeof TS {
   if (compiler !== undefined) return compiler;
   try {
     compiler = createRequire(import.meta.url)("typescript") as typeof TS;
     return compiler;
   } catch {
-    throw new Error("the TypeScript compiler is not installed (an optional dependency), and a plugin's imports are read with its parser: npm install --save-dev typescript");
+    throw new Error(`the TypeScript compiler is not installed (an optional dependency), and ${why}: npm install --save-dev typescript`);
   }
+}
+
+function typescript(): typeof TS {
+  return typescriptCompiler();
 }
 
 export function moduleSpecifiers(file: string, text: string): Specifier[] {
