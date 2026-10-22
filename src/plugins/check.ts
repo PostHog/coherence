@@ -29,6 +29,7 @@ import { performRun } from "../enforcement/run.ts";
 import { bundledAdapter, bundledPlugins, forProject, languageOfFile, registerProjectPlugins, syntaxOf } from "./languages.ts";
 import type { LoadedPlugin } from "./plugin.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
+import { proveVia, viaForm } from "./verify.ts";
 
 /** What a plugin's check.json holds: the project, and what the plugin must answer over it. */
 export interface CheckProject {
@@ -49,7 +50,8 @@ export interface CheckProject {
 
 /** One duty's outcome. */
 export interface Duty {
-  name: "file rule" | "declarations" | "references" | "chokepoint";
+  /** A language plugin's four duties, or a verifier's one per form it declares, as a bullet writes it ("[quint run]"). */
+  name: "file rule" | "declarations" | "references" | "chokepoint" | `[${string}]`;
   verdict: "pass" | "fail" | "not run";
   reason: string;
 }
@@ -139,27 +141,36 @@ function isDefault(plugin: LoadedPlugin): boolean {
   return plugin.source === "bundled" && bundledPlugins().some((p) => p.name === plugin.name);
 }
 
-/** Run every duty against the plugin, over each check project; a plugin that neither provides nor extends a language is refused, since the duties are a language's. */
+/**
+ * Run every duty the plugin owes: a language's, when it provides or extends
+ * one (Convex over TypeScript), over each check project; a verifier's, one
+ * per via form it declares, over its check.json's proofs; both, in that
+ * order, for a plugin that does both. A plugin that does neither is refused.
+ */
 export async function checkPlugin(root: string, given: string): Promise<PluginCheck> {
   const plugin = pluginAt(root, given);
-  // A plugin that extends a language without providing it (Convex over TypeScript) is held to that language's duties, as the adapter it wraps is.
+  // A plugin that extends a language without providing it is held to that language's duties, as the adapter it wraps is.
   const language = plugin.manifest.provides?.language ?? plugin.manifest.extends;
-  if (language === undefined) throw new Error(`plugin check: plugin ${plugin.name} neither provides nor extends a language, and the duties are a language plugin's`);
+  const verifies = (plugin.manifest.verifiers ?? []).length > 0;
+  if (language === undefined && !verifies) throw new Error(`plugin check: plugin ${plugin.name} neither provides nor extends a language nor proves a via form, so it owes no duty plugin check holds`);
+  const languageDuties = language === undefined ? [] : await languageDutiesOf(plugin, language);
+  const verifierDuties = verifies ? await verifierDutiesOf(plugin) : [];
+  return { plugin, language: language === undefined ? "verifier" : verifies ? `${language} + verifier` : language, duties: [...languageDuties, ...verifierDuties] };
+}
+
+/** A language plugin's four duties over each check project, the worst outcome of each standing. */
+async function languageDutiesOf(plugin: LoadedPlugin, language: string): Promise<Duty[]> {
   const projects = checkProjects(plugin, language);
-  if ("refusal" in projects) return { plugin, language, duties: DUTIES.map((name) => ({ name, verdict: "fail", reason: projects.refusal })) };
+  if ("refusal" in projects) return DUTIES.map((name) => ({ name, verdict: "fail", reason: projects.refusal }));
   const each: Duty[][] = [];
   for (const { label, project } of projects) each.push((await overProject(project, plugin, language)).map((d) => ({ ...d, reason: `${label}: ${d.reason}` })));
   // A duty passes only where it passes over every project; the worst outcome stands, with each project's reason.
   const rank = { pass: 0, "not run": 1, fail: 2 } as const;
-  return {
-    plugin,
-    language,
-    duties: DUTIES.map((name) => {
-      const found = each.map((duties) => duties.find((d) => d.name === name)!);
-      const worst = found.reduce((a, b) => (rank[b.verdict] > rank[a.verdict] ? b : a));
-      return { name, verdict: worst.verdict, reason: found.map((d) => d.reason).join("; ") };
-    }),
-  };
+  return DUTIES.map((name) => {
+    const found = each.map((duties) => duties.find((d) => d.name === name)!);
+    const worst = found.reduce((a, b) => (rank[b.verdict] > rank[a.verdict] ? b : a));
+    return { name, verdict: worst.verdict, reason: found.map((d) => d.reason).join("; ") };
+  });
 }
 
 /** A duty's outcome, or the duty failed with what it threw: one duty that throws never takes the others' outcomes with it. */
@@ -263,11 +274,117 @@ async function instrument(scratch: string, project: CheckProject, plugin: Loaded
   }
 }
 
-/** The report plugin check prints: the plugin, then one line per duty. */
+/** One proof a verifier's check.json expects: a via as a bullet writes it, from a folder of the check project, and the verdict it must read. */
+export interface ExpectedProof {
+  via: string;
+  /** The bullet's folder, project-relative; "." when absent. */
+  component?: string;
+  verdict: Duty["verdict"];
+  /** A regular expression the verdict's reason must match. */
+  reason?: string;
+  /** Environment set while this proof runs alone (a binary named away to show what its absence reads as). */
+  env?: Record<string, string>;
+}
+
+/** What a verifier plugin's check.json holds: the project, and the proofs over it with the verdicts each must read. */
+export interface VerifierCheckProject {
+  files: Record<string, string>;
+  proofs: ExpectedProof[];
+}
+
+function verifierProjectProblem(value: unknown): string | undefined {
+  const record = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+  if (!record(value)) return "it is not an object";
+  const wrong: string[] = [];
+  if (!record(value["files"]) || !Object.values(value["files"]).every((t) => typeof t === "string")) wrong.push("files, an object of file texts by path");
+  const proofs = value["proofs"];
+  if (!Array.isArray(proofs) || !proofs.every((p) => record(p) && typeof p["via"] === "string" && ["pass", "fail", "not run"].includes(String(p["verdict"])) && (p["reason"] === undefined || typeof p["reason"] === "string") && (p["component"] === undefined || typeof p["component"] === "string") && (p["env"] === undefined || (record(p["env"]) && Object.values(p["env"]).every((v) => typeof v === "string")))))
+    wrong.push('proofs, a list of { "via", "verdict": "pass" | "fail" | "not run", "reason"?, "component"?, "env"? }');
+  return wrong.length === 0 ? undefined : `it lacks ${wrong.join("; ")}`;
+}
+
+/**
+ * A verifier plugin held to its own check project: one duty per form it
+ * declares, each proof of that form proved as a run proves a bullet, over a
+ * scratch copy. A proof that reads what check.json expects is kept; one that
+ * reads otherwise fails the duty, except that a proof expected to pass or
+ * fail which could not run leaves the duty not run, with why (the tool
+ * absent here), never a pass. A form with no proof fails as nothing to check.
+ */
+async function verifierDutiesOf(plugin: LoadedPlugin): Promise<Duty[]> {
+  const forms = (plugin.manifest.verifiers ?? []).map((v) => v.form);
+  const file = join(plugin.dir, CHECK_FILE);
+  const refuse = (reason: string): Duty[] => forms.map((form) => ({ name: `[${form}]` as const, verdict: "fail" as const, reason }));
+  if (!existsSync(file)) return refuse(`plugin ${plugin.name} carries no ${CHECK_FILE}: nothing to check`);
+  let value: unknown;
+  try {
+    value = JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    return refuse(`plugin ${plugin.name}'s ${file} will not read: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const problem = verifierProjectProblem(value);
+  if (problem !== undefined) return refuse(`plugin ${plugin.name}'s ${file} is no verifier's check project: ${problem}`);
+  const project = value as VerifierCheckProject;
+  const scratch = mkdtempSync(join(tmpdir(), "coherence-plugin-check-"));
+  try {
+    for (const [path, text] of Object.entries(project.files)) {
+      mkdirSync(dirname(join(scratch, path)), { recursive: true });
+      writeFileSync(join(scratch, path), text);
+    }
+    const duties: Duty[] = [];
+    for (const form of forms) {
+      const name = `[${form}]` as const;
+      const proofs = project.proofs.filter((p) => viaForm(p.via)?.form === form);
+      if (proofs.length === 0) {
+        duties.push({ name, verdict: "fail", reason: `nothing to check: the check project proves nothing by [${form}]` });
+        continue;
+      }
+      const wrong: string[] = [];
+      const unrun: string[] = [];
+      for (const proof of proofs) {
+        const read = await guarded(name, async () => {
+          const outcome = await withEnv(proof.env, () => proveVia(scratch, [plugin], proof.via, CHECK_PROOF_MS, proof.component ?? "."));
+          return { name, verdict: outcome.verdict, reason: outcome.reason };
+        });
+        const said = `${proof.via} read ${read.verdict}: ${read.reason}`;
+        if (read.verdict === proof.verdict && (proof.reason === undefined || new RegExp(proof.reason).test(read.reason))) continue;
+        if (read.verdict === "not run" && proof.verdict !== "not run") unrun.push(said);
+        else wrong.push(`${said}; expected ${proof.verdict}${proof.reason === undefined ? "" : ` matching /${proof.reason}/`}`);
+      }
+      if (wrong.length > 0) duties.push({ name, verdict: "fail", reason: wrong.join("; ") });
+      else if (unrun.length > 0) duties.push({ name, verdict: "not run", reason: unrun.join("; ") });
+      else duties.push({ name, verdict: "pass", reason: `${proofs.length} of ${proofs.length} proofs read as expected` });
+    }
+    return duties;
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+/** How long one proof of a verifier's check project may take. */
+const CHECK_PROOF_MS = 120_000;
+
+/** Run `work` with the environment's named values set, every one restored after. */
+async function withEnv<T>(env: Record<string, string> | undefined, work: () => Promise<T>): Promise<T> {
+  if (env === undefined) return work();
+  const before = new Map(Object.keys(env).map((key) => [key, process.env[key]]));
+  Object.assign(process.env, env);
+  try {
+    return await work();
+  } finally {
+    for (const [key, value] of before) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+/** The report plugin check prints: the plugin, then one line per duty; a check with no fail but a duty not run says so rather than pass. */
 export function checkText(check: PluginCheck): string {
   const passed = check.duties.every((o) => o.verdict === "pass");
+  const failed = check.duties.some((o) => o.verdict === "fail");
   return [
-    `plugin check ${check.plugin.name} (${check.plugin.source}, ${check.language}, ${check.plugin.version}): ${passed ? "pass" : "FAIL"}`,
+    `plugin check ${check.plugin.name} (${check.plugin.source}, ${check.language}, ${check.plugin.version}): ${passed ? "pass" : failed ? "FAIL" : "NOT RUN"}`,
     ...check.duties.map((o) => `  ${o.verdict.padEnd(7)} ${o.name}: ${o.reason}`),
   ].join("\n");
 }

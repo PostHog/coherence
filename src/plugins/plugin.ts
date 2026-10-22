@@ -148,6 +148,8 @@ export interface PluginManifest {
 /** What a verifier is asked. */
 export interface VerifyRequest {
   root: string;
+  /** The folder of the spec whose bullet names the proof, project-relative ("." for the root): where a name without a file is looked for. */
+  component: string;
   form: string;
   name: string;
   timeoutMs: number;

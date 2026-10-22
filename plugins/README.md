@@ -17,6 +17,7 @@ Bundled but opt-in: a project runs these only by naming them,
 | Plugin | Adds |
 |---|---|
 | `convex` | over TypeScript: a Convex function reached through the generated API as a reference, and a deployment's functions, HTTP routes and crons as entrances |
+| `quint` | a verifier: `via: [quint]` and `[quint run]` prove a property of a Quint model |
 
 `defaults.json` lists the plugins every project runs without naming them, and
 the language a config that names none reads. A project's config may name a

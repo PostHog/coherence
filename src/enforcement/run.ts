@@ -466,7 +466,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
         const t0 = Date.now();
         if (viaForm(via) !== undefined) {
           // Proved by the plugin that declares the form, graded as a test is, with the plugin and its evidence on the entry.
-          const proved = await proveVia(root, config.plugins, via, options.timeoutMs ?? TOTALITY_TIMEOUT_MS);
+          const proved = await proveVia(root, config.plugins, via, options.timeoutMs ?? TOTALITY_TIMEOUT_MS, component);
           details.push({
             entry: {
               ...entryOf(component, invariant.name, "totality oracle", {

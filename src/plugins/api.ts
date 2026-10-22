@@ -44,7 +44,9 @@ export { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, neste
 // TOML's line lookup is exported under its own name: entrance detection has a lineOf of its own.
 export { lineOf as tomlLineOf, parseToml, TomlError, type TomlTable, type TomlValue } from "../adapters/toml.ts";
 export { isSourceFile, toRelative, type SourceSyntax } from "../economy/source.ts";
-export { spawnSync } from "../lifecycle/work-meter.ts";
+export { configRecord } from "../adapters/project-config.ts";
+export { killTree } from "../enforcement/totality.ts";
+export { spawn, spawnSync } from "../lifecycle/work-meter.ts";
 export { typescriptCompiler } from "./specifiers.ts";
 export type { InterfaceSymbol } from "../observation/interfaces.ts";
 export type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
