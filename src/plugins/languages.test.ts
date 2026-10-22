@@ -184,7 +184,8 @@ test("a plugin that provides a language no bundled plugin does is read as a bund
   assert.ok(environmentFolders().has("zzdeps"), "its environment folders are left out of every walk");
   assert.deepEqual(entranceRules("zz").map((r) => r.rule), ["zz verb"], "its entrance rules are the language's");
   assert.deepEqual([ciNotes(["zz"]), ciSteps(["zz"])], [["zz needs its server"], [{ name: "zz server", run: "install-zz-server" }]], "the CI workflow carries its note and its steps");
-  assert.equal(syntaxOf("zz", "topLevel")?.("verb reset\n", "reset"), true, "its syntax slot answers for it");
+  const topLevel = syntaxOf("zz", "topLevel");
+  assert.ok(typeof topLevel === "function" && topLevel("verb reset\n", "reset"), "its syntax slot answers for it");
   const problems = loadSpecModel(root, { runs: false }).problems.map((p) => p.message).filter((m) => /entrance/.test(m));
   assert.equal(problems.length, 1, JSON.stringify(problems));
   assert.match(problems[0]!, /entrance rename: handler rename is not declared at the top level of app\/accounts\.zz/, "the spec check reads its handlers by the plugin's slot: one declared, one not");
