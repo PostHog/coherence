@@ -134,11 +134,17 @@ function checkProjects(plugin: LoadedPlugin, language: string): { label: string;
   return projects;
 }
 
-/** Run every duty against the plugin, over each check project; a plugin that provides no language is refused, since the duties are a language's. */
+/** Whether a plugin is one of the bundled defaults every project runs, rather than one a project names (an opt-in bundled plugin, or one by path). */
+function isDefault(plugin: LoadedPlugin): boolean {
+  return plugin.source === "bundled" && bundledPlugins().some((p) => p.name === plugin.name);
+}
+
+/** Run every duty against the plugin, over each check project; a plugin that neither provides nor extends a language is refused, since the duties are a language's. */
 export async function checkPlugin(root: string, given: string): Promise<PluginCheck> {
   const plugin = pluginAt(root, given);
-  const language = plugin.manifest.provides?.language;
-  if (language === undefined) throw new Error(`plugin check: plugin ${plugin.name} provides no language, and the duties are a language plugin's`);
+  // A plugin that extends a language without providing it (Convex over TypeScript) is held to that language's duties, as the adapter it wraps is.
+  const language = plugin.manifest.provides?.language ?? plugin.manifest.extends;
+  if (language === undefined) throw new Error(`plugin check: plugin ${plugin.name} neither provides nor extends a language, and the duties are a language plugin's`);
   const projects = checkProjects(plugin, language);
   if ("refusal" in projects) return { plugin, language, duties: DUTIES.map((name) => ({ name, verdict: "fail", reason: projects.refusal })) };
   const each: Duty[][] = [];
@@ -173,7 +179,7 @@ async function overProject(project: CheckProject, plugin: LoadedPlugin, language
       mkdirSync(dirname(join(scratch, path)), { recursive: true });
       writeFileSync(join(scratch, path), text);
     }
-    registerProjectPlugins(scratch, plugin.source === "bundled" ? [] : [plugin]);
+    registerProjectPlugins(scratch, isDefault(plugin) ? [] : [plugin]);
     return await forProject(scratch, async () => [await guarded("file rule", () => fileRule(project, language)), await guarded("declarations", () => declarations(project, language)), ...(await instrument(scratch, project, plugin, language))]);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
@@ -200,7 +206,7 @@ function declarations(project: CheckProject, language: string): Duty {
 
 /** The plugin's adapter over the scratch project: its module's factory, handed the bundled adapter of the language it extends, which the check closes as the core does. */
 function adapterOf(scratch: string, plugin: LoadedPlugin, language: string): { adapter: LanguageAdapter; base: LanguageAdapter | undefined } {
-  if (plugin.source === "bundled") return { adapter: bundledAdapter(language, scratch)!, base: undefined };
+  if (isDefault(plugin)) return { adapter: bundledAdapter(language, scratch)!, base: undefined };
   const module = moduleSyncOf(plugin);
   if (typeof module.adapter !== "function") throw new Error(`plugin ${plugin.name}'s module exports no adapter factory`);
   const base = plugin.manifest.extends === undefined ? undefined : bundledAdapter(plugin.manifest.extends, scratch);

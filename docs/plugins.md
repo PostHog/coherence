@@ -13,8 +13,9 @@ Plugins ship two ways:
   the languages a config declares (`declared`) are bundled plugins that every
   project runs without naming them (`plugins/defaults.json` lists them, with
   the default language). Coherence's core names no language: everything it
-  knows of one is asked of the plugin that provides it. Convex and Quint will
-  arrive as bundled plugins a project opts into by naming them.
+  knows of one is asked of the plugin that provides it. Others ship bundled
+  but run only for a project that names them, `"<name>": "bundled"`: Convex
+  (below).
 - **By path**: a folder in the project (or anywhere the project names). This is
   how a project enhances a bundled plugin: copy it out, change it, and point
   the config at the copy.
@@ -253,6 +254,16 @@ refused at load, by name, rather than read as having none.
   adapter answers for that language, the core's or a providing plugin's. Several
   wrap in the config's order. This is how an enhancement such as Convex layers
   over TypeScript.
+- A plugin that extends a language adds to its readings too: the entrance
+  rules its manifest lists (`entrances.rules`) and the names it vouches for
+  (`wellKnown`) join the language's, and a syntax slot it fills names a
+  function of the table beneath it (the provider's, then each earlier
+  extending plugin's) that returns the table to read by. Convex's
+  `"entrances": "convex-entrances.ts#convexEntrances"` returns TypeScript's
+  entrance syntax with Convex's shapes added. All of it is for the project
+  that names the plugin alone; one that does not reads no file of it.
+- `plugin check` holds a plugin that extends a language to that language's
+  duties, over the bundled minimum for it and the plugin's own `check.json`.
 - **Two plugins that provide one language are refused**, both named: two
   adapters cannot both answer.
 
@@ -301,6 +312,34 @@ order, then the project's.
 - A session start carries a plugin's layer only while its surface is in use: a
   language it provides or extends among the project's, or a via form it proves
   on some bullet. `coherence lexicon` always prints every layer.
+
+## Opt-in bundled plugins
+
+### Convex
+
+`"plugins": { "convex": "bundled" }` in a TypeScript project that deploys a
+Convex backend. It extends TypeScript:
+
+- **References.** Convex code reaches a function through the object `convex
+  dev` generates into `<functions folder>/_generated/api`
+  (`internal.telemetry.send` is `telemetry.ts`'s `send`), whose type the
+  language server never links back to the export. The plugin reads each such
+  property chain, from the syntax tree, as a reference to the export it names,
+  so a chokepoint over a Convex function grades the calls real callers make.
+  Its refutation stages one such reference. The functions folder is the
+  nearest one above a file holding both `_generated/api` and
+  `_generated/server`; a path alias to it must end in the folder's own name.
+- **Entrances.** A public function (an exported `query`, `mutation` or
+  `action` built from the folder's `_generated/server`), a route a
+  `convex/server` `httpRouter` registers, and the function a `cronJobs` table
+  runs. Internal functions are not entrances. Not detected: a library's
+  routes added with `addHttpRoutes`, a custom builder wrapping Convex's, and
+  the functions a library such as `convexAuth` exports.
+- **Vocabulary.** Its own lexicon layer: Convex function, generated API,
+  functions folder, Convex cron.
+
+It needs the TypeScript compiler (`typescript`, an optional dependency of
+Coherence's that a Convex project has already).
 
 ## What a run records
 

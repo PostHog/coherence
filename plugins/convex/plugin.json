@@ -1,0 +1,32 @@
+{
+  "name": "convex",
+  "version": "0.1.0",
+  "pluginApi": 2,
+  "extends": "typescript",
+  "module": "index.ts",
+  "syntax": {
+    "entrances": "convex-entrances.ts#convexEntrances"
+  },
+  "entrances": {
+    "rules": [
+      {
+        "rule": "Convex function",
+        "plural": "Convex functions",
+        "detects": "an exported query, mutation or action built by what a file inside the Convex functions folder imports from _generated/server; an internal function is not one"
+      },
+      {
+        "rule": "Convex HTTP route",
+        "plural": "Convex HTTP routes",
+        "detects": "a route a convex/server httpRouter registers with .route({ path or pathPrefix, method, handler }), its handler named or inline"
+      },
+      {
+        "rule": "Convex cron",
+        "plural": "Convex crons",
+        "detects": "the function a convex/server cronJobs table runs, named through the generated API by dots or static brackets"
+      }
+    ],
+    "notDetected": "a library's routes added with addHttpRoutes, functions built by a custom builder wrapping Convex's, and functions a library such as convexAuth exports are not detected"
+  },
+  "wellKnown": ["Convex"],
+  "lexicon": "lexicon.json"
+}
