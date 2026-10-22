@@ -23,6 +23,7 @@ import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import type { AdapterBounds, LanguageAdapter, Ladder } from "../adapters/adapter.ts";
 import type { DeclaredLanguage } from "../adapters/declared-config.ts";
+import type { BoundarySource } from "../scaffold/boundaries.ts";
 import type { EntranceRule, LoadedPlugin, MarkedFolder, PluginManifest, PluginModule, SyntaxSlot, SyntaxTables } from "./plugin.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
 import { setLanguageData } from "../readings/scope/language-data.ts";
@@ -302,6 +303,16 @@ export function ciNotes(languages: readonly string[]): string[] {
 /** The names the core's language plugins vouch for as well known. */
 export function pluginWellKnown(): string[] {
   return providers().flatMap(({ language }) => fieldOf(language, "wellKnown") ?? []);
+}
+
+/** The boundary sources the core's language plugins supply (tach's, the Python plugin's), each once, by name: what scaffold import and adoption draft specs from. */
+export function boundarySources(): BoundarySource[] {
+  const found = new Map<string, BoundarySource>();
+  for (const { language } of providers()) {
+    const source = syntaxOf(language, "boundaries");
+    if (source !== undefined && !found.has(source.name)) found.set(source.name, source);
+  }
+  return [...found.values()];
 }
 
 /** The ladder the language's adapter grades on, as its plugin's manifest declares it. */

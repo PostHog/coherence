@@ -119,6 +119,13 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: made declaresAtTop ignore export lists, so a name a route file re-exports was not declared there -> "the model: a handler an export list re-exports, or a destructuring across lines declares, is declared at the top level of its file" went red in src/spec/spec.test.ts; restored, green (2026-10-05)
   kinds: none
+- a handler is declared as its language declares one: Whether a file's top level declares a handler, a guard's symbol or a mirror's name is its language plugin's to say (the topLevel slot of its manifest's syntax, src/plugins/languages.ts): a Rust item or macro, a Python def, class or assignment, a TypeScript or JavaScript declaration, export list or destructuring; a file of a language whose plugin says nothing is no source the check reads, and a file is never read as another language.
+  over: Rust handlers (a pub fn, a pub(crate) struct, a macro_rules! macro), a Python async def, a TypeScript exported const, a Rust name looked for in a TypeScript file, and a Rust mod
+  via: the model: a handler is declared as its file's language declares one: a Rust item, a Python def, a TypeScript export, each read by its language's plugin
+  because: the check read TypeScript's and Python's forms itself, so a Rust handler (a wasm or FFI export) was a spec problem however it was written (Holofield gap G4), and an ejected plugin could not change what its language declares (d-5ec9a20a)
+  crossing: project-source -> reading
+  refuted: made declaresAtTop read every file through the first language's slot, so a Rust or Python file was read as TypeScript (src/spec/model.ts) -> "the model: a handler is declared as its file's language declares one: a Rust item, a Python def, a TypeScript export, each read by its language's plugin" went red in spec.test.ts on its own assertion; restored from a copy, green batched and alone (2026-10-22)
+  kinds: none
 - an entrance guard names a chokepoint: An entrance's guard: line names a chokepoint some invariant declares, by its symbol, or a symbol declared in a chokepoint that is a module; any other name, an empty line, or a second guard line is a problem.
   over: every guard: line: a chokepoint's symbol, a symbol of a chokepoint module, a name no invariant declares, an empty and a second line
   via: the model: an entrance's guard: line names a chokepoint an invariant declares, or a symbol of a chokepoint module

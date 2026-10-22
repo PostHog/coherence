@@ -165,6 +165,8 @@ reading first asks for that slot:
 | `declares` | the observation's interface map | `(line) => "type" \| "value" \| "body" \| "unknown"` |
 | `notice` | the session start | `(root) => string` |
 | `lists` | declared mirrors | `(text, name) => Literal \| undefined` |
+| `topLevel` | the spec model's check that a handler, guard or mirror is declared | `(text, name) => boolean` |
+| `boundaries` | `scaffold import` and adoption | `BoundarySource` (`src/scaffold/boundaries.ts`): a tool's declaration file read into modules, as tach's |
 
 A slot a plugin leaves empty reads as "not read for <language>", never as
 another language. A plugin answers for the project whose config names it
@@ -249,15 +251,11 @@ What the interface does not carry yet:
 - **Eject and check.** `coherence plugin eject <name>` (copy a bundled plugin
   into the project and point the config at it) and `coherence plugin check`
   (the bundled plugins' own suite run against any plugin) are the next step.
-- **Language knowledge still in the core.** The spec model's check that a
-  handler or a mirror is declared at a file's top level reads TypeScript's
-  and Python's declaration forms itself (`declaresAtTop`, `src/spec/model.ts`);
-  the vocabulary's code scan reads many languages' declarations
-  (`src/lifecycle/lexicon-coverage.ts`, `src/lifecycle/check.ts`); entrance
-  detection's package-script rule names the runners it follows; `scaffold
-  import` and adoption read tach's configuration (`src/scaffold/boundaries.ts`,
-  `src/lifecycle/adopt.ts`); the mirror reading parses with the TypeScript
-  compiler; rust-analyzer is located in `src/adapters/installed.ts`; a
+- **Language knowledge still in the core.** The vocabulary's code scan reads
+  many languages' declarations (`src/lifecycle/lexicon-coverage.ts`,
+  `src/lifecycle/check.ts`); entrance detection's package-script rule names
+  the runners it follows, and its pyproject console scripts; the mirror
+  readers parse with the TypeScript compiler and resolve its specifiers; a
   module's own files (a Python package's `__init__`, a Rust module's folder)
   are read in `src/enforcement/check.ts`; run routes pytest; the observation
   reads Python tracebacks. The structural test names each as an exception

@@ -122,3 +122,10 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   crossing: instrument -> reading
   refuted: made proposeClosures read every handler's declaration in the primary language -> "scaffold control on a two-language project reads both languages and proposes from each language's handlers" went red in multi-language.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- a boundary source is its language plugin's: scaffold import and adoption reach every boundary source through the language plugins' boundaries slot, never by a tool's name in the core: tach's tach.toml through the Python plugin, so adoption names the draft command for a folder the file declares as a module, and scaffold import names the sources the plugins supply.
+  over: a repository whose tach.toml declares one of two folders as a module, each adopted
+  via: adopting a folder a boundary source's file declares as a module names the draft command: tach.toml through the Python plugin's source
+  because: tach is Python's tool, and a core that read it by name kept it from an ejected Python plugin and kept a second language's tool out (d-5ec9a20a)
+  crossing: project-source -> reading
+  refuted: made boundarySources ask no language plugin, so no source reached scaffold import or adoption (languages.ts) -> "adopting a folder a boundary source's file declares as a module names the draft command: tach.toml through the Python plugin's source" went red in registry.test.ts on its own assertion; restored from a copy, green batched and alone (2026-10-22)
+  kinds: none

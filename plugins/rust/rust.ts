@@ -1,6 +1,6 @@
 /**
  * The Rust adapter: the language server protocol over stdio to
- * rust-analyzer, found on the machine (locateRustAnalyzer in installed.ts):
+ * rust-analyzer, found on the machine (locateRustAnalyzer in rust-analyzer.ts):
  * it is no npm package, so the resolver has nothing to resolve.
  *
  * The server is asked nothing before it says it is quiescent: rust-analyzer
@@ -50,7 +50,8 @@ import {
   type StagedSite,
   type Visibility,
 } from "../../src/adapters/adapter.ts";
-import { locateRustAnalyzer, type ServerLocation } from "../../src/adapters/installed.ts";
+import type { ServerLocation } from "../../src/adapters/installed.ts";
+import { locateRustAnalyzer } from "./rust-analyzer.ts";
 import manifest from "./plugin.json" with { type: "json" };
 import { JsonRpcClient, RpcError } from "../../src/adapters/jsonrpc.ts";
 import { keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/adapters/project-files.ts";

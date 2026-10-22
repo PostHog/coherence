@@ -15,7 +15,7 @@
 import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { CONFIG_FILE, readConfigFile, repositoryTop, under } from "../adapters/project-config.ts";
-import { readTach } from "../scaffold/boundaries.ts";
+import { boundarySources } from "../plugins/languages.ts";
 import { projectPractices } from "../spec/model.ts";
 import { deadTriggers, deadTriggerText } from "../spec/practices.ts";
 
@@ -28,8 +28,8 @@ export interface Adopted {
   folder: string;
   /** Whether the registry was created by this call. */
   created: boolean;
-  /** The tach module whose path is this folder, when tach.toml at the top declares one. */
-  tachModule: string | undefined;
+  /** The module a boundary source's file at the top declares at this folder (tach.toml's), when one does: the source and the module's id. */
+  boundaryModule: { source: string; file: string; id: string } | undefined;
   /** The folder's own practice triggers that match no file in it, as spec --check will name them: a whole-repository adoption's paths, still relative to the repository top. */
   deadTriggers: string[];
 }
@@ -74,7 +74,7 @@ export function adopt(cwd: string, given: string): Adopted {
   const indent = text === undefined ? 2 : indentationOf(text);
   const newline = text === undefined || text === "" || text.endsWith("\n");
   writeFileSync(path, JSON.stringify(next, null, indent) + (newline ? "\n" : ""));
-  return { path, folder, created: text === undefined, tachModule: tachModuleFor(top, folder), deadTriggers: deadTriggersIn(target) };
+  return { path, folder, created: text === undefined, boundaryModule: boundaryModuleFor(top, folder), deadTriggers: deadTriggersIn(target) };
 }
 
 /** The dead triggers of the folder's own practices, or none when its practices cannot be read (spec --check says why). */
@@ -86,15 +86,19 @@ function deadTriggersIn(folder: string): string[] {
   }
 }
 
-/** The tach module whose folder is `folder`, read from tach.toml at the top; undefined when there is none or it will not read. */
-function tachModuleFor(top: string, folder: string): string | undefined {
-  const file = join(top, "tach.toml");
-  if (!existsSync(file)) return undefined;
-  try {
-    return readTach(top, file).find((m) => m.folder === folder)?.id;
-  } catch {
-    return undefined;
+/** The module a boundary source's file at the top declares at `folder` (tach.toml's, through the Python plugin), the first source that declares one; undefined when none does or its file will not read. */
+function boundaryModuleFor(top: string, folder: string): Adopted["boundaryModule"] {
+  for (const source of boundarySources()) {
+    const file = join(top, source.file);
+    if (!existsSync(file)) continue;
+    try {
+      const id = source.read(top, file).find((m) => m.folder === folder)?.id;
+      if (id !== undefined) return { source: source.name, file: source.file, id };
+    } catch {
+      // A file that will not read declares nothing here; scaffold import says why when it is run.
+    }
   }
+  return undefined;
 }
 
 /** What adopt prints: what it wrote, and the next steps. */
@@ -105,7 +109,8 @@ export function adoptText(adopted: Adopted, cli: string): string {
     `Next: work through the adoption practice from inside ${adopted.folder}: ${cli} query practice "adopt Coherence"`,
   ];
   if (adopted.deadTriggers.length > 0) lines.push(`${adopted.deadTriggers.length} practice trigger${adopted.deadTriggers.length === 1 ? "" : "s"} in ${adopted.folder} name no file of the project it now is (a when: line's paths are relative to the project's folder):`, ...adopted.deadTriggers.map((t) => `  ${t}`));
-  if (adopted.tachModule !== undefined) lines.push(`tach.toml declares ${adopted.folder} as the module ${adopted.tachModule}; draft its spec with: ${cli} scaffold import tach ${adopted.tachModule}`);
+  const declared = adopted.boundaryModule;
+  if (declared !== undefined) lines.push(`${declared.file} declares ${adopted.folder} as the module ${declared.id}; draft its spec with: ${cli} scaffold import ${declared.source} ${declared.id}`);
   lines.push(`Install the hooks once, at the repository top, if they are not yet: ${cli} hooks install --host claude (or --local for yourself alone).`);
   return lines.join("\n") + "\n";
 }

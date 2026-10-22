@@ -110,6 +110,8 @@
     "interfaces": "python-scope.ts#PYTHON_INTERFACES",
     "kept": "python-scope.ts#pythonKeptModules",
     "source": "python-source.ts#PYTHON_SOURCE",
-    "declares": "python-interfaces.ts#pythonDeclares"
+    "declares": "python-interfaces.ts#pythonDeclares",
+    "topLevel": "python-top-level.ts#pythonDeclaresAtTop",
+    "boundaries": "tach-boundaries.ts#TACH_BOUNDARIES"
   }
 }

@@ -59,10 +59,9 @@ function coreSources(dir: string, into: string[] = []): string[] {
  */
 const ALLOWED: readonly { file: string; texts: readonly string[]; why: string }[] = [
   { file: "src/adapters/declared-config.ts", texts: ['"python"'], why: "the interpreter's program name, one of the runners a declared server is started through" },
-  { file: "src/build.ts", texts: ['/(from\\s+["\']\\.{1,2}\\/[^"\']+)\\.ts(["\'])/g', "/\\.(test|e2e)\\.ts$/", '".ts"', '/((?:\\bfrom|\\bimport)\\s*\\(?\\s*["\']\\.{1,2}\\/[^"\']+)\\.ts(["\'])/g', "/\\.ts$/", '".js"', '/("(?:module|entrances|interfaces|source|kept|declares|notice|lists)":\\s*"[^"#]+)\\.ts(["#])/g'], why: "Coherence's own build compiles its own TypeScript sources" },
+  { file: "src/build.ts", texts: ['/(from\\s+["\']\\.{1,2}\\/[^"\']+)\\.ts(["\'])/g', "/\\.(test|e2e)\\.ts$/", '".ts"', '/((?:\\bfrom|\\bimport)\\s*\\(?\\s*["\']\\.{1,2}\\/[^"\']+)\\.ts(["\'])/g', "/\\.ts$/", '".js"', '/("[A-Za-z]+":\\s*"[^"#/]+)\\.ts(["#])/g'], why: "Coherence's own build compiles its own TypeScript sources" },
   { file: "src/enforcement/code-fingerprint.ts", texts: ["/\\.(ts|mts|cts|js|mjs|cjs|json)$/", "/\\.js$/", "/\\.ts$/"], why: "the identity of Coherence's own code, its sources or the compiled modules" },
   { file: "src/readings/scope/build.ts", texts: ["/\\.ts$/", '".js"'], why: "the Scope page is built from Coherence's own TypeScript sources" },
-  { file: "src/spec/model.ts", texts: ["/\\.(?:[cm]?[jt]sx?|py)$/"], why: "not yet a plugin's: the spec model's check that a handler or mirror is declared at a file's top level, moving in its own change" },
   { file: "src/enforcement/check.ts", texts: ["/^(.*)\\/(?:__init__\\.py|mod\\.rs)$/", "/^((?:.*\\/)?src)\\/(?:lib|main)\\.rs$/", "/^(.*)\\.rs$/"], why: "not yet a plugin's: which files a module owns (a Python package's __init__, a Rust module's folder)" },
   { file: "src/lifecycle/check.ts", texts: ['".ts"', '".tsx"', '".js"', '".jsx"', '".mjs"', '".cjs"', '".mts"', '".cts"', '".py"', '".rs"'], why: "not yet a plugin's: the vocabulary check's list of code extensions, which names many languages besides the bundled ones" },
   { file: "src/lifecycle/mirrors.ts", texts: ["/\\.[cm]?js$/", "/\\.([cm]?)js$/", "/\\.js$/", '".tsx"'], why: "not yet a plugin's: how a declared mirror's import closure resolves a TypeScript specifier" },

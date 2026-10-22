@@ -12,7 +12,7 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { runHook } from "./hook.ts";
 import { projectRoot, vocabularyFacts } from "./project.ts";
-import { adopt, AdoptError } from "./adopt.ts";
+import { adopt, AdoptError, adoptText } from "./adopt.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { configIgnore, configReferences } from "../adapters/project-files.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
@@ -220,6 +220,20 @@ test("hooks install with a registry writes the host settings once, at the reposi
     assert.ok(!existsSync(join(top, "products/errors/.claude")), "never a leaf's own settings");
     for (const leaf of ["products/notebooks", "products/errors"]) assert.ok(existsSync(join(top, leaf, ".coherence/.gitignore")), leaf);
     assert.ok(!existsSync(join(top, ".coherence")), "the registry's top is no project");
+  } finally {
+    rmSync(top, { recursive: true, force: true });
+  }
+});
+
+test("adopting a folder a boundary source's file declares as a module names the draft command: tach.toml through the Python plugin's source", () => {
+  const top = repository({ "tach.toml": '[[modules]]\npath = "shop.billing"\ndepends_on = []\n', "shop/billing/__init__.py": "", "shop/stock/__init__.py": "" });
+  try {
+    const declared = adopt(top, "shop/billing");
+    assert.deepEqual(declared.boundaryModule, { source: "tach", file: "tach.toml", id: "shop.billing" });
+    assert.match(adoptText(declared, "coherence"), /^tach\.toml declares shop\/billing as the module shop\.billing; draft its spec with: coherence scaffold import tach shop\.billing$/m);
+    const undeclared = adopt(top, "shop/stock");
+    assert.equal(undeclared.boundaryModule, undefined, "a folder no module names");
+    assert.doesNotMatch(adoptText(undeclared, "coherence"), /scaffold import/);
   } finally {
     rmSync(top, { recursive: true, force: true });
   }

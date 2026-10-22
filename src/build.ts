@@ -68,7 +68,7 @@ for (const file of files(plugins)) {
   } else if (file.endsWith(".json")) {
     const text = readFileSync(file, "utf8");
     // Every module a manifest names (its module and each syntax slot's) by the .js the build wrote.
-    writeFileSync((mkdirSync(dirname(join(bundled, at)), { recursive: true }), join(bundled, at)), basename(file) === "plugin.json" ? text.replace(/("(?:module|entrances|interfaces|source|kept|declares|notice|lists)":\s*"[^"#]+)\.ts(["#])/g, "$1.js$2") : text);
+    writeFileSync((mkdirSync(dirname(join(bundled, at)), { recursive: true }), join(bundled, at)), basename(file) === "plugin.json" ? text.replace(/("[A-Za-z]+":\s*"[^"#/]+)\.ts(["#])/g, "$1.js$2") : text);
   }
 }
 
