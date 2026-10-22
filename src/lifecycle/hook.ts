@@ -809,7 +809,9 @@ export async function startReading(root: string, input: HookInput = {}, report?:
  * The plugins the config names that the registry refuses, each by name with
  * its reason, ahead of the spec block: a refused plugin stops every command
  * that reads the config, so the session hears which and why before anything
- * else. Nothing when the config names no plugins or none is refused.
+ * else. With none refused, one line naming each plugin the project brings
+ * whose syntax slots will run in this session's hooks. Nothing when the
+ * config names no plugins, or none of its plugins has syntax code.
  */
 function pluginRefusalBlock(root: string): string {
   let value: unknown;
@@ -820,9 +822,12 @@ function pluginRefusalBlock(root: string): string {
     return "";
   }
   if (value === undefined) return "";
-  const { problems } = readPlugins(root, value, CONFIG_FILE, LANGUAGES, (extension) => languageOfFile(`x${extension}`));
-  if (problems.length === 0) return "";
-  return `Plugins refused (${problems.length}); every command that reads the config stops on this until it is fixed:\n${problems.map((p) => `✕ ${p}`).join("\n")}\n\n`;
+  const { plugins, problems } = readPlugins(root, value, CONFIG_FILE, LANGUAGES, (extension) => languageOfFile(`x${extension}`));
+  if (problems.length > 0) return `Plugins refused (${problems.length}); every command that reads the config stops on this until it is fixed:\n${problems.map((p) => `✕ ${p}`).join("\n")}\n\n`;
+  // A plugin's syntax slots run where the readings do, this session's hooks included (d-c18552a9): said once, for the plugins the project brings.
+  const hooked = plugins.filter((p) => p.source !== "bundled" && Object.keys(p.manifest.syntax ?? {}).length > 0);
+  if (hooked.length === 0) return "";
+  return `Plugin code in this session's hooks: ${hooked.map((p) => `${p.name} (${p.source}: ${Object.keys(p.manifest.syntax ?? {}).join(", ")})`).join("; ")} runs as a reading reads its language, with the project's privileges.\n\n`;
 }
 
 /**

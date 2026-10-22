@@ -18,6 +18,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import type { AdapterBounds, LanguageAdapter, Ladder } from "../adapters/adapter.ts";
@@ -81,36 +82,66 @@ export const LANGUAGES: readonly string[] = bundledLanguages();
 /** A language the core reads by name. */
 export type Language = string;
 
-/** Plugins a project's config names that provide one of the core's languages, by language: they take the bundled one's place. */
-const swapped = new Map<string, LoadedPlugin>();
+/**
+ * Plugins each project's config names that provide one of the core's
+ * languages, by project root, then by language: they take the bundled one's
+ * place for that project alone.
+ */
+const swapsByRoot = new Map<string, Map<string, LoadedPlugin>>();
 
-/** What is derived from the providers' data, kept until a project's plugins are registered. */
+/** The project root a question is asked for: the one forProject names around it, else the project whose config was read last. */
+const scope = new AsyncLocalStorage<string>();
+let lastRoot: string | undefined;
+
+/** The swaps of the project a question is asked for. */
+function swapsNow(): ReadonlyMap<string, LoadedPlugin> {
+  const root = scope.getStore() ?? lastRoot;
+  return (root === undefined ? undefined : swapsByRoot.get(root)) ?? NO_SWAPS;
+}
+
+const NO_SWAPS: ReadonlyMap<string, LoadedPlugin> = new Map();
+
+/** What is derived from the providers' data, per project root, kept until that project's plugins are registered again. */
 const derivedCache = new Map<string, unknown>();
 
 function cached<T>(key: string, make: () => T): T {
-  if (!derivedCache.has(key)) derivedCache.set(key, make());
-  return derivedCache.get(key) as T;
+  const scoped = `${scope.getStore() ?? lastRoot ?? ""}\u0000${key}`;
+  if (!derivedCache.has(scoped)) derivedCache.set(scoped, make());
+  return derivedCache.get(scoped) as T;
 }
 
 /**
- * Register the plugins the project whose config was just read names: one
- * that provides a language the bundled defaults provide takes its place in
- * every question asked here. The last project read is the one answered for;
- * a project that names none puts every bundled one back.
+ * Register the plugins a project's config names, under its root: one that
+ * provides a language the bundled defaults provide takes its place for that
+ * project. The project registered last is the one a question asked outside
+ * forProject is answered for; a project that names none reads the bundled
+ * ones.
  */
-export function registerProjectPlugins(plugins: readonly LoadedPlugin[]): void {
-  derivedCache.clear();
-  swapped.clear();
+export function registerProjectPlugins(root: string, plugins: readonly LoadedPlugin[]): void {
+  const key = resolve(root);
+  for (const cachedKey of [...derivedCache.keys()]) if (cachedKey.startsWith(`${key}\u0000`)) derivedCache.delete(cachedKey);
+  const swaps = new Map<string, LoadedPlugin>();
   for (const plugin of plugins) {
     const language = plugin.manifest.provides?.language;
-    if (language !== undefined && LANGUAGES.includes(language) && plugin.source !== "bundled") swapped.set(language, plugin);
+    if (language !== undefined && LANGUAGES.includes(language) && plugin.source !== "bundled") swaps.set(language, plugin);
   }
+  swapsByRoot.set(key, swaps);
+  lastRoot = key;
   setLanguageData(languageDataTable());
+}
+
+/**
+ * Run `work` with every question it asks here answered for the project at
+ * `root`, however its awaits interleave with another project's: what a
+ * process that serves several projects at once wraps each one's work in.
+ */
+export function forProject<T>(root: string, work: () => T): T {
+  return scope.run(resolve(root), work);
 }
 
 /** The plugin that provides one of the core's languages: the project's swap when its config named one, else the bundled one; undefined for any other name. */
 export function providerOf(language: string): LoadedPlugin | undefined {
-  return swapped.get(language) ?? bundledProvider(language);
+  return swapsNow().get(language) ?? bundledProvider(language);
 }
 
 function bundledProvider(language: string): LoadedPlugin | undefined {
@@ -123,7 +154,7 @@ function bundledProvider(language: string): LoadedPlugin | undefined {
  * keeps every reading of the language.
  */
 function fieldOf<K extends keyof PluginManifest>(language: string, key: K): PluginManifest[K] | undefined {
-  const swap = swapped.get(language);
+  const swap = swapsNow().get(language);
   if (swap !== undefined && swap.manifest[key] !== undefined) return swap.manifest[key];
   return bundledProvider(language)?.manifest[key];
 }
@@ -146,8 +177,12 @@ function providers(): { language: string; plugin: LoadedPlugin }[] {
 const fileRules = new Map<string, { pattern: RegExp; except: RegExp | undefined }>();
 
 function fileRule(language: string): { pattern: RegExp; except: RegExp | undefined } {
-  const files = fieldOf(language, "files");
-  const extensions = fieldOf(language, "extensions") ?? [];
+  // A file rule is one rule, never merged field by field: a swap that names its files either way (a pattern, or a list of
+  // extensions) owns them whole, so a swap that adds .svelte by extensions is never left reading the bundled pattern alone.
+  const swap = swapsNow().get(language);
+  const owner = swap !== undefined && (swap.manifest.files !== undefined || swap.manifest.extensions !== undefined) ? swap : bundledProvider(language);
+  const files = owner?.manifest.files;
+  const extensions = owner?.manifest.extensions ?? [];
   const key = JSON.stringify([files, extensions]);
   let rule = fileRules.get(key);
   if (rule === undefined) {
@@ -286,7 +321,7 @@ const slots = new Map<string, unknown>();
  */
 export function syntaxOf<S extends SyntaxSlot>(language: string, slot: S): SyntaxTables[S] | undefined {
   // The swap's slot when it fills it, else the bundled provider's: a plugin that replaces only the adapter keeps the readings.
-  const swap = swapped.get(language);
+  const swap = swapsNow().get(language);
   const plugin = swap?.manifest.syntax?.[slot] !== undefined ? swap : bundledProvider(language);
   const at = plugin?.manifest.syntax?.[slot];
   if (plugin === undefined || at === undefined) return undefined;
@@ -302,7 +337,7 @@ export function syntaxOf<S extends SyntaxSlot>(language: string, slot: S): Synta
 
 /** Every module the core's language plugins answer from, by absolute path: their adapter modules and the modules their syntax slots name. */
 export function languageCode(): string[] {
-  return [...providers().map(({ plugin }) => plugin), ...[...swapped.keys()].flatMap((l) => bundledProvider(l) ?? [])].flatMap((plugin) => {
+  return [...providers().map(({ plugin }) => plugin), ...[...swapsNow().keys()].flatMap((l) => bundledProvider(l) ?? [])].flatMap((plugin) => {
     const files = [plugin.manifest.module, ...Object.values(plugin.manifest.syntax ?? {}).map((at) => at.split("#")[0])].filter((f): f is string => f !== undefined);
     return [...new Set(files)].map((f) => resolve(plugin.dir, f));
   });

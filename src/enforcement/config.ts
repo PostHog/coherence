@@ -165,7 +165,7 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   // The project's own config over its registry's keys (project-config.ts), each inherited path rebased to the project.
   const found = effectiveConfig(root);
   if (found === undefined) {
-    registerProjectPlugins([]);
+    registerProjectPlugins(root, []);
     return config;
   }
   const { record, path } = found;
@@ -179,7 +179,7 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   config.plugins = read.plugins;
   config.provided = provided;
   // A plugin that provides one of the core's languages takes its bundled one's place in every reading, as in every check.
-  registerProjectPlugins(read.plugins);
+  registerProjectPlugins(root, read.plugins);
   const known = [...LANGUAGES, ...declared.map((d) => d.name), ...provided.map((p) => p.name)];
   const language = record["language"];
   if (language !== undefined) {

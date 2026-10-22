@@ -52,7 +52,8 @@ a hook's own process included: the economy's prediction at a stop, the
 lexicon's member scan and entrance detection read languages there, and the
 core's own languages are plugins now. A slot's module is loaded only when a
 reading asks for that slot, and should be what a syntax table is: small and
-without effects. Run a plugin you would run as a dev dependency, and review a
+without effects. A session start names, in one line, each plugin the project
+brings whose syntax code will run in its hooks. Run a plugin you would run as a dev dependency, and review a
 change to one as you would a change to the project's own code. A bundled
 plugin ships inside `@posthog/coherence` and is reviewed with it.
 
@@ -166,9 +167,13 @@ reading first asks for that slot:
 | `lists` | declared mirrors | `(text, name) => Literal \| undefined` |
 
 A slot a plugin leaves empty reads as "not read for <language>", never as
-another language. A plugin that provides one of the bundled languages answers
+another language. A plugin answers for the project whose config names it
+alone: a process serving several projects asks each one's questions under
+`forProject(root, ...)`. A plugin that provides one of the bundled languages answers
 each field and slot it declares, and the bundled plugin answers the rest, so
-an enhancement of the adapter alone keeps every reading of the language.
+an enhancement of the adapter alone keeps every reading of the language. Its
+file rule is one rule: a plugin that names its files, by `files` or
+`extensions`, owns them whole.
 
 ## Roles
 
@@ -252,12 +257,11 @@ What the interface does not carry yet:
   detection's package-script rule names the runners it follows; `scaffold
   import` and adoption read tach's configuration (`src/scaffold/boundaries.ts`,
   `src/lifecycle/adopt.ts`); the mirror reading parses with the TypeScript
-  compiler; and rust-analyzer is located in `src/adapters/installed.ts`. None
-  branches on a language's name, which the structural test holds, but each is
-  a table a language plugin should own.
+  compiler; rust-analyzer is located in `src/adapters/installed.ts`; a
+  module's own files (a Python package's `__init__`, a Rust module's folder)
+  are read in `src/enforcement/check.ts`; run routes pytest; the observation
+  reads Python tracebacks. The structural test names each as an exception
+  with its reason, and each is a table a language plugin should own.
 - **Bullets about a plugin's code** still live in the core's specs
   (`src/adapters/Adapters.spec.md`): a bullet's witnessed refutation is keyed
   by its component, so moving one restages its refutation.
-- **One project per process.** A plugin a project's config names takes its
-  language's place for the rest of the process, until another project's
-  config is read; a registry run reads each project's config before running it.
