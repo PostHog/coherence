@@ -99,7 +99,7 @@ test("a declared language is read from the config strictly: a built-in's name, a
     const swift = { swift: { extensions: [".swift"], server: ["sourcekit-lsp"] } };
     assert.throws(() => config({ languages: swift }), /languages declares swift, which language does not name/);
     assert.throws(() => config({ language: "swiftt", languages: swift }), /language names "swiftt"; each is one of typescript, python, rust, swift/);
-    assert.throws(() => config({ language: "go" }), /language names "go"; each is one of typescript, python, rust \(or a language declared under languages\)/);
+    assert.throws(() => config({ language: "go" }), /language names "go"; each is one of typescript, python, rust, a language declared under languages, or one a plugin named under plugins provides \(docs\/plugins\.md\)/);
     const mixed = config({ language: ["typescript", "swift"], languages: swift });
     assert.deepEqual([mixed.language, mixed.languages, mixed.enforced, mixed.declared.map((d) => d.name)], ["typescript", ["typescript"], ["typescript", "swift"], ["swift"]]);
     const alone = config({ language: "swift", languages: swift });

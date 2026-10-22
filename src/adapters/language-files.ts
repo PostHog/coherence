@@ -6,4 +6,4 @@
  * rule is each language plugin's, read from its manifest (src/plugins/languages.ts).
  */
 
-export { LANGUAGES, languageOfFile, type Language } from "../plugins/languages.ts";
+export { coreLanguageOfExtension, LANGUAGES, languageOfFile, type Language } from "../plugins/languages.ts";

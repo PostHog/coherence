@@ -215,6 +215,37 @@ the workspace are unseen. Totality oracles run through `cargo test` one at a
 time (`"test": "cargo test -q -- --exact {filter}"`, `"testMatch": "test
 result: ok\\. [1-9]"`); doctests are not run as `via`s.
 
+## Go
+
+`"language": "go"` with `"plugins": { "go": "bundled" }` grades through
+gopls, found from `COHERENCE_GOPLS`, then the `PATH`, then
+`go env GOPATH`/bin; install it with
+`go install golang.org/x/tools/gopls@latest`. Go is the opt-in bundled
+plugin's, not a default: a project that does not name the plugin reads no
+`.go` file as Go.
+
+Go's ladder has two rungs, by Go's one visibility rule:
+
+- **visibility-choked** (the compiler, go build): the protected name is
+  unexported (its first letter is not upper case), so the compiler refuses
+  it from any other package, and every reference inside its package is
+  classified as usual.
+- **reference-choked** (Coherence's check at the edit and in CI): the name
+  is exported, and every reference gopls reports in the module is inside
+  the chokepoint.
+
+A site in a `_test.go` file is a test reference. A module is one `.go`
+file; a package folder resolves only when it holds one non-test file.
+
+The refutation never touches disk: every staged use is an unsaved overlay.
+For an unexported name, a new package beside the protected one uses it, and
+gopls's refusal (`UnexportedName`) is the refutation, with a control use
+inside the package that must not be refused. For an exported one, a new
+file in the protected thing's package and the chokepoint's own file, past
+the chokepoint, each use it, and both must come back as bypasses; with
+`from:`, a use from a new package outside the exempt folder is staged
+instead of the one inside it.
+
 ## A declared language
 
 A language Coherence has no adapter for is declared in the config, under

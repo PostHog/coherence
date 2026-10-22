@@ -101,6 +101,23 @@ export interface MarkedFolder {
   reason: string;
 }
 
+/**
+ * One step the generated CI workflow runs, after the install and before the
+ * checks, for a project that reads a plugin's language: an action it uses,
+ * pinned to a commit, or a command it runs (the toolchain and the language
+ * server its adapter asks, which no lockfile brings).
+ */
+export interface CiStep {
+  name?: string;
+  /** An action, as owner/repo@<40-hex commit>. */
+  uses?: string;
+  /** The release the action's commit is, written beside it as a comment; required with uses. */
+  version?: string;
+  with?: Record<string, string>;
+  /** A shell command. */
+  run?: string;
+}
+
 /** What `plugin.json` holds. */
 export interface PluginManifest {
   name: string;
@@ -130,8 +147,8 @@ export interface PluginManifest {
   environmentFolders?: string[];
   /** Folders the language's tools made, left out by a marker. */
   markedFolders?: MarkedFolder[];
-  /** What the CI workflow says when a project reads the language. */
-  ci?: { note: string };
+  /** What the CI workflow says when a project reads the language, and the steps it runs first to set up what the plugin's adapter asks. */
+  ci?: { note: string; steps?: CiStep[] };
   /** Names a plugin vouches for as well known, beside well-known.json. */
   wellKnown?: string[];
   /** The module, relative to the manifest, whose default export is a PluginModule. */

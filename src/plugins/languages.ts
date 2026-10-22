@@ -10,7 +10,9 @@
  * runs without naming them: TypeScript, Python, Rust, and the declared plugin
  * that reads the languages a config declares. A project's config may name a
  * plugin that provides one of their languages, which takes its place (the
- * swap rule, src/plugins/registry.ts); reading the config registers it here.
+ * swap rule, src/plugins/registry.ts), or one that provides a language none
+ * of them does (Go), which is read here as a bundled one is, for that
+ * project alone; reading the config registers either here.
  *
  * The manifests are data, read once per process; a slot's module is loaded
  * synchronously, once, when a reading first asks for that slot of that
@@ -24,7 +26,7 @@ import { join, resolve } from "node:path";
 import type { AdapterBounds, LanguageAdapter, Ladder } from "../adapters/adapter.ts";
 import type { DeclaredLanguage } from "../adapters/declared-config.ts";
 import type { BoundarySource } from "../scaffold/boundaries.ts";
-import type { EntranceRule, LoadedPlugin, MarkedFolder, PluginManifest, PluginModule, SyntaxSlot, SyntaxTables } from "./plugin.ts";
+import type { CiStep, EntranceRule, LoadedPlugin, MarkedFolder, PluginManifest, PluginModule, SyntaxSlot, SyntaxTables } from "./plugin.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
 import { setLanguageData } from "../readings/scope/language-data.ts";
 
@@ -122,6 +124,20 @@ const NO_SWAPS: ReadonlyMap<string, LoadedPlugin> = new Map();
  */
 const extendersByRoot = new Map<string, readonly LoadedPlugin[]>();
 
+/**
+ * Plugins each project's config names that provide a language no bundled
+ * plugin provides (Go), by project root, in the config's order: each is its
+ * language's whole provider for that project, its manifest data and syntax
+ * slots read as a bundled plugin's are.
+ */
+const addedByRoot = new Map<string, readonly LoadedPlugin[]>();
+
+/** The plugins that add a language for the project a question is asked for. */
+function addedNow(): readonly LoadedPlugin[] {
+  const root = rootNow();
+  return (root === undefined ? undefined : addedByRoot.get(root)) ?? [];
+}
+
 /** The plugins that extend the language for the project a question is asked for, in the config's order. */
 function extendersOf(language: string): readonly LoadedPlugin[] {
   const root = rootNow();
@@ -149,13 +165,18 @@ export function registerProjectPlugins(root: string, plugins: readonly LoadedPlu
   for (const cachedKey of [...derivedCache.keys()]) if (cachedKey.startsWith(`${key}\u0000`)) derivedCache.delete(cachedKey);
   const swaps = new Map<string, LoadedPlugin>();
   const extenders: LoadedPlugin[] = [];
+  const added: LoadedPlugin[] = [];
   for (const plugin of plugins) {
     const language = plugin.manifest.provides?.language;
-    if (language !== undefined && LANGUAGES.includes(language) && plugin.source !== "bundled") swaps.set(language, plugin);
-    else if (language === undefined && plugin.manifest.extends !== undefined && LANGUAGES.includes(plugin.manifest.extends)) extenders.push(plugin);
+    if (language !== undefined && LANGUAGES.includes(language)) {
+      if (plugin.source !== "bundled") swaps.set(language, plugin);
+    } else if (language !== undefined) added.push(plugin);
+    // The registry has already refused one that extends a language neither the core nor a plugin here provides.
+    else if (plugin.manifest.extends !== undefined) extenders.push(plugin);
   }
   swapsByRoot.set(key, swaps);
   extendersByRoot.set(key, extenders);
+  addedByRoot.set(key, added);
   lastRoot = key;
   setLanguageData(languageDataTable());
 }
@@ -169,13 +190,28 @@ export function forProject<T>(root: string, work: () => T): T {
   return scope.run(resolve(root), work);
 }
 
-/** The plugin that provides one of the core's languages: the project's swap when its config named one, else the bundled one; undefined for any other name. */
+/** The plugin that provides a language the project reads: the project's swap when its config named one, else the bundled one, else the project's plugin that adds it; undefined for any other name. */
 export function providerOf(language: string): LoadedPlugin | undefined {
-  return swapsNow().get(language) ?? bundledProvider(language);
+  return swapsNow().get(language) ?? baseProvider(language);
 }
 
 function bundledProvider(language: string): LoadedPlugin | undefined {
   return bundledPlugins().find((p) => p.manifest.provides?.language === language);
+}
+
+/** What a swap falls back to: the bundled provider of one of the core's languages, else the project's plugin that adds the language. */
+function baseProvider(language: string): LoadedPlugin | undefined {
+  return bundledProvider(language) ?? addedNow().find((p) => p.manifest.provides?.language === language);
+}
+
+/**
+ * The core's language that reads files ending in an extension, whatever
+ * plugin a project adds: what the registry asks before it lets a plugin's
+ * new language claim the extension, so a plugin registered by an earlier
+ * read of the same config is never taken for another owner of its own files.
+ */
+export function coreLanguageOfExtension(extension: string): string | undefined {
+  return languageOfFile(`x${extension}`, LANGUAGES);
 }
 
 /**
@@ -186,7 +222,7 @@ function bundledProvider(language: string): LoadedPlugin | undefined {
 function fieldOf<K extends keyof PluginManifest>(language: string, key: K): PluginManifest[K] | undefined {
   const swap = swapsNow().get(language);
   if (swap !== undefined && swap.manifest[key] !== undefined) return swap.manifest[key];
-  return bundledProvider(language)?.manifest[key];
+  return baseProvider(language)?.manifest[key];
 }
 
 /** The bundled plugin that reads the languages a config declares. */
@@ -194,9 +230,9 @@ export function declaredProvider(): LoadedPlugin | undefined {
   return bundledPlugins().find((p) => p.manifest.provides?.declaredLanguages === true);
 }
 
-/** Every one of the core's languages with its provider, in the languages' order. */
+/** Every language the project reads by a plugin with its provider: the core's, in their order, then each its plugins add, in the config's. */
 function providers(): { language: string; plugin: LoadedPlugin }[] {
-  return LANGUAGES.flatMap((language) => {
+  return [...LANGUAGES, ...addedNow().map((p) => p.manifest.provides!.language!)].flatMap((language) => {
     const plugin = providerOf(language);
     return plugin === undefined ? [] : [{ language, plugin }];
   });
@@ -210,7 +246,7 @@ function fileRule(language: string): { pattern: RegExp; except: RegExp | undefin
   // A file rule is one rule, never merged field by field: a swap that names its files either way (a pattern, or a list of
   // extensions) owns them whole, so a swap that adds .svelte by extensions is never left reading the bundled pattern alone.
   const swap = swapsNow().get(language);
-  const owner = swap !== undefined && (swap.manifest.files !== undefined || swap.manifest.extensions !== undefined) ? swap : bundledProvider(language);
+  const owner = swap !== undefined && (swap.manifest.files !== undefined || swap.manifest.extensions !== undefined) ? swap : baseProvider(language);
   const files = owner?.manifest.files;
   const extensions = owner?.manifest.extensions ?? [];
   const key = JSON.stringify([files, extensions]);
@@ -329,6 +365,15 @@ export function ciNotes(languages: readonly string[]): string[] {
   });
 }
 
+/** The setup steps the CI workflow runs for the languages named, each plugin's in the languages' order, a step two name once. */
+export function ciSteps(languages: readonly string[]): CiStep[] {
+  const seen = new Set<string>();
+  return providers().flatMap(({ language }) => (languages.includes(language) ? (fieldOf(language, "ci")?.steps ?? []) : [])).filter((step) => {
+    const key = JSON.stringify(step);
+    return !seen.has(key) && seen.add(key) !== undefined;
+  });
+}
+
 /** The names the core's language plugins vouch for as well known. */
 export function pluginWellKnown(): string[] {
   return providers().flatMap(({ language }) => [...(fieldOf(language, "wellKnown") ?? []), ...extendersOf(language).flatMap((p) => p.manifest.wellKnown ?? [])]);
@@ -362,7 +407,7 @@ const slots = new Map<string, unknown>();
 export function syntaxOf<S extends SyntaxSlot>(language: string, slot: S): SyntaxTables[S] | undefined {
   // The swap's slot when it fills it, else the bundled provider's: a plugin that replaces only the adapter keeps the readings.
   const swap = swapsNow().get(language);
-  const plugin = swap?.manifest.syntax?.[slot] !== undefined ? swap : bundledProvider(language);
+  const plugin = swap?.manifest.syntax?.[slot] !== undefined ? swap : baseProvider(language);
   const provided = plugin === undefined ? undefined : (slotExport(plugin, slot) as SyntaxTables[S] | undefined);
   const extenders = extendersOf(language).filter((p) => p.manifest.syntax?.[slot] !== undefined);
   if (extenders.length === 0) return provided;

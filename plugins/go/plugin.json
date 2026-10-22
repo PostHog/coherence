@@ -1,0 +1,62 @@
+{
+  "name": "go",
+  "version": "0.1.0",
+  "pluginApi": 2,
+  "provides": {
+    "language": "go"
+  },
+  "extensions": [
+    ".go"
+  ],
+  "serverExtensions": [
+    ".go"
+  ],
+  "testFiles": [
+    "_test\\.go$"
+  ],
+  "environmentFolders": [
+    "vendor"
+  ],
+  "module": "index.ts",
+  "syntax": {
+    "topLevel": "go-top-level.ts#goDeclaresAtTop"
+  },
+  "ladder": {
+    "top": "visibility-choked",
+    "because": "the Go compiler refuses a reference to an unexported (lowercase) identifier from outside the package that declares it",
+    "rungs": [
+      {
+        "grade": "visibility-choked",
+        "enforcer": "the compiler (go build)",
+        "fact": "the protected identifier is unexported, so the compiler refuses any reference from outside its package, and every reference inside the package is inside the chokepoint"
+      },
+      {
+        "grade": "reference-choked",
+        "enforcer": "Coherence's check at the edit and in CI",
+        "fact": "the identifier is exported and reachable from any importing package; every reference gopls reports in the module is inside the chokepoint"
+      }
+    ]
+  },
+  "entrances": {
+    "rules": [],
+    "notDetected": "Go's entrances (func main, a net/http handler) are not detected yet: declare each under ## entrances"
+  },
+  "notScanned": "the text scans do not read Go yet: its declarations are read by the topLevel slot, and its references by gopls",
+  "ci": {
+    "note": "The Go plugin grades through gopls: the steps below set up Go (a go.mod that names a newer toolchain fetches it) and install gopls.",
+    "steps": [
+      {
+        "name": "Go",
+        "uses": "actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+        "version": "v7.0.0",
+        "with": {
+          "go-version": "stable"
+        }
+      },
+      {
+        "name": "gopls",
+        "run": "go install golang.org/x/tools/gopls@v0.23.0"
+      }
+    ]
+  }
+}

@@ -158,12 +158,16 @@ export function ejectPlugin(root: string, name: string, to?: string): Ejected {
   const config = configText === undefined ? {} : (JSON.parse(configText) as Record<string, unknown>);
   const plugins = (config["plugins"] ?? {}) as Record<string, unknown>;
   if (typeof plugins !== "object" || plugins === null || Array.isArray(plugins)) throw new EjectError(`plugin eject: ${CONFIG_FILE}'s plugins is not an object of plugins`);
-  if (name in plugins) throw new EjectError(`plugin eject: ${CONFIG_FILE} already runs plugin ${name} from ${JSON.stringify(plugins[name])}; remove that entry to eject it again`);
+  // A plugin the project runs bundled is the one being copied: the copy takes that entry's place. One it runs from a path is a copy already.
+  if (name in plugins && plugins[name] !== "bundled") throw new EjectError(`plugin eject: ${CONFIG_FILE} already runs plugin ${name} from ${JSON.stringify(plugins[name])}; remove that entry to eject it again`);
   // Every file read and rewritten before any is written: a refusal leaves nothing behind.
   const copies = filesUnder(source).map((file) => {
     const rel = relative(source, file);
     return { rel, text: ejectedSource(rel, readFileSync(file, "utf8")) };
   });
+  // The copy's modules are ES modules run as TypeScript: a package.json saying so, unless it carries one, keeps Node from guessing (and
+  // warning) at every load, whatever the project's own package.json says.
+  if (!copies.some(({ rel }) => rel === "package.json")) copies.push({ rel: "package.json", text: '{ "type": "module", "private": true }\n' });
   for (const { rel, text } of copies) {
     mkdirSync(dirname(join(target, rel)), { recursive: true });
     writeFileSync(join(target, rel), text);

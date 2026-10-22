@@ -24,7 +24,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { registryOf, repositoryTop } from "../adapters/project-config.ts";
-import { ciNotes } from "../plugins/languages.ts";
+import { ciNotes, ciSteps, forProject } from "../plugins/languages.ts";
+import type { CiStep } from "../plugins/plugin.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
 import type { Io } from "../journal/cli.ts";
 import { isCoherenceItself, PACKAGE_NAME } from "./project.ts";
 import { LOCKFILES, type PackageManager as AnyManager } from "./lockfiles.ts";
@@ -119,6 +121,8 @@ export interface CiPlan {
   nodeVersionFile: string | undefined;
   /** What the workflow says for the languages the projects read: each a language plugin's note (a Python checker the workflow does not install). */
   notes: string[];
+  /** The steps the language plugins the projects run ask the workflow to set up with (Go and gopls), after the install. */
+  steps: CiStep[];
 }
 
 function realOr(path: string): string {
@@ -214,7 +218,17 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
   const versionDeclared = declaresVersion(readJson(join(lock.dir, "package.json")), lock.manager);
   const versionFile = [".nvmrc", ".node-version"].find((name) => existsSync(join(lock.dir, name)));
   const projects = registry === undefined ? undefined : registry.leaves.map((leaf) => slash(relative(top, leaf)));
-  const notes = ciNotes([...languagesNamed(top), ...languagesNamed(at), ...(registry?.leaves ?? []).flatMap(languagesNamed)]);
+  // Each project's plugins are registered by reading its config, so a language a plugin adds says what it needs as a bundled one does.
+  const said = [...new Set([top, at, ...(registry?.leaves ?? [])])].map((dir) => {
+    try {
+      readEnforcementConfig(dir);
+    } catch (error) {
+      throw new CiError(`ci install: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return forProject(dir, () => ({ notes: ciNotes(languagesNamed(dir)), steps: ciSteps(languagesNamed(dir)) }));
+  });
+  const notes = [...new Set(said.flatMap((s) => s.notes))];
+  const steps = [...new Map(said.flatMap((s) => s.steps).map((step) => [JSON.stringify(step), step])).values()];
   return {
     host,
     mode,
@@ -226,7 +240,15 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
     versionDeclared,
     nodeVersionFile: versionFile === undefined ? undefined : slash(relative(top, join(lock.dir, versionFile))),
     notes,
+    steps,
   };
+}
+
+/** One plugin step as workflow lines: an action keeps its release in a comment, every other value is quoted. */
+function stepLines(step: CiStep): string[] {
+  const head = step.name === undefined ? [] : [`name: ${JSON.stringify(step.name)}`];
+  const body = step.uses !== undefined ? [`uses: ${step.uses}${step.version === undefined ? "" : ` # ${step.version}`}`, ...(step.with === undefined ? [] : ["with:", ...Object.entries(step.with).map(([k, v]) => `  ${k}: ${JSON.stringify(v)}`)])] : [`run: ${JSON.stringify(step.run)}`];
+  return [...head, ...body].map((line, i) => `${i === 0 ? "      - " : "        "}${line}`);
 }
 
 /** The step that sets up a manager Node.js does not bring: the version packageManager names, read where the lockfile is, else the fallback. */
@@ -293,6 +315,7 @@ export function workflowText(plan: CiPlan): string {
     "",
   );
   for (const note of plan.notes) add(`      # ${note}`, "");
+  for (const step of plan.steps) add(...stepLines(step), "");
   const where = plan.workdir === "." ? [] : [`        working-directory: ${plan.workdir}`];
   if (!comment) {
     add(

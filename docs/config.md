@@ -129,11 +129,11 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 |---|---|---|
 | `projects` | none | At the repository root only: the folders opted in, which makes this file a registry. See [Several folders](#several-folders-a-registry). |
 | `name` | the folder's name | The project's name, as Scope and the lexicon's project layer show it. |
-| `language` | `typescript` | `typescript`, `python` or `rust`, each read by a plugin bundled with Coherence (`plugins/`): which language server the chokepoint check asks (rust-analyzer for Rust; see [Rust](enforcement.md#rust)), a language declared under `languages`, or one a plugin provides. A list (`["python", "typescript"]`) for a project that spans more than one; see [More than one language](#more-than-one-language). Any other name is refused. |
+| `language` | `typescript` | `typescript`, `python` or `rust`, each read by a plugin bundled with Coherence (`plugins/`): which language server the chokepoint check asks (rust-analyzer for Rust; see [Rust](enforcement.md#rust)), a language declared under `languages`, or one a plugin named under `plugins` provides (`go`, with `"plugins": { "go": "bundled" }`; see [plugins.md](plugins.md#go)). A list (`["python", "typescript"]`) for a project that spans more than one; see [More than one language](#more-than-one-language). Any other name is refused. |
 | `languages` | none | Languages Coherence has no adapter for, each read through its own language server; see [A language Coherence has no adapter for](#a-language-coherence-has-no-adapter-for). Each must also be named in `language`. |
 | `plugins` | none | The plugins the project runs, each name mapped to `"bundled"` or a path to its folder: a language adapter (new, or wrapping a built-in), syntax tables, a verifier for `via: [form] name`, a lexicon layer. The project's own key, never inherited from a registry. See [plugins.md](plugins.md). |
 | `entryDir` | `.` | The folder holding the entry spec, the one that declares the trust levels. |
-| `ignore` | none | Folders that are not this project's code or prose: vendored code, generated output, fixtures, promo material. A name matches that folder anywhere; a path matches from the root. Every walk (the spec, the lexicon check, the reading) leaves them out. |
+| `ignore` | none | Folders and files that are not this project's code or prose: vendored code, generated output, fixtures, promo material, notes kept beside the project. A name matches that folder or file anywhere; a path matches from the root. Every walk (the spec, the lexicon check, the reading) leaves them out. |
 | `lexicon` | `lexicon.json` | The project's lexicon file, relative to the root. |
 | `wellKnown` | none | Names the project vouches for as well known (its vendors, its own product names), so the lexicon check does not nominate them as nouns to declare. |
 | `references` | `"project"` | Where a chokepoint check searches for references: `"project"` (the project alone), `"repository"` (the whole repository), or a list of folders relative to the repository top (`["posthog/api", "ee"]`), searched beside the project. A verdict over less than the whole repository names every folder it searched. Each folder adds to the language server's work: on PostHog, `products/notebooks` with `["posthog", "ee"]` took 15.5 s and 1.1 GB for one check, against 4.8 s and 380 MB for the project alone. |
@@ -202,8 +202,10 @@ its name (`server-typescript.json`). Only the primary server answers the live
 Scope reading over HTTP.
 
 **What the hooks keep between calls.** `.coherence/cache/` is transient.
-The `.coherence/.gitignore` that install writes leaves it out, along with
-everything else except the journal, runs, work orders and hook voice.
+The `.coherence/.gitignore` leaves it out, along with everything else except
+the journal, runs, work orders and hook voice. `hooks install` writes it, and
+so does any command that makes `.coherence/` itself (a first `run` in a project
+without hooks); a `.coherence/` already there keeps whatever its adopter left.
 Deleting it costs time, never a result. It holds two things that let a tool
 hook pay for what changed rather than for the whole project:
 

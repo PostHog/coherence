@@ -26,7 +26,7 @@ export const CONFIG_FILE = "coherence.config.json";
 export { DEFAULT_PROJECT_LEXICON };
 
 import { LOCAL_SETTINGS_FILE, SETTINGS_FILE } from "./hosts.ts";
-import { LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
+import { coreLanguageOfExtension, LANGUAGES } from "../adapters/language-files.ts";
 import { composeStack, pluginLayers, type LayerClash } from "../plugins/lexicon.ts";
 import { readPlugins } from "../plugins/registry.ts";
 export { HOST_FOLDER, HOSTS, isHost, LOCAL_SETTINGS_FILE, SETTINGS_FILE, type Host } from "./hosts.ts";
@@ -371,7 +371,7 @@ export async function loadProjectLexicons(root: string): Promise<ProjectLexicons
   if (project !== undefined) project.project = projectName(root, project.project);
   if (value === undefined) return { root, coherence: own, project, clashes: [] };
   // A config whose plugins are refused composes none here: the spec check and every command that reads the config say why.
-  const { plugins } = readPlugins(root, value, CONFIG_FILE, LANGUAGES, (extension) => languageOfFile(`x${extension}`));
+  const { plugins } = readPlugins(root, value, CONFIG_FILE, LANGUAGES, coreLanguageOfExtension);
   const { coherence, clashes } = composeStack(own, pluginLayers(plugins), project);
   return { root, coherence, project, clashes };
 }

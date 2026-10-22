@@ -20,7 +20,8 @@ import { instrumentFor } from "../adapters/index.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { BUNDLED_DIR } from "./registry.ts";
 import { moduleSpecifiers } from "./specifiers.ts";
-import { forProject, LANGUAGES, languageOfFile, providerOf, serverExtensions, syntaxOf } from "./languages.ts";
+import { ciNotes, ciSteps, entranceRules, environmentFolders, forProject, LANGUAGES, languageOfFile, providerOf, serverExtensions, syntaxOf } from "./languages.ts";
+import { loadSpecModel } from "../spec/model.ts";
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PLUGINS = resolve(SRC, "..", "plugins");
@@ -148,6 +149,60 @@ test("a project with no plugins key reads every language through the bundled plu
   assert.ok(!isTestPath("src/test_x.py", []), "and replaces the bundled plugin's");
   readEnforcementConfig(bare);
   assert.equal(providerOf("python")?.dir, join(BUNDLED_DIR, "python"), "a project that names none reads the bundled one again");
+});
+
+test("a plugin that provides a language no bundled plugin does is read as a bundled one is, for its project alone: its files, tests, folders, entrance rules, CI steps and syntax slots; a language nothing provides is refused by the spec check as by a run", () => {
+  const zz = (fields: Record<string, unknown> = {}): Record<string, string> => ({
+    "plugins/zz/plugin.json": JSON.stringify({
+      name: "zz",
+      version: "0.1.0",
+      pluginApi: 2,
+      provides: { language: "zz" },
+      module: "./index.ts",
+      extensions: [".zz"],
+      testFiles: ["_check\\.zz$"],
+      environmentFolders: ["zzdeps"],
+      entrances: { rules: [{ rule: "zz verb", plural: "zz verbs", detects: "a verb a zz file exports" }], notDetected: "a zz verb built at run time" },
+      ci: { note: "zz needs its server", steps: [{ name: "zz server", run: "install-zz-server" }] },
+      syntax: { topLevel: "top.ts#zzDeclaresAtTop" },
+      ...fields,
+    }),
+    "plugins/zz/index.ts": swapPlugin("zz", "zz", {})["plugins/zz/index.ts"]!,
+    "plugins/zz/top.ts": "export const zzDeclaresAtTop = (text, name) => text.split(\"\\n\").includes(`verb ${name}`);\n",
+  });
+  const root = project({
+    "coherence.config.json": JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }),
+    ...zz(),
+    "app/Accounts.spec.md": "# Accounts\n\nThe accounts.\n\n## entrances\n- reset: an operator resets a password\n  handler: reset in app/accounts.zz\n- rename: an operator renames an account\n  handler: rename in app/accounts.zz\n",
+    "app/accounts.zz": "verb reset\n",
+  });
+  const config = readEnforcementConfig(root);
+  assert.deepEqual(config.languages, ["zz"], "the plugin's language is among those the readings read, not set aside as unscanned");
+  assert.doesNotThrow(() => readEnforcementConfig(root), "reading the config again never takes the plugin for another owner of its own .zz");
+  assert.equal(languageOfFile("app/accounts.zz"), "zz", "its files are its extensions'");
+  assert.ok(isTestPath("app/accounts_check.zz", []), "its testFiles name its tests");
+  assert.ok(environmentFolders().has("zzdeps"), "its environment folders are left out of every walk");
+  assert.deepEqual(entranceRules("zz").map((r) => r.rule), ["zz verb"], "its entrance rules are the language's");
+  assert.deepEqual([ciNotes(["zz"]), ciSteps(["zz"])], [["zz needs its server"], [{ name: "zz server", run: "install-zz-server" }]], "the CI workflow carries its note and its steps");
+  assert.equal(syntaxOf("zz", "topLevel")?.("verb reset\n", "reset"), true, "its syntax slot answers for it");
+  const problems = loadSpecModel(root, { runs: false }).problems.map((p) => p.message).filter((m) => /entrance/.test(m));
+  assert.equal(problems.length, 1, JSON.stringify(problems));
+  assert.match(problems[0]!, /entrance rename: handler rename is not declared at the top level of app\/accounts\.zz/, "the spec check reads its handlers by the plugin's slot: one declared, one not");
+
+  const bare = project({ "coherence.config.json": JSON.stringify({ language: "typescript" }) });
+  readEnforcementConfig(bare);
+  assert.equal(languageOfFile("app/accounts.zz"), undefined, "a project that does not name the plugin reads none of it");
+  assert.equal(forProject(root, () => languageOfFile("app/accounts.zz")), "zz", "while the one that does still reads it");
+
+  const taken = project({ "coherence.config.json": JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }), ...zz({ extensions: [".zz", ".py"] }) });
+  assert.throws(() => readEnforcementConfig(taken), /plugin zz claims \.py, which python already reads/, "a bundled language's files are never a new language's");
+
+  const unnamed = project({ "coherence.config.json": JSON.stringify({ language: "zz" }) });
+  assert.deepEqual(
+    loadSpecModel(unnamed, { runs: false }).problems.map((p) => p.message).filter((m) => /language names/.test(m)).map((m) => m.replace(/^.*?: language/, "language")),
+    ['language names "zz"; each is one of typescript, python, rust, a language declared under languages, or one a plugin named under plugins provides (docs/plugins.md)'],
+    "the spec check refuses the language a run refuses, and names the plugin route",
+  );
 });
 
 test("a plugin adapter's test filter is its own from the first ask, before any question has loaded its module", async () => {

@@ -41,7 +41,8 @@ test("plugin eject copies a bundled plugin's source and its check.json into the 
   const said = await cli(["plugin", "eject", "typescript"], { cwd: root });
   assert.equal(said.status, 0, said.stderr);
   const copy = join(root, "coherence-plugins", "typescript");
-  assert.deepEqual(filesUnder(copy), filesUnder(join(PLUGIN_SOURCES, "typescript")), "every file of the bundled plugin, its check.json among them");
+  assert.deepEqual(filesUnder(copy), [...filesUnder(join(PLUGIN_SOURCES, "typescript")), "package.json"].sort(), "every file of the bundled plugin, its check.json among them, and a package.json naming its modules ES modules");
+  assert.deepEqual(JSON.parse(readFileSync(join(copy, "package.json"), "utf8")), { type: "module", private: true });
   assert.ok(filesUnder(copy).includes("check.json"), "its tests come with it");
   for (const file of filesUnder(copy).filter((f) => f.endsWith(".ts"))) {
     const text = readFileSync(join(copy, file), "utf8");
@@ -55,6 +56,9 @@ test("plugin eject copies a bundled plugin's source and its check.json into the 
   assert.match(said.stdout, /plugin check \.\/coherence-plugins\/typescript$/m, "what to run next");
 
   assert.throws(() => ejectPlugin(root, "typescript", "elsewhere"), (e: unknown) => e instanceof EjectError && /already runs plugin typescript/.test(e.message), "an entry the config has");
+  const opted = project({ "coherence.config.json": JSON.stringify({ language: "go", plugins: { go: "bundled" } }) });
+  assert.equal(ejectPlugin(opted, "go").folder, "./coherence-plugins/go", "a plugin the project runs bundled ejects");
+  assert.deepEqual(JSON.parse(readFileSync(join(opted, "coherence.config.json"), "utf8")), { language: "go", plugins: { go: "./coherence-plugins/go" } }, "its copy takes the bundled entry's place");
   assert.throws(() => ejectPlugin(root, "python", "coherence-plugins/typescript"), (e: unknown) => e instanceof EjectError && /coherence-plugins\/typescript exists/.test(e.message), "a folder that exists");
   assert.throws(() => ejectPlugin(root, "python", "../outside"), (e: unknown) => e instanceof EjectError && /not a folder inside the project/.test(e.message));
   assert.throws(() => ejectPlugin(root, "cobol"), (e: unknown) => e instanceof EjectError && /no bundled plugin is named "cobol"; the bundled plugins are .*typescript/.test(e.message));

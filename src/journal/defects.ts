@@ -26,7 +26,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JournalError } from "./args.ts";
-import { LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
+import { coreLanguageOfExtension, LANGUAGES } from "../adapters/language-files.ts";
 import { readPlugins } from "../plugins/registry.ts";
 import { effectiveConfig } from "../adapters/project-config.ts";
 import { missingCommits } from "./commits.ts";
@@ -72,7 +72,7 @@ function stackFiles(root: string, strict: boolean): string[] {
   const fallback = join(root, "lexicon.json");
   const named = config["lexicon"];
   const project = typeof named === "string" ? (isAbsolute(named) ? named : join(root, named)) : existsSync(fallback) ? fallback : undefined;
-  const { plugins, problems } = readPlugins(root, config["plugins"], "coherence.config.json", LANGUAGES, (extension) => languageOfFile(`x${extension}`));
+  const { plugins, problems } = readPlugins(root, config["plugins"], "coherence.config.json", LANGUAGES, coreLanguageOfExtension);
   // A refused plugin is said, never dropped with every other plugin's classes in silence: by a refusal here, or by the reader that already reports it.
   if (problems.length > 0 && strict) throw new JournalError(`the lexicon stack's defect classes cannot be read: ${problems.join("; ")}`);
   const layers = plugins.flatMap((p) => (p.manifest.lexicon === undefined ? [] : [resolve(p.dir, p.manifest.lexicon)]));
