@@ -6,11 +6,18 @@
  * runs before any Node resolver exists; it builds no path to open.
  */
 
+import { HOST_FOLDER } from "./hosts.ts";
 import { PACKAGE_NAME, SIBLING } from "./project.ts";
 
 /** Whether a command is Coherence's hook for `event`: this tool's binary or its own src/cli.ts, followed by hook <event>, as install's ownership test reads it. */
 export function isOwnHook(command: unknown, event: string): boolean {
   return typeof command === "string" && new RegExp(`(?:^|[\\s"'/$])(?:coherence|src/cli\\.ts)"?\\s+hook\\s+${event}\\s*$`).test(command);
+}
+
+export function isLauncherHook(command: unknown, event?: string): boolean {
+  const run = typeof command === "string" ? /"?([^\s";]+)"?\s+([A-Za-z]+)\s*$/.exec(command) : null;
+  if (run === null || (event !== undefined && run[2] !== event)) return false;
+  return Object.values(HOST_FOLDER).some((folder) => run[1]!.endsWith(`/${folder}/coherence-hook`));
 }
 
 /**
