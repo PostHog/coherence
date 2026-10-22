@@ -86,6 +86,14 @@ export interface ReferenceSite {
    * chokepoint's own file included.
    */
   test?: true;
+  /**
+   * Set when the adapter cannot tell whether the site reaches the thing: a
+   * use it does not read through (a value passed on, a name by string), said
+   * in why. The check classes it as any other site, so one outside the
+   * chokepoint keeps it from passing, and names it as not read through
+   * rather than as a reference it read.
+   */
+  unread?: string;
 }
 
 /**

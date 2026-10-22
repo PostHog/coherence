@@ -329,6 +329,17 @@ Convex backend. It extends TypeScript:
   Its refutation stages one such reference. The functions folder is the
   nearest one above a file holding both `_generated/api` and
   `_generated/server`; a path alias to it must end in the folder's own name.
+  Followed as references: a namespace import (`import * as g`), a module that
+  re-exports the objects (by a relative path or a path alias, relays deep), a
+  const holding part of a chain (`const t = internal.telemetry; t.send`) and
+  a destructure (`const { send: s } = internal.telemetry`).
+- **Gaps, never silence.** Any other use the plugin cannot read through is
+  reported as a site not read through, with why, so one outside the
+  chokepoint keeps it from passing: the object or part of a chain passed on
+  as a value, spread, read with a computed key or a rest pattern, and a
+  string naming the function as Convex does (`"telemetry:send"`). Names are
+  matched by name, not scope: a local that shadows a followed name reads as
+  that name.
 - **Entrances.** A public function (an exported `query`, `mutation` or
   `action` built from the folder's `_generated/server`), a route a
   `convex/server` `httpRouter` registers, and the function a `cronJobs` table

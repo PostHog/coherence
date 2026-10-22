@@ -91,25 +91,6 @@ export function importedFrom(source: TS.SourceFile, file: string, folder: string
   return names;
 }
 
-/** The property names along a chain of property and static element accesses rooted at an identifier: `internal.cleanup["sweep"]` is internal, cleanup, sweep. */
-function chainOf(node: TS.Expression): { root: TS.Identifier; segments: string[] } | undefined {
-  const compiler = ts();
-  const segments: string[] = [];
-  let at: TS.Expression = node;
-  for (;;) {
-    if (compiler.isPropertyAccessExpression(at)) {
-      segments.unshift(at.name.text);
-      at = at.expression;
-    } else if (compiler.isElementAccessExpression(at) && compiler.isStringLiteralLike(at.argumentExpression)) {
-      segments.unshift(at.argumentExpression.text);
-      at = at.expression;
-    } else if (compiler.isParenthesizedExpression(at) || compiler.isNonNullExpression(at)) {
-      at = at.expression;
-    } else break;
-  }
-  return compiler.isIdentifier(at) ? { root: at, segments } : undefined;
-}
-
 /** The innermost named declarations enclosing a node, outermost first, as `outer.inner`; undefined at module top level. */
 export function enclosingName(node: TS.Node): string | undefined {
   const compiler = ts();
@@ -120,42 +101,6 @@ export function enclosingName(node: TS.Node): string | undefined {
     if (declares && named !== undefined && compiler.isIdentifier(named)) names.unshift(named.text);
   }
   return names.length === 0 ? undefined : names.join(".");
-}
-
-/** One place a file reaches a function through the generated API: zero-based line and character of the chain's root, and the declaration enclosing it. */
-export interface GeneratedApiSite {
-  line: number;
-  character: number;
-  symbol: string | undefined;
-}
-
-/**
- * Where a file reaches one of a module's exported functions through its
- * folder's generated API: a chain on `api` or `internal` (under whatever name
- * the file imports it by) along the module's path, then one of `names`.
- */
-export function generatedApiReferences(file: string, text: string, target: ConvexModule & { names: readonly string[] }): GeneratedApiSite[] {
-  if (target.names.length === 0 || !text.includes("_generated/api")) return [];
-  const source = parse(file, text);
-  const objects = new Set([...importedFrom(source, file, target.folder, "api")].filter(([, exported]) => GENERATED_OBJECTS.has(exported)).map(([local]) => local));
-  if (objects.size === 0) return [];
-  const compiler = ts();
-  const wanted = new Set(target.names);
-  const found: GeneratedApiSite[] = [];
-  const visit = (node: TS.Node): void => {
-    // A chain is read once, at its outermost access: the accesses inside it are its own prefixes.
-    const outermost = (compiler.isPropertyAccessExpression(node) || compiler.isElementAccessExpression(node)) && !((compiler.isPropertyAccessExpression(node.parent) || compiler.isElementAccessExpression(node.parent)) && node.parent.expression === node);
-    if (outermost) {
-      const chain = chainOf(node as TS.Expression);
-      if (chain !== undefined && objects.has(chain.root.text) && chain.segments.length === target.path.length + 1 && target.path.every((segment, i) => chain.segments[i] === segment) && wanted.has(chain.segments[target.path.length]!)) {
-        const at = source.getLineAndCharacterOfPosition(chain.root.getStart(source));
-        found.push({ line: at.line, character: at.character, symbol: enclosingName(node) });
-      }
-    }
-    compiler.forEachChild(node, visit);
-  };
-  visit(source);
-  return found;
 }
 
 /** The names a module exports a local declaration under, which are the names the generated API gives it: its own name when an export modifier declares it, and every name an export list gives it ("default" for a default export). */

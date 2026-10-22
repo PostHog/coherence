@@ -10,7 +10,14 @@
     "convex/webhooks.ts": "import { httpAction } from \"./_generated/server\";\n\nexport const webhook = httpAction(async () => new Response(null));\n",
     "convex/crons.ts": "import { cronJobs } from \"convex/server\";\nimport { internal } from \"./_generated/api\";\n\nconst crons = cronJobs();\ncrons.daily(\"flush telemetry\", { hourUTC: 3, minuteUTC: 0 }, internal.telemetry[\"send\"]);\nexport default crons;\n",
     "src/client.ts": "/** A client outside the functions folder: its own module, never a Convex function. */\nexport const query = (name: string): string => name;\nexport const recent = query(\"recent\");\n",
-    "README.md": "# A Convex project\n"
+    "README.md": "# A Convex project\n",
+    "convex/alias.ts": "import { action } from \"./_generated/server\";\nimport { internal } from \"./_generated/api\";\n\n// A const holding part of the chain: followed.\nconst t = internal.telemetry;\nexport const viaAlias = action({ handler: async (ctx: any) => ctx.runAction(t.send, {}) });\n",
+    "src/lib/api.ts": "/** A module that hands the generated API on: followed, however it is imported. */\nexport { internal } from \"../../convex/_generated/api\";\n",
+    "src/relayed.ts": "import { internal } from \"./lib/api\";\n\nexport const relayed = internal.telemetry.send;\n",
+    "convex/namespace.ts": "import * as generated from \"./_generated/api\";\n\nexport const throughNamespace = generated.internal.telemetry.send;\n",
+    "convex/destructure.ts": "import { internal } from \"./_generated/api\";\n\nconst { send: s } = internal.telemetry;\nexport const destructured = s;\n",
+    "convex/byname.ts": "import { action } from \"./_generated/server\";\n\n// A function named by string: a gap the plugin names, never silence.\nexport const byName = action({ handler: async (ctx: any) => ctx.runAction(\"telemetry:send\", {}) });\n",
+    "convex/passed.ts": "import { internal } from \"./_generated/api\";\n\ndeclare function register(functions: unknown): void;\n// Part of the chain passed on: a gap.\nregister(internal.telemetry);\n"
   },
   "language": {
     "files": [
@@ -44,13 +51,25 @@
   "protects": "send",
   "chokepoint": "record",
   "references": [
+    "convex/alias.ts:6",
+    "convex/byname.ts:4",
     "convex/crons.ts:5",
+    "convex/destructure.ts:3",
     "convex/events.ts:7",
-    "convex/leak.ts:11"
+    "convex/leak.ts:11",
+    "convex/namespace.ts:3",
+    "convex/passed.ts:5",
+    "src/relayed.ts:3"
   ],
   "grade": "broken",
   "bypasses": [
+    "convex/alias.ts:6",
+    "convex/byname.ts:4",
     "convex/crons.ts:5",
-    "convex/leak.ts:11"
+    "convex/destructure.ts:3",
+    "convex/leak.ts:11",
+    "convex/namespace.ts:3",
+    "convex/passed.ts:5",
+    "src/relayed.ts:3"
   ]
 }

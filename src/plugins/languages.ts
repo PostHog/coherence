@@ -94,9 +94,20 @@ const swapsByRoot = new Map<string, Map<string, LoadedPlugin>>();
 const scope = new AsyncLocalStorage<string>();
 let lastRoot: string | undefined;
 
+/**
+ * The project a question is asked for: the root forProject names around it,
+ * else the project whose config was read last. Every per-project store here
+ * (the swaps, the extending plugins, what is derived from them) is read
+ * through this one door, so none can answer for a different project than
+ * the others.
+ */
+function rootNow(): string | undefined {
+  return scope.getStore() ?? lastRoot;
+}
+
 /** The swaps of the project a question is asked for. */
 function swapsNow(): ReadonlyMap<string, LoadedPlugin> {
-  const root = scope.getStore() ?? lastRoot;
+  const root = rootNow();
   return (root === undefined ? undefined : swapsByRoot.get(root)) ?? NO_SWAPS;
 }
 
@@ -113,7 +124,7 @@ const extendersByRoot = new Map<string, readonly LoadedPlugin[]>();
 
 /** The plugins that extend the language for the project a question is asked for, in the config's order. */
 function extendersOf(language: string): readonly LoadedPlugin[] {
-  const root = scope.getStore() ?? lastRoot;
+  const root = rootNow();
   return ((root === undefined ? undefined : extendersByRoot.get(root)) ?? []).filter((p) => p.manifest.extends === language);
 }
 
@@ -121,7 +132,7 @@ function extendersOf(language: string): readonly LoadedPlugin[] {
 const derivedCache = new Map<string, unknown>();
 
 function cached<T>(key: string, make: () => T): T {
-  const scoped = `${scope.getStore() ?? lastRoot ?? ""}\u0000${key}`;
+  const scoped = `${rootNow() ?? ""}\u0000${key}`;
   if (!derivedCache.has(scoped)) derivedCache.set(scoped, make());
   return derivedCache.get(scoped) as T;
 }

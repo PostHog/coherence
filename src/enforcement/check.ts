@@ -287,7 +287,7 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
   sites.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character || a.of.localeCompare(b.of));
   const counts: Record<Exclude<SiteClass, "chokepoint-reference">, number> = { inside: 0, test: 0, exempt: 0, bypass: 0 };
   for (const site of sites) if (site.of === "protected" && site.class !== "chokepoint-reference") counts[site.class] += 1;
-  const bypasses: Bypass[] = sites.filter((s) => s.of === "protected" && s.class === "bypass").map((s) => ({ file: s.file, line: s.line, symbol: s.symbol ?? "module top level", ...(s.checker === undefined ? {} : { checker: s.checker }) }));
+  const bypasses: Bypass[] = sites.filter((s) => s.of === "protected" && s.class === "bypass").map((s) => ({ file: s.file, line: s.line, symbol: s.symbol ?? "module top level", ...(s.checker === undefined ? {} : { checker: s.checker }), ...(s.unread === undefined ? {} : { unread: s.unread }) }));
   const files = [...new Set([protectedThing.file, chokepoint.file, ...sites.map((s) => s.file)])].sort();
 
   const earned = rungFor(adapter, visibility);
@@ -333,7 +333,7 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
       visibility: visibility.evidence,
       files,
       governed,
-      reason: `${bypasses.length} reference${bypasses.length === 1 ? "" : "s"} to ${protectedThing.name} outside ${chokepoint.name}: ${bypasses.map((b) => `${b.file}:${b.line} in ${b.symbol}${b.checker === undefined ? "" : ` (${b.checker})`}`).join(", ")}${governedClause(governed, counts.exempt)}`,
+      reason: `${bypasses.length} reference${bypasses.length === 1 ? "" : "s"} to ${protectedThing.name} outside ${chokepoint.name}: ${bypasses.map((b) => `${b.file}:${b.line} in ${b.symbol}${b.checker === undefined ? "" : ` (${b.checker})`}${b.unread === undefined ? "" : ` (not read through: ${b.unread})`}`).join(", ")}${governedClause(governed, counts.exempt)}`,
     };
   }
   // When the instrument could not see the synthetic site, Coherence's own check enforces nothing: a ladder may name the rung that is left.

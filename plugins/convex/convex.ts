@@ -21,13 +21,16 @@ import {
   type Refutation,
   type ResolveHint,
 } from "../../src/plugins/api.ts";
-import { convexBuilder, convexModule, exportedNames, generatedApiReferences, generatedObjectFor, moduleExports } from "./convex-api.ts";
+import { convexBuilder, convexModule, exportedNames, generatedObjectFor, moduleExports } from "./convex-api.ts";
+import { ApiReader } from "./convex-reach.ts";
 
 export class ConvexAdapter implements LanguageAdapter {
   readonly language: string;
   readonly ladder: LanguageAdapter["ladder"];
   /** The project's TypeScript sources and its horizon's, project-relative, taken once per forget. */
   private sources: string[] | undefined;
+  /** The generated-API reader over the sources, its parses and relays kept until forget. */
+  private reader: ApiReader | undefined;
   /** Unsaved documents a refutation stages, by project-relative path: read as sources while they are open. */
   private readonly probes = new Map<string, string>();
 
@@ -59,6 +62,7 @@ export class ConvexAdapter implements LanguageAdapter {
 
   async forget(files?: readonly string[]): Promise<void> {
     this.sources = undefined;
+    this.reader = undefined;
     await this.base.forget(files);
   }
 
@@ -133,11 +137,12 @@ export class ConvexAdapter implements LanguageAdapter {
     if (text === undefined) return [];
     const target = { ...module, names: this.namesOf(definition, text) };
     if (target.names.length === 0) return [];
+    const files = [...new Set([...this.sourcesNow(), ...this.probes.keys()])];
+    // A reader per question: a staged document joins the files it may read, and its parses are dropped with it.
+    const reader = this.probes.size === 0 ? (this.reader ??= new ApiReader(files, (f) => this.text(f))) : new ApiReader(files, (f) => this.text(f));
     const sites: ReferenceSite[] = [];
-    for (const file of new Set([...this.sourcesNow(), ...this.probes.keys()])) {
-      const source = this.text(file);
-      if (source === undefined) continue;
-      for (const at of generatedApiReferences(file, source, target)) sites.push({ file, line: at.line + 1, character: at.character, symbol: at.symbol });
+    for (const file of files) {
+      for (const at of reader.reach(file, target)) sites.push({ file, line: at.line + 1, character: at.character, symbol: at.symbol, ...(at.unread === undefined ? {} : { unread: at.unread }) });
     }
     return sites;
   }

@@ -20,9 +20,12 @@ import { countingFs } from "../lifecycle/fs-count-fixture.ts";
 import { loadProjectLexicons } from "../lifecycle/project.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { checkPlugin } from "./check.ts";
-import { entranceRules, pluginWellKnown } from "./languages.ts";
+import { entranceRules, forProject, pluginWellKnown } from "./languages.ts";
 import { BUNDLED_DIR } from "./registry.ts";
-import { generatedApiReferences } from "../../plugins/convex/convex-api.ts";
+import { generatedApiReferences } from "../../plugins/convex/convex-reach.ts";
+import { ConvexAdapter } from "../../plugins/convex/convex.ts";
+import { checkChokepoint } from "../enforcement/check.ts";
+import type { Definition, LanguageAdapter } from "../adapters/adapter.ts";
 
 const CONVEX = join(BUNDLED_DIR, "convex");
 const roots: string[] = [];
@@ -70,7 +73,7 @@ test("the Convex plugin grades a Convex project's chokepoint: a function reached
   };
   const entry = await graded(ENABLED);
   assert.equal(entry.grade, "broken", entry.reason);
-  assert.deepEqual((entry.bypasses ?? []).map((b) => `${b.file}:${b.line}`).sort(), ["convex/crons.ts:5", "convex/leak.ts:11"], "the cron and the aliased call across lines; the comment, the string and the longer name are none");
+  assert.deepEqual((entry.bypasses ?? []).map((b) => `${b.file}:${b.line}`).sort(), ["convex/alias.ts:6", "convex/byname.ts:4", "convex/crons.ts:5", "convex/destructure.ts:3", "convex/leak.ts:11", "convex/namespace.ts:3", "convex/passed.ts:5", "src/relayed.ts:3"], "the cron, the aliased call across lines and every followed or unread use; the comment, the string and the longer name are none");
   assert.equal(entry.refutation, "automatic", entry.reason);
   assert.deepEqual(entry.plugins, [{ name: "convex", version: "0.1.0" }], "the entry names the plugin that answered");
 
@@ -112,6 +115,8 @@ test("a Convex deployment's public functions, HTTP routes and crons are entrance
     "Convex HTTP route: convex/http.ts:6 webhook",
     "Convex HTTP route: convex/http.ts:7 ",
     "Convex cron: convex/crons.ts:5 send",
+    "Convex function: convex/alias.ts:6 viaAlias",
+    "Convex function: convex/byname.ts:4 byName",
     "Convex function: convex/events.ts:5 record",
     "Convex function: convex/leak.ts:7 flush",
   ]);
@@ -136,6 +141,9 @@ test("a project that does not name the Convex plugin pays nothing for it: no fil
   assert.deepEqual(entranceRules("typescript").filter((r) => r.rule.startsWith("Convex")).map((r) => r.rule), ["Convex function", "Convex HTTP route", "Convex cron"]);
   assert.ok(pluginWellKnown().includes("Convex"));
   assert.equal((await loadProjectLexicons(enabled)).coherence.concepts.find((c) => c.name === "Convex function")?.layer, "convex", "its vocabulary is its own layer");
+  readEnforcementConfig(bare);
+  assert.ok(forProject(enabled, () => entranceRules("typescript")).some((r) => r.rule === "Convex function"), "a question asked for a project inside forProject is answered for it, whichever was read last");
+  assert.ok(!forProject(bare, () => entranceRules("typescript")).some((r) => r.rule === "Convex function"));
 });
 
 test("plugin check holds a plugin that extends a language to that language's duties: the Convex plugin passes TypeScript's minimum and its own check project, a Convex chokepoint graded through it", async () => {
@@ -143,5 +151,45 @@ test("plugin check holds a plugin that extends a language to that language's dut
   assert.equal(checked.language, "typescript", "the language it extends");
   assert.deepEqual(checked.duties.map((d) => [d.name, d.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["references", "pass"], ["chokepoint", "pass"]], JSON.stringify(checked.duties));
   for (const duty of checked.duties) assert.match(duty.reason, /the bundled minimum: .*; plugin convex's own: /, `${duty.name} is held over both projects`);
-  assert.match(checked.duties.find((d) => d.name === "references")!.reason, /plugin convex's own: 3 of 3 references to send/);
+  assert.match(checked.duties.find((d) => d.name === "references")!.reason, /plugin convex's own: 9 of 9 references to send/);
+});
+
+/** The TypeScript adapter as a language server that links nothing through the generated API: what the Convex plugin wraps, with no server to start. */
+function blindBase(): LanguageAdapter {
+  const definition = (name: string, file: string, start: number, end: number): Definition => ({ name, kind: "symbol", file, range: { start: { line: start, character: 0 }, end: { line: end, character: 2 } }, selection: { line: start, character: 13 } });
+  return {
+    language: "typescript",
+    ladder: { top: "reference-choked", because: "a stand-in", rungs: [{ grade: "reference-choked", enforcer: "Coherence's check", fact: "every reference is inside" }] },
+    ready: async () => ({ ok: true }),
+    resolve: async (name) => ({ ok: true, definition: name === "send" ? definition("send", "convex/telemetry.ts", 3, 3) : definition("record", "convex/events.ts", 4, 8) }),
+    references: async () => [],
+    visibility: async () => ({ enforced: false, visible: true, evidence: "exported" }),
+    testFilter: (via) => via,
+    refute: async () => ({ seen: true, staged: [], account: "a stand-in staged nothing" }),
+    forget: async () => {},
+    close: async () => {},
+  };
+}
+
+test("a use of the generated API the Convex plugin cannot read through is a named gap that keeps the chokepoint from passing, never silence; an alias, a destructure, a namespace import and a re-exporting module are followed as references", async () => {
+  const core = Object.fromEntries(["convex/_generated/api.d.ts", "convex/_generated/server.d.ts", "convex/telemetry.ts", "convex/events.ts"].map((f) => [f, FIXTURE[f]!]));
+  const cases: { files: string[]; at: string; unread?: RegExp }[] = [
+    { files: ["convex/alias.ts"], at: "convex/alias.ts:6" },
+    { files: ["src/lib/api.ts", "src/relayed.ts"], at: "src/relayed.ts:3" },
+    { files: ["convex/namespace.ts"], at: "convex/namespace.ts:3" },
+    { files: ["convex/destructure.ts"], at: "convex/destructure.ts:3" },
+    { files: ["convex/byname.ts"], at: "convex/byname.ts:4", unread: /names telemetry:send by string/ },
+    { files: ["convex/passed.ts"], at: "convex/passed.ts:5", unread: /internal\.telemetry is passed on as a value/ },
+  ];
+  for (const { files, at, unread } of cases) {
+    const root = project({ ...core, ...Object.fromEntries(files.map((f) => [f, FIXTURE[f]!])) });
+    const graded = await checkChokepoint(new ConvexAdapter(root, blindBase()), { protects: "send", chokepoint: "record", component: ".", testFolders: ["__tests__"], root });
+    assert.notEqual(graded.verdict, "pass", `${at}: ${graded.reason}`);
+    assert.deepEqual(graded.bypasses.map((b) => `${b.file}:${b.line}`), [at], graded.reason);
+    if (unread === undefined) assert.equal(graded.bypasses[0]!.unread, undefined, `${at} is read through, a reference`);
+    else {
+      assert.match(graded.bypasses[0]!.unread ?? "", unread);
+      assert.match(graded.reason, /\(not read through: /, "the reason names the gap as one");
+    }
+  }
 });

@@ -71,6 +71,8 @@ export interface Bypass {
   symbol: string;
   /** The checker that refuses this import, with its error, when one does (tach). */
   checker?: string;
+  /** Why the instrument could not tell whether this site reaches the protected thing, when it could not: a gap that keeps the chokepoint from passing. */
+  unread?: string;
 }
 
 /** What a persisted reference site points at. */
