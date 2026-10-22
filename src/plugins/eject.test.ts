@@ -152,3 +152,15 @@ test("eject's guard reads every import with the parser: a dynamic import, a requ
   }
   assert.equal(ejectedSource("index.ts", "import { a } from '../../src/plugins/api.ts';\nconst b = await import('./b.ts');\n"), `import { a } from "${PACKAGE_SPECIFIER}";\nconst b = await import('./b.ts');\n`);
 });
+
+test("plugin check holds a plugin that both extends a language and proves via forms to both: the language's four duties, then one duty per form, in that order", async () => {
+  const typescript = JSON.parse(readFileSync(join(PLUGIN_SOURCES, "typescript", "check.json"), "utf8")) as Record<string, unknown>;
+  const root = project({
+    "both/plugin.json": JSON.stringify({ name: "both", version: "0.1.0", pluginApi: 2, extends: "typescript", module: "./index.ts", verifiers: [{ form: "both exit", evidence: "exit-checked", command: ["node", "-e", "process.exit(process.argv[1] === 'ok' ? 0 : 1)", "{name}"] }] }),
+    "both/index.ts": "export default { adapter: ({ base }) => ({ language: base.language, ladder: base.ladder, ready: () => base.ready(), resolve: (n, h) => base.resolve(n, h), references: (d) => base.references(d), visibility: (d, c) => base.visibility(d, c), testFilter: (v) => base.testFilter(v), refute: (p, o, e) => base.refute(p, o, e), forget: (f) => base.forget(f), close: async () => {} }) };\n",
+    "both/check.json": JSON.stringify({ ...typescript, proofs: [{ via: "[both exit] ok", verdict: "pass" }, { via: "[both exit] no", verdict: "fail" }] }),
+  });
+  const checked = await checkPlugin(root, "./both");
+  assert.equal(checked.language, "typescript + verifier");
+  assert.deepEqual(checked.duties.map((d) => [d.name, d.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["references", "pass"], ["chokepoint", "pass"], ["[both exit]", "pass"]], JSON.stringify(checked.duties));
+});
