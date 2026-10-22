@@ -6,7 +6,7 @@
 
 import { statSync } from "node:fs";
 import { posix, resolve } from "node:path";
-import { isSourceFile, toRelative, type SourceSyntax } from "../../src/economy/source.ts";
+import { isSourceFile, toRelative, type SourceSyntax } from "../../src/plugins/api.ts";
 
 const TS_DECLARATION = /^(export\s+)?(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:function\*?|const|let|var|class|interface|type|enum|namespace)\s+([A-Za-z_$][\w$]*)/;
 const TS_NAMED = /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;

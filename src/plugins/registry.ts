@@ -21,7 +21,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { MANIFEST, PLUGIN_API, SYNTAX_SLOTS, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
+import { MANIFEST, OLDEST_PLUGIN_API, PLUGIN_API, SYNTAX_SLOTS, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -101,7 +101,8 @@ export function readManifest(name: string, dir: string, where: string): { manife
   const problems: string[] = [];
   if (raw["name"] !== name) problems.push(`${where}: the plugin keyed ${name} names itself ${JSON.stringify(raw["name"])} in ${file}; the key is the manifest's name`);
   if (typeof raw["version"] !== "string" || raw["version"] === "") problems.push(`${where}: plugin ${name} carries no version in ${file}`);
-  if (raw["pluginApi"] !== PLUGIN_API) problems.push(`${where}: plugin ${name} was written for pluginApi ${JSON.stringify(raw["pluginApi"])}; this Coherence runs pluginApi ${PLUGIN_API}`);
+  const api = raw["pluginApi"];
+  if (typeof api !== "number" || !Number.isInteger(api) || api < OLDEST_PLUGIN_API || api > PLUGIN_API) problems.push(`${where}: plugin ${name} was written for pluginApi ${JSON.stringify(api)}; this Coherence runs pluginApi ${PLUGIN_API} and reads plugins written for ${OLDEST_PLUGIN_API} to ${PLUGIN_API}`);
   const provides = raw["provides"];
   if (provides !== undefined && (!isRecord(provides) || (provides["language"] !== undefined && (typeof provides["language"] !== "string" || provides["language"] === "")) || (provides["declaredLanguages"] !== undefined && provides["declaredLanguages"] !== true))) problems.push(`${where}: plugin ${name}'s provides is { "language": "<name>" }`);
   problems.push(...dataProblems(raw, `${where}: plugin ${name}`));

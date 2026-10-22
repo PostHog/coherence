@@ -93,11 +93,11 @@ import {
   type SiteForm,
   type StagedSite,
   type Visibility,
-} from "../../src/adapters/adapter.ts";
-import { locateServer as locateInstalled, type ServerLocation } from "../../src/adapters/installed.ts";
-import { JsonRpcClient } from "../../src/adapters/jsonrpc.ts";
+} from "../../src/plugins/api.ts";
+import { locateServer as locateInstalled, type ServerLocation } from "../../src/plugins/api.ts";
+import { JsonRpcClient } from "../../src/plugins/api.ts";
 import manifest from "./plugin.json" with { type: "json" };
-import { horizonFolders, keepHorizonFiles, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, nestedFolder, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/adapters/project-files.ts";
+import { horizonFolders, keepHorizonFiles, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, nestedFolder, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
 import { TACH_CONFIG, dottedFor, excluded, findTachConfig, locateTach, moduleLocations, moduleOf, reaches, readTachConfig, runTach, tachGovernance, tachOverCopy, witnessTach, type TachConfig, type TachModule, type TachRun, type TachWitness } from "./tach.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control server ordering. */

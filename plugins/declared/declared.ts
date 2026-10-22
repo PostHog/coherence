@@ -37,11 +37,11 @@ import {
   type Resolved,
   type Rung,
   type Visibility,
-} from "../../src/adapters/adapter.ts";
-import { JsonRpcClient } from "../../src/adapters/jsonrpc.ts";
-import { declaredInstrument, declaredLanguageOf, type DeclaredLanguage } from "../../src/adapters/declared-config.ts";
-import { languageOfFile } from "../../src/adapters/language-files.ts";
-import { fileIdentity, keepProjectFiles, walkBounds, walkedProjectFiles } from "../../src/adapters/project-files.ts";
+} from "../../src/plugins/api.ts";
+import { JsonRpcClient } from "../../src/plugins/api.ts";
+import { declaredInstrument, declaredLanguageOf, type DeclaredLanguage } from "../../src/plugins/api.ts";
+import { languageOfFile } from "../../src/plugins/api.ts";
+import { fileIdentity, keepProjectFiles, walkBounds, walkedProjectFiles } from "../../src/plugins/api.ts";
 
 /**
  * The most files of a declared language the adapter opens before asking for

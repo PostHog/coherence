@@ -5,8 +5,8 @@
 
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
-import type { ServerLocation } from "../../src/adapters/installed.ts";
-import { spawnSync } from "../../src/lifecycle/work-meter.ts";
+import type { ServerLocation } from "../../src/plugins/api.ts";
+import { spawnSync } from "../../src/plugins/api.ts";
 
 /** The first line a failed program printed, for a looked string. */
 function firstLine(run: { stderr?: string | null; stdout?: string | null; error?: Error | undefined; status: number | null }): string {

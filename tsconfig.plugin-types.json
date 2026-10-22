@@ -4,6 +4,6 @@
     "declaration": true,
     "emitDeclarationOnly": true
   },
-  "include": ["src/plugins/plugin.ts"],
+  "include": ["src/plugins/api.ts"],
   "exclude": []
 }

@@ -64,6 +64,8 @@ import { keepAttributes, keepIgnore } from "./lifecycle/state-files.ts";
 import { installMod, modInstalled, ownModLinked, uninstallMod, MOD_ID, MOD_REPOSITORY, OWN_MOD_LINK, type ModStep } from "./lifecycle/mod-install.ts";
 import { registryOf } from "./adapters/project-config.ts";
 import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
+import { checkPlugin, checkText } from "./plugins/check.ts";
+import { ejectPlugin, ejectText } from "./plugins/eject.ts";
 import { TELEMETRY_USAGE, telemetryCommand } from "./lifecycle/telemetry-cli.ts";
 import { CI_USAGE, ciInstallCommand, ciSuggestion } from "./lifecycle/ci.ts";
 import { ciReportCommand } from "./lifecycle/ci-report.ts";
@@ -85,6 +87,8 @@ ${ENFORCEMENT_USAGE}
 ${ECONOMY_USAGE}
 ${QUERY_USAGE}
 ${SCOPE_USAGE}
+  coherence plugin eject <name> [--to <dir>]   copy a bundled plugin's source and its check.json into the project (coherence-plugins/<name> by default) and point the config's plugins at the copy, which then answers in the bundled plugin's place
+  coherence plugin check <plugin>   hold a plugin, bundled by name or a folder, to what every language plugin owes (file rule, declarations, references, a chokepoint graded) over its check.json's project; pass or fail per duty, exit 1 unless all pass
   coherence adopt <folder>   list the folder in the registry (projects in coherence.config.json at the repository top), creating it when absent
   coherence hook <${HOOK_EVENTS.join("|")}>
   coherence hook-serve [--socket]   the warm hook process: {"op":"hook","event":...,"input":...} per line on stdin; --socket also over HTTP on a Unix socket
@@ -304,6 +308,29 @@ const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
   check: new Set(["check", "host", "command", "local"]),
   status: new Set(),
 };
+
+/** plugin eject <name> [--to <dir>] | plugin check <plugin>: the eject, enhance and swap workflow (docs/plugins.md). */
+async function pluginCommand(call: CommandCall, args: string[], root: string): Promise<number> {
+  const { flags, positionals } = parse(args, new Set(["to"]));
+  const [verb, given, ...more] = positionals;
+  if (given === undefined || more.length > 0 || (verb !== "eject" && verb !== "check")) fail(`plugin: eject <name> [--to <dir>], or check <plugin>\n${USAGE}`);
+  if (verb === "check" && flags.size > 0) fail(`plugin check: no flags\n${USAGE}`);
+  const to = flags.get("to");
+  if (to === true) fail(`plugin eject: --to names a folder\n${USAGE}`);
+  try {
+    if (verb === "eject") {
+      call.stdout.write(`${ejectText(ejectPlugin(root, given, to), given, await cliName(root))}\n`);
+      return 0;
+    }
+    const checked = await checkPlugin(root, given);
+    call.stdout.write(`${checkText(checked)}\n`);
+    return checked.duties.every((o) => o.verdict === "pass") ? 0 : 1;
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    call.stderr.write(`${error.message}\n`);
+    return 1;
+  }
+}
 
 /** adopt <folder>: one folder, relative to where the command runs; never the project root the other commands resolve to. */
 async function adoptCommand(call: CommandCall, args: string[]): Promise<number> {
@@ -531,6 +558,8 @@ export async function main(argv: string[], call: CommandCall): Promise<number> {
       return calibrateCommand(rest, io);
     case "adopt":
       return adoptCommand(call, rest);
+    case "plugin":
+      return pluginCommand(call, rest, root);
     case "mass":
       return massCommand(rest, io);
     case "query":

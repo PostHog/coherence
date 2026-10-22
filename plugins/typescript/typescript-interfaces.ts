@@ -3,7 +3,7 @@
  * keyword says can execute (interfaces.ts reads them through DECLARES).
  */
 
-import type { InterfaceSymbol } from "../../src/observation/interfaces.ts";
+import type { InterfaceSymbol } from "../../src/plugins/api.ts";
 
 /** An interface or type alias is a type, an enum or namespace a value; a binding is read by what it is bound to. */
 export function typescriptDeclares(line: string): InterfaceSymbol["declares"] {

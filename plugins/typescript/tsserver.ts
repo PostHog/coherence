@@ -5,7 +5,7 @@
  * Coherence's own. Packages are found through installed.ts, by the resolver.
  */
 
-import { COHERENCE_FROM, installedPackage, packageFile, projectFrom } from "../../src/adapters/installed.ts";
+import { COHERENCE_FROM, installedPackage, packageFile, projectFrom } from "../../src/plugins/api.ts";
 
 /** The first number of a version. */
 function major(version: string): number {

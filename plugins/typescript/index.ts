@@ -4,7 +4,7 @@
  * config names a plugin that provides typescript in this one's place.
  */
 
-import type { PluginModule } from "../../src/plugins/plugin.ts";
+import type { PluginModule } from "../../src/plugins/api.ts";
 import { TypeScriptAdapter } from "./typescript.ts";
 
 const typescript: PluginModule = {

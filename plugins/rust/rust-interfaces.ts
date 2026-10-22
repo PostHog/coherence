@@ -3,7 +3,7 @@
  * through DECLARES).
  */
 
-import type { InterfaceSymbol } from "../../src/observation/interfaces.ts";
+import type { InterfaceSymbol } from "../../src/plugins/api.ts";
 
 /** Rust is not read by this reading yet: every declaration is counted as able to execute, so never read as bodiless. */
 export function rustDeclares(): InterfaceSymbol["declares"] {

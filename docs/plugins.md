@@ -84,7 +84,7 @@ The bundled plugins are the fullest examples: `plugins/typescript`,
 {
   "name": "sample",
   "version": "0.1.0",
-  "pluginApi": 1,
+  "pluginApi": 2,
   "provides": { "language": "swift" },
   "extends": "typescript",
   "extensions": [".swift"],
@@ -101,7 +101,7 @@ The bundled plugins are the fullest examples: `plugins/typescript`,
 | Key | Meaning |
 |---|---|
 | `name`, `version` | Who the plugin is. Every run entry its adapter or verifier answers names both. |
-| `pluginApi` | The interface version it was written for. A version this Coherence does not run is refused, naming both. This release runs `1`. |
+| `pluginApi` | The interface version it was written for. This release runs `2` and reads plugins written for `1` to `2`: a plugin written for `1` loads, and the session start names it with what changed since. Any other version is refused, naming both. |
 | `provides.language` | The language its adapter answers for. A built-in name takes the built-in's place (see the swap rule). A new name needs `extensions`, and the config's `language` must name it. |
 | `extends` | The language whose adapter it is handed to wrap. |
 | `extensions` | The files a new language is written in. An extension a built-in, a declared language, or another plugin owns is refused. |
@@ -177,6 +177,46 @@ an enhancement of the adapter alone keeps every reading of the language. Its
 file rule is one rule: a plugin that names its files, by `files` or
 `extensions`, owns them whole.
 
+## Eject, enhance and swap
+
+Every language Coherence reads is a bundled plugin, so a project that finds
+one wanting changes a copy of it:
+
+1. **Eject**: `coherence plugin eject typescript` copies `plugins/typescript`
+   from the installed package into `coherence-plugins/typescript` (or
+   `--to <dir>`), with its `check.json`, and adds
+   `"plugins": { "typescript": "./coherence-plugins/typescript" }` to the
+   project's config. The copy imports Coherence only through
+   `@posthog/coherence/plugin`: the bundled plugins import the core through
+   that one module (`src/plugins/api.ts`), so the copy reads from the
+   installed package what it read bundled. Eject refuses, writing nothing,
+   when the folder exists, when it leaves the project, or when the config
+   already runs a plugin by that name.
+2. **Enhance**: change the copy. It answers for its language in the bundled
+   plugin's place from the next command on; what it does not declare (a data
+   field, a syntax slot) the bundled plugin still answers.
+3. **Check**: `coherence plugin check ./coherence-plugins/typescript` holds it
+   to what every language plugin owes, over the project its `check.json`
+   carries:
+
+   | Duty | Holds when |
+   |---|---|
+   | file rule | the files `check.json` names as the language's are, and the others are not |
+   | declarations | the `topLevel` slot says which names a file declares, as `check.json` says |
+   | references | the adapter reports every reference to the protected thing, and none else; one that reports none fails here, by name |
+   | chokepoint | the run grades the chokepoint as `check.json` expects, bypasses named, its refutation seen or refused |
+
+   Each duty passes, fails with why, or is not run with why (the
+   language server is absent). The command exits 0 only when every one
+   passes. Add cases to the copy's `check.json` as you enhance it: they are
+   its tests. `plugin check typescript` holds the bundled plugin to the same.
+4. **Swap back**: remove the `plugins` entry, and the bundled plugin answers
+   again.
+
+A plugin is pinned to the `pluginApi` it was written for. When Coherence moves
+on, the session start names the plugin and what changed since, so an ejected
+copy's author knows what to update.
+
 ## Roles
 
 ### A language adapter: the swap rule
@@ -248,9 +288,6 @@ entry also carries `evidence`, the label its manifest gives the form.
 
 What the interface does not carry yet:
 
-- **Eject and check.** `coherence plugin eject <name>` (copy a bundled plugin
-  into the project and point the config at it) and `coherence plugin check`
-  (the bundled plugins' own suite run against any plugin) are the next step.
 - **Language knowledge still in the core.** The vocabulary's code scan reads
   many languages' declarations (`src/lifecycle/lexicon-coverage.ts`,
   `src/lifecycle/check.ts`); entrance detection's package-script rule names

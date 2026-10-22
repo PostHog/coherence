@@ -6,8 +6,8 @@
  */
 
 import { posix } from "node:path";
-import { languageOfFile } from "../../src/adapters/language-files.ts";
-import { escape, handlerName, lineOf, NEXT_ROUTE_METHODS, REMIX_ROUTE_EXPORTS, spanOf, throughOf, type EntranceCandidate, type EntranceSyntax } from "../../src/adapters/entrance-candidates.ts";
+import { languageOfFile } from "../../src/plugins/api.ts";
+import { escape, handlerName, lineOf, NEXT_ROUTE_METHODS, REMIX_ROUTE_EXPORTS, spanOf, throughOf, type EntranceCandidate, type EntranceSyntax } from "../../src/plugins/api.ts";
 
 /** The text from its first code: leading whitespace and comments skipped by a walk, never a backtracking pattern. */
 function leadingCode(text: string): string {
