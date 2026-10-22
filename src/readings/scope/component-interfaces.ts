@@ -980,7 +980,7 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
       if (symbol === undefined) return `guard ${guard} names no symbol`;
       // A chokepoint module's symbol may be a binding no declaration line names (a factory's destructured products), so its text is read too.
       const moduleDeclares = (t: ChokepointTarget): boolean =>
-        [...code.keys()].some((file) => nodeIs({ component: t.component, name: "x", file, type: false }, t.chokepoint, t.component) && declaresAtTop(readFileSync(join(root, file), "utf8"), symbol));
+        [...code.keys()].some((file) => nodeIs({ component: t.component, name: "x", file, type: false }, t.chokepoint, t.component) && declaresAtTop(readFileSync(join(root, file), "utf8"), symbol, file));
       const named = targets.filter((t) => (t.chokepoint.symbol !== undefined ? t.chokepoint.symbol === symbol : [...nodes.values()].some((n) => n.name === symbol && nodeIs(n, t.chokepoint, t.component)) || moduleDeclares(t)));
       if (named.length === 0) return `guard ${symbol} is no chokepoint an invariant declares`;
       const wraps = [...(calls.get(start) ?? new Map<string, number>()).keys()].some((id) => nodes.get(id)?.name === symbol);

@@ -508,11 +508,14 @@ test("the model: a handler an export list re-exports, or a destructuring across 
     assert.deepEqual(model.problems.map((p) => p.message), ["entrance NextAuth handlers object: handler handlers is not declared at the top level of auth.ts (read under app/(auth) and under the root)"], "a key the destructuring reads through binds nothing");
   });
   const listed = "const handle = () => null;\nexport { handle as GET, type Shape, other };\n";
-  assert.deepEqual(["GET", "Shape", "other", "handle"].map((n) => declaresAtTop(listed, n)), [true, true, true, true], "an export list exports a name, under its alias when it has one; handle is declared by its const");
-  assert.equal(declaresAtTop('export { handle as GET } from "./h";\n', "handle"), false, "a name a re-export renames is not exported under its own name");
-  assert.equal(declaresAtTop('import { GET } from "./auth";\n', "GET"), false, "an import declares nothing");
-  assert.equal(declaresAtTop("export const {\n  a,\n  b: { c },\n}: Things = make();\n", "c"), true, "a typed destructuring across lines");
-  assert.equal(declaresAtTop("const {\n  a,\n  b,\n};\n", "a"), false, "braces that assign nothing are no destructuring");
+  assert.deepEqual(["GET", "Shape", "other", "handle"].map((n) => declaresAtTop(listed, n, "route.ts")), [true, true, true, true], "an export list exports a name, under its alias when it has one; handle is declared by its const");
+  assert.equal(declaresAtTop('export { handle as GET } from "./h";\n', "handle", "route.ts"), false, "a name a re-export renames is not exported under its own name");
+  assert.equal(declaresAtTop('import { GET } from "./auth";\n', "GET", "route.ts"), false, "an import declares nothing");
+  assert.equal(declaresAtTop("export const {\n  a,\n  b: { c },\n}: Things = make();\n", "c", "route.ts"), true, "a typed destructuring across lines");
+  assert.equal(declaresAtTop("const {\n  a,\n  b,\n};\n", "a", "route.ts"), false, "braces that assign nothing are no destructuring");
+  assert.equal(declaresAtTop("export const aXb = 1;\n", "a.b", "route.ts"), false, "a handler name is matched as written, not as a pattern");
+  assert.equal(declaresAtTop("aXb = 1\n", "a.b", "handlers.py"), false, "a Python handler name is matched as written, not as a pattern");
+  assert.equal(declaresAtTop("export const $x = 1;\n", "$x", "route.ts"), true, "a $ in a name is matched as written");
 });
 
 test("the model: an entrance's guard: line names a chokepoint an invariant declares, or a symbol of a chokepoint module", () => {
@@ -599,4 +602,24 @@ test("the model: a mirror names a list and what it mirrors that are both declare
   assert.deepEqual(problems("- EVENTS in build.ts: the events\n  mirrors: whatever events.ts says\n"), ["7 mirrors: on EVENTS reads closure of <file>, <file>, keys of <NAME> in <file>, or <NAME> in <file>"]);
   assert.deepEqual(problems("- EVENTS in build.ts: the events\n  mirrors: HOOK_EVENTS in src/hooks/events.ts\n  because: why\n"), ['8 unknown key "because": a mirror carries mirrors']);
   assert.deepEqual(problems("- EVENTS: the events\n  mirrors: HOOK_EVENTS in src/hooks/events.ts\n"), ["6 a mirror is one bullet: - <NAME> in <file>: <meaning>, with an indented mirrors: closure of <file>, <file> | keys of <NAME> in <file> | <NAME> in <file> line"]);
+});
+
+test("the model: a handler is declared as its file's language declares one: a Rust item, a Python def, a TypeScript export, each read by its language's plugin", () => {
+  const spec = (handlers: string): Record<string, string> => ({
+    "Core.spec.md": `# Core\n\nA document core.\n\n## trust levels\n- public (outside): anyone on the network\n\n## entrances\n${handlers}\n## invariants\n`,
+    "src/lib.rs": "pub mod document;\n\n#[wasm_bindgen]\npub fn apply_change(doc: &mut Document) {}\n\npub(crate) struct Session;\n\nmacro_rules! tick {\n    () => {};\n}\n",
+    "src/door.py": "async def take(request):\n    return None\n",
+    "src/door.ts": "export const peek = (): void => {};\n",
+  });
+  const entrance = (name: string, handler: string): string => `- ${name}: work enters\n  handler: ${handler}\n  trust: public\n`;
+  withModel(spec([entrance("change", "apply_change in src/lib.rs"), entrance("session", "Session in src/lib.rs"), entrance("tick", "tick in src/lib.rs"), entrance("take", "take in src/door.py"), entrance("peek", "peek in src/door.ts")].join("")), (model) => {
+    assert.deepEqual(model.problems, [], "each handler is declared as its own language declares one");
+  });
+  withModel(spec([entrance("missing", "apply_change in src/door.ts"), entrance("rust's own", "document in src/lib.rs")].join("")), (model) => {
+    assert.deepEqual(
+      model.problems.map((p) => p.message),
+      ["entrance missing: handler apply_change is not declared at the top level of src/door.ts (read under . and under the root)"],
+      "a TypeScript file is not read as Rust, and a Rust mod is an item",
+    );
+  });
 });

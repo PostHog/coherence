@@ -118,6 +118,7 @@
     "kept": "typescript-scope.ts#typescriptKeptModules",
     "source": "typescript-source.ts#TYPESCRIPT_SOURCE",
     "declares": "typescript-interfaces.ts#typescriptDeclares",
-    "notice": "tsserver.ts#tsserverNotice"
+    "notice": "tsserver.ts#tsserverNotice",
+    "topLevel": "typescript-top-level.ts#typescriptDeclaresAtTop"
   }
 }

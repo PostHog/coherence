@@ -21,7 +21,7 @@ import { after, before, test } from "node:test";
 import { checkChokepoint, classifySite } from "../enforcement/check.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import type { Definition } from "./adapter.ts";
-import { locateRustAnalyzer } from "./installed.ts";
+import { locateRustAnalyzer } from "../../plugins/rust/rust-analyzer.ts";
 import { RUST_LADDER, RustAdapter, locateServer, marksTest, readHeader, scopeOf, useForm, type RustLanguageClient } from "../../plugins/rust/rust.ts";
 
 const CARGO = `[package]

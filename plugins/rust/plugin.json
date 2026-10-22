@@ -50,6 +50,7 @@
     "interfaces": "rust-scope.ts#RUST_INTERFACES",
     "kept": "rust-scope.ts#rustKeptModules",
     "source": "rust-source.ts#RUST_SOURCE",
-    "declares": "rust-interfaces.ts#rustDeclares"
+    "declares": "rust-interfaces.ts#rustDeclares",
+    "topLevel": "rust-top-level.ts#rustDeclaresAtTop"
   }
 }

@@ -26,6 +26,7 @@ import { deriveState, type Lack, type State } from "./state.ts";
 import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles, type Walked } from "../adapters/project-files.ts";
 import { configuredName, effectiveConfig, lexiconFileOf, readConfigFile } from "../adapters/project-config.ts";
 import { LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
+import { syntaxOf } from "../plugins/languages.ts";
 import type { LoadedPlugin } from "../plugins/plugin.ts";
 import { readPlugins } from "../plugins/registry.ts";
 import { viaFormProblem } from "../plugins/verify.ts";
@@ -729,10 +730,10 @@ function entranceGuardProblems(root: string, components: readonly Component[]): 
       const named = chokepoints.some(({ component: owner, value }) => {
         const symbol = HANDLER.exec(value)?.[1];
         if (symbol !== undefined) return symbol === name;
-        if (!SOURCE.test(value)) return false;
+        if (!isDeclaringSource(value)) return false;
         return [owner.folder === "." ? value : `${owner.folder}/${value}`, value].some((path) => {
           const at = resolve(root, path);
-          return existsSync(at) && statSync(at).isFile() && declaresAtTop(readProjectText(at, "source"), name);
+          return existsSync(at) && statSync(at).isFile() && declaresAtTop(readProjectText(at, "source"), name, path);
         });
       });
       if (!named) {
@@ -743,63 +744,25 @@ function entranceGuardProblems(root: string, components: readonly Component[]): 
   }
   return problems;
 }
-const SOURCE = /\.(?:[cm]?[jt]sx?|py)$/;
+/** Whether a file is source the spec model reads for a declaration: a file of a language whose plugin says what its top level declares. */
+function isDeclaringSource(file: string): boolean {
+  const language = languageOfFile(file);
+  return language !== undefined && syntaxOf(language, "topLevel") !== undefined;
+}
 
 /**
- * Whether a source text declares the name at its top level (TypeScript,
- * JavaScript, or Python). A destructured binding counts, on one line or
- * across several and however deeply nested, as a factory's products are
- * exported (export const { handlers: { GET, POST }, auth } = NextAuth(...));
- * so does an export list, with or without a from, under the name it exports
- * (export { GET, POST } from "./auth", export { handle as GET }): the
- * re-exporting file is where a framework finds the name, and the source is
- * not followed (d-7155e46f).
+ * Whether a source file's text declares the name at its top level, as the
+ * file's language plugin reads its declarations (its topLevel slot): false
+ * for a file of no language, or one whose plugin does not say.
  */
-export function declaresAtTop(text: string, name: string): boolean {
-  const escaped = name.replace(/\$/g, "\\$");
-  const typescript = new RegExp(`^(?:export\\s+)?(?:default\\s+)?(?:declare\\s+)?(?:abstract\\s+)?(?:async\\s+)?(?:function\\*?|const|let|var|class|interface|type|enum|namespace)\\s+${escaped}\\b`, "m");
-  if (destructuredAtTop(text).has(name) || exportListed(text).has(name)) return true;
-  const python = new RegExp(`^(?:async\\s+)?(?:def|class)\\s+${escaped}\\b|^${escaped}\\s*(?::[^=\\n]+)?=`, "m");
-  return typescript.test(text) || python.test(text);
-}
-
-/** The text of the braces opening at `open`, through its matching close, or undefined when it never closes. */
-function braced(text: string, open: number): string | undefined {
-  let depth = 0;
-  for (let i = open; i < text.length; i++) {
-    if (text[i] === "{") depth += 1;
-    else if (text[i] === "}" && --depth === 0) return text.slice(open, i + 1);
-  }
-  return undefined;
-}
-
-/** The names a top-level object destructuring binds, on one line or several, nested or not: a name followed by , } or = (a key followed by : binds nothing). */
-function destructuredAtTop(text: string): Set<string> {
-  const names = new Set<string>();
-  for (const m of text.matchAll(/^(?:export\s+)?(?:const|let|var)\s*(?=\{)/gm)) {
-    const open = m.index + m[0].length;
-    const pattern = braced(text, open);
-    if (pattern === undefined || !/^\s*(?::[^=]+)?=/.test(text.slice(open + pattern.length))) continue;
-    for (const b of pattern.matchAll(/(?<=[\s,{:])([A-Za-z_$][\w$]*)(?=\s*[,}=])/g)) names.add(b[1]!);
-  }
-  return names;
-}
-
-/** The names a top-level export list exports, with or without a from: export { a, b as c } from "x" exports a and c. */
-function exportListed(text: string): Set<string> {
-  const names = new Set<string>();
-  for (const m of text.matchAll(/^export\s+(?:type\s+)?\{([^}]*)\}/gm)) {
-    for (const item of m[1]!.split(",")) {
-      const named = /^\s*(?:type\s+)?([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?\s*$/.exec(item.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ""));
-      if (named !== null) names.add(named[2] ?? named[1]!);
-    }
-  }
-  return names;
+export function declaresAtTop(text: string, name: string, file: string): boolean {
+  const language = languageOfFile(file);
+  return language !== undefined && (syntaxOf(language, "topLevel")?.(text, name) ?? false);
 }
 
 /** Source files under a folder, sorted, never into the folders no walk enters. */
 function sourcesUnder(root: string, folder: string, ignore: readonly string[]): string[] {
-  return walkedFiles(root, folder, ignore).filter((rel) => SOURCE.test(rel));
+  return walkedFiles(root, folder, ignore).filter(isDeclaringSource);
 }
 
 /**
@@ -813,7 +776,7 @@ function handlerFile(root: string, folder: string, handler: string, ignore: read
   if (isModuleHandler(handler)) {
     // A module file: its top-level script is the handler. It must be a source file that exists, under the component or the root.
     const file = handler.trim();
-    if (!SOURCE.test(file)) return { reason: `handler ${file} names a file that is not source code` };
+    if (!isDeclaringSource(file)) return { reason: `handler ${file} names a file that is not source code` };
     const candidates = [folder === "." ? file : `${folder}/${file}`, file].filter((path, index, all) => all.indexOf(path) === index && !path.split("/").includes(".."));
     for (const candidate of candidates) {
       const path = resolve(root, candidate);
@@ -831,7 +794,7 @@ function handlerFile(root: string, folder: string, handler: string, ignore: read
   for (const candidate of candidates) {
     const path = resolve(root, candidate);
     if (!existsSync(path) || !statSync(path).isFile()) continue;
-    if (declaresAtTop(readProjectText(path, "source"), name)) return candidate;
+    if (declaresAtTop(readProjectText(path, "source"), name, candidate)) return candidate;
   }
   return {
     reason:
@@ -862,7 +825,7 @@ export function modelMirror(root: string, folder: string, specPath: string, mirr
       problems.push({ file: specPath, line: role === "list" ? mirror.line : mirror.recipeLine, message: `mirror ${mirror.name}: ${file} does not exist (read under ${folder} and under the root)` });
       return undefined;
     }
-    if (!declaresAtTop(readProjectText(resolve(root, found), "source"), name)) {
+    if (!declaresAtTop(readProjectText(resolve(root, found), "source"), name, found)) {
       problems.push({ file: specPath, line: role === "list" ? mirror.line : mirror.recipeLine, message: `mirror ${mirror.name}: ${name} is not declared at the top level of ${found}; derive what was hand-kept, or remove the mirror` });
       return undefined;
     }

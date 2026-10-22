@@ -43,6 +43,7 @@ import type { SourceSyntax } from "../economy/source.ts";
 import type { Literal } from "../lifecycle/mirrors.ts";
 import type { InterfaceSymbol } from "../observation/interfaces.ts";
 import type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
+import type { BoundarySource } from "../scaffold/boundaries.ts";
 import type { Verdict } from "../enforcement/record.ts";
 
 /** The interface version this core runs; a plugin written for another is refused, naming both. */
@@ -153,10 +154,14 @@ export interface SyntaxTables {
   notice?: (root: string) => string;
   /** The mirror reader: the literal a list named `name` is set to in a file's text. */
   lists?: (text: string, name: string) => Literal | undefined;
+  /** Whether a file's text declares a name at its top level, for the spec model's check that a handler, guard or mirror exists. */
+  topLevel?: (text: string, name: string) => boolean;
+  /** A tool of the language's whose declaration file scaffold import and adoption draft specs from (tach's tach.toml). */
+  boundaries?: BoundarySource;
 }
 
 /** The slots by name, so a reading can say which one a plugin left empty. */
-export const SYNTAX_SLOTS = ["entrances", "interfaces", "source", "kept", "declares", "notice", "lists"] as const;
+export const SYNTAX_SLOTS = ["entrances", "interfaces", "source", "kept", "declares", "notice", "lists", "topLevel", "boundaries"] as const;
 export type SyntaxSlot = (typeof SYNTAX_SLOTS)[number];
 
 /** What the adapter factory is handed. */
