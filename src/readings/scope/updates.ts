@@ -18,6 +18,7 @@
  */
 
 import type { Damaged, InterfaceReading, JournalRecord, PageEntry, RecordedSite, RunRecord, ShellState, WorkOrder } from "./model.ts";
+import { setLanguageData } from "./language-data.ts";
 
 /** One event off the stream: its name and its data, still JSON text. */
 export interface StreamEvent {
@@ -153,6 +154,7 @@ export function mergeSnapshot(state: ShellState, incoming: ShellState): void {
   state.views = incoming.views;
   state.lexicon = { ...incoming.lexicon, query: state.lexicon.query };
   state.spec = incoming.spec;
+  if (incoming.spec.languages !== undefined) setLanguageData(incoming.spec.languages);
   state.componentInterfaces = incoming.componentInterfaces;
   state.structure = { ...state.structure, preview: incoming.structure.preview };
   const journal = { ...incoming.journal, records: state.journal.records };

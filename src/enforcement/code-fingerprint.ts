@@ -1,6 +1,7 @@
 /**
  * The identity of the Coherence code on disk: a hash of every source file
- * under this installation's src (tests aside) and of package.json. The warm
+ * under this installation's src (tests aside), of its bundled plugins, and of
+ * package.json. The warm
  * server reports it so a client never talks to stale code, and every parse
  * Coherence keeps across hook calls is keyed by it, so a release that
  * changes a parser can never serve a parse the old one made.
@@ -8,12 +9,19 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { dirname, extname, join, relative, resolve } from "node:path";
+import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { perProcess } from "../lifecycle/process-caches.ts";
 
 const CODE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE_JSON = join(CODE_DIR, "..", "package.json");
+/**
+ * The bundled plugins' sources in a checkout, beside src; the published
+ * package compiles them into dist/bundled, under CODE_DIR, where the walk
+ * below already reads them.
+ */
+const PLUGINS_DIR = join(CODE_DIR, "..", "plugins");
+const BUNDLED_OUTSIDE = !existsSync(join(CODE_DIR, "bundled")) && existsSync(PLUGINS_DIR);
 const CODE_FILE = /\.(ts|mts|cts|js|mjs|cjs|json)$/;
 
 /**
@@ -33,7 +41,7 @@ function codeFiles(dir: string, into: string[]): string[] {
 }
 
 function allCodeFiles(): string[] {
-  const files = codeFiles(CODE_DIR, []).sort();
+  const files = [...codeFiles(CODE_DIR, []), ...(BUNDLED_OUTSIDE ? codeFiles(PLUGINS_DIR, []) : [])].sort();
   if (existsSync(PACKAGE_JSON)) files.push(PACKAGE_JSON);
   return files;
 }
@@ -89,14 +97,16 @@ const held = perProcess(new Map<string, string>());
 function dataFiles(): string[] {
   const docs = join(CODE_DIR, "..", "docs");
   const fromDocs = existsSync(docs) ? readdirSync(docs).filter((n) => n.endsWith(".json")).map((n) => join(docs, n)) : [];
-  return [...codeFiles(CODE_DIR, []).filter((f) => f.endsWith(".json")), ...fromDocs, ...(existsSync(PACKAGE_JSON) ? [PACKAGE_JSON] : [])].sort();
+  const bundled = BUNDLED_OUTSIDE ? codeFiles(PLUGINS_DIR, []).filter((f) => f.endsWith(".json")) : [];
+  return [...codeFiles(CODE_DIR, []).filter((f) => f.endsWith(".json")), ...bundled, ...fromDocs, ...(existsSync(PACKAGE_JSON) ? [PACKAGE_JSON] : [])].sort();
 }
 
 /**
  * The modules `entries` import, transitively, by relative specifier: the code
- * a parse they make depends on. Entries are named as in src; this
- * installation's own files are what is followed, the sources in a checkout
- * and the compiled modules beside each other in the published package.
+ * a parse they make depends on. Entries are named as in src, or by an
+ * absolute path (a plugin's module); this installation's own files are what
+ * is followed, the sources in a checkout and the compiled modules beside each
+ * other in the published package.
  */
 export function closureOf(entries: readonly string[]): string[] {
   const seen = new Set<string>();
@@ -112,7 +122,7 @@ export function closureOf(entries: readonly string[]): string[] {
     for (const m of text.matchAll(/(?:\bfrom|\bimport)\s*\(?\s*["'](\.{1,2}\/[^"']+)["']/g)) visit(resolve(dirname(file), m[1]!.replace(/\.js$/, extname(file))));
   };
   // Entries are named as in src; compiled, each is the .js beside the others.
-  for (const entry of entries) visit(resolve(CODE_DIR, entry.replace(/\.ts$/, extname(fileURLToPath(import.meta.url)))));
+  for (const entry of entries) visit(isAbsolute(entry) ? entry : resolve(CODE_DIR, entry.replace(/\.ts$/, extname(fileURLToPath(import.meta.url)))));
   return [...seen].filter((f) => existsSync(f)).sort();
 }
 

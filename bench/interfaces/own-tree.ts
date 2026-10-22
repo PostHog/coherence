@@ -10,7 +10,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { TypeScriptAdapter } from "../../src/adapters/typescript.ts";
+import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { bothWays, sameMap } from "../../src/readings/scope/both-ways.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");

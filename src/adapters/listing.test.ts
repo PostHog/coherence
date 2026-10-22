@@ -11,8 +11,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { keepProjectFiles, projectListing } from "./project-files.ts";
-import { TypeScriptAdapter } from "./typescript.ts";
-import { PythonAdapter } from "./python.ts";
+import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
+import { PythonAdapter } from "../../plugins/python/python.ts";
 import { countingGit } from "./git-count-fixture.ts";
 
 function repo(files: Record<string, string>): string {
@@ -85,7 +85,7 @@ test("the Python adapter reads the project's files once per forget: a module cre
 });
 
 test("a cold server resolves a name the project declares even when the first source file of the walk lies outside the TypeScript project", { timeout: 120_000 }, async () => {
-  const { seedFile } = await import("./typescript.ts");
+  const { seedFile } = await import("../../plugins/typescript/typescript.ts");
   const root = repo({
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
     "bench/a-measure.ts": "export const measured = 1;\n",

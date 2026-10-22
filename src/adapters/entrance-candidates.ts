@@ -7,11 +7,11 @@
  * A scan, never a parse and never a guess presented as fact: each rule is a
  * shape a framework or a runner fixes, few enough to list, and each detected
  * entrance carries the rule and why it matched. Precision over recall: what
- * the rules cannot see is said in NOT_DETECTED, and a surface a project
- * builds its own way (a hand-written dispatcher, a message consumer) is left
- * to its declared entrances. The rule list (CANDIDATE_RULES and
- * NOT_DETECTED) lives in readings/scope/entrance-coverage.ts, which the
- * browser bundle carries, so the view, the query and the spec print one list.
+ * the rules cannot see is said in the language plugin's notDetected, and a
+ * surface a project builds its own way (a hand-written dispatcher, a message
+ * consumer) is left to its declared entrances. The rule list and what it
+ * misses are each language plugin's manifest data (its `entrances`), which
+ * the readings, the query and the page all read, so they print one list.
  *
  * Detection reads the spec for one thing only: the symbols declared
  * entrances name as handlers or guards, the wrappers. An export created by
@@ -27,9 +27,7 @@ import { readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import type { Language } from "./index.ts";
 import { isTestPath } from "./adapter.ts";
-import { PYTHON_ENTRANCES } from "./python-entrances.ts";
-import { RUST_ENTRANCES } from "./rust-entrances.ts";
-import { TYPESCRIPT_ENTRANCES } from "./typescript-entrances.ts";
+import { syntaxOf } from "../plugins/languages.ts";
 
 /** One entrance the reading detected in the tree. */
 export interface EntranceCandidate {
@@ -43,7 +41,7 @@ export interface EntranceCandidate {
    * entrance (a script, a package bin).
    */
   symbol: string;
-  /** The rule that detected it, one of the language's CANDIDATE_RULES (entrance-coverage.ts). */
+  /** The rule that detected it, one of the language plugin's entrance rules (its manifest's entrances). */
   rule: string;
   /** Why, in words a reader can check against the file. */
   why: string;
@@ -72,10 +70,10 @@ export function escape(name: string): string {
 }
 
 /**
- * What entrance detection knows of one language, each language's in its own
- * module (typescript-entrances.ts, python-entrances.ts, rust-entrances.ts): its rules, and the
- * syntax the shared scans below read by. A language ENTRANCE_SYNTAX lacks
- * fails to compile, never reads as another language.
+ * What entrance detection knows of one language, each language's in its
+ * plugin's module (the `entrances` slot of its manifest's syntax): its rules,
+ * and the syntax the shared scans below read by. A language whose plugin
+ * fills no such slot detects nothing, never reads as another language.
  */
 export interface EntranceSyntax {
   /** Set when the reading detects none of the language's entrances yet (Rust): detection answers none for it, package.json's included. */
@@ -99,18 +97,6 @@ export interface EntranceSyntax {
   /** Which code files some other one imports: only TypeScript's scripts are told apart by it. */
   importedAmong(code: readonly string[], read: (file: string) => string | undefined): ReadonlySet<string>;
 }
-
-/**
- * Each language's entrance detection: one key per language, so a new one is
- * one module and one key here. Read at call time: the language modules import
- * this one's scans, so a table filled at load would read a module that has
- * not run yet whenever a language module is loaded first.
- */
-const ENTRANCE_SYNTAX: Record<Language, () => EntranceSyntax> = {
-  typescript: () => TYPESCRIPT_ENTRANCES,
-  python: () => PYTHON_ENTRANCES,
-  rust: () => RUST_ENTRANCES,
-};
 
 /** The lines of the statement or definition that starts at `start` (zero-based): until the next line at or left of its indentation that begins something new. */
 export function spanOf(lines: readonly string[], start: number, syntax: EntranceSyntax): string {
@@ -242,8 +228,8 @@ export function detectEntranceCandidates(root: string, options: DetectOptions): 
     return text;
   };
   const isTest = (file: string): boolean => isTestPath(file, testFolders);
-  const syntax = ENTRANCE_SYNTAX[language]();
-  if (syntax.undetected === true) return [];
+  const syntax = syntaxOf(language, "entrances");
+  if (syntax === undefined || syntax.undetected === true) return [];
   const code = files.filter((f) => !isTest(f) && syntax.isCode(f));
   const found: EntranceCandidate[] = [];
   for (const file of code) {

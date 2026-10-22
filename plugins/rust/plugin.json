@@ -1,0 +1,55 @@
+{
+  "name": "rust",
+  "version": "1.8.0",
+  "pluginApi": 1,
+  "provides": {
+    "language": "rust"
+  },
+  "files": {
+    "pattern": "\\.rs$"
+  },
+  "serverExtensions": [
+    ".rs"
+  ],
+  "members": {
+    "opens": "(?!)",
+    "closes": "^[}\\]]",
+    "field": "(?!)"
+  },
+  "entrances": {
+    "rules": [],
+    "notDetected": "Rust is not read by this reading yet: no Rust entrance is detected"
+  },
+  "notScanned": "Rust is not read by this reading yet",
+  "markedFolders": [
+    {
+      "name": "target",
+      "beside": "Cargo.toml",
+      "reason": "Cargo build folder"
+    }
+  ],
+  "ladder": {
+    "top": "visibility-choked",
+    "because": "rustc refuses a path to an item from outside its visibility scope (private: its module and descendants; pub(super)/pub(in …): that module's subtree), so an item whose effective visibility stops short of the crate cannot be referenced from outside that scope",
+    "rungs": [
+      {
+        "grade": "visibility-choked",
+        "enforcer": "the compiler (rustc)",
+        "fact": "the protected item's effective visibility (its own and every enclosing module's) stops short of the crate root, so rustc refuses any reference from outside that scope"
+      },
+      {
+        "grade": "reference-choked",
+        "enforcer": "Coherence's check at the edit and in CI",
+        "fact": "the item is pub(crate) or pub and reachable crate-wide, and every resolved reference in the workspace is inside the chokepoint"
+      }
+    ]
+  },
+  "module": "index.ts",
+  "syntax": {
+    "entrances": "rust-entrances.ts#RUST_ENTRANCES",
+    "interfaces": "rust-scope.ts#RUST_INTERFACES",
+    "kept": "rust-scope.ts#rustKeptModules",
+    "source": "rust-source.ts#RUST_SOURCE",
+    "declares": "rust-interfaces.ts#rustDeclares"
+  }
+}

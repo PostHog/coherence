@@ -13,7 +13,7 @@
 import { spawnSync } from "./lifecycle/work-meter.ts";
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire, stripTypeScriptTypes } from "node:module";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { browserSources, strippedName } from "./readings/scope/build.ts";
 
@@ -51,6 +51,27 @@ for (const file of files(src)) {
   if (at.startsWith(join("plugins", "fixtures"))) continue;
   if (/\.(json|css)$/.test(file) || dirname(at) === join(scope, "fonts")) copy(file, join(dist, at));
 }
+// The bundled plugins (plugins/): their manifests and the defaults beside them, and each module stripped of its types, at
+// dist/bundled at the same depth as plugins/ beside src, so a plugin's import of the core ("../../src/x.ts") is the compiled
+// one ("../../x.js") and its own siblings keep their names. A manifest names its modules as .js there.
+const plugins = join(root, "plugins");
+const bundled = join(dist, "bundled");
+for (const file of files(plugins)) {
+  const at = relative(plugins, file);
+  if (/\.(test|e2e)\.ts$/.test(file)) continue;
+  if (file.endsWith(".ts")) {
+    const code = stripTypeScriptTypes(readFileSync(file, "utf8"), { mode: "strip" })
+      .replace(/((?:\bfrom|\bimport)\s*\(?\s*["'])\.\.\/\.\.\/src\//g, "$1../../")
+      .replace(/((?:\bfrom|\bimport)\s*\(?\s*["']\.{1,2}\/[^"']+)\.ts(["'])/g, "$1.js$2");
+    mkdirSync(dirname(join(bundled, at)), { recursive: true });
+    writeFileSync(join(bundled, at.replace(/\.ts$/, ".js")), code);
+  } else if (file.endsWith(".json")) {
+    const text = readFileSync(file, "utf8");
+    // Every module a manifest names (its module and each syntax slot's) by the .js the build wrote.
+    writeFileSync((mkdirSync(dirname(join(bundled, at)), { recursive: true }), join(bundled, at)), basename(file) === "plugin.json" ? text.replace(/("(?:module|entrances|interfaces|source|kept|declares|notice|lists)":\s*"[^"#]+)\.ts(["#])/g, "$1.js$2") : text);
+  }
+}
+
 // The same modules the page joins, found the same way: from the entry, by what each imports at run time.
 for (const name of await browserSources()) {
   const source = readFileSync(join(src, scope, name), "utf8");

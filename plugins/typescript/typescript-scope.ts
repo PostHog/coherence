@@ -5,8 +5,8 @@
  * through INTERFACE_SYNTAX, kept-answers.ts through KEPT_MODULES).
  */
 
-import { specifierCandidates } from "../../adapters/typescript.ts";
-import type { InterfaceSyntax } from "./component-interfaces.ts";
+import { specifierCandidates } from "./typescript.ts";
+import type { InterfaceSyntax } from "../../src/readings/scope/component-interfaces.ts";
 
 /** A TypeScript import or export list: `import { a as b } from`, `export { a as b }`, `export type { … }`. */
 const TS_LIST = /\b(?:import|export)\s+(?:type\s+)?(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}/g;

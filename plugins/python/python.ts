@@ -93,10 +93,11 @@ import {
   type SiteForm,
   type StagedSite,
   type Visibility,
-} from "./adapter.ts";
-import { locateServer as locateInstalled, type ServerLocation } from "./installed.ts";
-import { JsonRpcClient } from "./jsonrpc.ts";
-import { horizonFolders, isVirtualEnvironment, keepHorizonFiles, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, nestedFolder, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
+} from "../../src/adapters/adapter.ts";
+import { locateServer as locateInstalled, type ServerLocation } from "../../src/adapters/installed.ts";
+import { JsonRpcClient } from "../../src/adapters/jsonrpc.ts";
+import manifest from "./plugin.json" with { type: "json" };
+import { horizonFolders, keepHorizonFiles, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, nestedFolder, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/adapters/project-files.ts";
 import { TACH_CONFIG, dottedFor, excluded, findTachConfig, locateTach, moduleLocations, moduleOf, reaches, readTachConfig, runTach, tachGovernance, tachOverCopy, witnessTach, type TachConfig, type TachModule, type TachRun, type TachWitness } from "./tach.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control server ordering. */
@@ -113,19 +114,18 @@ export type PythonClientFactory = (command: string, args: string[], cwd: string,
 
 const SERVER_BIN = "pyright-langserver";
 const ENUMERATION_TIMEOUT_MS = 10 * 60 * 1000;
+/** The file that marks a folder as a Python virtual environment, as this plugin's manifest names it for the walks. */
+const VENV_MARKER = manifest.markedFolders.find((m) => m.reason === "virtual environment")!.marker;
+
+/** Whether a folder on disk is a Python virtual environment. */
+function isVirtualEnvironment(dir: string): boolean {
+  return existsSync(join(dir, VENV_MARKER));
+}
+
 const COHERENCE_ENFORCER = "Coherence's check at the edit and in CI";
 
-export const PYTHON_LADDER: Ladder = {
-  top: "reference-choked",
-  because: "Python enforces no visibility: an underscore prefix and a module's __all__ list are conventions the interpreter does not enforce, so a module attribute can be imported from anywhere and only a name that never becomes a module attribute is refused",
-  rungs: [
-    { grade: "closure-choked", enforcer: "the interpreter", fact: "the protected thing is never a module attribute: defined inside the chokepoint function's body, so nothing outside can import or name it" },
-    { grade: "checker-choked", enforcer: "a checker the project runs", fact: "the name is underscore-prefixed and the project's Pyright configuration makes reportPrivateUsage an error, an import-linter rule names the protected module, or a tach interface exposes the chokepoint and not the protected thing" },
-    { grade: "reference-choked", enforcer: COHERENCE_ENFORCER, fact: "no bypass among resolved references; the top rung when neither the interpreter nor a checker refuses one" },
-    { grade: "convention", enforcer: "nobody", fact: "an underscore prefix or __all__ exclusion alone" },
-  ],
-  whenVacuous: "convention",
-};
+/** The ladder, as this plugin's manifest declares it for the core to read without loading this module. */
+export const PYTHON_LADDER: Ladder = manifest.ladder as Ladder;
 
 /** Where the language server binary is, with every place looked. */
 export function locateServer(root: string): ServerLocation {

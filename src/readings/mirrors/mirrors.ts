@@ -27,7 +27,7 @@
 import { execFileSync } from "../../lifecycle/work-meter.ts";
 import { basename, dirname, extname, posix } from "node:path";
 import type * as TS from "typescript";
-import { declaredLanguageOf, type DeclaredLanguage } from "../../adapters/declared.ts";
+import { declaredLanguageOf, type DeclaredLanguage } from "../../adapters/declared-config.ts";
 import { languageOfFile } from "../../adapters/language-files.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { DERIVED, DOC_FORMS, type Finding, type Form, type Group, type MirrorHistory, type MirrorReading, type SetRef, type Verdict } from "./model.ts";

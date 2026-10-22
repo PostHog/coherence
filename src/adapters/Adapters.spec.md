@@ -76,7 +76,7 @@ The language adapter seam: how to ask a language's server for definitions, refer
   kinds: none
 - rust-analyzer located or a reason: rust-analyzer is found as a binary on the machine, COHERENCE_RUST_ANALYZER first, then rustup's answer from the project root, then the first rust-analyzer on PATH that answers --version, and its absence is a reason naming each place looked, rustup's proxy without the component included, never a crash.
   protects: SERVER_BIN in rust.ts
-  chokepoint: src/adapters/rust.ts
+  chokepoint: plugins/rust/rust.ts
   over: COHERENCE_RUST_ANALYZER, rustup which from the project root, and every rust-analyzer on PATH, a rustup proxy without the component among them
   via: rust-analyzer is found, or its absence names each place looked
   because: rust-analyzer is no npm package, so the resolver cannot find it; rustup's proxy at ~/.cargo/bin/rust-analyzer exists without the component and fails only when run, so a file that exists is not a server that starts, and an adopter must be told which of the three places was looked at and how to install it (rustup component add rust-analyzer rust-src) rather than see a run crash. The chokepoint's refutation is the compiler's own refusal of a synthetic import of SERVER_BIN, which its module does not export (ruling rs-e93ecdd6)
@@ -118,7 +118,7 @@ The language adapter seam: how to ask a language's server for definitions, refer
   kinds: none
 - server located or a reason: The language server binary is resolved by the package resolver from the adopter's project first, then from Coherence's own module, then found on PATH, and its absence is a reason naming each place looked, never a crash.
   protects: SERVER_BIN in typescript.ts
-  chokepoint: src/adapters/typescript.ts
+  chokepoint: plugins/typescript/typescript.ts
   over: the adopter's project, Coherence's own module, and every folder on PATH
   via: the language server binary is found (the adapter's precondition)
   because: the language server is an optional dependency; an adopter without it must get a reason naming where the tool looked and how to install it, and a run must record not run rather than crash, since not run is a verdict the status view can show. The chokepoint's refutation is the compiler's own refusal of a synthetic import of SERVER_BIN, which its module does not export (ruling rs-e93ecdd6); the totality oracle was refuted by making locateServer answer before it looked anywhere, which is the absence branch staged inside the function rather than by taking the binary off the machine

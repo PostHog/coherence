@@ -6,7 +6,7 @@
 
 import { existsSync } from "node:fs";
 import { posix, resolve } from "node:path";
-import type { SourceSyntax } from "./source.ts";
+import type { SourceSyntax } from "../../src/economy/source.ts";
 
 const PY_DECLARATION = /^(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)|^([A-Z_][A-Z0-9_]*)\s*(?::[^=]+)?=/;
 const PY_FROM = /^from\s+([\w.]+)\s+import\s+([^\n]+)$/gm;

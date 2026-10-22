@@ -41,13 +41,13 @@
  * edit wrote, so the check at an edit never runs tach over the whole tree.
  */
 
-import { spawnSync } from "../lifecycle/work-meter.ts";
+import { spawnSync } from "../../src/lifecycle/work-meter.ts";
 import { createHash, randomBytes } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseToml, type TomlTable, type TomlValue } from "./toml.ts";
+import { parseToml, type TomlTable, type TomlValue } from "../../src/adapters/toml.ts";
 
 export const TACH_CONFIG = "tach.toml";
 const TACH_BIN = "tach";

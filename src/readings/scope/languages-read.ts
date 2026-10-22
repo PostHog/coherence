@@ -17,7 +17,10 @@
  * refuses any reading that takes the config's primary language another way.
  */
 
-import type { Language } from "../../adapters/index.ts";
+import { languageData } from "./language-data.ts";
+
+/** A language a reading reads by name. */
+type Language = string;
 
 /** One language a reading did not read, and why: a built-in, or a language the config declares under `languages`. */
 export interface LanguageNotRead {
@@ -80,24 +83,15 @@ export function allLanguagesRead(config: DeclaredLanguages): LanguagesRead {
   return languagesRead(config.languages, new Map(), unscannedOf(config));
 }
 
-/** The reason a reading gives for Rust, whose text no scan of the economy and scope readings reads yet. */
-export const RUST_NOT_READ = "Rust is not read by this reading yet";
-
-/** Each language's text scan, decided once per language: undefined when it is read, else why not; a language with no key fails to compile. */
-const NOT_SCANNED: Record<Language, string | undefined> = {
-  typescript: undefined,
-  python: undefined,
-  rust: RUST_NOT_READ,
-};
-
 /**
  * Why a reading that scans a language's text (declarations, imports, entrance
- * rules) does not read the language, or undefined when it reads it: Rust has
- * an adapter but no text scan yet, so a reading names it rather than parse
- * Rust as another language.
+ * rules) does not read the language, or undefined when it reads it: a
+ * language whose plugin has an adapter but no text scan yet says so in its
+ * manifest (notScanned), so a reading names it rather than parse it as
+ * another language.
  */
 export function notScannedYet(language: Language): string | undefined {
-  return NOT_SCANNED[language];
+  return languageData()[language]?.notScanned;
 }
 
 /** Every declared language a text scan reads, and each one it does not read yet named with why (notScannedYet). */

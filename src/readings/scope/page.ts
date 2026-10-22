@@ -26,6 +26,7 @@ import type { JournalKind, JournalRecord, LifecycleState, RecordedSite, RunRecor
 import { renderMasthead, renderShell, renderViewResults } from "./shell.ts";
 import { FLOW_NONE_ID, flowDefaultSelection, flowExpanded, flowKeyAction, flowOf, isFlowId } from "./structure-flow.ts";
 import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream } from "./updates.ts";
+import { setLanguageData } from "./language-data.ts";
 
 /** The state a snapshot carries inline; undefined in the shell, whose state the warm server serves. */
 function readEmbeddedState(): ShellState | undefined {
@@ -90,6 +91,8 @@ function setFilter(state: ShellState, name: string, value: string): void {
  * of the page holds focus, so a reader typing a query is never interrupted.
  */
 function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefined): { update: () => void } {
+  // The languages' entrance rules and what they miss are the plugins', carried in the state: set before anything renders them.
+  if (state.spec.languages !== undefined) setLanguageData(state.spec.languages);
   const renderAll = (): void => {
     document.title = `${state.project} Scope`;
     root.innerHTML = renderShell(state).text;

@@ -1,0 +1,9 @@
+{
+  "language": "typescript",
+  "plugins": [
+    "typescript",
+    "python",
+    "rust",
+    "declared"
+  ]
+}

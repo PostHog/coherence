@@ -11,26 +11,18 @@ import { isTestPath } from "../adapters/adapter.ts";
 import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import { languageOfFile } from "../adapters/language-files.ts";
+import { leftOutOfSource, syntaxOf } from "../plugins/languages.ts";
 import type { Component, SpecModel } from "../spec/model.ts";
-import { PYTHON_SOURCE } from "./python-source.ts";
-import { RUST_SOURCE } from "./rust-source.ts";
-import { TYPESCRIPT_SOURCE } from "./typescript-source.ts";
 
 /**
- * What the scan leaves out of a language's files (languageOfFile): TypeScript's
- * JavaScript, so its source is the files the TypeScript adapter reads as source
- * (SOURCE_EXTENSIONS in adapters/typescript.ts); Python's stubs, which restate
- * the names their module declares and would count each one twice.
+ * Whether a file is source the plain scan reads for the language: one of the
+ * language's files (languageOfFile), less what its plugin's manifest leaves
+ * out of the source scan (TypeScript's JavaScript, so its source is the files
+ * the TypeScript adapter reads as source; Python's stubs, which restate the
+ * names their module declares and would count each one twice).
  */
-const NOT_SOURCE: Record<Language, RegExp> = {
-  typescript: /\.[cm]?jsx?$/,
-  python: /\.pyi$/,
-  rust: /(?!)/,
-};
-
-/** Whether a file is source the plain scan reads for the language. */
 export function isSourceFile(file: string, language: Language): boolean {
-  return languageOfFile(file, [language]) === language && !NOT_SOURCE[language].test(file);
+  return languageOfFile(file, [language]) === language && !leftOutOfSource(file, language);
 }
 
 /**
@@ -52,8 +44,9 @@ export function toRelative(root: string, path: string): string | undefined {
 
 /**
  * What the plain scan reads of one language's source, each language's in its
- * own module (typescript-source.ts, python-source.ts, rust-source.ts): a language
- * SOURCE_SYNTAX lacks fails to compile, never reads as another language.
+ * plugin's module (the `source` slot of its manifest's syntax): a language
+ * whose plugin fills no such slot declares nothing, imports nothing and
+ * resolves no specifier here, never reads as another language.
  */
 export interface SourceSyntax {
   /** The name a line declares at the top level and whether its file exports it, or undefined when it declares none. */
@@ -64,17 +57,12 @@ export interface SourceSyntax {
   importsOf(text: string, add: (name: string | undefined, specifier: string) => void): void;
 }
 
-/**
- * Each language's source scan: one key per language, so a new one is one
- * module and one key here. Read at call time: typescript-source.ts imports
- * toRelative and isSourceFile from here, so a table filled at load would read
- * a module that has not run yet whenever that one is loaded first.
- */
-const SOURCE_SYNTAX: Record<Language, () => SourceSyntax> = {
-  typescript: () => TYPESCRIPT_SOURCE,
-  python: () => PYTHON_SOURCE,
-  rust: () => RUST_SOURCE,
-};
+/** The language's source scan, from its plugin; one that reads nothing for a language whose plugin fills no source slot. */
+function sourceSyntax(language: Language): SourceSyntax {
+  return syntaxOf(language, "source") ?? NO_SOURCE;
+}
+
+const NO_SOURCE: SourceSyntax = { declarationOf: () => undefined, resolveModule: () => undefined, importsOf: () => {} };
 
 export interface Declaration {
   name: string;
@@ -87,7 +75,7 @@ export interface Declaration {
 export function declarationsOf(text: string, language: Language): Declaration[] {
   const found: Declaration[] = [];
   const seen = new Set<string>();
-  const syntax = SOURCE_SYNTAX[language]();
+  const syntax = sourceSyntax(language);
   text.split("\n").forEach((raw, index) => {
     const line = raw.replace(/\r$/, "");
     const declared = syntax.declarationOf(line);
@@ -114,7 +102,7 @@ const NONE: ReadonlySet<string> = new Set();
  * though it were still on disk, so its importers can be found.
  */
 export function resolveModule(root: string, from: string, specifier: string, language: Language, vanished: ReadonlySet<string> = NONE): string | undefined {
-  return SOURCE_SYNTAX[language]().resolveModule(root, from, specifier, vanished);
+  return sourceSyntax(language).resolveModule(root, from, specifier, vanished);
 }
 
 /** The names a file imports from files under the root, with the module each comes from; `vanished` as for resolveModule. */
@@ -125,7 +113,7 @@ export function importsOf(root: string, file: string, text: string, language: La
     if (module === undefined || module === file) return;
     found.push({ name, module });
   };
-  SOURCE_SYNTAX[language]().importsOf(text, add);
+  sourceSyntax(language).importsOf(text, add);
   const seen = new Set<string>();
   return found.filter((i) => {
     const key = `${i.name ?? "*"} ${i.module}`;

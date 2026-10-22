@@ -1,42 +1,35 @@
 /**
- * Which adapter a project gets: the config's `language`, else TypeScript; a
- * language the config declares (declared.ts) is read by the generic adapter;
- * a language a plugin provides is the plugin's (src/plugins), and a plugin
- * that extends a language wraps whichever adapter answers for it.
+ * Which adapter a project gets: the config's `language`, else the bundled
+ * default's. Every language's adapter is a plugin's: the bundled plugins
+ * (plugins/) answer for the core's languages and for the languages a config
+ * declares; a plugin the config names that provides a language takes its
+ * place, and a plugin that extends a language wraps whichever adapter
+ * answers for it (src/plugins).
  */
 
-import { DeclaredAdapter, type DeclaredLanguage } from "./declared.ts";
 import { PluginAdapter } from "../plugins/adapter.ts";
+import { coreAdapter, declaredAdapter, LANGUAGES, type Language } from "../plugins/languages.ts";
 import type { LoadedPlugin } from "../plugins/plugin.ts";
 import { extendersOf, providerOf } from "../plugins/registry.ts";
-import { PythonAdapter } from "./python.ts";
-import { RustAdapter } from "./rust.ts";
-import { TypeScriptAdapter } from "./typescript.ts";
+import type { DeclaredLanguage } from "./declared-config.ts";
 import type { AdapterBounds, LanguageAdapter } from "./adapter.ts";
 
-import { LANGUAGES, type Language } from "./language-files.ts";
-export { LANGUAGES, type Language } from "./language-files.ts";
+export { LANGUAGES, type Language } from "../plugins/languages.ts";
 
 export function isLanguage(value: string): value is Language {
-  return (LANGUAGES as readonly string[]).includes(value);
+  return LANGUAGES.includes(value);
 }
 
 /**
- * The adapter for the language, over the whole workspace; with bounds, one
- * whose server leaves the bounded-away folders out, for the component
- * interface reading alone (Python narrows its workspace; TypeScript's server
- * reads the project its tsconfig names and rust-analyzer its Cargo workspace,
- * and neither takes bounds).
+ * The adapter for one of the core's languages, over the whole workspace;
+ * with bounds, one whose server leaves the bounded-away folders out, for the
+ * component interface reading alone (a server that cannot narrow reads its
+ * whole project and takes no bounds).
  */
 export function adapterFor(language: Language, root: string, bounds?: AdapterBounds): LanguageAdapter {
-  switch (language) {
-    case "typescript":
-      return new TypeScriptAdapter(root);
-    case "python":
-      return new PythonAdapter(root, undefined, bounds);
-    case "rust":
-      return new RustAdapter(root);
-  }
+  const adapter = coreAdapter(language, root, bounds);
+  if (adapter === undefined) throw new Error(`${language} is not one of the core's languages (${LANGUAGES.join(", ")})`);
+  return adapter;
 }
 
 /** What instrumentFor needs of the config: the languages it declares and the plugins it runs. */
@@ -49,7 +42,7 @@ export interface Instruments {
 function ownAdapter(language: string, root: string, declared: readonly DeclaredLanguage[], bounds?: AdapterBounds): LanguageAdapter | undefined {
   if (isLanguage(language)) return adapterFor(language, root, bounds);
   const found = declared.find((d) => d.name === language);
-  return found === undefined ? undefined : new DeclaredAdapter(root, found);
+  return found === undefined ? undefined : declaredAdapter(found, root);
 }
 
 /**

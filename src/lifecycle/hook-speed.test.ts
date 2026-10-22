@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { patchFingerprint, recordWriteTrace, sessionPatch, traceFile, type Snapshot } from "../economy/trace.ts";
 import { economyStopText, editContext, runHook } from "./hook.ts";
-import { TypeScriptAdapter } from "../adapters/typescript.ts";
+import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";

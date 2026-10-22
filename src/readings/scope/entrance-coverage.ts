@@ -22,44 +22,20 @@
  */
 
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
-import type { Language } from "../../adapters/index.ts";
+import { derived, type CandidateRule } from "./language-data.ts";
 import type { SpecComponent } from "./model.ts";
 
-/** The rules, per language, each with its plural and what it detects: the documentation the query prints and the spec states, and the one place a rule's plural is said. */
-export const CANDIDATE_RULES: Record<Language, readonly { rule: string; plural: string; detects: string }[]> = {
-  typescript: [
-    { rule: "server function", plural: "server functions", detects: "an exported const created by createServerFn (TanStack Start)" },
-    { rule: "wrapped export", plural: "wrapped exports", detects: "an exported const created by calling a symbol a declared entrance names as its handler or guard" },
-    { rule: "server route", plural: "server routes", detects: "an exported route created by createFileRoute with server handlers, createServerFileRoute or createAPIFileRoute" },
-    { rule: "route handler", plural: "route handlers", detects: "a GET, POST, PUT, PATCH, DELETE, HEAD or OPTIONS a Next.js app/**/route file exports, declared there, in an export list or re-export, or destructured; a default export under pages/api; or an exported loader or action under app/routes" },
-    { rule: "request proxy", plural: "request proxies", detects: "the proxy a Next.js proxy.ts exports, or the middleware a middleware.ts exports, at the root or under src/: declared, in an export list or re-export, or as the default export" },
-    { rule: "page route", plural: "page routes", detects: "the default export of a Next.js app/**/page file, the page as a whole" },
-    { rule: "server action", plural: "server actions", detects: "an exported function of a file that opens with 'use server'" },
-    { rule: "route table", plural: "route table entries", detects: "an object literal naming a path or pattern that starts with / and a handler, on one line" },
-    { rule: "route method", plural: "registered routes", detects: "a call like app.get('/path', handler) whose first argument is a path starting with /" },
-    { rule: "package bin", plural: "package bins", detects: "a file package.json's bin names" },
-    { rule: "package script", plural: "package scripts", detects: "a project file a package.json script runs with node, tsx, ts-node, bun, deno, vite-node or python" },
-    { rule: "script", plural: "scripts", detects: "a file directly under a top-level scripts/ or bin/ folder that no project file imports" },
-  ],
-  python: [
-    { rule: "url pattern", plural: "URL patterns", detects: "a path(), re_path() or url() in a urls.py that routes to a view (include() is delegation, not an entrance)" },
-    { rule: "viewset", plural: "viewsets", detects: "a router.register('prefix', ViewSet) registration" },
-    { rule: "route decorator", plural: "decorated routes", detects: "a function decorated @x.get/post/put/patch/delete/route/api_route/websocket('/path')" },
-    { rule: "management command", plural: "management commands", detects: "a Command class in a management/commands/ module" },
-    { rule: "task", plural: "tasks", detects: "a function decorated @shared_task or @<app>.task (Celery), or @activity.defn / @workflow.defn (Temporal)" },
-    { rule: "console script", plural: "console scripts", detects: "a function pyproject.toml's [project.scripts] or [tool.poetry.scripts] names" },
-    { rule: "script", plural: "scripts", detects: "a file directly under a top-level scripts/ folder with an if __name__ == \"__main__\" block" },
-  ],
-  // Rust is not read by this reading yet: no rule is listed, and NOT_DETECTED says so.
-  rust: [],
-};
+/**
+ * The rules, per language, each with its plural and what it detects: the
+ * documentation the query prints and the spec states, and the one place a
+ * rule's plural is said. Each language plugin's manifest declares its own
+ * (its `entrances`); a language whose plugin lists none detects nothing, and
+ * NOT_DETECTED says so.
+ */
+export const CANDIDATE_RULES: Readonly<Record<string, readonly CandidateRule[]>> = derived((data) => Object.fromEntries(Object.entries(data).map(([language, said]) => [language, said.rules])));
 
 /** What the rules do not see, per language: said wherever the coverage is, so an absence is never read as none. */
-export const NOT_DETECTED: Record<Language, string> = {
-  typescript: "file routes outside a Next.js app/**/page without server handlers (their work enters through server functions), hand-written dispatchers, message consumers, workers and host callbacks are not detected",
-  python: "views reached only through include(), hand-written dispatchers, message consumers and signal handlers are not detected",
-  rust: "Rust is not read by this reading yet: no Rust entrance is detected",
-};
+export const NOT_DETECTED: Readonly<Record<string, string>> = derived((data) => Object.fromEntries(Object.entries(data).flatMap(([language, said]) => (said.notDetected === undefined ? [] : [[language, said.notDetected]]))));
 
 /** A recorded reading's language, by name: its rules, or none for a name no language goes by. */
 export function candidateRulesOf(language: string): readonly { rule: string; plural: string; detects: string }[] {
@@ -169,7 +145,7 @@ export function coverageLine(coverage: EntranceCoverage): string {
 }
 
 /** Each rule's plural, read off the rules themselves, so a rule added there is never counted as "<rule>s" (df-5c6288f3). */
-export const RULE_PLURALS: Readonly<Record<string, string>> = Object.fromEntries(Object.values(CANDIDATE_RULES).flatMap((rules) => rules.map((r) => [r.rule, r.plural])));
+export const RULE_PLURALS: Readonly<Record<string, string>> = derived((data) => Object.fromEntries(Object.values(data).flatMap((said) => said.rules.map((r) => [r.rule, r.plural]))));
 
 /** A count of entrances detected by one rule, in words: "1 request proxy", "3 request proxies". */
 export function ruleCount(n: number, rule: string): string {

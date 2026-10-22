@@ -20,10 +20,8 @@ import { configIgnore, projectSites } from "../adapters/project-files.ts";
 import { componentOf, declarationsOf, isTest, sourceFiles } from "../economy/source.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
 import type { Language } from "../adapters/index.ts";
+import { syntaxOf } from "../plugins/languages.ts";
 import type { SpecModel } from "../spec/model.ts";
-import { pythonDeclares } from "./python-interfaces.ts";
-import { rustDeclares } from "./rust-interfaces.ts";
-import { typescriptDeclares } from "./typescript-interfaces.ts";
 
 export interface InterfaceSite {
   file: string;
@@ -70,16 +68,10 @@ export function interfaceId(from: string, to: string): string {
   return `${from} -> ${to}`;
 }
 
-/** Each language's reading of what a declaration line's keyword says can execute: a language with none fails to compile. */
-const DECLARES: Record<Language, (line: string) => InterfaceSymbol["declares"]> = {
-  typescript: typescriptDeclares,
-  python: pythonDeclares,
-  rust: rustDeclares,
-};
-
 /** What a declaration line's keyword says can execute. */
 export function declares(line: string, language: Language): InterfaceSymbol["declares"] {
-  return DECLARES[language](line);
+  // Each language's reading is its plugin's (the declares slot); a language whose plugin fills none says nothing executes.
+  return syntaxOf(language, "declares")?.(line) ?? "unknown";
 }
 
 

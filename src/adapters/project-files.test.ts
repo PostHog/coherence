@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import { keepProjectFiles, nestedCheckouts, projectFiles } from "./project-files.ts";
-import { TypeScriptAdapter } from "./typescript.ts";
+import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { checkChokepoint } from "../enforcement/check.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { computeMass } from "../economy/mass.ts";

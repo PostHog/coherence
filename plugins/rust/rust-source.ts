@@ -5,7 +5,7 @@
  * this through SOURCE_SYNTAX; mass and undeclared name Rust as not read).
  */
 
-import type { SourceSyntax } from "./source.ts";
+import type { SourceSyntax } from "../../src/economy/source.ts";
 
 /** Rust is not read by this reading yet (notScannedYet): no line declares a name, no specifier resolves, no import is handed on. */
 export const RUST_SOURCE: SourceSyntax = {

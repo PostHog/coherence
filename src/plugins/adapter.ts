@@ -1,8 +1,9 @@
 /**
  * A plugin's language adapter as the core holds it: built at once from the
- * manifest, its module imported only when a question first reaches it, so a
- * reading that needs only the ladder (Structure's grades) or a hook that never
- * asks the instrument pays no import. A module that fails to load, or holds
+ * manifest, its module loaded only when something first asks for it (a
+ * question, its test filter), so a reading that needs only the ladder
+ * (Structure's grades, from the manifest) or a hook that never asks the
+ * instrument pays no load. A module that fails to load, or holds
  * no adapter factory, makes the adapter unready with that reason: every
  * chokepoint it was asked about reads not run, never a pass.
  */
@@ -10,7 +11,7 @@
 import type { Definition, LanguageAdapter, Ladder, Refutation, ReferenceSite, Resolved, ResolveHint, Visibility } from "../adapters/adapter.ts";
 import type { LoadedPlugin, PluginTag } from "./plugin.ts";
 import { tagOf } from "./plugin.ts";
-import { moduleOf } from "./registry.ts";
+import { moduleSyncOf } from "./registry.ts";
 
 /** The ladder of a plugin adapter that declares none and wraps none: Coherence's check alone, as for a declared language. */
 function referenceLadder(plugin: LoadedPlugin, language: string): Ladder {
@@ -41,13 +42,17 @@ export class PluginAdapter implements LanguageAdapter {
     this.plugins = [...(base instanceof PluginAdapter ? base.plugins : []), tagOf(plugin)];
   }
 
+  /** The plugin's adapter, built once, synchronously, the first time anything asks: a question, its ladder or its test filter. */
+  private build(): LanguageAdapter {
+    if (this.loaded !== undefined) return this.loaded;
+    const module = moduleSyncOf(this.plugin);
+    if (typeof module.adapter !== "function") throw new Error(`plugin ${this.plugin.name}'s module exports no adapter factory for ${this.language}`);
+    this.loaded = module.adapter({ root: this.root, language: this.language, ...(this.base === undefined ? {} : { base: this.base }) });
+    return this.loaded;
+  }
+
   private adapter(): Promise<LanguageAdapter> {
-    this.inner ??= moduleOf(this.plugin).then((module) => {
-      if (typeof module.adapter !== "function") throw new Error(`plugin ${this.plugin.name}'s module exports no adapter factory for ${this.language}`);
-      const built = module.adapter({ root: this.root, language: this.language, ...(this.base === undefined ? {} : { base: this.base }) });
-      this.loaded = built;
-      return built;
-    });
+    this.inner ??= Promise.resolve().then(() => this.build());
     return this.inner;
   }
 
@@ -71,9 +76,13 @@ export class PluginAdapter implements LanguageAdapter {
     return (await this.adapter()).visibility(definition, chokepoint);
   }
 
-  /** Synchronous by the interface: the loaded adapter's once a question has loaded it, else the wrapped one's, else the name as written. */
+  /** Synchronous by the interface: the plugin's own filter, its module loaded now when no question has loaded it yet; a module that will not load leaves the wrapped adapter's, else the name as written, and its failure stands at ready(). */
   testFilter(via: string): string {
-    return (this.loaded ?? this.base)?.testFilter(via) ?? via;
+    try {
+      return this.build().testFilter(via);
+    } catch {
+      return this.base?.testFilter(via) ?? via;
+    }
   }
 
   async refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string): Promise<Refutation> {
@@ -85,13 +94,9 @@ export class PluginAdapter implements LanguageAdapter {
   }
 
   async close(): Promise<void> {
-    // Never loaded, nothing of the plugin's runs; the wrapped adapter may still hold a server.
-    if (this.inner === undefined) {
-      await this.base?.close();
-      return;
-    }
+    // Never built, nothing of the plugin's runs; the wrapped adapter may still hold a server.
     try {
-      await (await this.inner).close();
+      await this.loaded?.close();
     } finally {
       await this.base?.close();
     }

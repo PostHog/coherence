@@ -1,8 +1,10 @@
 /**
  * What enforcement reads from `coherence.config.json`:
  *
- *   language   typescript (default) or python, or a list of both for a
- *              project that spans them: each file's language is chosen by
+ *   language   one of the languages the bundled plugins provide (the
+ *              defaults' primary, typescript, when absent), a language the
+ *              config declares, or one a plugin provides; or a list for a
+ *              project that spans several: each file's language is chosen by
  *              its extension, and the first listed is the primary (the one a
  *              single-language reading, such as Structure, reads)
  *   test       the test command: an argv array the filter is appended to,
@@ -44,12 +46,13 @@
 
 import { isAbsolute } from "node:path";
 import { isLanguage, LANGUAGES, type Language } from "../adapters/index.ts";
-import { declaredLanguageOf, readDeclaredLanguages, type DeclaredLanguage } from "../adapters/declared.ts";
+import { declaredLanguageOf, readDeclaredLanguages, type DeclaredLanguage } from "../adapters/declared-config.ts";
 import { languageOfFile } from "../adapters/language-files.ts";
 import { effectiveConfig, type SetupKey } from "../adapters/project-config.ts";
 import { FROM_FORM, parseFrom, type ChokepointFrom } from "../spec/grammar.ts";
 import type { LoadedPlugin } from "../plugins/plugin.ts";
 import { pluginLanguages, readPlugins } from "../plugins/registry.ts";
+import { defaultLanguage, registerProjectPlugins } from "../plugins/languages.ts";
 
 export { languageOfFile } from "../adapters/language-files.ts";
 
@@ -155,11 +158,16 @@ function testSetupOf(raw: Record<string, unknown>, path: string, where: string):
 }
 
 export function readEnforcementConfig(root: string): EnforcementConfig {
-  const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], declared: [], enforced: ["typescript"], plugins: [], provided: [], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined };
+  // A project whose config names no language reads the bundled defaults' primary one (plugins/defaults.json).
+  const primary = defaultLanguage();
+  const config: EnforcementConfig = { language: primary, languages: [primary], declared: [], enforced: [primary], plugins: [], provided: [], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined };
   config.tests = [{ language: undefined, files: undefined, cwd: undefined, test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] }];
   // The project's own config over its registry's keys (project-config.ts), each inherited path rebased to the project.
   const found = effectiveConfig(root);
-  if (found === undefined) return config;
+  if (found === undefined) {
+    registerProjectPlugins(root, []);
+    return config;
+  }
   const { record, path } = found;
   const declared = readDeclaredLanguages(record["languages"], path);
   // The plugins first: a language a plugin provides is one the language key may name.
@@ -170,6 +178,8 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   if (twice.length > 0) throw new Error(`${path}: ${twice.map((p) => `${p.name} is both declared under languages and provided by plugin ${p.plugin}`).join("; ")}; keep one`);
   config.plugins = read.plugins;
   config.provided = provided;
+  // A plugin that provides one of the core's languages takes its bundled one's place in every reading, as in every check.
+  registerProjectPlugins(root, read.plugins);
   const known = [...LANGUAGES, ...declared.map((d) => d.name), ...provided.map((p) => p.name)];
   const language = record["language"];
   if (language !== undefined) {

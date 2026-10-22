@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { after, before, test } from "node:test";
 import { projectFiles, walkBounds, walkedProjectFiles } from "./project-files.ts";
-import { pythonFiles } from "./python.ts";
+import { pythonFiles } from "../../plugins/python/python.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { sourceFiles } from "../economy/source.ts";
 import { collectFiles } from "../lifecycle/check.ts";

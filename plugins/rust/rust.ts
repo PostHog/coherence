@@ -49,10 +49,11 @@ import {
   type SiteForm,
   type StagedSite,
   type Visibility,
-} from "./adapter.ts";
-import { locateRustAnalyzer, type ServerLocation } from "./installed.ts";
-import { JsonRpcClient, RpcError } from "./jsonrpc.ts";
-import { keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
+} from "../../src/adapters/adapter.ts";
+import { locateRustAnalyzer, type ServerLocation } from "../../src/adapters/installed.ts";
+import manifest from "./plugin.json" with { type: "json" };
+import { JsonRpcClient, RpcError } from "../../src/adapters/jsonrpc.ts";
+import { keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/adapters/project-files.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control when the server is quiescent. */
 export interface RustLanguageClient {
@@ -82,14 +83,8 @@ const COMPILER = "the compiler (rustc)";
  * the compiler constrains nothing a single-crate project could break, and
  * Coherence's own check is the enforcer.
  */
-export const RUST_LADDER: Ladder = {
-  top: "visibility-choked",
-  because: "rustc refuses a path to an item from outside its visibility scope (private: its module and descendants; pub(super)/pub(in …): that module's subtree), so an item whose effective visibility stops short of the crate cannot be referenced from outside that scope",
-  rungs: [
-    { grade: "visibility-choked", enforcer: COMPILER, fact: "the protected item's effective visibility (its own and every enclosing module's) stops short of the crate root, so rustc refuses any reference from outside that scope" },
-    { grade: "reference-choked", enforcer: COHERENCE_ENFORCER, fact: "the item is pub(crate) or pub and reachable crate-wide, and every resolved reference in the workspace is inside the chokepoint" },
-  ],
-};
+/** The ladder, as this plugin's manifest declares it for the core to read without loading this module. */
+export const RUST_LADDER: Ladder = manifest.ladder as Ladder;
 
 /** Where rust-analyzer is, with every place looked. */
 export function locateServer(root: string): ServerLocation {

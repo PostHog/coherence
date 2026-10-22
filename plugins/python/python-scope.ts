@@ -5,8 +5,8 @@
  * through INTERFACE_SYNTAX, kept-answers.ts through KEPT_MODULES).
  */
 
-import { resolveDotted } from "../../adapters/python.ts";
-import type { InterfaceSyntax } from "./component-interfaces.ts";
+import { resolveDotted } from "./python.ts";
+import type { InterfaceSyntax } from "../../src/readings/scope/component-interfaces.ts";
 
 /** A Python import statement, a parenthesized list or one logical line: `import a as b`, `from m import (a as b, c)`. */
 const PY_IMPORT = /^[ \t]*(?:from\s+\S+\s+)?import\s+(\([^)]*\)|[^\n]*(?:\\\n[^\n]*)*)/gm;

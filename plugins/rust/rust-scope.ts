@@ -5,7 +5,7 @@
  * kept-answers.ts through KEPT_MODULES).
  */
 
-import type { InterfaceSyntax } from "./component-interfaces.ts";
+import type { InterfaceSyntax } from "../../src/readings/scope/component-interfaces.ts";
 
 /** Rust is not read by this reading yet: no type-only declaration, default export, import list or glob use is read; rust-analyzer reads its Cargo workspace, so it takes no bounds. */
 export const RUST_INTERFACES: InterfaceSyntax = {

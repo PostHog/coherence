@@ -23,6 +23,8 @@
  * as conventions enforced by nobody.
  */
 
+import { testByLanguageName } from "../plugins/languages.ts";
+
 /** A position as the protocol counts it: zero-based line and character. */
 export interface Position {
   line: number;
@@ -295,10 +297,10 @@ export function outsideOfFolder(folder: string): string | undefined {
   return parent === "." ? "" : `${parent}/`;
 }
 
-/** Whether a project-relative path lies in a test folder or is a test file by name (`.test.ts`, `.spec.ts`, pytest's `test_*.py` and `*_test.py`). */
+/** Whether a project-relative path lies in a test folder or is a test file by name (`.test.ts`, `.spec.ts`, or a language plugin's own naming: pytest's `test_*.py` and `*_test.py`). */
 export function isTestPath(file: string, testFolders: readonly string[]): boolean {
   const parts = file.split("/");
   if (parts.some((part) => testFolders.includes(part))) return true;
   const base = parts[parts.length - 1] ?? "";
-  return /\.(test|spec)\.[a-z]+$/.test(base) || /^test_.*\.py$/.test(base) || /_test\.py$/.test(base);
+  return /\.(test|spec)\.[a-z]+$/.test(base) || testByLanguageName(base);
 }

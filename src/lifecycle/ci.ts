@@ -24,6 +24,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { registryOf, repositoryTop } from "../adapters/project-config.ts";
+import { ciNotes } from "../plugins/languages.ts";
 import type { Io } from "../journal/cli.ts";
 import { isCoherenceItself, PACKAGE_NAME } from "./project.ts";
 import { LOCKFILES, type PackageManager as AnyManager } from "./lockfiles.ts";
@@ -116,8 +117,8 @@ export interface CiPlan {
   versionDeclared: boolean;
   /** The Node.js version file at the install folder (.nvmrc or .node-version), relative to the top, when there is one. */
   nodeVersionFile: string | undefined;
-  /** Whether any of the projects reads Python, whose project checkers the workflow does not install. */
-  python: boolean;
+  /** What the workflow says for the languages the projects read: each a language plugin's note (a Python checker the workflow does not install). */
+  notes: string[];
 }
 
 function realOr(path: string): string {
@@ -167,11 +168,10 @@ function upTo(from: string, top: string): string[] {
   }
 }
 
-/** Whether a config at `dir` (or the registry's keys) names Python among its languages. */
-function readsPython(dir: string): boolean {
-  const config = readJson(join(dir, "coherence.config.json"));
-  const language = config?.["language"];
-  return language === "python" || (Array.isArray(language) && language.includes("python"));
+/** The languages a config at `dir` names, as its language key lists them. */
+function languagesNamed(dir: string): string[] {
+  const language = readJson(join(dir, "coherence.config.json"))?.["language"];
+  return typeof language === "string" ? [language] : Array.isArray(language) ? language.filter((l): l is string => typeof l === "string") : [];
 }
 
 /**
@@ -214,7 +214,7 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
   const versionDeclared = declaresVersion(readJson(join(lock.dir, "package.json")), lock.manager);
   const versionFile = [".nvmrc", ".node-version"].find((name) => existsSync(join(lock.dir, name)));
   const projects = registry === undefined ? undefined : registry.leaves.map((leaf) => slash(relative(top, leaf)));
-  const python = readsPython(top) || readsPython(at) || (registry?.leaves ?? []).some(readsPython);
+  const notes = ciNotes([...languagesNamed(top), ...languagesNamed(at), ...(registry?.leaves ?? []).flatMap(languagesNamed)]);
   return {
     host,
     mode,
@@ -225,7 +225,7 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
     installDir: slash(relative(top, lock.dir)),
     versionDeclared,
     nodeVersionFile: versionFile === undefined ? undefined : slash(relative(top, join(lock.dir, versionFile))),
-    python,
+    notes,
   };
 }
 
@@ -292,7 +292,7 @@ export function workflowText(plan: CiPlan): string {
     `        run: ${install}`,
     "",
   );
-  if (plan.python) add("      # A chokepoint graded by a Python checker the project runs (tach, import-linter) needs that checker here: install the project's Python tools before the check.", "");
+  for (const note of plan.notes) add(`      # ${note}`, "");
   const where = plan.workdir === "." ? [] : [`        working-directory: ${plan.workdir}`];
   if (!comment) {
     add(
