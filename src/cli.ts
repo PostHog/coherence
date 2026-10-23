@@ -242,7 +242,7 @@ async function lexiconCommand(call: CommandCall, args: string[], root: string): 
   call.stdout.write(compact);
   const estimate = tokenEstimate(compact);
   let note = "";
-  const within = renderCompactWithin(coherence, project, CONTEXT_BUDGET, "coherence", true, () => true, named, VOCABULARY_TOKENS);
+  const within = renderCompactWithin(coherence, project, CONTEXT_BUDGET, "coherence", await isCoherenceItself(root), () => true, named, VOCABULARY_TOKENS);
   if (within.delivered.name > 0 || within.delivered.out > 0) {
     note = `; the start injection presents at most ${VOCABULARY_TOKENS} tokens of it, so alone it would go ${deliveredText(within.delivered)} (~${tokenEstimate(within.text).tokens} tokens)`;
   }

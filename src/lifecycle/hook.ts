@@ -824,8 +824,10 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const practices = practiceOrientText(root, commands);
   const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await copyBlock(root)}\n${await sessionBlock(root, input)}`;
   // The vocabulary in the order the journal last named it, so the host's budget trims what the work has not named for longest.
-  const named = lastNamed(loadJournal(root).records, [...coherence.concepts, ...(project?.concepts ?? [])]);
-  const { text, delivered } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root), pluginsInUse(root, coherence), named, VOCABULARY_TOKENS);
+  const own = await isCoherenceItself(root);
+  // In an adopter Coherence's own concepts are not ranked, so the journal is read only for the concepts that are.
+  const named = lastNamed(loadJournal(root).records, [...coherence.concepts.filter((c) => own || c.layer !== undefined), ...(project?.concepts ?? [])]);
+  const { text, delivered } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), own, pluginsInUse(root, coherence), named, VOCABULARY_TOKENS);
   return { text: head + text + tail, vocabulary: text, delivered, coverage: reading };
 }
 

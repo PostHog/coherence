@@ -323,6 +323,9 @@ test("an open escalation that cites a decision and a work order names each by id
 test("the start injection stays under the budget with escalations present: the vocabulary decays from its least recently named concept, to names and then to a pointer, and no escalation is shortened", async () => {
   const dir = await freshRoot();
   try {
+    // The project's vocabulary: sixty parts no record names, then the vertebra every escalation names.
+    const part = (i: number) => ({ name: `part${i}`, definition: `The ${i}th part of the widgetry, described at some length so that its line is long. More follows.` });
+    await writeFile(join(dir, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, rejected: [], concepts: [...Array.from({ length: 60 }, (_, i) => part(i)), { name: "vertebra", definition: "One bone of the spine the owner alone may retire." }] }));
     const io = { cwd: dir, out: () => {}, err: () => {} };
     const ids: string[] = [];
     const what = (n: number): string => `retire invariant ${n}: ${"the chokepoint no longer reflects how the store is reached and a human must weigh the reliance listing ".repeat(4)}`;
@@ -334,10 +337,12 @@ test("the start injection stays under the budget with escalations present: the v
     const context = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
     assert.ok(context.length <= CONTEXT_BUDGET, `${context.length} characters against a budget of ${CONTEXT_BUDGET}`);
     for (let n = 0; n < 8; n += 1) assert.ok(context.includes(`▲ ${ids[n]}  scope  ${what(n)} — only the owner can retire a vertebra, and this is the ${n}th`), `escalation ${n} is shown whole`);
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts, most recently named first; use these names when you mean Coherence's concepts\):\n/m, "Coherence's layer in the order the journal last named it");
-    assert.match(context, /^(Named only here \(full entries: [^)]*\): |\d+ more, the least recently named: )/m, "the vocabulary decayed: not every concept keeps its line");
-    const vocabulary = context.slice(context.indexOf("Coherence vocabulary"));
-    for (const recent of ["chokepoint", "reliance"]) assert.ok(vocabulary.search(new RegExp(`\\b${recent}\\b`)) < vocabulary.search(/\bgyroscope\b/) || !/\bgyroscope\b/.test(vocabulary), `${recent}, which the escalations name, is kept ahead of gyroscope, which no record names`);
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts; use these names when you mean Coherence's concepts\):\n\d+ more: /m, "in an adopter Coherence's layer is not ranked, and its names go before any of the project's");
+    assert.match(context, /^Widgetry vocabulary \(61 concepts, most recently named first; [^)]*\):\n/m, "the project's layer in the order the journal last named it");
+    assert.match(context, /^(Named only here \(full entries: [^)]*\): |\d+ more, the least recently named: )/m, "the project's vocabulary decayed: not every concept keeps its line");
+    const vocabulary = context.slice(context.indexOf("Widgetry vocabulary"));
+    assert.ok(/^- vertebra: /m.test(vocabulary), "the vertebra, which the escalations name, keeps its whole line");
+    assert.ok(vocabulary.search(/\bvertebra\b/) < vocabulary.search(/\bpart59\b/) || !/\bpart59\b/.test(vocabulary), "the vertebra is kept ahead of part59, which no record names");
     assert.match(context, /\nSession: s-budget\n/, "the session block still rides along");
 
     // More escalations, until even the names do not fit: the vocabulary gives way to one line that points at the lexicon command.
@@ -362,7 +367,8 @@ test("the start injection stays under the budget with escalations present: the v
       const light = contextOf(await runHook("SessionStart", { cwd: one, session_id: "s-light" }, one));
       assert.ok(light.length <= CONTEXT_BUDGET);
       assert.match(light, /^Escalations awaiting a human \(1\)/);
-      assert.match(light, /^- invariant: /m, "with room to spare the vocabulary keeps its lines, from the head of its order");
+      assert.match(light, /^Coherence vocabulary \(\d+ concepts; use these names when you mean Coherence's concepts\):\nNamed only here \(full entries: [^)]*\): invariant, requirement, /m, "with room to spare an adopter still sees Coherence's concepts by name alone, in the file's order");
+      assert.doesNotMatch(light, /^- invariant: /m, "and never their whole lines");
     } finally {
       await rm(one, { recursive: true, force: true });
     }
@@ -370,7 +376,7 @@ test("the start injection stays under the budget with escalations present: the v
     // No escalation and a project lexicon long enough that the host's budget would leave the vocabulary more than its own bound: the bound decides.
     const roomyRoot = await freshRoot();
     try {
-      await writeFile(join(roomyRoot, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, rejected: [], concepts: Array.from({ length: 40 }, (_, i) => ({ name: `thing${i}`, definition: `The ${i}th thing, described at some length so that the line is long. A second sentence follows.` })) }));
+      await writeFile(join(roomyRoot, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, rejected: [], concepts: Array.from({ length: 70 }, (_, i) => ({ name: `thing${i}`, definition: `The ${i}th thing, described at some length so that the line is long. A second sentence follows.` })) }));
       const roomy = await startReading(roomyRoot);
       assert.ok(roomy.text.includes(roomy.vocabulary));
       assert.ok(tokenEstimate(roomy.vocabulary).tokens <= VOCABULARY_TOKENS, `with room to spare the vocabulary still presents at most ${VOCABULARY_TOKENS} tokens: ${tokenEstimate(roomy.vocabulary).tokens}`);

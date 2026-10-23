@@ -110,7 +110,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: memory-budget dismissed: the bound is on the injected text, not on allocation
   checklist: execution-budget dismissed: no steps are counted
   checklist: circuit-breaker-policy dismissed: no dependency failures are observed
-- the vocabulary is kept most recently named first: The start injection orders every concept of every shown layer protected first, then by the latest journal record naming it, then in its file's order, and keeps the head of that order: the most that fit keep their names, and of those the most that fit keep their whole lines, so the host's budget trims what the work has not named for longest and a protected concept goes last.
+- the vocabulary is kept most recently named first: The start injection orders every concept of every ranked layer (every shown layer, less Coherence's own in an adopter) protected first, then by the latest journal record naming it, then in its file's order, and keeps the head of that order: the most that fit keep their names, and of those the most that fit keep their whole lines, so the host's budget trims what the work has not named for longest and a protected concept goes last.
   over: every concept of Coherence's lexicon, each shown plugin layer and the project's, protected or not, named by a record or never
   via: renderCompactWithin keeps the vocabulary most recently named first: the host's budget trims the least recently named, to its name and then out, and a protected concept goes last
   because: the owner: "no cap and sort it by most recently used/touched. this will allow implicit decay while still allowing specific concepts to be protected even when they're obscure" (d-2b4c96a2). Stepping a whole layer down at once hid every concept's line, the one the session was working with among them, to make room for one more
@@ -121,6 +121,18 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: redaction dismissed: the order reads record times and concept names, and writes no record text into the injection
   checklist: commit-ordered-effects dismissed: nothing is committed; the order is computed and dropped with the injection
   checklist: circuit-breaker-policy dismissed: no dependency is sampled; an unreadable journal is the same failure every start reading already has
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
+- an adopter's window is the project's: In an adopter the start injection shows Coherence's own concepts as one line of names in their file's order, never whole and never ranked by the journal, after every ranked concept, and keeps that line only while every project and plugin concept keeps its whole line and the line still fits; otherwise it counts them out. In Coherence's own repository its concepts are ranked with the rest.
+  over: an adopter with a project lexicon, room for everything, room one character short of it, and a journal naming Coherence's concepts more recently than the project's; Coherence's own repository with the same journal
+  via: renderCompactWithin in an adopter gives the window to the project: Coherence's own concepts are one line of names in the file's order, never ranked by the journal, and the first to go
+  because: the owner, on Coherence's lexicon taking 1,979 of 1,999 tokens in an adopter with no lexicon of its own: "that's probably unnecessary ... do that" (d-980480e2). An adopter's records name Coherence's concepts in nearly every record, so recency would rank the tool's vocabulary over the project's; the practices and hook messages that need Coherence's terms carry them, and the lexicon command has the full entries
+  crossing: project-source -> reading
+  refuted: made renderCompactWithin rank Coherence's own concepts with the project's by the journal in an adopter, as before -> "renderCompactWithin in an adopter gives the window to the project: Coherence's own concepts are one line of names in the file's order, never ranked by the journal, and the first to go" went red in lexicon.test.ts; restored, green (2026-10-23)
+  kinds: output
+  checklist: destination-confinement dismissed: the names line is part of the one injection, which goes to the host's additionalContext and follows no redirect
+  checklist: redaction dismissed: the line carries concept names from Coherence's own lexicon file and nothing from the adopter's records
+  checklist: commit-ordered-effects dismissed: nothing is committed; the line is computed and dropped with the injection
+  checklist: circuit-breaker-policy dismissed: no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
 - a concept is dated by the latest record naming it: When the journal last named a concept is the time of the newest record whose prose writes its name, an alias or an instance as whole words, singular or plural, across line breaks; a record's ids, citations, paths and states never name one.
   over: every journal record kind, and every concept of every layer

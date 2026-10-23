@@ -30,7 +30,7 @@ export interface Concept {
   related: string[];
   /** The plugin whose lexicon layer brought the concept (src/plugins/lexicon.ts); absent for Coherence's own and the project's. */
   layer?: string;
-  /** Kept whole at the head of the injection however long since the journal last named it (`"protected": true` in the file). */
+  /** First in the injection's order however long since the journal last named it, so the last to lose its whole line or its name (`"protected": true` in the file); in an adopter Coherence's own concepts are names alone, protected or not. */
   protected?: boolean;
 }
 
@@ -329,7 +329,7 @@ export interface Delivered {
 export function deliveredText(delivered: Delivered): string {
   if (delivered.name === 0 && delivered.out === 0) return "whole";
   if (delivered.whole === 0 && delivered.name === 0) return "as a pointer to the lexicon command";
-  return `${delivered.whole} whole, ${delivered.name} by name only, ${delivered.out} left out, the least recently named first to go`;
+  return `${delivered.whole} whole, ${delivered.name} by name only, ${delivered.out} left out`;
 }
 
 /** The one line that stands in for the vocabulary when nothing else fits. */
@@ -355,13 +355,13 @@ function capitalize(text: string): string {
   return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1);
 }
 
-/** One layer's concepts as shown: whole lines in order, then the names alone, then how many are left out. */
-function layerLines(concepts: readonly Concept[], show: (concept: Concept) => Shown, cli: string): string[] {
+/** One layer's concepts as shown: whole lines in order, then the names alone, then how many are left out (the least recently named, when the layer is in recency order). */
+function layerLines(concepts: readonly Concept[], show: (concept: Concept) => Shown, cli: string, recency = true): string[] {
   const lines = concepts.filter((c) => show(c) === "whole").map(renderConcept);
   const named = concepts.filter((c) => show(c) === "name").map((c) => c.name);
   if (named.length > 0) lines.push(`Named only here (full entries: ${cli} lexicon): ${named.join(", ")}`);
   const out = concepts.filter((c) => show(c) === "out").length;
-  if (out > 0) lines.push(`${out} more, the least recently named: ${cli} lexicon`);
+  if (out > 0) lines.push(`${out} more${recency ? ", the least recently named" : ""}: ${cli} lexicon`);
   return lines;
 }
 
@@ -386,9 +386,10 @@ export function renderCompact(
   const order = lastNamed.size > 0 ? ", most recently named first" : "";
   // In Coherence's own repository its rejected names are defects everywhere; in an adopter they bind only where Coherence's concepts are named.
   const rule = own ? "rejected names are defects" : "use these names when you mean Coherence's concepts";
-  const mine = byRecency(coherence.concepts.filter((c) => c.layer === undefined), lastNamed);
-  lines.push(`Coherence vocabulary (${mine.length} concepts${order}; ${rule}):`);
-  lines.push(...layerLines(mine, show, cli));
+  // In an adopter Coherence's own concepts keep the file's order: the journal there names them in every record, so recency would rank the tool's vocabulary over the project's.
+  const mine = byRecency(coherence.concepts.filter((c) => c.layer === undefined), own ? lastNamed : new Map());
+  lines.push(`Coherence vocabulary (${mine.length} concepts${own ? order : ""}; ${rule}):`);
+  lines.push(...layerLines(mine, show, cli, own));
   // Each plugin's layer under its own header, between Coherence's and the project's; one whose surface the caller says is out of the way is left out.
   for (const layer of coherence.layers ?? []) {
     if (!shown(layer.name)) continue;
@@ -417,8 +418,11 @@ export function renderCompact(
  * those, the most that fit keep their whole lines, from the head again. A
  * concept the journal has not named for longest decays first, to its name
  * and then out, and a protected one goes last; among concepts no record
- * tells apart, Coherence's own decay before a plugin's and the project's.
- * When no name fits, one line points at the lexicon command (`cli` names
+ * tells apart, the project's outlast a plugin's, and a plugin's outlast
+ * Coherence's own. In an adopter (`own` false) Coherence's own concepts are
+ * not ranked at all: the window is the project's, so they are one line of
+ * names after everything ranked, shown only while every ranked concept is
+ * whole and they still fit, and otherwise counted out. When no name fits, one line points at the lexicon command (`cli` names
  * it); that line is returned even when it does not fit, so the caller always
  * has something to inject.
  */
@@ -432,17 +436,20 @@ export function renderCompactWithin(
   lastNamed: LastNamed = new Map(),
   maxTokens = Number.POSITIVE_INFINITY,
 ): { text: string; delivered: Delivered } {
-  // Concepts no record tells apart keep this order: the project's first, whose rejected names bind in all of its text, then each shown plugin's, then Coherence's, whose names bind in an adopter only where Coherence's concepts are named.
+  // In an adopter Coherence's own concepts are not ranked: they are names alone, after everything ranked, kept only while every ranked concept is whole (d-980480e2).
+  const mine = own ? [] : coherence.concepts.filter((c) => c.layer === undefined);
+  // Concepts no record tells apart keep this order: the project's first, whose rejected names bind in all of its text, then each shown plugin's, then Coherence's in its own repository.
   const visible = [
     ...(project?.concepts ?? []),
     ...coherence.concepts.filter((c) => c.layer !== undefined && shown(c.layer)),
-    ...coherence.concepts.filter((c) => c.layer === undefined),
+    ...(own ? coherence.concepts.filter((c) => c.layer === undefined) : []),
   ];
   const all = byRecency(visible, lastNamed);
   const rank = new Map(all.map((c, i) => [c, i]));
-  const render = (kept: number, whole: number): string =>
+  const render = (kept: number, whole: number, names = false): string =>
     renderCompact(coherence, project, own, shown, lastNamed, (c) => {
-      const at = rank.get(c) ?? all.length;
+      const at = rank.get(c);
+      if (at === undefined) return names ? "name" : "out";
       return at < whole ? "whole" : at < kept ? "name" : "out";
     }, cli);
   // The largest n in [0, max] whose render fits, scanning down: a count does not always lengthen the text (a layer's first name adds its "named only" line, its last one drops a "more" line), so a bisection could stop short.
@@ -451,10 +458,14 @@ export function renderCompactWithin(
     return 0;
   };
   const fits = (text: string): boolean => text.length <= maxChars && tokenEstimate(text).tokens <= maxTokens;
+  if (mine.length > 0) {
+    const withNames = render(all.length, all.length, true);
+    if (fits(withNames)) return { text: withNames, delivered: { whole: all.length, name: mine.length, out: 0 } };
+  }
   const kept = largest(all.length, (n) => fits(render(n, 0)));
-  if (kept === 0 && all.length > 0) return { text: renderPointer(cli), delivered: { whole: 0, name: 0, out: all.length } };
+  if (kept === 0 && all.length + mine.length > 0) return { text: renderPointer(cli), delivered: { whole: 0, name: 0, out: all.length + mine.length } };
   const whole = kept < all.length ? 0 : largest(kept, (n) => fits(render(kept, n)));
-  return { text: render(kept, whole), delivered: { whole, name: kept - whole, out: all.length - kept } };
+  return { text: render(kept, whole), delivered: { whole, name: kept - whole, out: all.length - kept + mine.length } };
 }
 
 /** The token estimate used throughout: bytes divided by four. */

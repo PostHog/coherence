@@ -206,6 +206,32 @@ test("renderCompactWithin keeps the vocabulary most recently named first: the ho
   assert.equal(deliveredText(renderCompactWithin(coherence, undefined, 1_000_000).delivered), "whole", "without a project and with room, every concept whole");
 });
 
+test("renderCompactWithin in an adopter gives the window to the project: Coherence's own concepts are one line of names in the file's order, never ranked by the journal, and the first to go", () => {
+  const widgets = parseLexicon(
+    { project: "widgetry", version: 0, concepts: Array.from({ length: 12 }, (_, i) => ({ name: `widget${i}`, definition: `The ${i}th widget, described at some length so that the line is long. More follows.` })) },
+    "widgetry.json",
+  );
+  // The adopter's journal names Coherence's journal and invariant more recently than any widget, as its records do.
+  const named = new Map([["journal", "2026-10-23T12:00:00.000Z"], ["invariant", "2026-10-23T11:00:00.000Z"], ["widget7", "2026-10-23T10:00:00.000Z"]]);
+  const all = widgets.concepts.length;
+  const mine = coherence.concepts.length;
+
+  const roomy = renderCompactWithin(coherence, widgets, 1_000_000, "coherence", false, () => true, named);
+  assert.deepEqual(roomy.delivered, { whole: all, name: mine, out: 0 }, "every project concept whole, every Coherence concept by name alone");
+  assert.match(roomy.text, /^Coherence vocabulary \(2 concepts; use these names when you mean Coherence's concepts\):\nNamed only here \(full entries: coherence lexicon\): invariant, journal\n/, "Coherence's own in the file's order, not the journal's, and no whole line");
+  assert.match(roomy.text, /^Widgetry vocabulary \(12 concepts, most recently named first; [^\n]*\n- widget7: /m, "the project's layer ranked by the journal");
+
+  // One character short: Coherence's names go, counted, before any project concept loses its line.
+  const short = renderCompactWithin(coherence, widgets, roomy.text.length - 1, "coherence", false, () => true, named);
+  assert.deepEqual(short.delivered, { whole: all, name: 0, out: mine }, JSON.stringify(short.delivered));
+  assert.match(short.text, /^Coherence vocabulary \(2 concepts; [^\n]*\n2 more: coherence lexicon\n/);
+
+  // In Coherence's own repository the same journal ranks Coherence's concepts with the rest, whole.
+  const itself = renderCompactWithin(coherence, widgets, 1_000_000, "coherence", true, () => true, named);
+  assert.deepEqual(itself.delivered, { whole: all + mine, name: 0, out: 0 });
+  assert.match(itself.text, /^- journal: /m);
+});
+
 test("lastNamed: the latest record naming each concept by name, alias or plural in its prose, never in an id or a path", () => {
   const record = (at: string, chose: string, extra: Record<string, unknown> = {}) => ({ kind: "decision", id: `d-${at.slice(11, 13)}000000`, at, session: "s", agent: "a", chose, over: "", because: "", ...extra });
   const widget = parseLexicon({ concepts: [{ name: "widget", definition: "A thing.", aliases: ["gadget"] }, { name: "trust level", definition: "A level." }, { name: "sprocket", definition: "Never named." }] }, "w.json");
