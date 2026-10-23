@@ -82,22 +82,56 @@ These stay their own slots, since each is a feature of a tool or framework
 rather than a reading of the language: entrance rules (`candidates`,
 `manifestCandidates`), `notice`, `lists` and `boundaries`.
 
-## No silent reading
+## Every plugin has a spec
 
-- **Every reading is read or declined.** `plugin.json` gains `declines`:
-  `{ "<reading>": "<why>" }`. A model method a plugin leaves out is refused at
-  load unless its reading is declined, and a declined reading is said at
-  session start and counted in mass's "not read" line as a gap, as an
-  undeclared entrance is. `NO_SOURCE` and `NO_INTERFACES` go; `notScanned`
-  becomes a decline of every reading.
-- **The sample project proves each reading.** `check.json` gains
-  expectations: the items a file declares, the files an import resolves to,
-  the entrances detected, the files and reach mass reports. `plugin check`
-  grades each and prints a table: read and proven, read and unproven, or
-  declined with why. An unproven reading fails the check.
-- **The bundled plugins decline nothing without a spec bullet.** A
-  structural test fails on a bundled plugin's decline that no bullet of
-  `src/plugins/Plugins.spec.md` names with its reason.
+A plugin is a component, and a component without a spec is one Coherence
+cannot hold to anything. So no plugin loads without one: a plugin folder
+carries `<Name>.spec.md` beside its `plugin.json`, and the loader refuses a
+plugin whose spec is missing or lacks a bullet its manifest calls for, as it
+refuses two plugins for one language today, naming what to write.
+
+Because the shape of a plugin is known, so are the bullets it owes. Each role
+it provides, and each reading its model gives, calls for one bullet of a known
+kind, and each reading it leaves out calls for a decline:
+
+| The plugin provides | The bullet it owes | Proved by |
+|---|---|---|
+| a language (`extensions`, file rule) | its files are read and no others | `[plugin files]`: `check.json` `language` |
+| an adapter | every reference to a protected thing is found, and a chokepoint's bypasses named | `[plugin references]`, `[plugin chokepoint]` |
+| `items` | the items a file declares, top level or not, exported or not | `[plugin items]`: `check.json` `declarations` |
+| `imports` and `resolve` | an import joins the file, or the module, it names | `[plugin imports]`: `check.json` `imports` (new) |
+| entrance rules | the sample project's entrances are found, by name | `[plugin entrances]`: `check.json` `entrances` (new) |
+| `boundaries` | the tool's declared boundaries are read | `[plugin boundaries]`: `check.json` `boundaries` (new) |
+| a verifier form | the form passes a true name and fails a false one | `[plugin <form>]`: both, from `check.json` |
+| a lexicon layer | its terms clash with none of Coherence's | `[plugin lexicon]` |
+| a reading left out | a decline: the reading, and why | a `## declines` bullet with `because:` |
+
+`declines` lives in the spec, not the manifest: a decline is a claim about
+the plugin, said where its other claims are, and the loader reads which
+readings a plugin gives from the module and which it declines from the spec.
+A reading neither given nor declined refuses the load.
+
+- **The bullets are written for the author.** `coherence scaffold plugin
+  <dir>` reads the manifest and module and writes the spec: one bullet per
+  role and reading, each with its `via: [plugin ...]`, and one decline per
+  reading left out with `because: TODO`, which the loader refuses until it
+  says why.
+- **The proof is the plugin's own sample project.** `[plugin ...]` is a via
+  form Coherence itself proves (the verifier role), graded over
+  `check.json` as `plugin check` grades its duties today. A plugin needs no
+  test runner of its own to be proved, and its bullets grade in the run of
+  whichever project holds it: Coherence's run for the bundled plugins, the
+  project's for a plugin by path.
+- **Each bullet is refuted mechanically.** The shape that tells Coherence
+  what a bullet must be also tells it how to break the bullet: swap the
+  reading for its empty answer (no items, no imports, an adapter that reports
+  nothing) and the bullet must go red. One that stays green proves nothing,
+  and the plugin is refused: this is the check that a plugin which "does
+  almost nothing" fails, however many slots it fills.
+- **Nothing is read silently.** A declined reading is said at session start
+  and counted in mass's "not read" line as a gap, as an undeclared entrance
+  is. `NO_SOURCE` and `NO_INTERFACES` go; `notScanned` becomes a decline of
+  every reading.
 - **The core names no language.** A structural test fails on a language's
   layout word (`Cargo.toml`, `src/bin`, `__init__.py`, `go.mod`...) in a core
   module outside the language table, so knowledge of one language stays in
@@ -110,6 +144,11 @@ as they do today, and the session start names what changed. Each bundled
 plugin then moves in its own commit, with the same answers before and after
 on a real project:
 
+0. The spec requirement first, on interface 2: it does not wait for the
+   model. Each bundled plugin gets its spec (the bullets about one plugin in
+   `src/plugins/Plugins.spec.md` move into it), keyed to today's slots, and
+   the requirement holds third-party plugins from the release after, with a
+   session-start notice in between.
 1. Rust first: `rust-source.ts` is already the model (`itemOf`,
    `manifestOf`, `binaryOf`, `codeOnly`, `testRanges`).
 2. TypeScript and Python, which fill every slot today; the derived answers
