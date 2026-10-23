@@ -14,7 +14,7 @@ import { computeMass, formatMass } from "../economy/mass.ts";
 import { declarationsOf, importsOf } from "../economy/source.ts";
 import { declares } from "../observation/interfaces.ts";
 import { isTypeDeclaration } from "../readings/scope/component-interfaces.ts";
-import { RUST_INTERFACES, rustKeptModules } from "../../plugins/rust/rust-scope.ts";
+import { RUST_INTERFACES } from "../../plugins/rust/rust-scope.ts";
 import { uncommented, useLeaves } from "../../plugins/rust/rust-source.ts";
 
 const madeFolders: string[] = [];
@@ -99,7 +99,7 @@ test("a Rust path resolves by its crate's folder layout: crate, self, super and 
   assert.ok(!api.some((line) => line.includes("serde")), "a path into a crate outside the workspace resolves to nothing");
   assert.ok(!api.some((line) => line.includes("hiargs")), "HiArgs is an item of the crate root, never the module file hiargs.rs, on any disk");
   assert.deepEqual(imports("tool/main.rs", "mod flags;\nuse shop_core::store::seal;\nuse ::shop_core::api::render;\n"), ["seal <- crates/shop/src/store/mod.rs", "render <- crates/shop/src/api.rs", "* <- tool/flags/mod.rs"], "a workspace crate by its package name, - read as _; a [[bin]] root's module beside it");
-  assert.deepEqual(rustKeptModules("crates/shop/src/api.rs", "use crate::store::rows::*;\n"), ["crates/shop/src/store/rows.rs", "crates/shop/src/store/rows/mod.rs"], "a glob names its module in both layouts");
+  assert.deepEqual(RUST_INTERFACES.wildcardModules("crates/shop/src/api.rs", "use crate::store::rows::*;\n"), ["crates/shop/src/store/rows.rs", "crates/shop/src/store/rows/mod.rs"], "a glob names its module in both layouts");
 });
 
 test("mass reads a Rust project as it reads the other languages: its files counted, reach followed through its use trees and mod declarations, and no language named not read", () => {

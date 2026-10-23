@@ -350,10 +350,33 @@ export function languageDataTable(): Record<string, { rules: EntranceRule[]; not
   const table: Record<string, { rules: EntranceRule[]; notDetected?: string; notScanned?: string }> = {};
   for (const { language } of providers()) {
     const entrances = fieldOf(language, "entrances");
-    const reason = fieldOf(language, "notScanned");
+    // A plugin that fills no source slot reads no text of its language: said, never read as an empty project.
+    const reason = fieldOf(language, "notScanned") ?? (fillsSlot(language, "source") ? undefined : `the ${language} plugin fills no source slot, so no text scan reads ${language}'s declarations or imports`);
     table[language] = { rules: [...entranceRules(language)], ...(entrances === undefined ? {} : { notDetected: entrances.notDetected }), ...(reason === undefined ? {} : { notScanned: reason }) };
   }
   return table;
+}
+
+/** Whether a base name is a file besides source some language's answers and entrances rest on: its configuration, a manifest or a lockfile, as each plugin names them (basisFiles). */
+export function isBasisFile(name: string): boolean {
+  return providers().some(({ language }) => (fieldOf(language, "basisFiles") ?? []).some((pattern) => regex(pattern).test(name)));
+}
+
+/** The folder a module file owns (a package's __init__.py, a Rust mod.rs, a crate root), as its language's plugin says (moduleFolders); undefined when the file owns none. */
+export function moduleFolderOf(file: string): string | undefined {
+  for (const { language } of providers()) {
+    for (const pattern of fieldOf(language, "moduleFolders") ?? []) {
+      const owned = regex(pattern).exec(file)?.[1];
+      if (owned !== undefined) return owned;
+    }
+  }
+  return undefined;
+}
+
+/** Whether any plugin answering for the language fills the slot, read from the manifests alone: the swap, the provider, or a plugin that extends it. */
+export function fillsSlot(language: string, slot: SyntaxSlot): boolean {
+  const filled = (p: LoadedPlugin | undefined): boolean => p?.manifest.syntax?.[slot] !== undefined;
+  return filled(swapsNow().get(language)) || filled(baseProvider(language)) || extendersOf(language).some(filled);
 }
 
 /** How the language's exported type bodies read, for the lexicon's member scan; undefined when its plugin says nothing. */
@@ -438,6 +461,37 @@ function slotExport(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
     slots.set(key, module[name]);
   }
   return slots.get(key);
+}
+
+/**
+ * The answers a plugin gives twice: each pair of its slots' functions (a slot
+ * that is a function, or a function of a slot's table) that are one function,
+ * or two spelled alike. Two slots answering one question in two places is
+ * how a plugin's answers drift apart: the question belongs to one slot. A
+ * function that answers a constant (`() => false`) is no answer to repeat.
+ */
+export function repeatedAnswers(plugin: LoadedPlugin): string[] {
+  const answers: { at: string; fn: Function; text: string }[] = [];
+  const add = (at: string, value: unknown): void => {
+    if (typeof value !== "function") return;
+    // The text past the function's own name, white space dropped: two functions spelled alike read alike under any name.
+    const text = value.toString().replace(/^[^(]*/, "").replace(/\s+/g, "");
+    if (/^\([\w,]*\)=>(?:false|true|undefined|\[\]|""|0|\{\})$/.test(text)) return;
+    answers.push({ at, fn: value, text });
+  };
+  for (const slot of Object.keys(plugin.manifest.syntax ?? {}) as SyntaxSlot[]) {
+    const value = slotExport(plugin, slot);
+    if (typeof value === "function") add(slot, value);
+    else if (value !== null && typeof value === "object") for (const [key, field] of Object.entries(value)) add(`${slot}.${key}`, field);
+  }
+  const repeated: string[] = [];
+  for (let i = 0; i < answers.length; i++)
+    for (let j = i + 1; j < answers.length; j++) {
+      const [a, b] = [answers[i]!, answers[j]!];
+      if (a.fn === b.fn) repeated.push(`${a.at} and ${b.at} are one function`);
+      else if (a.text === b.text) repeated.push(`${a.at} and ${b.at} are spelled alike`);
+    }
+  return repeated;
 }
 
 /** Every module the core's language plugins answer from, by absolute path: their adapter modules and the modules their syntax slots name. */

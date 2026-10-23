@@ -216,7 +216,7 @@ reading first asks for that slot:
 |---|---|---|
 | `entrances` | entrance detection | `EntranceSyntax` |
 | `interfaces` | the Structure reading | `InterfaceSyntax` |
-| `kept` | the Structure reading's kept answers | `(file, text) => string[]` |
+| `kept` | the Structure reading's kept answers, when filled; else `interfaces.wildcardModules` | `(file, text) => string[]` |
 | `source` | the economy and mass | `SourceSyntax` |
 | `declares` | the observation's interface map | `(line) => "type" \| "value" \| "body" \| "unknown"` |
 | `notice` | the session start | `(root) => string` |
@@ -232,7 +232,21 @@ the plugin knows a better one than its symbol gives (a Rust binary by the
 name its Cargo.toml gives it), so no language's layout is known in the core.
 
 Every type is exported from `@posthog/coherence/plugin`. A slot a plugin leaves empty reads as "not read for <language>", never as
-another language. A plugin answers for the project whose config names it
+another language: a plugin that fills no `source` slot is named not read by
+mass and every reading that scans text, and one that fills no `interfaces`
+slot by the Structure reading. The kept answers read the `interfaces` slot's
+`wildcardModules`; the `kept` slot is still read when a plugin fills it, and
+`plugin check` fails a plugin whose two slots answer with one function or
+two spelled alike (its "one answer each" duty).
+
+Two manifest fields name a language's files so the core never does:
+`basisFiles`, regular expressions a base name matches for the files besides
+source its answers and entrances rest on (configuration, manifests,
+lockfiles: `^Cargo\.toml$`), which a kept answer and the Structure reading's
+fingerprint are both read against; and `moduleFolders`, regular expressions a
+module file's path matches whose first group is the folder it owns
+(`^(.*)/__init__\.py$`), by which a chokepoint that is a module covers its
+folder's files. A plugin answers for the project whose config names it
 alone: a process serving several projects asks each one's questions under
 `forProject(root, ...)`. A plugin that provides one of the bundled languages answers
 each field and slot it declares, and the bundled plugin answers the rest, so
@@ -358,6 +372,7 @@ one wanting changes a copy of it:
    | declarations | the `topLevel` slot says which names a file declares, as `check.json` says |
    | references | the adapter reports every reference to the protected thing, and none else; one that reports none fails here, by name |
    | chokepoint | the run grades the chokepoint as `check.json` expects, bypasses named, its refutation seen or refused |
+   | one answer each | no two of its slots answer with one function, or two spelled alike |
 
    Each duty passes, fails with why, or is not run with why (the
    language server is absent). The command exits 0 only when every one

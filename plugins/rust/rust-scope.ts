@@ -2,7 +2,7 @@
  * Rust's facts for the component interface reading: which declaration lines
  * are types, what the word index reads of a file's use trees, and the
  * modules a file glob-imports (component-interfaces.ts reads them through
- * INTERFACE_SYNTAX, kept-answers.ts through KEPT_MODULES).
+ * INTERFACE_SYNTAX, kept-answers.ts through the same wildcardModules).
  */
 
 import { posix } from "node:path";
@@ -40,6 +40,3 @@ export const RUST_INTERFACES: InterfaceSyntax = {
   defaultNames: () => [],
   wildcardModules: globModules,
 };
-
-/** The module files a changed file glob-imports, in every spelling a kept answer can name them by. */
-export const rustKeptModules: (file: string, text: string) => string[] = globModules;

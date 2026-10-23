@@ -19,6 +19,17 @@
     "^test_.*\\.py$",
     "_test\\.py$"
   ],
+  "basisFiles": [
+    "^pyproject\\.toml$",
+    "^pyrightconfig\\.json$",
+    "^setup\\.cfg$",
+    "^uv\\.lock$",
+    "^poetry\\.lock$",
+    "^requirements[\\w.-]*\\.txt$"
+  ],
+  "moduleFolders": [
+    "^(.*)/__init__\\.py$"
+  ],
   "members": {
     "opens": "^class\\s",
     "closes": "^\\S",
@@ -108,7 +119,6 @@
   "syntax": {
     "entrances": "python-entrances.ts#PYTHON_ENTRANCES",
     "interfaces": "python-scope.ts#PYTHON_INTERFACES",
-    "kept": "python-scope.ts#pythonKeptModules",
     "source": "python-source.ts#PYTHON_SOURCE",
     "declares": "python-interfaces.ts#pythonDeclares",
     "topLevel": "python-top-level.ts#pythonDeclaresAtTop",

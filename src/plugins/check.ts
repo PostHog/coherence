@@ -13,6 +13,9 @@
  *   chokepoint     the check grades the protected thing through the
  *                  chokepoint as check.json expects, bypasses named, its
  *                  refutation seen or refused, never missing
+ *   one answer each  no two of its slots answer with one function, or two
+ *                  spelled alike: a question asked of the language belongs
+ *                  to one slot, or its answers drift apart
  *
  * Each duty passes, fails with why, or is not run with why (the
  * plugin's language server is absent); only every one passing is a pass.
@@ -26,7 +29,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { DEFAULT_TEST_FOLDERS } from "../enforcement/config.ts";
 import { performRun } from "../enforcement/run.ts";
-import { bundledAdapter, bundledPlugins, forProject, languageOfFile, registerProjectPlugins, syntaxOf } from "./languages.ts";
+import { bundledAdapter, bundledPlugins, forProject, languageOfFile, registerProjectPlugins, repeatedAnswers, syntaxOf } from "./languages.ts";
 import type { LoadedPlugin } from "./plugin.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
 import { proveVia, viaForm } from "./verify.ts";
@@ -51,7 +54,7 @@ export interface CheckProject {
 /** One duty's outcome. */
 export interface Duty {
   /** A language plugin's four duties, or a verifier's one per form it declares, as a bullet writes it ("[quint run]"). */
-  name: "file rule" | "declarations" | "references" | "chokepoint" | `[${string}]`;
+  name: "file rule" | "declarations" | "references" | "chokepoint" | "one answer each" | `[${string}]`;
   verdict: "pass" | "fail" | "not run";
   reason: string;
 }
@@ -189,11 +192,20 @@ async function languageDutiesOf(plugin: LoadedPlugin, language: string): Promise
   for (const { label, project } of projects) each.push((await overProject(project, plugin, language)).map((d) => ({ ...d, reason: `${label}: ${d.reason}` })));
   // A duty passes only where it passes over every project; the worst outcome stands, with each project's reason.
   const rank = { pass: 0, "not run": 1, fail: 2 } as const;
-  return DUTIES.map((name) => {
-    const found = each.map((duties) => duties.find((d) => d.name === name)!);
-    const worst = found.reduce((a, b) => (rank[b.verdict] > rank[a.verdict] ? b : a));
-    return { name, verdict: worst.verdict, reason: found.map((d) => d.reason).join("; ") };
-  });
+  return [
+    ...DUTIES.map((name) => {
+      const found = each.map((duties) => duties.find((d) => d.name === name)!);
+      const worst = found.reduce((a, b) => (rank[b.verdict] > rank[a.verdict] ? b : a));
+      return { name, verdict: worst.verdict, reason: found.map((d) => d.reason).join("; ") };
+    }),
+    await guarded("one answer each", () => oneAnswerEach(plugin)),
+  ];
+}
+
+/** Whether each of the plugin's answers is given by one slot alone (repeatedAnswers). */
+function oneAnswerEach(plugin: LoadedPlugin): Duty {
+  const repeated = repeatedAnswers(plugin);
+  return repeated.length === 0 ? { name: "one answer each", verdict: "pass", reason: "no two slots give one answer" } : { name: "one answer each", verdict: "fail", reason: `${repeated.join("; ")}: keep the answer in one slot (the kept answers read interfaces.wildcardModules, so a kept slot that repeats it goes)` };
 }
 
 /** A duty's outcome, or the duty failed with what it threw: one duty that throws never takes the others' outcomes with it. */

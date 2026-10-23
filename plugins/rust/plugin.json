@@ -11,6 +11,16 @@
   "serverExtensions": [
     ".rs"
   ],
+  "basisFiles": [
+    "^Cargo\\.toml$",
+    "^Cargo\\.lock$",
+    "^rust-toolchain(?:\\.toml)?$"
+  ],
+  "moduleFolders": [
+    "^(.*)/mod\\.rs$",
+    "^((?:.*/)?src)/(?:lib|main)\\.rs$",
+    "^(.*)\\.rs$"
+  ],
   "members": {
     "opens": "^pub(?:\\([^)]*\\))?\\s+(?:struct|union)\\s.*\\{\\s*$",
     "closes": "^\\}",
@@ -73,7 +83,6 @@
   "syntax": {
     "entrances": "rust-entrances.ts#RUST_ENTRANCES",
     "interfaces": "rust-scope.ts#RUST_INTERFACES",
-    "kept": "rust-scope.ts#rustKeptModules",
     "source": "rust-source.ts#RUST_SOURCE",
     "declares": "rust-interfaces.ts#rustDeclares",
     "topLevel": "rust-top-level.ts#rustDeclaresAtTop"
