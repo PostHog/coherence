@@ -12,13 +12,13 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, posix, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { after, test } from "node:test";
 import ts from "typescript";
 import { isTestPath } from "../adapters/adapter.ts";
 import { instrumentFor } from "../adapters/index.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
-import { BUNDLED_DIR } from "./registry.ts";
+import { BUNDLED_DIR, moduleOf, moduleSyncOf } from "./registry.ts";
 import { moduleSpecifiers } from "./specifiers.ts";
 import { ciNotes, ciSteps, entranceRules, environmentFolders, forProject, LANGUAGES, languageOfFile, providerOf, serverExtensions, syntaxOf } from "./languages.ts";
 import { loadSpecModel } from "../spec/model.ts";
@@ -332,4 +332,26 @@ test("the bundled plugins reach the core only through the plugin interface, src/
   assert.deepEqual(reaching, [], "an ejected copy reaches Coherence only through the package's plugin interface; export what a plugin needs from src/plugins/api.ts");
   const pkg = JSON.parse(readFileSync(join(PLUGINS, "..", "package.json"), "utf8")) as { exports: Record<string, { default: string }> };
   assert.equal(pkg.exports["./plugin"]!.default, "./dist/plugins/api.js", "the package's plugin export is that module");
+});
+
+test("a project's plugin reads the plugin interface of the Coherence that runs, never the copy beside it: by import, by require and as a syntax slot its helpers answer from this process's registry, and a file outside every plugin's folder resolves as before", async () => {
+  // The project installed another copy of the package, whose registry no plugin filled: what a global install, a checkout or another workspace's copy runs beside.
+  const root = project({
+    "coherence.config.json": JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }),
+    "plugins/zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, module: "./index.ts", extensions: [".zz"], syntax: { topLevel: "top.ts#zzDeclaresAtTop" } }),
+    "plugins/zz/index.ts": 'import { languageOfFile } from "@posthog/coherence/plugin";\nexport default { adapter: () => { throw new Error("not asked"); }, languageOf: (file) => languageOfFile(file) };\n',
+    "plugins/zz/top.ts": 'import { languageOfFile } from "@posthog/coherence/dist/plugins/api.js";\nexport const zzDeclaresAtTop = (text, name) => languageOfFile("app/accounts.zz") === "zz" && text.includes(name);\n',
+    "node_modules/@posthog/coherence/package.json": JSON.stringify({ name: "@posthog/coherence", version: "0.0.1", type: "module", exports: { "./plugin": "./dist/plugins/api.js", "./dist/*": "./dist/*" } }),
+    "node_modules/@posthog/coherence/dist/plugins/api.js": 'export const languageOfFile = () => undefined;\nexport const copy = "the project\'s";\n',
+    "tools/copy.ts": 'export { copy } from "@posthog/coherence/plugin";\n',
+  });
+  const config = readEnforcementConfig(root);
+  const plugin = config.plugins.find((p) => p.name === "zz")!;
+  const topLevel = syntaxOf("zz", "topLevel");
+  assert.ok(typeof topLevel === "function" && topLevel("verb reset\n", "reset"), "a syntax slot, loaded by require, reads the registry that holds zz");
+  type Probe = { languageOf: (file: string) => string | undefined };
+  assert.equal((moduleSyncOf(plugin) as unknown as Probe).languageOf("app/accounts.zz"), "zz", "the module loaded by require reads it");
+  assert.equal(((await moduleOf(plugin)) as unknown as Probe).languageOf("app/accounts.zz"), "zz", "the module loaded by import reads it");
+  const outside = (await import(pathToFileURL(join(root, "tools", "copy.ts")).href)) as { copy: string };
+  assert.equal(outside.copy, "the project's", "a file outside every plugin's folder still resolves the package as its folder finds it");
 });

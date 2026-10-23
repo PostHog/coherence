@@ -27,7 +27,7 @@ import type { AdapterBounds, LanguageAdapter, Ladder } from "../adapters/adapter
 import type { DeclaredLanguage } from "../adapters/declared-config.ts";
 import type { BoundarySource } from "../scaffold/boundaries.ts";
 import type { CiStep, EntranceRule, LoadedPlugin, MarkedFolder, PluginManifest, PluginModule, SyntaxSlot, SyntaxTables } from "./plugin.ts";
-import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
+import { BUNDLED_DIR, moduleSyncOf, readManifest, throughThisCore } from "./registry.ts";
 import { setLanguageData } from "../readings/scope/language-data.ts";
 
 /** The defaults file beside the bundled plugins. */
@@ -456,6 +456,7 @@ function slotExport(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
   const key = `${plugin.dir}\u0000${at}`;
   if (!slots.has(key)) {
     const [file, name] = at.split("#") as [string, string];
+    throughThisCore(plugin);
     const module = load(resolve(plugin.dir, file)) as Record<string, unknown>;
     if (!(name in module)) throw new Error(`plugin ${plugin.name}'s syntax.${slot} names ${at}, whose module exports no ${name}`);
     slots.set(key, module[name]);

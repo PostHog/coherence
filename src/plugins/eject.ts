@@ -15,6 +15,7 @@ import { dirname, join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONFIG_FILE } from "../enforcement/config.ts";
 import { MANIFEST } from "./plugin.ts";
+import { PACKAGE_SPECIFIER } from "./registry.ts";
 import { moduleSpecifiers } from "./specifiers.ts";
 import { landsWithin } from "./within.ts";
 
@@ -25,7 +26,7 @@ export const PLUGIN_SOURCES = resolve(here, "..", "..", "plugins");
 
 /** How a bundled plugin's module names the core, and how an ejected one names it. */
 export const CORE_SPECIFIER = "../../src/plugins/api.ts";
-export const PACKAGE_SPECIFIER = "@posthog/coherence/plugin";
+export { PACKAGE_SPECIFIER };
 
 export class EjectError extends Error {}
 
