@@ -547,6 +547,13 @@ export interface InterfacePartial {
   unread: string[];
 }
 
+/** A file whose declarations the language server could not answer for, with its words: the reading read every other file and names this one. */
+export interface InterfaceUnanswered {
+  file: string;
+  component: string;
+  reason: string;
+}
+
 export type InterfaceReading =
   | {
       kind: "read";
@@ -573,6 +580,8 @@ export type InterfaceReading =
       outside?: { sites: number; files: number; into: { component: string; sites: number }[] };
       /** Present when a budget stopped the reading: which budget, its size, and the components whose declarations were not all read. */
       partial?: InterfacePartial;
+      /** Present when the language server failed a question about some files: those files, unread, while the rest was read. */
+      unanswered?: InterfaceUnanswered[];
       /** The entrances the language's rules detect in the tree, each with its rule and why: what the declared entrances' coverage is measured against. Absent from a reading taken before detection. */
       candidates?: EntranceCandidate[];
       /** Present when the reading was scoped to some entrances' routes rather than read whole: never recorded as the tree's reading. */

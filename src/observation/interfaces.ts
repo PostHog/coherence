@@ -61,6 +61,8 @@ export interface EntranceHandler {
 export interface InterfaceMap {
   symbols: InterfaceSymbol[];
   entrances: EntranceHandler[];
+  /** Files the server failed a question about, with its words: their interfaces are not read, the rest are. */
+  unanswered?: { file: string; reason: string }[];
 }
 
 /** The id a component interface goes by in a record: the ordered pair. */
@@ -88,6 +90,7 @@ export async function readInterfaceMap(root: string, adapter: LanguageAdapter, m
   const testFolders = config.testFolders;
   const files = sourceFiles(root, language, configIgnore(root)).filter((file) => !isTest(file, testFolders));
   const tally = new Map<string, InterfaceSymbol>();
+  const unanswered = new Map<string, string>();
   for (const file of files) {
     const owner = componentOf(model, file)?.folder;
     if (owner === undefined) continue;
@@ -95,10 +98,19 @@ export async function readInterfaceMap(root: string, adapter: LanguageAdapter, m
     const lines = text.split("\n");
     for (const declaration of declarationsOf(text, language)) {
       if (!declaration.exported) continue;
-      const resolved = await adapter.resolve(`${declaration.name} in ${file}`, { component: owner, testFolders });
-      if (!resolved.ok || resolved.definition.file !== file) continue;
+      let resolved: Awaited<ReturnType<LanguageAdapter["resolve"]>>;
+      let references: Awaited<ReturnType<LanguageAdapter["references"]>>;
+      try {
+        resolved = await adapter.resolve(`${declaration.name} in ${file}`, { component: owner, testFolders });
+        if (!resolved.ok || resolved.definition.file !== file) continue;
+        references = await adapter.references(resolved.definition);
+      } catch (error) {
+        // A server that fails a question about one file (gopls has no package for a file outside the host's build) leaves that file's interfaces unread, named; the rest are read.
+        unanswered.set(file, error instanceof Error ? error.message : String(error));
+        break;
+      }
       const kind = declares(lines[declaration.line - 1] ?? "", language);
-      for (const site of projectSites(root, await adapter.references(resolved.definition))) {
+      for (const site of projectSites(root, references)) {
         if (isTest(site.file, testFolders)) continue;
         const from = componentOf(model, site.file)?.folder;
         if (from === undefined || from === owner) continue;
@@ -124,5 +136,5 @@ export async function readInterfaceMap(root: string, adapter: LanguageAdapter, m
     );
   }
   const symbols = [...tally.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to) || a.symbol.localeCompare(b.symbol) || a.file.localeCompare(b.file));
-  return { symbols, entrances };
+  return { symbols, entrances, ...(unanswered.size === 0 ? {} : { unanswered: [...unanswered].map(([file, reason]) => ({ file, reason })).sort((a, b) => a.file.localeCompare(b.file)) }) };
 }
