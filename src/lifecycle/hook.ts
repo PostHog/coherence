@@ -80,10 +80,11 @@ import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
-import { syntaxOf } from "../plugins/languages.ts";
+import { bundledPlugins, syntaxOf } from "../plugins/languages.ts";
 import { enforcedLanguageOf, readEnforcementConfig } from "../enforcement/config.ts";
 import { viaForm } from "../plugins/verify.ts";
 import { readPlugins } from "../plugins/registry.ts";
+import { overridesOf, unsaidReadings } from "../plugins/abstract.ts";
 import { changesSince, PLUGIN_API } from "../plugins/plugin.ts";
 import { coreLanguageOfExtension, LANGUAGES } from "../adapters/language-files.ts";
 import { readConfigFile } from "../adapters/project-config.ts";
@@ -846,6 +847,14 @@ function pluginRefusalBlock(root: string): string {
   // A plugin's syntax slots run where the readings do, this session's hooks included (d-c18552a9): said once, for the plugins the project brings.
   const hooked = plugins.filter((p) => p.source !== "bundled" && Object.keys(p.manifest.syntax ?? {}).length > 0);
   if (hooked.length > 0) lines.push(`Plugin code in this session's hooks: ${hooked.map((p) => `${p.name} (${p.source}: ${Object.keys(p.manifest.syntax ?? {}).join(", ")})`).join("; ")} runs as a reading reads its language, with the project's privileges.`);
+  // The abstract plugin spec holds every plugin the project runs: what a plugin's own spec sets aside, and what it leaves out saying nothing, is said once.
+  for (const plugin of plugins) {
+    const overridden = [...overridesOf(plugin).keys()];
+    const language = plugin.manifest.provides?.language;
+    const unsaid = unsaidReadings(plugin, bundledPlugins().find((p) => p.manifest.provides?.language === language)?.manifest);
+    if (overridden.length > 0) lines.push(`Plugin ${plugin.name} is not held to ${overridden.join(", ")} of the abstract plugin spec, as its own spec says with why; those readings of its language are not read.`);
+    if (unsaid.length > 0) lines.push(`Plugin ${plugin.name} gives no ${unsaid.join(", ")} reading and its spec overrides none of them: plugin check ${plugin.name} fails each until the plugin reads it or its spec says why under ## overrides.`);
+  }
   return lines.length === 0 ? "" : `${lines.join("\n")}\n\n`;
 }
 

@@ -42,11 +42,6 @@
       }
     ]
   },
-  "entrances": {
-    "rules": [],
-    "notDetected": "Go's entrances (func main, a net/http handler) are not detected yet: declare each under ## entrances"
-  },
-  "notScanned": "the text scans do not read Go yet: its declarations are read by the topLevel slot, and its references by gopls",
   "ci": {
     "note": "The Go plugin grades through gopls: the steps below set up Go (a go.mod that names a newer toolchain fetches it) and install gopls.",
     "steps": [

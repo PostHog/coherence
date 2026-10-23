@@ -22,6 +22,10 @@
  *   - <NAME> in <file>: <one-line meaning: what the hand list lists>
  *     mirrors: closure of <file>, <file> | keys of <NAME> in <file> | <NAME> in <file>
  *
+ *   ## overrides               (a plugin's spec only: the folder holds plugin.json)
+ *   - <abstract bullet>: <what the plugin does instead>
+ *     because: <why the plugin is not held to it>
+ *
  *   ## invariants
  *   - <name>: <sentence>
  *     protects: <symbol or module>            chokepoint form, with
@@ -67,9 +71,10 @@ export const TRUST_LEVELS_SECTION = "trust levels";
 export const ENTRANCES_SECTION = "entrances";
 export const MIRRORS_SECTION = "mirrors";
 export const INVARIANTS_SECTION = "invariants";
+export const OVERRIDES_SECTION = "overrides";
 
 /** What a spec may hold, for the problems that name it. */
-const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances, ## mirrors and ## invariants";
+const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances, ## mirrors, ## overrides (a plugin's spec only) and ## invariants";
 
 /** The keys an invariant bullet may carry, in the order the scaffold prints them. */
 export const KEYS = ["protects", "chokepoint", "from", "over", "via", "because", "crossing", "entrances", "refuted", "kinds", "checklist"] as const;
@@ -124,6 +129,19 @@ export interface Entrance {
   noControl?: string | undefined;
   /** The control line, when there is one. */
   controlLine?: number | undefined;
+}
+
+/**
+ * A bullet of the abstract plugin spec (plugins/Plugin.abstract.md) that a
+ * plugin's own spec sets aside: what the plugin does instead, and why it is
+ * not held to the bullet. Without a because: it sets nothing aside.
+ */
+export interface Override {
+  /** The abstract bullet's name. */
+  name: string;
+  instead: string;
+  because: string | undefined;
+  line: number;
 }
 
 /**
@@ -292,6 +310,8 @@ export interface ParsedSpec {
   entrances: Entrance[];
   /** Empty when the spec has no mirrors section. */
   mirrors: Mirror[];
+  /** Empty when the spec has no overrides section. */
+  overrides: Override[];
   invariants: Invariant[];
   problems: Problem[];
 }
@@ -362,8 +382,10 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
   const mirrors: Mirror[] = [];
   const misread = new Set<Mirror>();
   const bullets: RawBullet[] = [];
+  let overridesSeen = false;
+  const overrides: Override[] = [];
 
-  type Section = "head" | "trust levels" | "entrances" | "mirrors" | "invariants" | "skip";
+  type Section = "head" | "trust levels" | "entrances" | "mirrors" | "overrides" | "invariants" | "skip";
   let section: Section = "head";
   let paragraph: string[] = [];
   let paragraphLine = 0;
@@ -428,6 +450,12 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         if (mirrorsSeen) problem(line, "## mirrors given twice");
         mirrorsSeen = true;
         section = "mirrors";
+        return;
+      }
+      if (key === OVERRIDES_SECTION) {
+        if (overridesSeen) problem(line, "## overrides given twice");
+        overridesSeen = true;
+        section = "overrides";
         return;
       }
       if (key === INVARIANTS_SECTION) {
@@ -596,6 +624,31 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         else current.recipe = recipe;
         return;
       }
+      case "overrides": {
+        if (raw.trim() === "") return;
+        const bullet = /^[-*]\s+([^:]+):\s*(.*)$/.exec(raw);
+        if (bullet !== null) {
+          const name = bullet[1]!.trim();
+          if (overrides.some((o) => o.name === name)) problem(line, `override ${name} given twice`);
+          if (bullet[2]!.trim() === "") problem(line, `override ${name} needs what the plugin does instead`);
+          overrides.push({ name, instead: bullet[2]!.trim(), because: undefined, line });
+          return;
+        }
+        const current = overrides[overrides.length - 1];
+        const field = /^\s+([a-z]+):\s*(.*)$/.exec(raw);
+        if (current === undefined || field === null) {
+          problem(line, "expected an override bullet (- <abstract bullet>: <what the plugin does instead>) or an indented because: line under one");
+          return;
+        }
+        if (field[1] !== "because") {
+          problem(line, `unknown key "${field[1]}": an override carries because`);
+          return;
+        }
+        if (current.because !== undefined) problem(line, `override ${current.name} says why twice`);
+        const value = field[2]!.trim();
+        if (value !== "" && !isPlaceholder(value)) current.because = value;
+        return;
+      }
       case "invariants": {
         if (raw.trim() === "") return;
         const bullet = /^[-*]\s+(.*)$/.exec(raw);
@@ -657,8 +710,10 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
   for (const mirror of named) {
     if (mirror.recipe === undefined && !misread.has(mirror)) problem(mirror.line, `mirror ${mirror.name} names nothing it mirrors: add mirrors: closure of <file>, keys of <NAME> in <file>, or <NAME> in <file>`);
   }
+  // An override that says no why sets nothing aside: the plugin stays held to the bullet.
+  for (const override of overrides) if (override.because === undefined) problem(override.line, `override ${override.name} needs because: <why the plugin is not held to it>; until it says why, the plugin is held to the bullet`);
   const invariants = bullets.map((bullet) => buildInvariant(bullet, problem, options.seed));
-  return { file, title, intent, ...(owners === undefined ? {} : { owners }), trustLevels, trustLevelsLine, entrances, mirrors: named, invariants, problems };
+  return { file, title, intent, ...(owners === undefined ? {} : { owners }), trustLevels, trustLevelsLine, entrances, mirrors: named, overrides, invariants, problems };
 }
 
 function buildInvariant(bullet: RawBullet, problem: (line: number, message: string) => void, seed: Seed | undefined): Invariant {

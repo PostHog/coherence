@@ -4,7 +4,10 @@
     "src/store/secrets.ts": "/** The protected thing. */\nexport const SECRET_COLUMNS: Record<string, string[]> = { tokens: [\"token\"] };\n\n/** The chokepoint: the one way a row leaves without its secrets. */\nexport function seal(pattern: string, row: Record<string, unknown>): Record<string, unknown> {\n  const out = { ...row };\n  for (const column of SECRET_COLUMNS[pattern] ?? []) delete out[column];\n  return out;\n}\n",
     "src/api/render.ts": "import { SECRET_COLUMNS, seal } from \"../store/secrets.ts\";\n\nexport function render(pattern: string, row: Record<string, unknown>): string {\n  const sealed = seal(pattern, row);\n  const leaked = SECRET_COLUMNS[pattern];\n  return JSON.stringify({ sealed, leaked });\n}\n",
     "src/__tests__/secrets.test.ts": "import { SECRET_COLUMNS } from \"../store/secrets.ts\";\nexport const t = SECRET_COLUMNS;\n",
-    "README.md": "# A project\n"
+    "README.md": "# A project\n",
+    "src/store/rows.ts": "export interface Row {\n  id: string;\n}\n\nexport type RowId = string;\n\nconst LIMIT = 3;\n\nexport function first(rows: Row[]): Row[] {\n  return rows.slice(0, LIMIT);\n}\n",
+    "src/store/index.ts": "export * from \"./rows\";\n",
+    "src/server.ts": "import express from \"express\";\n\nimport { first } from \"./store/rows\";\n\nconst app = express();\n\napp.get(\"/rows\", listRows);\n\nfunction listRows() {\n  return first([]);\n}\n"
   },
   "language": {
     "files": [
@@ -54,5 +57,87 @@
   "bypasses": [
     "src/api/render.ts:1",
     "src/api/render.ts:5"
+  ],
+  "source": {
+    "declarations": [
+      {
+        "file": "src/store/rows.ts",
+        "name": "Row",
+        "exported": true
+      },
+      {
+        "file": "src/store/rows.ts",
+        "name": "LIMIT",
+        "exported": false
+      },
+      {
+        "file": "src/store/rows.ts",
+        "name": "first",
+        "exported": true
+      },
+      {
+        "file": "src/server.ts",
+        "name": "listRows",
+        "exported": false
+      }
+    ],
+    "imports": [
+      {
+        "from": "src/server.ts",
+        "to": "src/store/rows.ts"
+      },
+      {
+        "from": "src/api/render.ts",
+        "to": "src/store/secrets.ts"
+      }
+    ]
+  },
+  "interfaces": {
+    "types": [
+      {
+        "line": "export interface Row {",
+        "type": true
+      },
+      {
+        "line": "export type RowId = string;",
+        "type": true
+      },
+      {
+        "line": "const LIMIT = 3;",
+        "type": false
+      },
+      {
+        "line": "export function first(rows: Row[]): Row[] {",
+        "type": false
+      }
+    ],
+    "wildcards": [
+      {
+        "file": "src/store/index.ts",
+        "modules": [
+          "src/store/rows.ts"
+        ]
+      }
+    ]
+  },
+  "declares": [
+    {
+      "line": "export interface Row {",
+      "declares": "type"
+    },
+    {
+      "line": "const LIMIT = 3;",
+      "declares": "value"
+    },
+    {
+      "line": "export function first(rows: Row[]): Row[] {",
+      "declares": "body"
+    }
+  ],
+  "entrances": [
+    {
+      "file": "src/server.ts",
+      "symbol": "listRows"
+    }
   ]
 }

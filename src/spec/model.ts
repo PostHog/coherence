@@ -31,6 +31,7 @@ import type { LoadedPlugin } from "../plugins/plugin.ts";
 import { readPlugins } from "../plugins/registry.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { viaFormProblem } from "../plugins/verify.ts";
+import { overrideProblems } from "../plugins/abstract.ts";
 import { clashText, composeStack, pluginLayers } from "../plugins/lexicon.ts";
 import { parseLexicon } from "../lifecycle/lexicon.ts";
 import { COHERENCE_LEXICON } from "../lifecycle/project.ts";
@@ -443,6 +444,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
     }
     const parsed = parseSpec(readProjectText(specPath, "spec"), rel, { seed });
     problems.push(...parsed.problems);
+    // A plugin's spec sets aside bullets of the abstract plugin spec, each by a name that spec gives.
+    problems.push(...overrideProblems(parsed.overrides, dirname(specPath)).map((p) => ({ file: rel, ...p })));
     byFolder.set(folder, { folder, specPath: rel, parsed });
   }
 

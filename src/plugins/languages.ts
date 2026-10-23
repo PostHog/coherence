@@ -27,6 +27,7 @@ import type { AdapterBounds, LanguageAdapter, Ladder } from "../adapters/adapter
 import type { DeclaredLanguage } from "../adapters/declared-config.ts";
 import type { BoundarySource } from "../scaffold/boundaries.ts";
 import type { CiStep, EntranceRule, LoadedPlugin, MarkedFolder, PluginManifest, PluginModule, SyntaxSlot, SyntaxTables } from "./plugin.ts";
+import { overridesOf } from "./abstract.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
 import { setLanguageData } from "../readings/scope/language-data.ts";
 
@@ -337,22 +338,31 @@ export function entranceRules(language: string): readonly EntranceRule[] {
 
 /** What the language's entrance rules do not see. */
 export function notDetected(language: string): string | undefined {
-  return fieldOf(language, "entrances")?.notDetected;
+  const entrances = fieldOf(language, "entrances");
+  return entrances !== undefined ? entrances.notDetected : fillsSlot(language, "entrances") ? undefined : overriddenBecause(language, "entrances");
 }
 
-/** Why the text scans do not read the language yet, or undefined when they do. */
+/** Why the text scans do not read the language yet, or undefined when they do: its manifest's notScanned, else the source override its plugin's spec writes. */
 export function notScanned(language: string): string | undefined {
-  return fieldOf(language, "notScanned");
+  // The plugin's spec is read only for a plugin that leaves the slot empty, so a language whose plugin reads it pays for no file read.
+  return fieldOf(language, "notScanned") ?? (fillsSlot(language, "source") ? undefined : overriddenBecause(language, "source"));
+}
+
+/** Why the plugin that provides a language is not held to an abstract bullet, as its own spec's override says; undefined when it overrides none. */
+function overriddenBecause(language: string, bullet: string): string | undefined {
+  const plugin = providerOf(language);
+  const override = plugin === undefined ? undefined : cached(`overrides\u0000${plugin.dir}`, () => overridesOf(plugin)).get(bullet);
+  return override === undefined ? undefined : `${override.instead}, because ${override.because}`;
 }
 
 /** What a reading says of each of the core's languages without its code: the rules, what they miss, and why a scan skips it; the page carries the same table. */
 export function languageDataTable(): Record<string, { rules: EntranceRule[]; notDetected?: string; notScanned?: string }> {
   const table: Record<string, { rules: EntranceRule[]; notDetected?: string; notScanned?: string }> = {};
   for (const { language } of providers()) {
-    const entrances = fieldOf(language, "entrances");
+    const missed = notDetected(language);
     // A plugin that fills no source slot reads no text of its language: said, never read as an empty project.
-    const reason = fieldOf(language, "notScanned") ?? (fillsSlot(language, "source") ? undefined : `the ${language} plugin fills no source slot, so no text scan reads ${language}'s declarations or imports`);
-    table[language] = { rules: [...entranceRules(language)], ...(entrances === undefined ? {} : { notDetected: entrances.notDetected }), ...(reason === undefined ? {} : { notScanned: reason }) };
+    const reason = notScanned(language) ?? (fillsSlot(language, "source") ? undefined : `the ${language} plugin fills no source slot, so no text scan reads ${language}'s declarations or imports`);
+    table[language] = { rules: [...entranceRules(language)], ...(missed === undefined ? {} : { notDetected: missed }), ...(reason === undefined ? {} : { notScanned: reason }) };
   }
   return table;
 }
@@ -433,20 +443,42 @@ const slots = new Map<string, unknown>();
  * the slot empty, which a reading reads as "not read for <language>".
  */
 export function syntaxOf<S extends SyntaxSlot>(language: string, slot: S): SyntaxTables[S] | undefined {
+  // While plugin check grades a bullet with one plugin's slot emptied, that plugin answers nothing for it, and nothing stands in.
+  const out = (p: LoadedPlugin | undefined): boolean => p !== undefined && emptied !== undefined && emptied.slot === slot && p.dir === emptied.dir;
   // The swap's slot when it fills it, else the bundled provider's: a plugin that replaces only the adapter keeps the readings.
   const swap = swapsNow().get(language);
-  const plugin = swap?.manifest.syntax?.[slot] !== undefined ? swap : baseProvider(language);
-  const provided = plugin === undefined ? undefined : (slotExport(plugin, slot) as SyntaxTables[S] | undefined);
-  const extenders = extendersOf(language).filter((p) => p.manifest.syntax?.[slot] !== undefined);
+  const plugin = swap?.manifest.syntax?.[slot] !== undefined || out(swap) ? swap : baseProvider(language);
+  const provided = plugin === undefined || out(plugin) ? undefined : (slotExport(plugin, slot) as SyntaxTables[S] | undefined);
+  const extenders = extendersOf(language).filter((p) => p.manifest.syntax?.[slot] !== undefined && !out(p));
   if (extenders.length === 0) return provided;
   // Each extending plugin's export for the slot wraps the one beneath it, in the config's order, as its adapter wraps the adapter.
-  return cached(`syntax\u0000${language}\u0000${slot}`, () =>
+  const wrapped = (): SyntaxTables[S] | undefined =>
     extenders.reduce<SyntaxTables[S] | undefined>((beneath, extender) => {
       const wrap = slotExport(extender, slot);
       if (typeof wrap !== "function") throw new Error(`plugin ${extender.name} extends ${language}, so its syntax.${slot} names a function of the table beneath it, not a table`);
       return (wrap as (beneath: SyntaxTables[S] | undefined) => SyntaxTables[S])(beneath);
-    }, provided),
-  );
+    }, provided);
+  return emptied === undefined ? cached(`syntax\u0000${language}\u0000${slot}`, wrapped) : wrapped();
+}
+
+/** The plugin and slot plugin check reads as empty while it grades a bullet again with the plugin's reading emptied, or undefined. */
+let emptied: { slot: SyntaxSlot; dir: string } | undefined;
+
+/**
+ * Run `work` with one plugin's slot read as though the plugin left it empty,
+ * with nothing standing in for it: the answer a reading gives with nothing
+ * from the plugin, which plugin check grades a bullet against again, so a
+ * bullet that holds either way is seen to prove nothing of the plugin. The
+ * work is synchronous, so no other question reads the slot emptied.
+ */
+export function withSlotEmptied<T>(plugin: LoadedPlugin, slot: SyntaxSlot, work: () => T): T {
+  const before = emptied;
+  emptied = { slot, dir: plugin.dir };
+  try {
+    return work();
+  } finally {
+    emptied = before;
+  }
 }
 
 /** The export a plugin's manifest names for a slot, loaded synchronously and once; undefined when it leaves the slot empty. */

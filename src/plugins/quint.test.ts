@@ -186,7 +186,7 @@ test("a Quint bullet names its model from its own folder: the file it names, els
 
 test("plugin check holds a verifier plugin to its own proofs, one duty per form: Quint's simulation passes, and its model check without Java reads not run with why, never pass", async () => {
   const without = await withQuint({}, () => checkPlugin(process.cwd(), "quint"));
-  assert.deepEqual(without.duties.map((d) => [d.name, d.verdict]), [["[quint]", "not run"], ["[quint run]", "pass"]], JSON.stringify(without.duties));
+  assert.deepEqual(without.duties.map((d) => [d.name, d.verdict]), [["[quint]", "not run"], ["[quint run]", "pass"], ["lexicon", "pass"]], JSON.stringify(without.duties));
   assert.match(without.duties[0]!.reason, /\[quint\] nonNegative in Counter\.qnt read not run: .*Java not found/);
   assert.match(checkText(without), /^plugin check quint \(bundled, verifier, 0\.1\.0\): NOT RUN$/m, "no fail, but not every duty passed");
   const withJava = await withQuint({ STUB_JAVA: "present" }, () => checkPlugin(process.cwd(), "quint"));

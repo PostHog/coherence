@@ -1,10 +1,13 @@
 {
   "files": {
     "Cargo.toml": "[package]\nname = \"shop\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[lib]\npath = \"src/lib.rs\"\n",
-    "src/lib.rs": "pub mod store;\npub mod api;\n",
+    "src/lib.rs": "pub mod store;\npub mod api;\npub mod rows;\npub mod everything;\n",
     "src/store/mod.rs": "pub const SECRET_COLUMNS: &[&str] = &[\"token\"];\n\npub fn seal(row: &mut Vec<String>) {\n    row.retain(|c| !SECRET_COLUMNS.contains(&c.as_str()));\n}\n",
     "src/api/mod.rs": "use crate::store::{seal, SECRET_COLUMNS};\n\npub fn render(row: &mut Vec<String>) -> usize {\n    seal(row);\n    SECRET_COLUMNS.len()\n}\n",
-    "README.md": "# A crate\n"
+    "README.md": "# A crate\n",
+    "src/rows.rs": "pub struct Row {\n    pub id: RowId,\n}\n\npub type RowId = u64;\n\nconst LIMIT: usize = 3;\n\npub fn first(rows: &[Row]) -> &[Row] {\n    &rows[..LIMIT.min(rows.len())]\n}\n",
+    "src/everything.rs": "pub use crate::rows::*;\n",
+    "src/main.rs": "fn main() {\n    let rows: Vec<shop::rows::Row> = Vec::new();\n    let _ = shop::rows::first(&rows);\n}\n"
   },
   "language": {
     "files": [
@@ -49,5 +52,91 @@
   "bypasses": [
     "src/api/mod.rs:1",
     "src/api/mod.rs:5"
+  ],
+  "source": {
+    "declarations": [
+      {
+        "file": "src/rows.rs",
+        "name": "Row",
+        "exported": true
+      },
+      {
+        "file": "src/rows.rs",
+        "name": "RowId",
+        "exported": true
+      },
+      {
+        "file": "src/rows.rs",
+        "name": "LIMIT",
+        "exported": false
+      },
+      {
+        "file": "src/rows.rs",
+        "name": "first",
+        "exported": true
+      }
+    ],
+    "imports": [
+      {
+        "from": "src/api/mod.rs",
+        "to": "src/store/mod.rs"
+      },
+      {
+        "from": "src/everything.rs",
+        "to": "src/rows.rs"
+      },
+      {
+        "from": "src/lib.rs",
+        "to": "src/rows.rs"
+      }
+    ]
+  },
+  "interfaces": {
+    "types": [
+      {
+        "line": "pub type RowId = u64;",
+        "type": true
+      },
+      {
+        "line": "pub struct Row {",
+        "type": false
+      },
+      {
+        "line": "pub fn first(rows: &[Row]) -> &[Row] {",
+        "type": false
+      }
+    ],
+    "wildcards": [
+      {
+        "file": "src/everything.rs",
+        "modules": [
+          "src/rows.rs"
+        ]
+      }
+    ]
+  },
+  "declares": [
+    {
+      "line": "pub struct Row {",
+      "declares": "body"
+    },
+    {
+      "line": "pub type RowId = u64;",
+      "declares": "type"
+    },
+    {
+      "line": "const LIMIT: usize = 3;",
+      "declares": "value"
+    },
+    {
+      "line": "pub fn first(rows: &[Row]) -> &[Row] {",
+      "declares": "body"
+    }
+  ],
+  "entrances": [
+    {
+      "file": "src/main.rs",
+      "symbol": "main"
+    }
   ]
 }

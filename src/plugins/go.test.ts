@@ -49,6 +49,7 @@ test("plugin check holds the Go plugin to every duty a language plugin owes, rea
   assert.ok(gopls.found, `gopls is not installed, so the Go plugin's duties cannot be read: go install golang.org/x/tools/gopls@v0.23.0 (looked at: ${gopls.found ? "" : gopls.looked.join("; ")})`);
   const checked = await checkPlugin(process.cwd(), "go");
   assert.equal(checked.language, "go");
-  assert.deepEqual(checked.duties.map((d) => [d.name, d.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["references", "pass"], ["chokepoint", "pass"], ["one answer each", "pass"]], JSON.stringify(checked.duties));
-  assert.match(checked.duties[3]!.reason, /SecretColumns through Seal graded broken, refutation automatic/);
+  assert.deepEqual(checked.duties.map((d) => [d.name, d.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["source", "overridden"], ["interfaces", "overridden"], ["declares", "overridden"], ["entrances", "overridden"], ["references", "pass"], ["chokepoint", "pass"], ["one answer each", "pass"]], JSON.stringify(checked.duties));
+  assert.match(checked.duties.find((d) => d.name === "source")!.reason, /because a Go import names a package/);
+  assert.match(checked.duties.find((d) => d.name === "chokepoint")!.reason, /SecretColumns through Seal graded broken, refutation automatic/);
 });

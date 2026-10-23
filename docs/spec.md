@@ -3,8 +3,8 @@
 A component is any folder with a spec file, `<Name>.spec.md`. Folders without
 one are transparent; a super folder becomes a component when a relationship
 invariant about its children needs a home. The spec holds a title, a one-line
-intent, `## trust levels` in the entry spec only, `## entrances`, `## mirrors`, and
-`## invariants`. No other section: the parser refuses the reference's sections
+intent, `## trust levels` in the entry spec only, `## entrances`, `## mirrors`,
+`## overrides` in a plugin's spec only, and `## invariants`. No other section: the parser refuses the reference's sections
 by name and says what replaced each.
 
 The header may also declare who owns the component, on one line beside the
@@ -172,6 +172,23 @@ Mirror: src/readings/scope/structure-flow.ts now imports src/readings/scope/lang
 
 A literal the reader cannot read whole (a spread, a computed key, an element
 that is not a string) is said, and nothing is compared.
+
+## Overrides
+
+A plugin's spec, beside its `plugin.json`, may set aside a bullet of the
+abstract plugin spec every plugin is held to (`plugins/Plugin.abstract.md`),
+one bullet each, with what the plugin does instead and why:
+
+```markdown
+## overrides
+- entrances: Go's entrances are declared under ## entrances, never detected
+  because: no entrance rule is written for Go yet
+```
+
+The bullet's head names an abstract bullet. An override with no `because:`
+sets nothing aside and is a problem, as is one naming no abstract bullet or
+one in a spec beside no `plugin.json`. docs/plugins.md says what each
+abstract bullet asks and what an override changes.
 
 ## The bullet
 

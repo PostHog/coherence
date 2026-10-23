@@ -56,6 +56,61 @@ A relative path must stay inside the project; one that climbs out of it
 write its absolute path out: that is the explicit form, and it says on the page
 that the code comes from elsewhere.
 
+## The abstract plugin spec
+
+Every plugin is held to one spec it never has to write:
+[`plugins/Plugin.abstract.md`](../plugins/Plugin.abstract.md). The shape of a
+plugin says what it owes, so each bullet there names the shape it holds for,
+and a plugin of that shape is held to it whether or not its author wrote a
+line:
+
+| Bullet | Holds for | What it asks |
+|---|---|---|
+| file rule | a plugin that provides a language | its files are read as it, and no others |
+| declarations | a provider, or one that fills `topLevel` | which names a file's top level declares |
+| source | a provider, or one that fills `source` | the names each file declares, exported or not, and the file each import leads to |
+| interfaces | a provider, or one that fills `interfaces` | which declarations are types only, and the modules a file glob-imports |
+| declares | a provider, or one that fills `declares` | what a declaration line can run |
+| entrances | a provider, or one that fills `entrances` | the sample project's entrances, by file and name, and nothing else |
+| references | a plugin that provides or extends a language | every reference to the protected thing, and none else |
+| chokepoint | a plugin that provides or extends a language | the grade, its bypasses and its refutation |
+| one answer each | a plugin that fills any slot | no two slots answer with one function, or two spelled alike |
+| verifier forms | a verifier | each form proves a true name and refutes a false one |
+| lexicon | a plugin with a lexicon layer | none of its concepts takes a name Coherence's lexicon holds |
+
+A plugin that provides a language owes every reading of it. One that fills
+no `source` slot is not excused from the source bullet: it fails it, unless
+its own spec says why it does not read it.
+
+**Its own spec only overrides.** A `<Name>.spec.md` beside `plugin.json` is
+optional. Under `## overrides` it sets an abstract bullet aside, naming what
+the plugin does instead and why:
+
+```
+## overrides
+- source: no text scan reads Go's declarations or imports
+  because: a Go import names a package, and the source slot resolves an import to one file
+```
+
+An override with no `because:` sets nothing aside and is a spec problem, as
+is one naming no bullet of the abstract spec or one in a spec beside no
+`plugin.json`. An overridden reading is said at session start for every
+plugin a project runs, and an overridden `source` names the language not
+read in mass with the override's why (it stands for `notScanned`, and an
+overridden `entrances` for `notDetected`). A reading a provider gives no
+answer for and does not override is said at session start too, as one
+`plugin check` will fail. The spec may hold `## invariants` of its own as
+well, graded like any component's.
+
+**A bullet that holds with the reading emptied fails.** `plugin check`
+grades each bullet read from a slot twice: as the plugin answers, and again
+with the plugin's own answer for that slot taken away and nothing standing
+in for it (the file rule with a rule that takes no file). A bullet that
+holds both ways over every check project proves nothing of the plugin, and
+fails, naming what to add to `check.json`: a case only the plugin's reading
+gets right. A plugin that extends a language passes this over its own check
+project, where its answer is the one that counts.
+
 ## Trust
 
 A plugin's code runs with the project's privileges: whatever the user running
@@ -88,6 +143,7 @@ sample/
   plugin.json     the manifest, read as data
   index.ts        the module, imported only where its code runs
   check.json      the project plugin check holds it to (below)
+  Sample.spec.md  its own spec: overrides of the abstract plugin spec (optional)
   package.json    { "type": "module", "private": true }
   lexicon.json    the lexicon layer (optional)
 ```
@@ -147,7 +203,7 @@ copy names it the second way, and so should a plugin you write.
 | `testFolders` | Folder names whose files are all tests by the language's own layout, wherever they sit (SwiftPM's `Tests`), beside the config's test folders. A name matches a folder exactly, case and all. |
 | `members` | How an exported type's body reads for the lexicon's member scan: `opens`, `closes`, `field`, each a regular expression. |
 | `entrances` | The entrance detection rules (`rule`, `plural`, `detects`) and `notDetected`, what they miss: printed by the query, the page and orient. |
-| `notScanned` | Why the text scans do not read the language yet (Go's). Present, it turns off every reading that scans the language's text, whatever slots are filled: mass, entrance detection and the Structure reading each name the language as not read, with this reason. Remove it once the `source` slot reads the language. |
+| `notScanned` | Why the text scans do not read the language yet. Present, it turns off every reading that scans the language's text, whatever slots are filled: mass, entrance detection and the Structure reading each name the language as not read, with this reason. A `source` override in the plugin's own spec says the same with its why, and the bundled plugins say it that way (Go's `Go.spec.md`). |
 | `environmentFolders` | Folder names no project authors code in, wherever they sit (`node_modules`, `__pycache__`). |
 | `markedFolders` | Folders the language's tools make, left out by a `marker` inside (`pyvenv.cfg`) or by `name` beside a file (`target` beside `Cargo.toml`), each with its `reason`. |
 | `ci` | `note`: what the generated CI workflow says for a project that reads the language. `steps`: what it runs after the install to set up what the adapter asks (Go's toolchain and gopls), each `{ "name"?, "uses": "<owner/repo>@<40-hex commit>", "version": "<its release>", "with"? }` or `{ "name"?, "run": "<command>" }`. |
@@ -363,20 +419,13 @@ one wanting changes a copy of it:
    plugin's place from the next command on; what it does not declare (a data
    field, a syntax slot) the bundled plugin still answers.
 3. **Check**: `coherence plugin check ./coherence-plugins/typescript` holds it
-   to what every language plugin owes, over the project its `check.json`
-   carries:
-
-   | Duty | Holds when |
-   |---|---|
-   | file rule | the files `check.json` names as the language's are, and the others are not |
-   | declarations | the `topLevel` slot says which names a file declares, as `check.json` says |
-   | references | the adapter reports every reference to the protected thing, and none else; one that reports none fails here, by name |
-   | chokepoint | the run grades the chokepoint as `check.json` expects, bypasses named, its refutation seen or refused |
-   | one answer each | no two of its slots answer with one function, or two spelled alike |
-
-   Each duty passes, fails with why, or is not run with why (the
-   language server is absent). The command exits 0 only when every one
-   passes. The bundled plugin's `check.json` for the language, as the
+   to each bullet of [the abstract plugin spec](#the-abstract-plugin-spec)
+   its shape calls for, over the project its `check.json` carries. Each
+   bullet is a duty that passes, fails with why, is not run with why (the
+   language server is absent), or is overridden with the why its spec
+   gives. The command exits 0 only when every one passes or is
+   overridden. An adapter that reports no reference fails the references
+   duty by name. The bundled plugin's `check.json` for the language, as the
    installed package ships it, is the minimum: every plugin for that
    language is held to it, whatever its own `check.json` says. Add cases to
    the copy's `check.json` as you enhance it: they are its tests, held
@@ -399,6 +448,13 @@ one wanting changes a copy of it:
    | `references` | Every reference to `protects` as `file:line`, the line 1-based, test files' included: the adapter must report exactly these, none missed and none more. |
    | `grade` | What the run grades the chokepoint (`broken`, `reference-choked`, `visibility-choked`). |
    | `bypasses` | The references outside the chokepoint the run must name, as `file:line`; a test file's never is one. |
+   | `source` | `{ "declarations": [{ "file", "name", "exported" }], "imports": [{ "from", "to" }] }`: what the source scan must read, a name declared at the top level and whether its file exports it, and the file an import of `from` must lead to. |
+   | `interfaces` | `{ "types": [{ "line", "type" }], "wildcards": [{ "file", "modules" }] }`: whether a declaration line is a type only, and module files a file glob-imports. |
+   | `declares` | `[{ "line", "declares" }]`: what a declaration line can run, `type`, `value`, `body` or `unknown`. |
+   | `entrances` | `[{ "file", "symbol" }]`: every entrance the rules must find, `""` for a file's own (a script, an inline route), and none more. |
+
+   A field a duty reads that `check.json` leaves out fails that duty as
+   "nothing to check", unless the plugin's spec overrides the bullet.
 4. **Swap back**: remove the `plugins` entry, and the bundled plugin answers
    again.
 
@@ -518,7 +574,9 @@ it) reads a Go module through gopls:
 - **Read by the readings.** Go's files, tests and `vendor` folder, and its
   top-level declarations, so the spec check reads an entrance's handler or
   a guard in a Go file. Not yet: entrance detection (declare each under
-  `## entrances`) and the text scans mass and the economy read by.
+  `## entrances`) and the text scans mass and the economy read by;
+  `plugins/go/Go.spec.md` overrides those bullets of the abstract plugin
+  spec, each with why.
 - **gopls** is found from `COHERENCE_GOPLS`, else the `PATH`, else
   `go env GOPATH`/bin; with none, every Go chokepoint reads not run with
   how to install it. `ci install` sets up Go and gopls in the workflow it

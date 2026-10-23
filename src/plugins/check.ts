@@ -1,36 +1,36 @@
 /**
- * coherence plugin check <plugin>: the behaviour every language plugin owes,
- * held against any plugin, bundled or by path, over the small project its
- * own check.json carries (the plugin's tests, which an eject copies with it).
+ * coherence plugin check <plugin>: the abstract plugin spec
+ * (plugins/Plugin.abstract.md) held against any plugin, bundled or by path,
+ * over the small project its own check.json carries (the plugin's tests,
+ * which an eject copies with it). Each bullet that holds for the plugin's
+ * shape is a duty; one the plugin's own spec overrides, with why, is said
+ * as overridden. A duty read from a slot is graded again with the plugin's
+ * slot emptied (withSlotEmptied), and one that still holds over every check
+ * project proves nothing of the plugin, and fails.
  *
- *   file rule      the files check.json names as the language's are, and
- *                  those it names as not are not
- *   declarations   the topLevel slot says which names a file's top level
- *                  declares
- *   references     the adapter reports every reference to the protected
- *                  thing, and none else; a plugin that reports none fails
- *                  here, by name
- *   chokepoint     the check grades the protected thing through the
- *                  chokepoint as check.json expects, bypasses named, its
- *                  refutation seen or refused, never missing
- *   one answer each  no two of its slots answer with one function, or two
- *                  spelled alike: a question asked of the language belongs
- *                  to one slot, or its answers drift apart
- *
- * Each duty passes, fails with why, or is not run with why (the
- * plugin's language server is absent); only every one passing is a pass.
- * The plugin is held as a project would run it: swapped in for its language
- * over a scratch copy of the check project.
+ * Each duty passes, fails with why, is not run with why (the plugin's
+ * language server is absent), or is overridden with why; only every one
+ * passing or overridden is a pass. The plugin is held as a project would
+ * run it: swapped in for its language over a scratch copy of the check
+ * project.
  */
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
+import { detectEntranceCandidates } from "../adapters/entrance-candidates.ts";
+import { declarationsOf, importsOf } from "../economy/source.ts";
 import { DEFAULT_TEST_FOLDERS } from "../enforcement/config.ts";
+import { parseLexicon } from "../lifecycle/lexicon.ts";
+import { COHERENCE_LEXICON } from "../lifecycle/project.ts";
+import { declares as declaresOf } from "../observation/interfaces.ts";
+import { isTypeDeclaration } from "../readings/scope/component-interfaces.ts";
+import { abstractBullets, holdsFor, overridesOf, type AbstractBullet } from "./abstract.ts";
+import { clashText, composeStack, pluginLayers } from "./lexicon.ts";
 import { performRun } from "../enforcement/run.ts";
-import { bundledAdapter, bundledPlugins, forProject, languageOfFile, registerProjectPlugins, repeatedAnswers, syntaxOf } from "./languages.ts";
-import type { LoadedPlugin } from "./plugin.ts";
+import { bundledAdapter, bundledPlugins, forProject, languageOfFile, registerProjectPlugins, repeatedAnswers, syntaxOf, withSlotEmptied } from "./languages.ts";
+import type { LoadedPlugin, SyntaxSlot } from "./plugin.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
 import { proveVia, viaForm } from "./verify.ts";
 
@@ -49,13 +49,21 @@ export interface CheckProject {
   /** The grade the check gives, and its bypasses as file:line. */
   grade: string;
   bypasses: string[];
+  /** The source slot's reading: names a file declares at its top level, exported or not, and the file an import leads to. */
+  source?: { declarations: { file: string; name: string; exported: boolean }[]; imports: { from: string; to: string }[] };
+  /** The interfaces slot's reading: whether a declaration line is a type only, and the modules a file glob-imports. */
+  interfaces?: { types: { line: string; type: boolean }[]; wildcards: { file: string; modules: string[] }[] };
+  /** The declares slot's reading: what a declaration line can run. */
+  declares?: { line: string; declares: string }[];
+  /** The entrances the language's rules find, by file and symbol ("" for a file-grain entrance), and none besides. */
+  entrances?: { file: string; symbol: string }[];
 }
 
 /** One duty's outcome. */
 export interface Duty {
-  /** A language plugin's four duties, or a verifier's one per form it declares, as a bullet writes it ("[quint run]"). */
-  name: "file rule" | "declarations" | "references" | "chokepoint" | "one answer each" | `[${string}]`;
-  verdict: "pass" | "fail" | "not run";
+  /** An abstract bullet's name, or a verifier's one per form it declares, as a bullet writes it ("[quint run]"). */
+  name: string;
+  verdict: "pass" | "fail" | "not run" | "overridden";
   reason: string;
 }
 
@@ -103,10 +111,27 @@ export function checkProjectProblem(value: unknown): string | undefined {
   if (!Array.isArray(value["declarations"]) || !value["declarations"].every((d) => record(d) && typeof d["file"] === "string" && typeof d["name"] === "string" && typeof d["declared"] === "boolean")) wrong.push('declarations, a list of { "file", "name", "declared" }');
   for (const key of ["protects", "chokepoint", "grade"] as const) if (typeof value[key] !== "string" || value[key] === "") wrong.push(`${key}, a name`);
   for (const key of ["references", "bypasses"] as const) if (!strings(value[key])) wrong.push(`${key}, a list of file:line`);
+  const list = (v: unknown, keys: Record<string, string>): boolean => Array.isArray(v) && v.every((x) => record(x) && Object.entries(keys).every(([k, t]) => (t === "strings" ? strings(x[k]) : typeof x[k] === t)));
+  const source = value["source"];
+  if (source !== undefined && (!record(source) || !list(source["declarations"], { file: "string", name: "string", exported: "boolean" }) || !list(source["imports"], { from: "string", to: "string" })))
+    wrong.push('source, { "declarations": [{ "file", "name", "exported" }], "imports": [{ "from", "to" }] }');
+  const interfaces = value["interfaces"];
+  if (interfaces !== undefined && (!record(interfaces) || !list(interfaces["types"], { line: "string", type: "boolean" }) || !list(interfaces["wildcards"], { file: "string", modules: "strings" })))
+    wrong.push('interfaces, { "types": [{ "line", "type" }], "wildcards": [{ "file", "modules" }] }');
+  if (value["declares"] !== undefined && !list(value["declares"], { line: "string", declares: "string" })) wrong.push('declares, a list of { "line", "declares" }');
+  if (value["entrances"] !== undefined && !list(value["entrances"], { file: "string", symbol: "string" })) wrong.push('entrances, a list of { "file", "symbol" }');
   return wrong.length === 0 ? undefined : `it lacks ${wrong.join("; ")}`;
 }
 
-const DUTIES = ["file rule", "declarations", "references", "chokepoint"] as const;
+/** The abstract bullets graded over a language's check projects, in the order they run there. */
+export const LANGUAGE_DUTIES = ["file rule", "declarations", "source", "interfaces", "declares", "entrances", "references", "chokepoint"] as const;
+type LanguageDuty = (typeof LANGUAGE_DUTIES)[number];
+
+/** The bullets graded again with a slot emptied: each one's slot, or the file rule's own empty answer. */
+export const EMPTIED: Partial<Record<LanguageDuty, SyntaxSlot | "files">> = { "file rule": "files", declarations: "topLevel", source: "source", interfaces: "interfaces", declares: "declares", entrances: "entrances" };
+
+/** Every duty plugin check runs, by the abstract bullet it grades: what the abstract spec's own test holds its bullets to. */
+export const DUTY_NAMES: readonly string[] = [...LANGUAGE_DUTIES, "one answer each", "verifier forms", "lexicon"];
 
 /** The check projects a plugin is held over: the minimum (the bundled plugin's check.json for its language, as the installed package ships it, which no copy edits) and, when it adds to that, the plugin's own. */
 function checkProjects(plugin: LoadedPlugin, language: string): { label: string; project: CheckProject }[] | { refusal: string } {
@@ -168,38 +193,71 @@ function isDefault(plugin: LoadedPlugin): boolean {
 }
 
 /**
- * Run every duty the plugin owes: a language's, when it provides or extends
- * one (Convex over TypeScript), over each check project; a verifier's, one
- * per via form it declares, over its check.json's proofs; both, in that
- * order, for a plugin that does both. A plugin that does neither is refused.
+ * Hold a plugin to every bullet of the abstract spec its shape calls for:
+ * a language's, when it provides or extends one (Convex over TypeScript),
+ * over each check project; a verifier's, one per via form it declares, over
+ * its check.json's proofs; its lexicon layer's against Coherence's. A bullet
+ * the plugin's own spec overrides is said with why, never graded. A plugin
+ * no bullet holds for is refused.
  */
-export async function checkPlugin(root: string, given: string): Promise<PluginCheck> {
+export async function checkPlugin(root: string, given: string, options: { only?: readonly string[] } = {}): Promise<PluginCheck> {
   const plugin = pluginAt(root, given);
   // A plugin that extends a language without providing it is held to that language's duties, as the adapter it wraps is.
   const language = plugin.manifest.provides?.language ?? plugin.manifest.extends;
   const verifies = (plugin.manifest.verifiers ?? []).length > 0;
+  // `only` narrows the check to the bullets named (the text readings, which need no language server), never widens it.
+  const held = abstractBullets().filter((b) => holdsFor(b, plugin) && (options.only === undefined || options.only.includes(b.name)));
   if (language === undefined && !verifies) throw new Error(`plugin check: plugin ${plugin.name} neither provides nor extends a language nor proves a via form, so it owes no duty plugin check holds`);
-  const languageDuties = language === undefined ? [] : await languageDutiesOf(plugin, language);
-  const verifierDuties = verifies ? await verifierDutiesOf(plugin) : [];
-  return { plugin, language: language === undefined ? "verifier" : verifies ? `${language} + verifier` : language, duties: [...languageDuties, ...verifierDuties] };
+  const overrides = overridesOf(plugin);
+  const graded = new Set(held.filter((b) => !overrides.has(b.name)).map((b) => b.name));
+  const duties = new Map<string, Duty[]>();
+  for (const bullet of held) {
+    const override = overrides.get(bullet.name);
+    if (override !== undefined) duties.set(bullet.name, [{ name: bullet.name, verdict: "overridden", reason: `${override.instead}; because ${override.because}` }]);
+  }
+  const wanted = LANGUAGE_DUTIES.filter((name) => graded.has(name));
+  if (language !== undefined && wanted.length > 0) for (const duty of await languageDutiesOf(plugin, language, wanted)) duties.set(duty.name, [duty]);
+  if (graded.has("one answer each")) duties.set("one answer each", [await guarded("one answer each", () => oneAnswerEach(plugin))]);
+  if (graded.has("verifier forms")) duties.set("verifier forms", await verifierDutiesOf(plugin));
+  if (graded.has("lexicon")) duties.set("lexicon", [await guarded("lexicon", () => lexiconLayer(plugin))]);
+  // In the abstract spec's order, so every plugin's report reads alike.
+  const ordered = held.flatMap((b: AbstractBullet) => duties.get(b.name) ?? []);
+  return { plugin, language: language === undefined ? "verifier" : verifies ? `${language} + verifier` : language, duties: ordered };
 }
 
-/** A language plugin's four duties over each check project, the worst outcome of each standing. */
-async function languageDutiesOf(plugin: LoadedPlugin, language: string): Promise<Duty[]> {
+/** Whether the plugin's lexicon layer reads and takes no name Coherence's own lexicon holds. */
+function lexiconLayer(plugin: LoadedPlugin): Duty {
+  const own = parseLexicon(JSON.parse(readFileSync(COHERENCE_LEXICON, "utf8")), COHERENCE_LEXICON);
+  const layers = pluginLayers([plugin]);
+  const concepts = layers[0]?.lexicon.concepts.length ?? 0;
+  const { clashes } = composeStack(own, layers);
+  return clashes.length === 0 ? { name: "lexicon", verdict: "pass", reason: `${concepts} concepts, none taking a name Coherence's lexicon holds` } : { name: "lexicon", verdict: "fail", reason: clashes.map(clashText).join("; ") };
+}
+
+/** One duty over one check project, and its verdict with the plugin's slot emptied, when it was graded again. */
+type Graded = Duty & { emptied?: Duty };
+
+/**
+ * A language plugin's duties over each check project, the worst outcome of
+ * each standing; a duty graded again with the plugin's slot emptied that
+ * holds that way over every project proves nothing of the plugin, and fails.
+ */
+async function languageDutiesOf(plugin: LoadedPlugin, language: string, wanted: readonly LanguageDuty[]): Promise<Duty[]> {
   const projects = checkProjects(plugin, language);
-  if ("refusal" in projects) return DUTIES.map((name) => ({ name, verdict: "fail", reason: projects.refusal }));
-  const each: Duty[][] = [];
-  for (const { label, project } of projects) each.push((await overProject(project, plugin, language)).map((d) => ({ ...d, reason: `${label}: ${d.reason}` })));
+  if ("refusal" in projects) return wanted.map((name) => ({ name, verdict: "fail", reason: projects.refusal }));
+  const each: Graded[][] = [];
+  for (const { label, project } of projects) each.push((await overProject(project, plugin, language, wanted)).map((d) => ({ ...d, reason: `${label}: ${d.reason}` })));
   // A duty passes only where it passes over every project; the worst outcome stands, with each project's reason.
-  const rank = { pass: 0, "not run": 1, fail: 2 } as const;
-  return [
-    ...DUTIES.map((name) => {
-      const found = each.map((duties) => duties.find((d) => d.name === name)!);
-      const worst = found.reduce((a, b) => (rank[b.verdict] > rank[a.verdict] ? b : a));
-      return { name, verdict: worst.verdict, reason: found.map((d) => d.reason).join("; ") };
-    }),
-    await guarded("one answer each", () => oneAnswerEach(plugin)),
-  ];
+  const rank = { pass: 0, overridden: 0, "not run": 1, fail: 2 } as const;
+  return wanted.map((name): Duty => {
+    const found = each.map((duties) => duties.find((d) => d.name === name)!);
+    const worst = found.reduce((a, b) => (rank[b.verdict] > rank[a.verdict] ? b : a));
+    const reason = found.map((d) => d.reason).join("; ");
+    if (worst.verdict !== "pass" || EMPTIED[name] === undefined) return { name, verdict: worst.verdict, reason };
+    // The emptied reading must fail over some project: the plugin's own, where the bundled minimum asks nothing it alone answers.
+    if (found.some((d) => d.emptied !== undefined && d.emptied.verdict !== "pass")) return { name, verdict: "pass", reason: `${reason}; with the plugin's ${EMPTIED[name]} emptied it fails` };
+    return { name, verdict: "fail", reason: `holds with the plugin's ${EMPTIED[name]} emptied too, so check.json asks nothing the plugin alone answers: add to its ${name} what only the plugin's reading gets right (${reason})` };
+  });
 }
 
 /** Whether each of the plugin's answers is given by one slot alone (repeatedAnswers). */
@@ -217,8 +275,8 @@ async function guarded(name: Duty["name"], run: () => Duty | Promise<Duty>): Pro
   }
 }
 
-/** Every duty over one check project, in a scratch copy, the plugin in its language's place for it alone. */
-async function overProject(project: CheckProject, plugin: LoadedPlugin, language: string): Promise<Duty[]> {
+/** Every wanted duty over one check project, in a scratch copy, the plugin in its language's place for it alone. */
+async function overProject(project: CheckProject, plugin: LoadedPlugin, language: string, wanted: readonly LanguageDuty[]): Promise<Graded[]> {
   const scratch = realpathSync(mkdtempSync(join(tmpdir(), "coherence-plugin-check-")));
   try {
     for (const [path, text] of Object.entries(project.files)) {
@@ -229,18 +287,88 @@ async function overProject(project: CheckProject, plugin: LoadedPlugin, language
     // registers the plugin as the project's, never the bundled defaults alone.
     writeFileSync(join(scratch, CONFIG), JSON.stringify(checkConfig(project, plugin, language), null, 2) + "\n");
     registerProjectPlugins(scratch, isDefault(plugin) ? [] : [plugin]);
-    return await forProject(scratch, async () => [await guarded("file rule", () => fileRule(project, language)), await guarded("declarations", () => declarations(project, language)), ...(await instrument(scratch, project, plugin, language))]);
+    return await forProject(scratch, async () => {
+      const graded: Graded[] = [];
+      for (const name of wanted) {
+        const read = TEXT_DUTIES[name];
+        if (read === undefined) continue;
+        const duty = await guarded(name, () => read(project, scratch, language, languageOfFile));
+        const slot = EMPTIED[name];
+        if (duty.verdict !== "pass" || slot === undefined) {
+          graded.push(duty);
+          continue;
+        }
+        const emptied = await guarded(name, () => (slot === "files" ? read(project, scratch, language, () => undefined) : withSlotEmptied(plugin, slot, () => read(project, scratch, language, languageOfFile))));
+        graded.push({ ...duty, emptied });
+      }
+      if (wanted.includes("references") || wanted.includes("chokepoint")) graded.push(...(await instrument(scratch, project, plugin, language)).filter((d) => wanted.includes(d.name as LanguageDuty)));
+      return graded;
+    });
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
 }
 
-function fileRule(project: CheckProject, language: string): Duty {
+/** Which language a project file is read as: the registry's answer, or none, for the file rule graded with its rule emptied. */
+type LanguageOf = (file: string) => string | undefined;
+
+/** The duties read from text alone, each a reading of the core asked over the check project, so the plugin is held to what the readings make of its answers. */
+const TEXT_DUTIES: Partial<Record<LanguageDuty, (project: CheckProject, scratch: string, language: string, languageOf: LanguageOf) => Duty>> = {
+  "file rule": (project, _scratch, language, languageOf) => fileRule(project, language, languageOf),
+  declarations: (project, _scratch, language) => declarations(project, language),
+  source: (project, scratch, language) => {
+    const expected = project.source;
+    if (expected === undefined || expected.declarations.length + expected.imports.length === 0) return { name: "source", verdict: "fail", reason: 'nothing to check: check.json names no source, { "declarations": [...], "imports": [...] }' };
+    const wrong = [
+      ...expected.declarations.flatMap((d) => {
+        const found = declarationsOf(project.files[d.file] ?? "", language).find((f) => f.name === d.name);
+        return found === undefined ? [`${d.name} in ${d.file} not read as declared`] : found.exported !== d.exported ? [`${d.name} in ${d.file} read as ${found.exported ? "exported" : "not exported"}`] : [];
+      }),
+      ...expected.imports.flatMap((i) => (importsOf(scratch, i.from, project.files[i.from] ?? "", language).some((found) => found.module === i.to) ? [] : [`${i.from}'s imports lead to no ${i.to}`])),
+    ];
+    return wrong.length === 0 ? { name: "source", verdict: "pass", reason: `${expected.declarations.length} declarations and ${expected.imports.length} imports read as expected` } : { name: "source", verdict: "fail", reason: wrong.join("; ") };
+  },
+  interfaces: (project, _scratch, language) => {
+    const expected = project.interfaces;
+    if (expected === undefined || expected.types.length + expected.wildcards.length === 0) return { name: "interfaces", verdict: "fail", reason: 'nothing to check: check.json names no interfaces, { "types": [...], "wildcards": [...] }' };
+    const wildcard = syntaxOf(language, "interfaces")?.wildcardModules;
+    const wrong = [
+      ...expected.types.filter((t) => isTypeDeclaration(t.line, language) !== t.type).map((t) => `"${t.line}" read as ${t.type ? "no type" : "a type"}`),
+      ...expected.wildcards.flatMap((w) => {
+        const found = wildcard?.(w.file, project.files[w.file] ?? "") ?? [];
+        const missed = w.modules.filter((m) => !found.includes(m));
+        return missed.length === 0 ? [] : [`${w.file} glob-imports ${missed.join(", ")}, read as ${found.join(", ") || "none"}`];
+      }),
+    ];
+    return wrong.length === 0 ? { name: "interfaces", verdict: "pass", reason: `${expected.types.length} declaration lines and ${expected.wildcards.length} glob imports read as expected` } : { name: "interfaces", verdict: "fail", reason: wrong.join("; ") };
+  },
+  declares: (project, _scratch, language) => {
+    const expected = project.declares ?? [];
+    if (expected.length === 0) return { name: "declares", verdict: "fail", reason: 'nothing to check: check.json names no declares, [{ "line", "declares" }]' };
+    const wrong = expected.flatMap((d) => {
+      const found = declaresOf(d.line, language);
+      return found === d.declares ? [] : [`"${d.line}" read as ${found}, not ${d.declares}`];
+    });
+    return wrong.length === 0 ? { name: "declares", verdict: "pass", reason: `${expected.length} of ${expected.length} lines read as expected` } : { name: "declares", verdict: "fail", reason: wrong.join("; ") };
+  },
+  entrances: (project, scratch, language) => {
+    const expected = project.entrances;
+    if (expected === undefined) return { name: "entrances", verdict: "fail", reason: 'nothing to check: check.json names no entrances, [{ "file", "symbol" }]' };
+    const found = detectEntranceCandidates(scratch, { language, files: Object.keys(project.files).filter((f) => f !== CONFIG), wrappers: [], testFolders: [...DEFAULT_TEST_FOLDERS] }).map((c) => `${c.file}#${c.symbol}`);
+    const want = expected.map((e) => `${e.file}#${e.symbol}`);
+    if (want.length === 0) return { name: "entrances", verdict: "fail", reason: "nothing to check: check.json expects no entrance" };
+    const missed = want.filter((w) => !found.includes(w));
+    const extra = found.filter((f) => !want.includes(f));
+    return missed.length + extra.length === 0 ? { name: "entrances", verdict: "pass", reason: `${found.length} of ${want.length} entrances found` } : { name: "entrances", verdict: "fail", reason: [missed.length > 0 ? `missed ${missed.join(", ")}` : "", extra.length > 0 ? `found ${extra.join(", ")}, which check.json does not expect` : ""].filter((x) => x !== "").join("; ") };
+  },
+};
+
+function fileRule(project: CheckProject, language: string, languageOf: LanguageOf): Duty {
   const all = project.language.files.length + project.language.not.length;
   if (all === 0) return { name: "file rule", verdict: "fail", reason: "nothing to check: the check project names no file for the rule to take or leave" };
   const wrong = [
-    ...project.language.files.filter((f) => languageOfFile(f) !== language).map((f) => `${f} is not read as ${language}`),
-    ...project.language.not.filter((f) => languageOfFile(f) === language).map((f) => `${f} is read as ${language}`),
+    ...project.language.files.filter((f) => languageOf(f) !== language).map((f) => `${f} is not read as ${language}`),
+    ...project.language.not.filter((f) => languageOf(f) === language).map((f) => `${f} is read as ${language}`),
   ];
   return wrong.length === 0 ? { name: "file rule", verdict: "pass", reason: `${all} of ${all} files read as expected` } : { name: "file rule", verdict: "fail", reason: wrong.join("; ") };
 }
@@ -377,6 +505,11 @@ async function verifierDutiesOf(plugin: LoadedPlugin): Promise<Duty[]> {
         duties.push({ name, verdict: "fail", reason: `nothing to check: the check project proves nothing by [${form}]` });
         continue;
       }
+      // A form proved only ever to pass would pass a verifier that never fails: its check project must refute a false name too.
+      if (!proofs.some((p) => p.verdict === "pass") || !proofs.some((p) => p.verdict === "fail")) {
+        duties.push({ name, verdict: "fail", reason: `the check project must prove a name by [${form}] that holds and one that does not; it expects ${[...new Set(proofs.map((p) => p.verdict))].join(" and ")} only` });
+        continue;
+      }
       const wrong: string[] = [];
       const unrun: string[] = [];
       for (const proof of proofs) {
@@ -419,10 +552,10 @@ async function withEnv<T>(env: Record<string, string> | undefined, work: () => P
 
 /** The report plugin check prints: the plugin, then one line per duty; a check with no fail but a duty not run says so rather than pass. */
 export function checkText(check: PluginCheck): string {
-  const passed = check.duties.every((o) => o.verdict === "pass");
+  const passed = check.duties.every((o) => o.verdict === "pass" || o.verdict === "overridden");
   const failed = check.duties.some((o) => o.verdict === "fail");
   return [
     `plugin check ${check.plugin.name} (${check.plugin.source}, ${check.language}, ${check.plugin.version}): ${passed ? "pass" : failed ? "FAIL" : "NOT RUN"}`,
-    ...check.duties.map((o) => `  ${o.verdict.padEnd(7)} ${o.name}: ${o.reason}`),
+    ...check.duties.map((o) => `  ${o.verdict.padEnd(10)} ${o.name}: ${o.reason}`),
   ].join("\n");
 }

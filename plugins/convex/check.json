@@ -71,5 +71,35 @@
     "convex/namespace.ts:3",
     "convex/passed.ts:5",
     "src/relayed.ts:3"
+  ],
+  "entrances": [
+    {
+      "file": "convex/alias.ts",
+      "symbol": "viaAlias"
+    },
+    {
+      "file": "convex/byname.ts",
+      "symbol": "byName"
+    },
+    {
+      "file": "convex/crons.ts",
+      "symbol": "send"
+    },
+    {
+      "file": "convex/events.ts",
+      "symbol": "record"
+    },
+    {
+      "file": "convex/http.ts",
+      "symbol": "webhook"
+    },
+    {
+      "file": "convex/http.ts",
+      "symbol": ""
+    },
+    {
+      "file": "convex/leak.ts",
+      "symbol": "flush"
+    }
   ]
 }

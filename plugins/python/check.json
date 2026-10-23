@@ -7,7 +7,10 @@
     "shop/api/__init__.py": "",
     "shop/api/render.py": "from shop.store.secrets import SECRET_COLUMNS, seal\n\n\ndef render(pattern, row):\n    sealed = seal(pattern, row)\n    leaked = SECRET_COLUMNS.get(pattern)\n    return {\"sealed\": sealed, \"leaked\": leaked}\n",
     "tests/test_secrets.py": "from shop.store.secrets import SECRET_COLUMNS\n\n\ndef test_columns():\n    assert SECRET_COLUMNS\n",
-    "README.md": "# A project\n"
+    "README.md": "# A project\n",
+    "shop/store/rows.py": "class Row:\n    pass\n\n\n_LIMIT = 3\n\n\ndef first(rows):\n    return rows[:_LIMIT]\n",
+    "shop/store/everything.py": "from shop.store.rows import *\n",
+    "shop/api/routes.py": "from fastapi import FastAPI\n\nfrom shop.store.rows import first\n\napp = FastAPI()\n\n\n@app.get(\"/rows\")\ndef rows():\n    return first([])\n"
   },
   "language": {
     "files": [
@@ -56,5 +59,74 @@
   "bypasses": [
     "shop/api/render.py:1",
     "shop/api/render.py:6"
+  ],
+  "source": {
+    "declarations": [
+      {
+        "file": "shop/store/rows.py",
+        "name": "Row",
+        "exported": true
+      },
+      {
+        "file": "shop/store/rows.py",
+        "name": "_LIMIT",
+        "exported": false
+      },
+      {
+        "file": "shop/store/rows.py",
+        "name": "first",
+        "exported": true
+      }
+    ],
+    "imports": [
+      {
+        "from": "shop/api/routes.py",
+        "to": "shop/store/rows.py"
+      },
+      {
+        "from": "shop/api/render.py",
+        "to": "shop/store/secrets.py"
+      }
+    ]
+  },
+  "interfaces": {
+    "types": [
+      {
+        "line": "class Row:",
+        "type": false
+      },
+      {
+        "line": "def first(rows):",
+        "type": false
+      }
+    ],
+    "wildcards": [
+      {
+        "file": "shop/store/everything.py",
+        "modules": [
+          "shop/store/rows.py"
+        ]
+      }
+    ]
+  },
+  "declares": [
+    {
+      "line": "class Row:",
+      "declares": "body"
+    },
+    {
+      "line": "_LIMIT = 3",
+      "declares": "value"
+    },
+    {
+      "line": "def first(rows):",
+      "declares": "body"
+    }
+  ],
+  "entrances": [
+    {
+      "file": "shop/api/routes.py",
+      "symbol": "rows"
+    }
   ]
 }
