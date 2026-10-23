@@ -55,7 +55,7 @@ import { tmpdir } from "node:os";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import type { Definition, Ladder, LanguageAdapter, Refutation, ReferenceSite, ResolveHint, Resolved, Visibility } from "../adapters/adapter.ts";
+import type { Definition, Ladder, LanguageAdapter, Occasion, Refutation, ReferenceSite, ResolveHint, Resolved, Visibility } from "../adapters/adapter.ts";
 import { instrumentFor } from "../adapters/index.ts";
 import { readEnforcementConfig } from "./config.ts";
 import { codeFingerprint } from "./code-fingerprint.ts";
@@ -550,7 +550,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
     references: (definition) => enqueue(() => adapter.references(definition)),
     visibility: (definition, chokepoint) => enqueue(() => adapter.visibility(definition, chokepoint)),
     testFilter: (via) => adapter.testFilter(via),
-    refute: (thing, outside) => enqueue(() => adapter.refute(thing, outside)),
+    refute: (thing, outside, exempt, occasion) => enqueue(() => adapter.refute(thing, outside, exempt, occasion)),
     forget: (files) => enqueue(() => adapter.forget(files)),
     // The server owns the instrument; an app never closes it.
     close: async () => {},
@@ -623,7 +623,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
       case "testFilter":
         return adapter.testFilter(params[0] as string);
       case "refute":
-        return adapter.refute(params[0] as Definition, params[1] as Definition | undefined);
+        return adapter.refute(params[0] as Definition, params[1] as Definition | undefined, (params[2] as string | null | undefined) ?? undefined, (params[3] as Occasion | null | undefined) ?? undefined);
       case "forget":
         // Answered only once the instrument has acknowledged the current text, so the client's next question cannot be stale.
         await adapter.forget((params[0] as string[] | undefined) ?? []);
@@ -807,8 +807,9 @@ export class RemoteAdapter implements LanguageAdapter {
   testFilter(via: string): string {
     return via;
   }
-  refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation> {
-    return this.client.request("refute", [protectedThing, outsideOf]);
+  refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string, occasion?: Occasion): Promise<Refutation> {
+    // The exempt folder and the occasion travel too: dropped, a served refutation of an exempting check never staged its outside use.
+    return this.client.request("refute", [protectedThing, outsideOf, exempt ?? null, occasion ?? null]);
   }
   /** Drop what the server cached about file contents and re-read the named files; the edit hook calls it before re-checking. */
   async forget(files: readonly string[] = []): Promise<void> {

@@ -54,7 +54,7 @@ import type { ServerLocation } from "../../src/plugins/api.ts";
 import { locateRustAnalyzer } from "./rust-analyzer.ts";
 import manifest from "./plugin.json" with { type: "json" };
 import { JsonRpcClient, RpcError } from "../../src/plugins/api.ts";
-import { keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
+import { hintedFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control when the server is quiescent. */
 export interface RustLanguageClient {
@@ -646,7 +646,7 @@ export class RustAdapter implements LanguageAdapter {
 
   private async searchFiles(name: string, fileHint: string): Promise<Candidate[]> {
     const candidates: Candidate[] = [];
-    for (const file of this.walkedNow().filter((rel) => rel.endsWith(".rs") && (rel === fileHint || rel.endsWith(`/${fileHint}`)))) candidates.push(...(await this.declarationsIn(file, name)));
+    for (const file of hintedFiles(this.walkedNow().filter((rel) => rel.endsWith(".rs")), fileHint)) candidates.push(...(await this.declarationsIn(file, name)));
     return candidates;
   }
 

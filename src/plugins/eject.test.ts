@@ -72,7 +72,7 @@ test("plugin check holds a plugin to every duty, bundled or by path, and a plugi
   // A plugin that takes typescript's place and answers every references query with nothing.
   const root = project({
     "deaf/plugin.json": JSON.stringify({ name: "deaf", version: "0.1.0", pluginApi: 2, provides: { language: "typescript" }, extends: "typescript", module: "./index.ts" }),
-    "deaf/index.ts": "export default { adapter: ({ base }) => ({ language: base.language, ladder: base.ladder, ready: () => base.ready(), resolve: (n, h) => base.resolve(n, h), references: async () => [], visibility: (d, c) => base.visibility(d, c), testFilter: (v) => base.testFilter(v), refute: (p, o, e) => base.refute(p, o, e), forget: (f) => base.forget(f), close: async () => {} }) };\n",
+    "deaf/index.ts": "export default { adapter: ({ base }) => ({ language: base.language, ladder: base.ladder, ready: () => base.ready(), resolve: (n, h) => base.resolve(n, h), references: async () => [], visibility: (d, c) => base.visibility(d, c), testFilter: (v) => base.testFilter(v), refute: (p, o, e, c) => base.refute(p, o, e, c), forget: (f) => base.forget(f), close: async () => {} }) };\n",
   });
   cpSync(join(PLUGIN_SOURCES, "typescript", "check.json"), join(root, "deaf", "check.json"));
   const deaf = await checkPlugin(root, "./deaf");
@@ -86,9 +86,19 @@ test("plugin check holds a plugin to every duty, bundled or by path, and a plugi
   assert.equal(untested.duties.find((o) => o.name === "references")!.verdict, "fail", "a plugin with no check.json of its own is still held to the bundled minimum for its language");
 });
 
+test("plugin check hands the adapter its scratch project's real path, so a server that answers in real paths reports sites inside it", async () => {
+  // macOS keeps the temporary folder behind a link (/var is /private/var); a server answers in the real path, so a root that is not one loses every site.
+  const root = project({
+    "real/plugin.json": JSON.stringify({ name: "real", version: "0.1.0", pluginApi: 2, provides: { language: "typescript" }, extends: "typescript", module: "./index.ts" }),
+    "real/index.ts": 'import { realpathSync } from "node:fs";\nexport default { adapter: ({ root, base }) => ({ language: base.language, ladder: base.ladder, ready: async () => (realpathSync(root) === root ? base.ready() : { ok: false, reason: `handed ${root}, whose real path is ${realpathSync(root)}` }), resolve: (n, h) => base.resolve(n, h), references: (d) => base.references(d), visibility: (d, c) => base.visibility(d, c), testFilter: (v) => base.testFilter(v), refute: (p, o, e, c) => base.refute(p, o, e, c), forget: (f) => base.forget(f), close: async () => {} }) };\n',
+  });
+  const checked = await checkPlugin(root, "./real");
+  assert.deepEqual(checked.duties.map((o) => [o.name, o.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["references", "pass"], ["chokepoint", "pass"]], JSON.stringify(checked.duties));
+});
+
 test("plugin check passes nothing over nothing: a check.json with no cases fails each duty as nothing to check, {} is refused by name, the bundled minimum stands under a copy's own, and a duty that throws is named while the others report", async () => {
   const deafAdapter = (references: string): string =>
-    `export default { adapter: ({ base }) => ({ language: base.language, ladder: base.ladder, ready: () => base.ready(), resolve: (n, h) => base.resolve(n, h), references: ${references}, visibility: (d, c) => base.visibility(d, c), testFilter: (v) => base.testFilter(v), refute: (p, o, e) => base.refute(p, o, e), forget: (f) => base.forget(f), close: async () => {} }) };\n`;
+    `export default { adapter: ({ base }) => ({ language: base.language, ladder: base.ladder, ready: () => base.ready(), resolve: (n, h) => base.resolve(n, h), references: ${references}, visibility: (d, c) => base.visibility(d, c), testFilter: (v) => base.testFilter(v), refute: (p, o, e, c) => base.refute(p, o, e, c), forget: (f) => base.forget(f), close: async () => {} }) };\n`;
   const manifest = (name: string): string => JSON.stringify({ name, version: "0.1.0", pluginApi: 2, provides: { language: "typescript" }, extends: "typescript", module: "./index.ts" });
   const root = project({
     "honest/plugin.json": manifest("honest"),
@@ -161,7 +171,7 @@ test("plugin check holds a plugin that both extends a language and proves via fo
   const typescript = JSON.parse(readFileSync(join(PLUGIN_SOURCES, "typescript", "check.json"), "utf8")) as Record<string, unknown>;
   const root = project({
     "both/plugin.json": JSON.stringify({ name: "both", version: "0.1.0", pluginApi: 2, extends: "typescript", module: "./index.ts", verifiers: [{ form: "both exit", evidence: "exit-checked", command: ["node", "-e", "process.exit(process.argv[1] === 'ok' ? 0 : 1)", "{name}"] }] }),
-    "both/index.ts": "export default { adapter: ({ base }) => ({ language: base.language, ladder: base.ladder, ready: () => base.ready(), resolve: (n, h) => base.resolve(n, h), references: (d) => base.references(d), visibility: (d, c) => base.visibility(d, c), testFilter: (v) => base.testFilter(v), refute: (p, o, e) => base.refute(p, o, e), forget: (f) => base.forget(f), close: async () => {} }) };\n",
+    "both/index.ts": "export default { adapter: ({ base }) => ({ language: base.language, ladder: base.ladder, ready: () => base.ready(), resolve: (n, h) => base.resolve(n, h), references: (d) => base.references(d), visibility: (d, c) => base.visibility(d, c), testFilter: (v) => base.testFilter(v), refute: (p, o, e, c) => base.refute(p, o, e, c), forget: (f) => base.forget(f), close: async () => {} }) };\n",
     "both/check.json": JSON.stringify({ ...typescript, proofs: [{ via: "[both exit] ok", verdict: "pass" }, { via: "[both exit] no", verdict: "fail" }] }),
   });
   const checked = await checkPlugin(root, "./both");

@@ -348,6 +348,25 @@ test("mass: a file in no component and a file in a component that no invariant r
   assert.deepEqual(fromSpec.outside.files, ["src/api/render.ts", "src/util/format.ts"]);
 });
 
+test("mass over a project whose only language no scan reads says it measured nothing, never 0% unreached", () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-mass-unread-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text, "utf8");
+  };
+  try {
+    put("coherence.config.json", JSON.stringify({ language: "rust" }));
+    put("Cargo.toml", "[package]\nname = \"accounts\"\nversion = \"0.1.0\"\n");
+    put("src/Accounts.spec.md", "# Accounts\n\nThe accounts.\n");
+    put("src/lib.rs", "pub fn post() {}\n");
+    const printed = formatMass(computeMass(dir));
+    assert.match(printed.split("\n")[0]!, /^unreached mass: not measured, since no source file was read \(rust NOT READ; see the languages line below\)$/, printed);
+    assert.doesNotMatch(printed, /0% of lines/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("mass names each folder of three or more code files that a component above it holds only because the folder has no spec of its own", () => {
   const dir = mkdtempSync(join(tmpdir(), "coherence-mass-unspecced-"));
   const put = (path: string, text: string): void => {

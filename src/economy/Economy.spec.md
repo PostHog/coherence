@@ -73,3 +73,9 @@ The context closure of a change, the read traces that record what sessions actua
   crossing: project-source -> reading
   refuted: made computeMass take the primary language's source files alone -> "mass of a two-language project counts every language's files and says which languages it read" went red in multi-language.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- mass that read nothing says so: When mass reads no source file, its headline says the mass was not measured and names each language no scan read, never a share of unreached lines.
+  over: a project whose only language is Rust, which no text scan reads yet, holding a spec and a source file
+  via: mass over a project whose only language no scan reads says it measured nothing, never 0% unreached
+  because: mass over a language it could not read printed "0% of lines" unreached at its head, which reads as every line reached, with the language named as not read only at the bottom (the blind Swift plugin session, 2026-10-22)
+  refuted: made mass head with the unreached share even when it read no file, as before (mass.ts) -> "mass over a project whose only language no scan reads says it measured nothing, never 0% unreached" went red in economy.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
+  kinds: none

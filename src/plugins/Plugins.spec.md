@@ -254,3 +254,15 @@ One interface and registry for what a project adds to Coherence: a language adap
   because: the #139 review asked the dispatch be deliberate once Convex's extending plugins and Quint's verifiers met in one check.ts: a plugin taking both roles must owe both, never whichever branch came first
   refuted: held a plugin that extends a language to its language's duties alone, its via forms unchecked (checkPlugin in check.ts) -> "plugin check holds a plugin that both extends a language and proves via forms to both: the language's four duties, then one duty per form, in that order" went red in eject.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-22)
   kinds: none
+- a plugin names its language's test folders: A plugin's testFolders names folders whose files are all tests by its language's own layout (SwiftPM's Tests), wherever the folder sits and by its exact name, for the project that names the plugin alone; a file named like the folder is not in it.
+  over: a project naming a fixture plugin that adds zz with testFolders Checks, paths under Checks at the root and deeper, a file named Checks.zz, a folder named checks, and a bare project read after it
+  via: a plugin's testFolders name the folders its language keeps tests in, by exact name, for its project alone
+  because: SwiftPM keeps every test under Tests, which no test folder named, so a helper in a test target that touched the protected thing read as a bypass and each project had to remember testDirs (the blind Swift plugin session, 2026-10-22)
+  refuted: made isTestPath read the config's test folders alone, never a plugin's testFolders (adapter.ts) -> "a plugin's testFolders name the folders its language keeps tests in, by exact name, for its project alone" went red in languages.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
+  kinds: none
+- plugin check hands a real path: plugin check builds its scratch project in a folder named by its real path, so an adapter whose server answers in real paths reports every site inside the project.
+  over: a fixture plugin over the TypeScript adapter that refuses to be ready when its root is not its real path, checked against the bundled TypeScript check project
+  via: plugin check hands the adapter its scratch project's real path, so a server that answers in real paths reports sites inside it
+  because: on macOS the temporary folder sits behind a link (/var is /private/var), sourcekit-lsp answered in the real path, and every site fell outside the scratch project, so plugin check failed a correct adapter (the blind Swift plugin session, 2026-10-22)
+  refuted: made plugin check's scratch project the temporary path as made, never its real path, as before (check.ts) -> "plugin check hands the adapter its scratch project's real path, so a server that answers in real paths reports sites inside it" went red in eject.test.ts on macOS, whose temporary folder sits behind a link on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
+  kinds: none

@@ -20,7 +20,7 @@
  * over a scratch copy of the check project.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
@@ -207,7 +207,7 @@ async function guarded(name: Duty["name"], run: () => Duty | Promise<Duty>): Pro
 
 /** Every duty over one check project, in a scratch copy, the plugin in its language's place for it alone. */
 async function overProject(project: CheckProject, plugin: LoadedPlugin, language: string): Promise<Duty[]> {
-  const scratch = mkdtempSync(join(tmpdir(), "coherence-plugin-check-"));
+  const scratch = realpathSync(mkdtempSync(join(tmpdir(), "coherence-plugin-check-")));
   try {
     for (const [path, text] of Object.entries(project.files)) {
       mkdirSync(dirname(join(scratch, path)), { recursive: true });
@@ -351,7 +351,7 @@ async function verifierDutiesOf(plugin: LoadedPlugin): Promise<Duty[]> {
   const problem = verifierProjectProblem(value);
   if (problem !== undefined) return refuse(`plugin ${plugin.name}'s ${file} is no verifier's check project: ${problem}`);
   const project = value as VerifierCheckProject;
-  const scratch = mkdtempSync(join(tmpdir(), "coherence-plugin-check-"));
+  const scratch = realpathSync(mkdtempSync(join(tmpdir(), "coherence-plugin-check-")));
   try {
     for (const [path, text] of Object.entries(project.files)) {
       mkdirSync(dirname(join(scratch, path)), { recursive: true });

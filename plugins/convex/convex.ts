@@ -17,6 +17,7 @@ import {
   walkedProjectFiles,
   type Definition,
   type LanguageAdapter,
+  type Occasion,
   type ReferenceSite,
   type Refutation,
   type ResolveHint,
@@ -85,8 +86,8 @@ export class ConvexAdapter implements LanguageAdapter {
     return sites;
   }
 
-  async refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string): Promise<Refutation> {
-    const refuted = await this.base.refute(protectedThing, outsideOf, exempt);
+  async refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string, occasion?: Occasion): Promise<Refutation> {
+    const refuted = await this.base.refute(protectedThing, outsideOf, exempt, occasion);
     const staged = this.stageGeneratedApiUse(protectedThing, exempt);
     if (staged === undefined) return refuted;
     try {

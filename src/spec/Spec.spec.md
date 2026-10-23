@@ -268,3 +268,9 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: made modelMirror accept a name its file no longer declares -> "the model: a mirror names a list and what it mirrors that are both declared, and one whose name or file is gone is a problem" went red in spec.test.ts on its own assertion; restored byte for byte, green (2026-10-12)
   kinds: none
+- a lost refutation names the check its run could not make: When a bullet the run store graded an invariant has lost what it was graded with and its latest run entry is not run, the floor problem names that entry's reason as the cause and offers making it checkable again before the demotion decision.
+  over: a chokepoint bullet graded an invariant by a passing run, then a later run that could not check it because its protected name became ambiguous
+  via: an invariant whose latest run could not check it names that cause before the demotion it offers
+  because: a chokepoint that stopped resolving read as an invariant that "has lost its refutation" with a demotion as its only remedy, which is the wrong fix when the name became ambiguous (the blind Swift plugin session, 2026-10-22)
+  refuted: made the floor gap leave out the latest entry's not run reason, so the problem blames the lost refutation and offers the demotion alone, as before (floor.ts) -> "an invariant whose latest run could not check it names that cause before the demotion it offers" went red in floor.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
+  kinds: none

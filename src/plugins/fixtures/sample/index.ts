@@ -21,7 +21,7 @@ const sample: PluginModule = {
         return { ...seen, evidence: `the sample plugin answered: ${seen.evidence}` };
       },
       testFilter: (via) => base.testFilter(via),
-      refute: (protectedThing, outsideOf, exempt) => base.refute(protectedThing, outsideOf, exempt),
+      refute: (protectedThing, outsideOf, exempt, occasion) => base.refute(protectedThing, outsideOf, exempt, occasion),
       forget: (files) => base.forget(files),
       // The core closes the adapter it handed over; the plugin closes only what it started, which is nothing.
       close: async () => {},

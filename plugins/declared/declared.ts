@@ -41,7 +41,7 @@ import {
 import { JsonRpcClient } from "../../src/plugins/api.ts";
 import { declaredInstrument, declaredLanguageOf, type DeclaredLanguage } from "../../src/plugins/api.ts";
 import { languageOfFile } from "../../src/plugins/api.ts";
-import { fileIdentity, keepProjectFiles, walkBounds, walkedProjectFiles } from "../../src/plugins/api.ts";
+import { fileIdentity, hintedFiles, keepProjectFiles, walkBounds, walkedProjectFiles } from "../../src/plugins/api.ts";
 
 /**
  * The most files of a declared language the adapter opens before asking for
@@ -326,7 +326,7 @@ export class DeclaredAdapter implements LanguageAdapter {
 
   private async searchFiles(name: string, fileHint: string): Promise<Candidate[]> {
     const candidates: Candidate[] = [];
-    for (const file of this.files().filter((f) => f === fileHint || f.endsWith(`/${fileHint}`))) candidates.push(...(await this.declarationsIn(file, name)));
+    for (const file of hintedFiles(this.files(), fileHint)) candidates.push(...(await this.declarationsIn(file, name)));
     return candidates;
   }
 

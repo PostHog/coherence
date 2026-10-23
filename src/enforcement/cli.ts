@@ -25,7 +25,7 @@ import { verdictText } from "../spec/report.ts";
 import { governedBy } from "./check.ts";
 import { readEnforcementConfig } from "./config.ts";
 import { latencyLines } from "./latency.ts";
-import { RUNS_DIR, appendRefutation, latestByEnforcement, loadRuns, type Form, type RefutationRecord } from "./record.ts";
+import { RUNS_DIR, appendRefutation, entryKey, latestByEnforcement, loadRuns, type Form, type RefutationRecord, type RunEntry, type RunRecord } from "./record.ts";
 import { performRun, UnknownInvariants, type EachOutcome, type EntryDetail, type RunOutcome } from "./run.ts";
 import { DEFAULT_IDLE_MS, serve, type ServeOptions } from "./server.ts";
 import { gitState } from "../journal/store.ts";
@@ -147,6 +147,27 @@ export function formatStatus(root: string, model: SpecModel): string {
   return lines.join("\n");
 }
 
+/** Per enforcement, the latest verdict a run could reach (pass or fail) and when; an enforcement never checked is absent. */
+export function lastChecked(runs: readonly RunRecord[]): Map<string, { verdict: "pass" | "fail"; at: string }> {
+  const checked = new Map<string, { verdict: "pass" | "fail"; at: string }>();
+  for (const run of runs) for (const e of run.invariants) if (e.verdict === "pass" || e.verdict === "fail") checked.set(entryKey(e.component, e.name, e.form), { verdict: e.verdict, at: run.at });
+  return checked;
+}
+
+/** The entries a run could not check whose enforcement an earlier run did check: each has lapsed, whatever the reason now. */
+export function lapsedOf(entries: readonly RunEntry[], checked: ReadonlyMap<string, { verdict: "pass" | "fail"; at: string }>): { entry: RunEntry; before: { verdict: "pass" | "fail"; at: string } }[] {
+  return entries.flatMap((entry) => {
+    const before = entry.verdict === "not run" ? checked.get(entryKey(entry.component, entry.name, entry.form)) : undefined;
+    return before === undefined ? [] : [{ entry, before }];
+  });
+}
+
+function lapsedText(lapsed: ReturnType<typeof lapsedOf>): string {
+  const lines = [`${lapsed.length} enforcement${lapsed.length === 1 ? "" : "s"} an earlier run checked could not be checked now; a check that lapsed is no pass:`];
+  for (const { entry, before } of lapsed) lines.push(`  ○ ${entry.component}/${entry.name} (${entry.form}): ${before.verdict} at ${before.at}, not run now: ${entry.reason}`);
+  return lines.join("\n");
+}
+
 function realOr(path: string): string {
   try {
     return realpathSync(path);
@@ -240,6 +261,8 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
       io.err("run: --each confirms totality oracles one at a time; --form chokepoint runs none");
       return 64;
     }
+    // What each enforcement last read when a run could check it: one checked before and not run now has lapsed, never a clean run.
+    const checked = lastChecked(loadRuns(root).records);
     let outcome: Awaited<ReturnType<typeof performRun>>;
     try {
       outcome = await performRun(root, { session, agent, form, invariants, adapter: direct, adapters, server: directs.length === 0, observe, each });
@@ -248,6 +271,7 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
       io.err(error.message);
       return 64;
     }
+    const lapsed = lapsedOf(outcome.record.invariants, checked);
     if (parsed.switches.has("json")) {
       io.out(
         JSON.stringify(
@@ -257,6 +281,7 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
             instrumentReason: outcome.instrumentReason ?? null,
             instrumentDied: outcome.instrumentDied,
             latency: outcome.latency ?? null,
+            lapsed: lapsed.map(({ entry, before }) => ({ component: entry.component, name: entry.name, form: entry.form, before: before.verdict, beforeAt: before.at, reason: entry.reason })),
             ...(each
               ? {
                   each: outcome.each === undefined ? null : { ...outcome.each.record, file: outcome.each.file, hidden: outcome.each.hidden.map((d) => `${d.entry.component}/${d.entry.name}`), unconfirmed: outcome.each.unconfirmed.map((d) => `${d.entry.component}/${d.entry.name}`) },
@@ -269,12 +294,14 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
           2,
         ),
       );
+    } else {
+      io.out(formatRun(outcome));
+      if (lapsed.length > 0) io.out(lapsedText(lapsed));
     }
-    else io.out(formatRun(outcome));
-    // A run whose instrument never answered proved nothing; it must never read as a clean pass.
+    // A run whose instrument never answered proved nothing; it must never read as a clean pass, nor one that lost a check it could make before.
     // With --each, a test that cannot pass alone (or cannot run alone) is not confirmed either.
     const eachFailed = outcome.each !== undefined && outcome.each.details.some((d) => d.entry.verdict !== "pass");
-    return outcome.record.invariants.some((e) => e.verdict === "fail") || outcome.instrumentDied || eachFailed ? 1 : 0;
+    return outcome.record.invariants.some((e) => e.verdict === "fail") || outcome.instrumentDied || eachFailed || lapsed.length > 0 ? 1 : 0;
   } finally {
     for (const a of directs) await a.close();
   }

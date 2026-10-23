@@ -8,7 +8,7 @@
  * chokepoint it was asked about reads not run, never a pass.
  */
 
-import type { Definition, LanguageAdapter, Ladder, Refutation, ReferenceSite, Resolved, ResolveHint, Visibility } from "../adapters/adapter.ts";
+import type { Definition, LanguageAdapter, Ladder, Occasion, Refutation, ReferenceSite, Resolved, ResolveHint, Visibility } from "../adapters/adapter.ts";
 import type { LoadedPlugin, PluginTag } from "./plugin.ts";
 import { tagOf } from "./plugin.ts";
 import { moduleSyncOf } from "./registry.ts";
@@ -85,8 +85,8 @@ export class PluginAdapter implements LanguageAdapter {
     }
   }
 
-  async refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string): Promise<Refutation> {
-    return (await this.adapter()).refute(protectedThing, outsideOf, exempt);
+  async refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string, occasion?: Occasion): Promise<Refutation> {
+    return (await this.adapter()).refute(protectedThing, outsideOf, exempt, occasion);
   }
 
   async forget(files?: readonly string[]): Promise<void> {

@@ -78,7 +78,7 @@ function dataProblems(raw: Record<string, unknown>, who: string): string[] {
   if (files !== undefined && (!isRecord(files) || !compiles(files["pattern"]) || (files["except"] !== undefined && !compiles(files["except"])))) problems.push(`${who}'s files is { "pattern": "<regular expression>", "except"?: "<regular expression>" }`);
   const source = raw["source"];
   if (source !== undefined && (!isRecord(source) || !compiles(source["except"]))) problems.push(`${who}'s source is { "except": "<regular expression>" }`);
-  for (const key of ["serverExtensions", "environmentFolders", "wellKnown"] as const) if (raw[key] !== undefined && !strings(raw[key])) problems.push(`${who}'s ${key} is a list of names`);
+  for (const key of ["serverExtensions", "environmentFolders", "testFolders", "wellKnown"] as const) if (raw[key] !== undefined && !strings(raw[key])) problems.push(`${who}'s ${key} is a list of names`);
   const tests = raw["testFiles"];
   if (tests !== undefined && !(Array.isArray(tests) && tests.every(compiles))) problems.push(`${who}'s testFiles is a list of regular expressions a test file's base name matches`);
   const members = raw["members"];

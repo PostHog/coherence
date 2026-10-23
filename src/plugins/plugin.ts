@@ -137,6 +137,8 @@ export interface PluginManifest {
   serverExtensions?: string[];
   /** Regular expressions a file's base name matches when it is a test by the language's own naming (pytest's test_*.py). */
   testFiles?: string[];
+  /** Folder names that hold the language's tests wherever they sit, besides the config's test folders (SwiftPM's Tests). */
+  testFolders?: string[];
   /** How an exported type's body reads, for the lexicon's member scan: the line that opens it, the one that closes it, a field inside; regular expressions. */
   members?: { opens: string; closes: string; field: string };
   /** The language's entrance detection rules and what they do not see. */

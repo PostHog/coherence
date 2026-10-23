@@ -31,6 +31,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomBytes } from "node:crypto";
 import {
   JsonRpcClient,
+  hintedFiles,
   keepProjectFiles,
   outsideOfFolder,
   parseName,
@@ -369,7 +370,7 @@ export class GoAdapter implements LanguageAdapter {
 
   private async searchFiles(name: string, fileHint: string): Promise<Candidate[]> {
     const candidates: Candidate[] = [];
-    for (const file of this.files().filter((f) => f === fileHint || f.endsWith(`/${fileHint}`))) candidates.push(...(await this.declarationsIn(file, name)));
+    for (const file of hintedFiles(this.files(), fileHint)) candidates.push(...(await this.declarationsIn(file, name)));
     return candidates;
   }
 

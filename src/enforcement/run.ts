@@ -16,7 +16,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isTestPath, parseName, type LanguageAdapter } from "../adapters/adapter.ts";
+import { isTestPath, parseName, type LanguageAdapter, type Occasion } from "../adapters/adapter.ts";
 import { projectFiles } from "../adapters/project-files.ts";
 import { gitState } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
@@ -48,6 +48,8 @@ export interface RunOptions {
    * store; the invariant floor counts only graded entries. A full run grades.
    */
   grade?: boolean | undefined;
+  /** Who asks, handed to each refutation: "edit" for the check at an edit, inside the hook's budget; absent is a run. */
+  occasion?: Occasion | undefined;
   /** An adapter to use instead of the warm server (tests, and `--no-server`); in a multi-language project, for its own language. */
   adapter?: LanguageAdapter | undefined;
   /** Adapters by language to use instead of the warm servers (tests, and `--no-server` in a multi-language project). */
@@ -408,7 +410,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
           }
           let result: ChokepointResult;
           try {
-            result = await checkChokepoint(door.adapter, { protects, chokepoint, component, testFolders: config.testFolders, root, ...governs });
+            result = await checkChokepoint(door.adapter, { protects, chokepoint, component, testFolders: config.testFolders, root, ...governs, occasion: options.occasion ?? "run" });
           } catch (error) {
             const message = error instanceof Error ? error.message.split("\n")[0]! : String(error);
             instruments.fail(language, message);
