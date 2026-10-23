@@ -96,7 +96,8 @@ import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } 
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
-import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
+import { loadLexicon, rejectedNames, renderCompactWithin, type Delivered, type Lexicon } from "./lexicon.ts";
+import { lastNamed } from "./lexicon-recency.ts";
 import { COHERENCE_LEXICON, CONFIG_FILE, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
 import { keepStateFiles } from "./state-files.ts";
 
@@ -802,8 +803,8 @@ export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.e
   return versionBlock(root, await isCoherenceItself(root), env) + (earlier.length === 0 ? "" : earlier.join("\n") + "\n");
 }
 
-/** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
-export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
+/** The start injection with how the vocabulary was delivered, so a reading of the hook can say what orient carries. */
+export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; delivered: Delivered; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
   const commands=await cliName(root);
   // The hand lists come from the last mirror reading kept, never one taken here (recorded.ts).
@@ -815,8 +816,10 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   // The practices ride beside the commands that record them, after the vocabulary.
   const practices = practiceOrientText(root, commands);
   const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await copyBlock(root)}\n${await sessionBlock(root, input)}`;
-  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root), pluginsInUse(root, coherence));
-  return { text: head + text + tail, detail, coverage: reading };
+  // The vocabulary in the order the journal last named it, so the host's budget trims what the work has not named for longest.
+  const named = lastNamed(loadJournal(root).records, [...coherence.concepts, ...(project?.concepts ?? [])]);
+  const { text, delivered } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root), pluginsInUse(root, coherence), named);
+  return { text: head + text + tail, delivered, coverage: reading };
 }
 
 /**

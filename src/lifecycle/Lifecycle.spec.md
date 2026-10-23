@@ -96,12 +96,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects dismissed: nothing is committed before the injection and it has no external effect
   checklist: circuit-breaker-policy dismissed: no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
-- injection within budget: The start injection stays under the host budget: the project layer steps down in detail until the whole fits; when what must be shown whole (escalations are never shortened) leaves no room, Coherence's layer steps down to names and then to one line that points at the lexicon command.
-  over: every start injection, with both lexicon layers at every level and any number of open escalations ahead of them
-  via: the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened
-  because: a host replaces an over-long injection with a file preview or spills it, so an injection that overran the budget would be read by nobody, and the one record that exists for a human would be the thing that hid itself; the vocabulary can shrink because its full entries are one command away, the escalations cannot
+- injection within budget: The start injection stays under the host budget, and the lexicon has no ceiling of its own: the vocabulary gives way one concept at a time, from the least recently named, to its name and then out; when what must be shown whole (escalations are never shortened) leaves no room for a single name, one line points at the lexicon command.
+  over: every start injection, with every shown lexicon layer at every count of whole, named and left-out concepts and any number of open escalations ahead of them
+  via: the start injection stays under the budget with escalations present: the vocabulary decays from its least recently named concept, to names and then to a pointer, and no escalation is shortened
+  because: a host replaces an over-long injection with a file preview or spills it, so an injection that overran the budget would be read by nobody, and the one record that exists for a human would be the thing that hid itself; the vocabulary can shrink because its full entries are one command away, the escalations cannot. A fixed ceiling on the lexicon was a second budget managed by hand, trimmed after the fact four times (d-2b4c96a2)
   crossing: project-source -> reading
-  refuted: returned the full vocabulary unchecked whenever no project layer could step down, so eight open escalations put the start injection at 11,614 characters against 9,500 -> "the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened" went red in hook.test.ts; restored, green (2026-09-17)
+  refuted: made renderCompactWithin keep every concept's name whatever the budget, so only whole lines could give way -> "the start injection stays under the budget with escalations present: the vocabulary decays from its least recently named concept, to names and then to a pointer, and no escalation is shortened" went red in hook.test.ts; restored, green (2026-10-23)
   kinds: budget
   checklist: bounded-admission dismissed: no concurrent work is admitted; the bound is a character count on one document
   checklist: fair-admission dismissed: there are no contenders for the budget
@@ -109,6 +109,25 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: memory-budget dismissed: the bound is on the injected text, not on allocation
   checklist: execution-budget dismissed: no steps are counted
   checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+- the vocabulary is kept most recently named first: The start injection orders every concept of every shown layer protected first, then by the latest journal record naming it, then in its file's order, and keeps the head of that order: the most that fit keep their names, and of those the most that fit keep their whole lines, so the host's budget trims what the work has not named for longest and a protected concept goes last.
+  over: every concept of Coherence's lexicon, each shown plugin layer and the project's, protected or not, named by a record or never
+  via: renderCompactWithin keeps the vocabulary most recently named first: the host's budget trims the least recently named, to its name and then out, and a protected concept goes last
+  because: the owner: "no cap and sort it by most recently used/touched. this will allow implicit decay while still allowing specific concepts to be protected even when they're obscure" (d-2b4c96a2). Stepping a whole layer down at once hid every concept's line, the one the session was working with among them, to make room for one more
+  crossing: project-source -> reading
+  refuted: made byRecency keep the file's order, ignoring protection and the journal -> "renderCompactWithin keeps the vocabulary most recently named first: the host's budget trims the least recently named, to its name and then out, and a protected concept goes last" went red in lexicon.test.ts; restored, green (2026-10-23)
+  kinds: output
+  checklist: destination-confinement dismissed: the order is one argument to the one injection, which goes to the host's additionalContext and follows no redirect
+  checklist: redaction dismissed: the order reads record times and concept names, and writes no record text into the injection
+  checklist: commit-ordered-effects dismissed: nothing is committed; the order is computed and dropped with the injection
+  checklist: circuit-breaker-policy dismissed: no dependency is sampled; an unreadable journal is the same failure every start reading already has
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
+- a concept is dated by the latest record naming it: When the journal last named a concept is the time of the newest record whose prose writes its name, an alias or an instance as whole words, singular or plural, across line breaks; a record's ids, citations, paths and states never name one.
+  over: every journal record kind, and every concept of every layer
+  via: lastNamed: the latest record naming each concept by name, alias or plural in its prose, never in an id or a path
+  because: the journal is the timestamped trail of what the work named, and a lexicon change is itself a record naming its concept, so one reading answers both when a concept was used and when it was touched; a path or an id names a file, and a concept dated by one would stay fresh for a file nobody reads
+  crossing: project-source -> reading
+  refuted: made lastNamed read every string of a record, ids and citations included -> "lastNamed: the latest record naming each concept by name, alias or plural in its prose, never in an id or a path" went red in lexicon.test.ts; restored, green (2026-10-23)
+  kinds: none
 - rejected names refused: A rejected name is a finding as a whole word or phrase in prose and as an identifier token in code, each with its concept and because.
   over: every rejected name of both lexicon layers, across every prose and code file in the corpus
   via: rejected names are found as whole words in prose, with concept and because

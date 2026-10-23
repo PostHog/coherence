@@ -54,7 +54,8 @@ question.
 ## What exists and what is owed
 
 Exists: the lexicon shape (vocabulary injected; detail and provenance shown in
-Scope only), the compact injection at session start, the vocabulary check at
+Scope only), the compact injection at session start (most recently named first,
+see below), the vocabulary check at
 regulate, the Scope lexicon view with two layers, and the ruling records in
 Mnemion's lexicon.
 
@@ -65,6 +66,20 @@ half, and they rank ahead of any spine work that would reintroduce the class the
 catch.
 
 Anti-rot holds throughout: the lexicon names things and never points at code.
+
+## Recency, not a ceiling
+
+The lexicon has no token ceiling. The start injection orders every concept by
+the latest journal record that names it (its name, an alias or an instance, in
+a record's prose), and the host's budget decides how far down that order the
+injection reaches: the most recently named concepts keep their whole lines,
+the next keep only their names, and the rest are counted and left to
+`coherence lexicon`. A concept the work stops naming decays on its own. A
+lexicon change is itself a record that names the concept, so a touched
+concept rises with a used one.
+
+A concept a human wants kept whole however obscure it gets carries
+`"protected": true` in the lexicon file; protected concepts head the order.
 
 ## Coverage-first work orders
 

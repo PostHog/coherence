@@ -30,6 +30,8 @@ export interface Concept {
   related: string[];
   /** The plugin whose lexicon layer brought the concept (src/plugins/lexicon.ts); absent for Coherence's own and the project's. */
   layer?: string;
+  /** Kept whole at the head of the injection however long since the journal last named it (`"protected": true` in the file). */
+  protected?: boolean;
 }
 
 /** A plugin layer composed into the tool layer: who, and the surface that puts its vocabulary in a session's way. */
@@ -119,6 +121,7 @@ function parseConcept(value: unknown, where: string): Concept {
     notToBeConfusedWith: stringList(value["not_to_be_confused_with"]),
     properties: stringMap(value["properties"]),
     related: stringList(value["related"]),
+    ...(value["protected"] === true ? { protected: true } : {}),
   };
 }
 
@@ -293,36 +296,55 @@ function leadOf(entry: string): string {
 }
 
 /**
- * How much of each project concept the compact form carries. The hook steps
- * down this list until the injection fits the host's budget; Coherence's own
- * layer renders in full at every one of these levels.
+ * When the journal last named each concept: an ISO time by the concept's
+ * name, lowercased (lexicon-recency.ts reads it). A concept no record names
+ * is absent.
  */
-export const DETAIL_LEVELS = ["full", "no-confusions", "definitions", "names"] as const;
-export type DetailLevel = (typeof DETAIL_LEVELS)[number];
+export type LastNamed = ReadonlyMap<string, string>;
 
 /**
- * Below the project levels, two more the injection as a whole can fall to
- * when what must be shown whole (escalations are never shortened) leaves no
- * room: Coherence's own layer at names only, and then a one-line pointer to
- * the lexicon command in place of any vocabulary.
+ * Concepts from most to least kept: the protected first, then by the latest
+ * record naming each, then in the file's order. The injection keeps the head
+ * of this order whole and lets the tail decay, to its name and then out.
  */
-export type InjectionLevel = DetailLevel | "coherence-names" | "pointer";
+export function byRecency(concepts: readonly Concept[], lastNamed: LastNamed = new Map()): Concept[] {
+  const at = (c: Concept): string => lastNamed.get(c.name.toLowerCase()) ?? "";
+  return concepts
+    .map((concept, index) => ({ concept, index }))
+    .sort((a, b) => Number(b.concept.protected === true) - Number(a.concept.protected === true) || (at(a.concept) === at(b.concept) ? a.index - b.index : at(a.concept) < at(b.concept) ? 1 : -1))
+    .map((c) => c.concept);
+}
+
+/** How the injection shows one concept: its whole line, its name alone, or not at all (counted). */
+export type Shown = "whole" | "name" | "out";
+
+/** How many concepts the injection showed each way; all out is the one-line pointer. */
+export interface Delivered {
+  whole: number;
+  name: number;
+  out: number;
+}
+
+/** What a delivery says in a reading of the hook: "whole", or the counts. */
+export function deliveredText(delivered: Delivered): string {
+  if (delivered.name === 0 && delivered.out === 0) return "whole";
+  if (delivered.whole === 0 && delivered.name === 0) return "as a pointer to the lexicon command";
+  return `${delivered.whole} whole, ${delivered.name} by name only, ${delivered.out} left out, the least recently named first to go`;
+}
 
 /** The one line that stands in for the vocabulary when nothing else fits. */
 export function renderPointer(cli = "coherence"): string {
   return `Vocabulary omitted to stay under the host budget; full entries: ${cli} lexicon\n`;
 }
 
-function renderConcept(concept: Concept, detail: DetailLevel = "full"): string {
-  if (detail === "names") return concept.name;
+function renderConcept(concept: Concept): string {
   let line = `- ${concept.name}: ${firstSentence(concept.definition)}`;
-  if (detail === "definitions") return line;
   const aliases = concept.aliases.flatMap(aliasNames);
   if (aliases.length > 0) line += ` (also: ${aliases.join(", ")})`;
   if (concept.instances?.length) line += ` (instances: ${concept.instances.join(", ")})`;
   const rejected = concept.rejected.flatMap((r) => namesOfAlternative(r.alternative).map((n) => n.name));
   if (rejected.length > 0) line += ` [rejected: ${rejected.join(", ")}]`;
-  if (detail === "full" && concept.notToBeConfusedWith.length > 0) {
+  if (concept.notToBeConfusedWith.length > 0) {
     const leads = concept.notToBeConfusedWith.map(leadOf).filter((l) => l !== "");
     if (leads.length > 0) line += ` (not: ${leads.join(", ")})`;
   }
@@ -333,48 +355,53 @@ function capitalize(text: string): string {
   return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1);
 }
 
+/** One layer's concepts as shown: whole lines in order, then the names alone, then how many are left out. */
+function layerLines(concepts: readonly Concept[], show: (concept: Concept) => Shown, cli: string): string[] {
+  const lines = concepts.filter((c) => show(c) === "whole").map(renderConcept);
+  const named = concepts.filter((c) => show(c) === "name").map((c) => c.name);
+  if (named.length > 0) lines.push(`Named only here (full entries: ${cli} lexicon): ${named.join(", ")}`);
+  const out = concepts.filter((c) => show(c) === "out").length;
+  if (out > 0) lines.push(`${out} more, the least recently named: ${cli} lexicon`);
+  return lines;
+}
+
 /**
- * The compact form the hook injects: one header line, one line per concept
- * with name, first sentence, accepted aliases and rejected names, and beneath
- * it the project lexicon under its own header. Detail, provenance and
- * metaphors never appear.
+ * The compact form the hook injects: under each layer's header (Coherence's,
+ * each plugin's, the project's), one line per concept with name, first
+ * sentence, accepted aliases, rejected names and what it is not to be
+ * confused with, most recently named first. `show` says which concepts keep
+ * their whole line, which only their name, and which are left out; by
+ * default every one is whole. Detail, provenance and metaphors never appear.
  */
-export function renderCompact(coherence: Lexicon, project?: Lexicon, detail: DetailLevel = "full", coherenceDetail: "full" | "names" = "full", own = true, shown: (layer: string) => boolean = () => true): string {
+export function renderCompact(
+  coherence: Lexicon,
+  project?: Lexicon,
+  own = true,
+  shown: (layer: string) => boolean = () => true,
+  lastNamed: LastNamed = new Map(),
+  show: (concept: Concept) => Shown = () => "whole",
+  cli = "coherence",
+): string {
   const lines: string[] = [];
+  const order = lastNamed.size > 0 ? ", most recently named first" : "";
   // In Coherence's own repository its rejected names are defects everywhere; in an adopter they bind only where Coherence's concepts are named.
   const rule = own ? "rejected names are defects" : "use these names when you mean Coherence's concepts";
-  const mine = coherence.concepts.filter((c) => c.layer === undefined);
-  if (coherenceDetail === "names") {
-    lines.push(`Coherence vocabulary (${mine.length} concepts; names only here, ${rule}; full entries: coherence lexicon):`);
-    lines.push(mine.map((c) => renderConcept(c, "names")).join(", "));
-  } else {
-    lines.push(`Coherence vocabulary (${mine.length} concepts; ${rule}):`);
-    for (const concept of mine) lines.push(renderConcept(concept));
-  }
+  const mine = byRecency(coherence.concepts.filter((c) => c.layer === undefined), lastNamed);
+  lines.push(`Coherence vocabulary (${mine.length} concepts${order}; ${rule}):`);
+  lines.push(...layerLines(mine, show, cli));
   // Each plugin's layer under its own header, between Coherence's and the project's; one whose surface the caller says is out of the way is left out.
   for (const layer of coherence.layers ?? []) {
     if (!shown(layer.name)) continue;
-    const theirs = coherence.concepts.filter((c) => c.layer === layer.name);
+    const theirs = byRecency(coherence.concepts.filter((c) => c.layer === layer.name), lastNamed);
     if (theirs.length === 0) continue;
-    lines.push("");
-    if (coherenceDetail === "names") {
-      lines.push(`Plugin ${layer.name} vocabulary (${theirs.length} concepts; names only here; full entries: coherence lexicon):`);
-      lines.push(theirs.map((c) => renderConcept(c, "names")).join(", "));
-    } else {
-      lines.push(`Plugin ${layer.name} vocabulary (${theirs.length} concepts, ${layer.version}):`);
-      for (const concept of theirs) lines.push(renderConcept(concept));
-    }
+    lines.push("", `Plugin ${layer.name} vocabulary (${theirs.length} concepts, ${layer.version}${order}):`);
+    lines.push(...layerLines(theirs, show, cli));
   }
   if (project !== undefined) {
     const title = capitalize(project.project ?? "Project");
-    lines.push("");
-    const note = detail === "names" ? "names only here; full entries: coherence lexicon" : "inside the project its sense of a name wins";
-    lines.push(`${title} vocabulary (${project.concepts.length} concepts; ${note}):`);
-    if (detail === "names") {
-      lines.push(project.concepts.map((c) => renderConcept(c, detail)).join(", "));
-    } else {
-      for (const concept of project.concepts) lines.push(renderConcept(concept, detail));
-    }
+    const concepts = byRecency(project.concepts, lastNamed);
+    lines.push("", `${title} vocabulary (${concepts.length} concepts${order}; inside the project its sense of a name wins):`);
+    lines.push(...layerLines(concepts, show, cli));
     const topLevel = project.rejected.flatMap((r) => namesOfAlternative(r.alternative).map((n) => n.name));
     if (topLevel.length > 0) lines.push(`- rejected names: ${topLevel.join(", ")}`);
   }
@@ -382,11 +409,17 @@ export function renderCompact(coherence: Lexicon, project?: Lexicon, detail: Det
 }
 
 /**
- * The compact form at the richest level that fits `maxChars`, with the level
- * chosen: the project layer steps down first, then Coherence's layer to
- * names, then the vocabulary gives way to a one-line pointer at the lexicon
- * command (`cli` names it). The pointer is returned even when it does not
- * fit, so the caller always has something to inject.
+ * The compact form that fits `maxChars`, and how it showed the concepts. The
+ * lexicon itself has no ceiling: every concept of every shown layer is put
+ * in one order (byRecency) and the host's budget decides how far down it
+ * reaches. The most concepts that fit keep their names, from the head; of
+ * those, the most that fit keep their whole lines, from the head again. A
+ * concept the journal has not named for longest decays first, to its name
+ * and then out, and a protected one goes last; among concepts no record
+ * tells apart, Coherence's own decay before a plugin's and the project's.
+ * When no name fits, one line points at the lexicon command (`cli` names
+ * it); that line is returned even when it does not fit, so the caller always
+ * has something to inject.
  */
 export function renderCompactWithin(
   coherence: Lexicon,
@@ -395,15 +428,31 @@ export function renderCompactWithin(
   cli = "coherence",
   own = true,
   shown: (layer: string) => boolean = () => true,
-): { text: string; detail: InjectionLevel } {
+  lastNamed: LastNamed = new Map(),
+): { text: string; delivered: Delivered } {
+  // Concepts no record tells apart keep this order: the project's first, whose rejected names bind in all of its text, then each shown plugin's, then Coherence's, whose names bind in an adopter only where Coherence's concepts are named.
+  const visible = [
+    ...(project?.concepts ?? []),
+    ...coherence.concepts.filter((c) => c.layer !== undefined && shown(c.layer)),
+    ...coherence.concepts.filter((c) => c.layer === undefined),
+  ];
+  const all = byRecency(visible, lastNamed);
+  const rank = new Map(all.map((c, i) => [c, i]));
+  const render = (kept: number, whole: number): string =>
+    renderCompact(coherence, project, own, shown, lastNamed, (c) => {
+      const at = rank.get(c) ?? all.length;
+      return at < whole ? "whole" : at < kept ? "name" : "out";
+    }, cli);
+  // The largest n in [0, max] whose render fits, scanning down: a count does not always lengthen the text (a layer's first name adds its "named only" line, its last one drops a "more" line), so a bisection could stop short.
+  const largest = (max: number, fits: (n: number) => boolean): number => {
+    for (let n = max; n > 0; n--) if (fits(n)) return n;
+    return 0;
+  };
   const fits = (text: string): boolean => text.length <= maxChars;
-  for (const detail of project === undefined ? ([DETAIL_LEVELS[0]] as const) : DETAIL_LEVELS) {
-    const text = renderCompact(coherence, project, detail, "full", own, shown);
-    if (fits(text)) return { text, detail };
-  }
-  const names = renderCompact(coherence, project, "names", "names", own, shown);
-  if (fits(names)) return { text: names, detail: "coherence-names" };
-  return { text: renderPointer(cli), detail: "pointer" };
+  const kept = largest(all.length, (n) => fits(render(n, 0)));
+  if (kept === 0 && all.length > 0) return { text: renderPointer(cli), delivered: { whole: 0, name: 0, out: all.length } };
+  const whole = kept < all.length ? 0 : largest(kept, (n) => fits(render(kept, n)));
+  return { text: render(kept, whole), delivered: { whole, name: kept - whole, out: all.length - kept } };
 }
 
 /** The token estimate used throughout: bytes divided by four. */

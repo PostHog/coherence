@@ -88,7 +88,7 @@ Everything Coherence does as of branch `promo` (2026-09-24), grouped by what the
 
 - **Gyroscope** — the lifecycle as a whole: keeps an agent session balanced from start to stop through host events.
 1- **Orient** — at SessionStart and SubagentStart, injects any open escalation, the vocabulary, spec problems and open requirements, the session's work order, undefined terms, and the exact journal command with the session id. _(partial: the definition also names structural defects and unreached mass, which the start injection does not yet carry)_ `src/lifecycle/hook.ts`
-- **Injection budget** _(unnamed)_ — the start injection steps down in detail to stay under the host's size limit, never shortening escalations. `CONTEXT_BUDGET`
+- **Injection budget** _(unnamed)_ — the start injection keeps the most recently named concepts whole and decays the rest, to names and then out, to stay under the host's size limit, never shortening escalations. `CONTEXT_BUDGET`
 - **Revelation at the edit** — at PostToolUse after a file write, re-checks the chokepoints that file may touch and shows any bypass in the same turn. `src/lifecycle/hook.ts`
 - **Vocabulary at the edit** _(unnamed)_ — at PostToolUse, names only a new undefined term or at-risk meaning the edit just introduced. `src/lifecycle/hook.ts`
 - **Read trace** — records the files a session read at each tool use, and snapshots them at Stop against the change and the economy prediction. `src/economy/trace.ts`

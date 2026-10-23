@@ -320,7 +320,7 @@ test("an open escalation that cites a decision and a work order names each by id
   assert.equal(journalVerbs["acknowledge"]!([escalation.id, "--because", "renamed", ...who], io), 0, printed.join("\n"));
 });
 
-test("the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened", async () => {
+test("the start injection stays under the budget with escalations present: the vocabulary decays from its least recently named concept, to names and then to a pointer, and no escalation is shortened", async () => {
   const dir = await freshRoot();
   try {
     const io = { cwd: dir, out: () => {}, err: () => {} };
@@ -334,8 +334,10 @@ test("the start injection stays under the budget with escalations present: the v
     const context = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
     assert.ok(context.length <= CONTEXT_BUDGET, `${context.length} characters against a budget of ${CONTEXT_BUDGET}`);
     for (let n = 0; n < 8; n += 1) assert.ok(context.includes(`▲ ${ids[n]}  scope  ${what(n)} — only the owner can retire a vertebra, and this is the ${n}th`), `escalation ${n} is shown whole`);
-    assert.doesNotMatch(context, /^- invariant: /m, "the vocabulary stepped down: no full concept line");
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts; names only here, use these names when you mean Coherence's concepts; full entries: coherence lexicon\):\n/m, "Coherence's layer at names only");
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts, most recently named first; use these names when you mean Coherence's concepts\):\n/m, "Coherence's layer in the order the journal last named it");
+    assert.match(context, /^(Named only here \(full entries: [^)]*\): |\d+ more, the least recently named: )/m, "the vocabulary decayed: not every concept keeps its line");
+    const vocabulary = context.slice(context.indexOf("Coherence vocabulary"));
+    for (const recent of ["chokepoint", "reliance"]) assert.ok(vocabulary.search(new RegExp(`\\b${recent}\\b`)) < vocabulary.search(/\bgyroscope\b/) || !/\bgyroscope\b/.test(vocabulary), `${recent}, which the escalations name, is kept ahead of gyroscope, which no record names`);
     assert.match(context, /\nSession: s-budget\n/, "the session block still rides along");
 
     // More escalations, until even the names do not fit: the vocabulary gives way to one line that points at the lexicon command.
@@ -345,11 +347,13 @@ test("the start injection stays under the budget with escalations present: the v
       assert.equal(journalVerbs["escalate"]!([what(n), "--because", `only the owner can retire a vertebra, and this is the ${n}th`, "--session", `peer-${n}`, "--agent", "scope"], { ...io, out: (l) => printed.push(l) }), 0);
       ids.push(printed[0]!.split(/\s+/)[0]!);
       pointed = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
+      // Each concept decays on its own, so every size on the way down still fits while any vocabulary is shown.
+      if (/^Coherence vocabulary/m.test(pointed)) assert.ok(pointed.length <= CONTEXT_BUDGET, `${n + 1} escalations: ${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
     }
     assert.doesNotMatch(pointed, /^Coherence vocabulary/m, "the names no longer fit");
     assert.ok(pointed.includes(`\n  ${await cliName(dir)} journal\n`), "the journal command survives the reduced vocabulary");
     assert.ok(pointed.includes(`\nVocabulary omitted to stay under the host budget; full entries: ${await cliName(dir)} lexicon\n`), "one line points at the lexicon command instead");
-    assert.ok(pointed.length <= CONTEXT_BUDGET, `${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
+    // Past this point what overruns is what is never shortened: the escalations themselves.
     ids.forEach((id, n) => assert.ok(pointed.includes(`▲ ${id}  scope  ${what(n)} — only the owner`), `escalation ${n} is still shown whole`));
 
     const one = await freshRoot();

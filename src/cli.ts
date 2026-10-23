@@ -47,7 +47,9 @@ import { ENFORCEMENT_USAGE, refuteCommand, runCommand, serveCommand } from "./en
 import { warmInstrument } from "./enforcement/run.ts";
 import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/check.ts";
-import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
+import { deliveredText, renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
+import { lastNamed } from "./lifecycle/lexicon-recency.ts";
+import { loadJournal } from "./journal/store.ts";
 import { clashText } from "./plugins/lexicon.ts";
 import { cliName, CONTEXT_BUDGET, ECONOMY_SNAPSHOT, isHookEvent, HOOK_EVENTS, MIRROR_REFRESH, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
@@ -234,15 +236,15 @@ async function lexiconCommand(call: CommandCall, args: string[], root: string): 
     call.stdout.write(JSON.stringify({ coherence, project: project ?? null }, null, 2) + "\n");
     return 0;
   }
-  const compact = renderCompact(coherence, project);
+  // In the order the start injection keeps, so what is printed first is what the host's budget trims last.
+  const named = lastNamed(loadJournal(root).records, [...coherence.concepts, ...(project?.concepts ?? [])]);
+  const compact = renderCompact(coherence, project, true, () => true, named);
   call.stdout.write(compact);
   const estimate = tokenEstimate(compact);
   let note = "";
-  if (project !== undefined) {
-    const within = renderCompactWithin(coherence, project, CONTEXT_BUDGET);
-    if (within.detail !== "full") {
-      note = `; the hook injects the project layer at detail "${within.detail}" (~${tokenEstimate(within.text).tokens} tokens) to stay under ${CONTEXT_BUDGET} characters`;
-    }
+  const within = renderCompactWithin(coherence, project, CONTEXT_BUDGET, "coherence", true, () => true, named);
+  if (within.delivered.name > 0 || within.delivered.out > 0) {
+    note = `; alone in an injection under ${CONTEXT_BUDGET} characters it would go ${deliveredText(within.delivered)} (~${tokenEstimate(within.text).tokens} tokens)`;
   }
   call.stderr.write(`~${estimate.tokens} tokens (${estimate.bytes} bytes / 4)${note}\n`);
   return 0;
