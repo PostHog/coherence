@@ -181,12 +181,23 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
   /** The hops for the given files of one language, through that language's adapter. */
   const hops = async (adapter: LanguageAdapter, language: Language, mine: readonly string[]): Promise<void> => {
     listing ??= projectListing(root);
+    /** The server's answer, or undefined once it failed a question about one file (gopls has no package for a file outside the host's build): said on that file's line, and the hops go on. */
+    const answered = async <T>(file: string, ask: () => Promise<T>): Promise<T | undefined> => {
+      try {
+        return await ask();
+      } catch (error) {
+        out.add(file, `the ${adapter.language} server could not answer for it (${error instanceof Error ? error.message : String(error)}), so what references it is not read`);
+        return undefined;
+      }
+    };
     // Hop in: who references what the given files declare.
     for (const file of mine) {
       for (const declaration of declarationsOf(texts.get(file)!, language)) {
-        const resolved = await adapter.resolve(`${declaration.name} in ${file}`, hint(file));
-        if (!resolved.ok) continue;
-        for (const site of projectSites(root, await adapter.references(resolved.definition), listing)) {
+        const resolved = await answered(file, () => adapter.resolve(`${declaration.name} in ${file}`, hint(file)));
+        if (resolved === undefined || !resolved.ok) continue;
+        const references = await answered(file, () => adapter.references(resolved.definition));
+        if (references === undefined) break;
+        for (const site of projectSites(root, references, listing)) {
           if (givenSet.has(site.file)) continue;
           const kind = isTest(site.file, config.testFolders) ? "test references" : "references";
           out.add(site.file, `${kind} ${declaration.name} (${file}) at line ${site.line}${site.symbol === undefined ? "" : ` in ${site.symbol}`}`);
@@ -199,9 +210,11 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
       for (const imported of importsOf(root, file, texts.get(file)!, language)) {
         if (givenSet.has(imported.module)) continue;
         const name = imported.name === undefined ? imported.module : `${imported.name} in ${imported.module}`;
-        const resolved = await adapter.resolve(name, hint(imported.module));
-        if (!resolved.ok) continue;
-        const sites = projectSites(root, await adapter.references(resolved.definition), listing);
+        const resolved = await answered(imported.module, () => adapter.resolve(name, hint(imported.module)));
+        if (resolved === undefined || !resolved.ok) continue;
+        const references = await answered(imported.module, () => adapter.references(resolved.definition));
+        if (references === undefined) continue;
+        const sites = projectSites(root, references, listing);
         const used = sites.filter((s) => s.file === file);
         if (used.length === 0) continue;
         const label = imported.name === undefined ? "the module" : imported.name;

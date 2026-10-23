@@ -30,6 +30,10 @@ import { answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
 import { proposeClosures, renderProposal, type Proposal } from "../../scaffold/control.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
+import { predictClosure } from "../../economy/closure.ts";
+import { readInterfaceMap } from "../../observation/interfaces.ts";
+import { loadSpecModel } from "../../spec/model.ts";
+import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { adapterCode, keptLine } from "./kept-answers.ts";
 import { lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
 import type { InterfaceReading } from "./model.ts";
@@ -66,6 +70,8 @@ class TextServer implements LanguageAdapter {
   /** Every question put to it, a resolve or a references, by the file it is about. */
   readonly questions: string[] = [];
   readonly stall = new Set<string>();
+  /** Files it fails every question about, with its words, as gopls fails a file outside the host's build. */
+  readonly fail = new Map<string, string>();
   /** How many times a reading started it. */
   started = 0;
   private readonly root: string;
@@ -92,6 +98,8 @@ class TextServer implements LanguageAdapter {
     this.asked.push(definition.name);
     this.questions.push(definition.file);
     if (this.stall.has(definition.name)) return new Promise(() => {});
+    const failed = this.fail.get(definition.file);
+    if (failed !== undefined) throw new Error(failed);
     const sites: ReferenceSite[] = [];
     for (const file of projectFiles(this.root).filter((f) => /\.(ts|py)$/.test(f))) {
       let enclosing: string | undefined;
@@ -269,6 +277,41 @@ test("the interface reading is bounded in time and says when it is partial", { t
     assert.equal(byFlag.kind === "read" && byFlag.partial?.budget, "50 MB", "the flag's memory ceiling outranks the config's");
   } finally {
     configured.remove();
+  }
+});
+
+test("a file the language server cannot answer for is named and left unread while the rest of the language is read", async () => {
+  // A second store file only one host's build holds, which the api calls beside the store's write.
+  const { root, remove } = project({
+    ...BOUNDED,
+    "src/store/clock_windows.ts": "export function tick(): number {\n  return 1;\n}\n",
+    "src/api/api.ts": "import { write } from \"../store/rows.ts\";\nimport { tick } from \"../store/clock_windows.ts\";\nexport function go(): string {\n  tick();\n  return write(\"a\");\n}\n",
+  });
+  try {
+    const server = new TextServer(root);
+    server.fail.set("src/store/clock_windows.ts", "no package metadata for file src/store/clock_windows.ts");
+    const read = await readComponentInterfaces(root, server, { keep: false });
+    assert.equal(read.kind, "read", `one file's failure leaves the language read: ${read.kind === "unread" ? read.because : ""}`);
+    if (read.kind !== "read") return;
+    assert.deepEqual(read.unanswered, [{ file: "src/store/clock_windows.ts", component: "src/store", reason: "no package metadata for file src/store/clock_windows.ts" }]);
+    assert.ok(read.symbols.some((s) => s.from === "src/api" && s.to === "src/store" && s.symbol === "write"), "every other file is read: the api's use of the store's write is drawn");
+    assert.equal(read.partial, undefined, "no budget was spent");
+    const { state } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: read });
+    assert.match(renderView(state, "structure").text, /data-field="partial" data-partial="unanswered">Partial map: the language server could not answer for 1 file, which was left unread while the rest was read[^<]*src\/store\/clock_windows\.ts \(no package metadata/);
+    assert.match(answerStructure(state).text, /^partial map: the language server could not answer for 1 file[^\n]*src\/store\/clock_windows\.ts/, "query structure leads with it");
+    const whole = await readComponentInterfaces(root, new TextServer(root), { keep: false });
+    assert.equal(whole.kind === "read" && whole.unanswered, undefined, "a server that answers every file leaves nothing unanswered");
+    // The economy of a change to that file: the closure is said, with the file's line naming what the server could not answer.
+    const economy = await predictClosure(root, ["src/store/clock_windows.ts"], { adapter: server });
+    const why = Object.fromEntries(economy.entries.map((e) => [e.file, e.why]));
+    assert.ok(why["src/store/clock_windows.ts"]?.some((w) => /^the typescript server could not answer for it \(no package metadata for file src\/store\/clock_windows\.ts\), so what references it is not read$/.test(w)), JSON.stringify(why));
+    assert.deepEqual(why["src/store/Store.spec.md"], ["spec of src/store, which holds src/store/clock_windows.ts"], "the rest of the closure is still read");
+    // The observation's interface map: the file is named, the store's write still read.
+    const observed = await readInterfaceMap(root, server, loadSpecModel(root, { runs: false }), readEnforcementConfig(root), "typescript");
+    assert.deepEqual(observed.unanswered, [{ file: "src/store/clock_windows.ts", reason: "no package metadata for file src/store/clock_windows.ts" }]);
+    assert.ok(observed.symbols.some((s) => s.from === "src/api" && s.to === "src/store" && s.symbol === "write"), "the observation reads every other file");
+  } finally {
+    remove();
   }
 });
 
