@@ -4,7 +4,8 @@
     "src/store/secrets.ts": "/** The protected thing. */\nexport const SECRET_COLUMNS: Record<string, string[]> = { tokens: [\"token\"] };\n\n/** The chokepoint: the one way a row leaves without its secrets. */\nexport function seal(pattern: string, row: Record<string, unknown>): Record<string, unknown> {\n  const out = { ...row };\n  for (const column of SECRET_COLUMNS[pattern] ?? []) delete out[column];\n  return out;\n}\n",
     "src/api/render.ts": "import { SECRET_COLUMNS, seal } from \"../store/secrets.ts\";\n\nexport function render(pattern: string, row: Record<string, unknown>): string {\n  const sealed = seal(pattern, row);\n  const leaked = SECRET_COLUMNS[pattern];\n  return JSON.stringify({ sealed, leaked });\n}\n",
     "src/__tests__/secrets.test.ts": "import { SECRET_COLUMNS } from \"../store/secrets.ts\";\nexport const t = SECRET_COLUMNS;\n",
-    "README.md": "# A project\n"
+    "README.md": "# A project\n",
+    "src/api/routes.ts": "import { render } from \"./render.ts\";\n\nexport const app = {\n  get(path: string, handler: (row: Record<string, unknown>) => string): readonly [string, (row: Record<string, unknown>) => string] {\n    return [path, handler] as const;\n  },\n};\n\nexport function rows(row: Record<string, unknown>): string {\n  return render(\"tokens\", row);\n}\n\napp.get(\"/rows\", rows);\n"
   },
   "language": {
     "files": [
@@ -54,5 +55,54 @@
   "bypasses": [
     "src/api/render.ts:1",
     "src/api/render.ts:5"
-  ]
+  ],
+  "readings": {
+    "declared": {
+      "src/api/render.ts": [
+        "render"
+      ],
+      "src/api/routes.ts": [
+        "app",
+        "rows"
+      ],
+      "src/store/secrets.ts": [
+        "SECRET_COLUMNS",
+        "seal"
+      ]
+    },
+    "imports": [
+      {
+        "file": "src/api/render.ts",
+        "module": "src/store/secrets.ts",
+        "names": [
+          "SECRET_COLUMNS",
+          "seal"
+        ]
+      },
+      {
+        "file": "src/api/routes.ts",
+        "module": "src/api/render.ts",
+        "names": [
+          "render"
+        ]
+      }
+    ],
+    "interfaces": [
+      {
+        "from": "src/api",
+        "to": "src/store",
+        "symbols": [
+          "SECRET_COLUMNS",
+          "seal"
+        ]
+      }
+    ],
+    "entrances": [
+      {
+        "file": "src/api/routes.ts",
+        "symbol": "rows",
+        "rule": "route method"
+      }
+    ]
+  }
 }

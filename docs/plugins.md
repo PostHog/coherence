@@ -147,7 +147,7 @@ copy names it the second way, and so should a plugin you write.
 | `testFolders` | Folder names whose files are all tests by the language's own layout, wherever they sit (SwiftPM's `Tests`), beside the config's test folders. A name matches a folder exactly, case and all. |
 | `members` | How an exported type's body reads for the lexicon's member scan: `opens`, `closes`, `field`, each a regular expression. |
 | `entrances` | The entrance detection rules (`rule`, `plural`, `detects`) and `notDetected`, what they miss: printed by the query, the page and orient. |
-| `notScanned` | Why the text scans do not read the language yet (Go's). Present, it turns off every reading that scans the language's text, whatever slots are filled: mass, entrance detection and the Structure reading each name the language as not read, with this reason. Remove it once the `source` slot reads the language. |
+| `notScanned` | Why the text scans do not read the language. Present, it turns off every reading that scans the language's text, whatever slots are filled: mass, entrance detection and the Structure reading each name the language as not read, with this reason. No bundled plugin carries it, and `plugin check` fails a plugin that does: every language plugin owes the readings of its text (the reading duties below), and none is waived. It stays so that a plugin still being written says what it does not read rather than measuring as a project of no code. |
 | `environmentFolders` | Folder names no project authors code in, wherever they sit (`node_modules`, `__pycache__`). |
 | `markedFolders` | Folders the language's tools make, left out by a `marker` inside (`pyvenv.cfg`) or by `name` beside a file (`target` beside `Cargo.toml`), each with its `reason`. |
 | `ci` | `note`: what the generated CI workflow says for a project that reads the language. `steps`: what it runs after the install to set up what the adapter asks (Go's toolchain and gopls), each `{ "name"?, "uses": "<owner/repo>@<40-hex commit>", "version": "<its release>", "with"? }` or `{ "name"?, "run": "<command>" }`. |
@@ -372,11 +372,21 @@ one wanting changes a copy of it:
    | declarations | the `topLevel` slot says which names a file declares, as `check.json` says |
    | references | the adapter reports every reference to the protected thing, and none else; one that reports none fails here, by name |
    | chokepoint | the run grades the chokepoint as `check.json` expects, bypasses named, its refutation seen or refused |
+   | mass | mass reads the language, counts each file, and the `source` slot's scan finds in each the names `check.json`'s `readings.declared` gives |
+   | imports | the `source` slot's scan reads every import `readings.imports` names, resolved to its project file, and none else: what the economy's closure walks |
+   | interfaces | with each folder `readings.interfaces` names a component, the component interface reading finds the symbols one uses of another, and none else |
+   | entrances | entrance detection finds every entrance `readings.entrances` names, by file, handler and rule, and none else |
    | one answer each | no two of its slots answer with one function, or two spelled alike |
 
    Each duty passes, fails with why, or is not run with why (the
    language server is absent). The command exits 0 only when every one
-   passes. The bundled plugin's `check.json` for the language, as the
+   passes. The reading duties run each reading as a project's runs, through
+   the core, so a slot that answers in its type and reads nothing (a
+   `declarationOf` that always says `undefined`) fails every reading it
+   feeds, by what each missed, and so does a slot left empty: a slot's
+   success is what the readings that consume it recover. No plugin waives a
+   reading; a check project that names no `readings` fails each reading duty
+   as nothing to check. The bundled plugin's `check.json` for the language, as the
    installed package ships it, is the minimum: every plugin for that
    language is held to it, whatever its own `check.json` says. Add cases to
    the copy's `check.json` as you enhance it: they are its tests, held
@@ -399,6 +409,7 @@ one wanting changes a copy of it:
    | `references` | Every reference to `protects` as `file:line`, the line 1-based, test files' included: the adapter must report exactly these, none missed and none more. |
    | `grade` | What the run grades the chokepoint (`broken`, `reference-choked`, `visibility-choked`). |
    | `bypasses` | The references outside the chokepoint the run must name, as `file:line`; a test file's never is one. |
+   | `readings` | What each reading of the language's text must recover over `files`, each compared exactly, each with at least one answer: `declared`, `{ "<file>": ["Name", ...] }` for every non-test file of the language; `imports`, `[{ "file", "module", "names" }]`, one per file and the project file it imports from, `"*"` for the module whole; `interfaces`, `[{ "from", "to", "symbols" }]`, component folders and the symbols of `to` that `from` uses; `entrances`, `[{ "file", "symbol", "rule" }]`, `symbol` empty when the file itself is the entrance. Write it for your small project before you write a slot: it is the slot's spec. |
 4. **Swap back**: remove the `plugins` entry, and the bundled plugin answers
    again.
 

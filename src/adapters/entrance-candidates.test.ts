@@ -14,6 +14,8 @@ import { describe, test } from "node:test";
 import { CANDIDATE_RULES } from "../readings/scope/entrance-coverage.ts";
 import { detectEntranceCandidates, type EntranceCandidate } from "./entrance-candidates.ts";
 import { entranceName } from "../scaffold/entrances.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
+import { entranceRules } from "../plugins/languages.ts";
 
 function project(files: Record<string, string>): { root: string; files: string[]; remove: () => void } {
   const root = mkdtempSync(join(tmpdir(), "coherence-detect-"));
@@ -229,6 +231,65 @@ describe("entrance detection", () => {
         ["binary serve", "binary shop", "binary shopd", "build script shop"],
         "a binary is named as its manifest names it, else for its file or its crate, so two mains never propose one name",
       );
+    } finally {
+      remove();
+    }
+  });
+
+  test("the Go rules detect a command's main, a handler registered on a ServeMux, a route on a router the file imports, and a cgo export; a doc comment, a string, an inline handler, a test file and a router method in a file that imports no router detect nothing", () => {
+    const { root, files, remove } = project({
+      "coherence.config.json": JSON.stringify({ language: "go", plugins: { go: "bundled" } }),
+      "go.mod": "module example.com/shop\n\ngo 1.22\n",
+      "main.go": "package main\n\nfunc main() {}\n",
+      "cmd/shopd/main.go": [
+        "package main",
+        "",
+        "import (",
+        "\t\"net/http\"",
+        "",
+        "\t\"example.com/shop/api\"",
+        ")",
+        "",
+        "// Example: http.HandleFunc(\"/doc\", fromADoc)",
+        "func main() {",
+        "\tmux := http.NewServeMux()",
+        "\tmux.HandleFunc(\"GET /rows/{id}\", api.ShowRow)",
+        "\thttp.Handle(\"/admin\", checked(",
+        "\t\thttp.HandlerFunc(adminPage),",
+        "\t))",
+        "\thttp.HandleFunc(\"/inline\", func(w http.ResponseWriter, r *http.Request) {})",
+        "\thttp.Handle(\"/static/\", http.FileServer(http.Dir(\".\")))",
+        "\tlabel := \"http.HandleFunc(\\\"/in-a-string\\\", fake)\"",
+        "\t_ = label",
+        "\thttp.ListenAndServe(\":8080\", mux)",
+        "}",
+      ].join("\n"),
+      "api/routes.go": [
+        "package api",
+        "",
+        "import \"github.com/gin-gonic/gin\"",
+        "",
+        "func Routes(r *gin.Engine) {",
+        "\tr.GET(\"/rows\", auth, listRows)",
+        "\tr.POST(\"/rows\", createRow)",
+        "}",
+      ].join("\n"),
+      "api/client.go": "package api\n\nfunc fetch(c *Client) {\n\tc.Get(\"/rows\", options)\n}\n",
+      "ffi/export.go": "package main\n\nimport \"C\"\n\n//export shop_init\nfunc shop_init() {}\n\nfunc helper() {}\n",
+      "cmd/shopd/main_test.go": "package main\n\nimport \"net/http\"\n\nfunc TestRoutes() {\n\thttp.HandleFunc(\"/test-only\", fake)\n}\n",
+    });
+    try {
+      readEnforcementConfig(root);
+      const found = detectEntranceCandidates(root, { language: "go", files, wrappers: ["checked"], testFolders: [] });
+      const rules = new Set(entranceRules("go").map((r) => r.rule));
+      for (const c of found) assert.ok(rules.has(c.rule) && c.why.length > 0, `${c.rule} is a listed rule and says why`);
+      const names = (rule: string): string[] => found.filter((c) => c.rule === rule).map((c) => `${c.file} ${c.symbol}`).sort();
+      assert.deepEqual(names("binary"), ["cmd/shopd/main.go main", "main.go main"], "package main's func main, at the module's root or under cmd/; a file of package main with no main is none");
+      assert.deepEqual(names("http route"), ["cmd/shopd/main.go ShowRow", "cmd/shopd/main.go adminPage"], "a method pattern, a handler through a wrapper across lines; never an inline func, a file server, a doc comment, a string or a test");
+      assert.deepEqual(found.find((c) => c.symbol === "adminPage")?.through, ["checked"], "a wrapper the handler is passed through");
+      assert.deepEqual(names("router route"), ["api/routes.go createRow", "api/routes.go listRows"], "the last argument is the handler, past a middleware; a Get in a file that imports no router is no route");
+      assert.deepEqual(names("cgo export"), ["ffi/export.go shop_init"]);
+      assert.deepEqual(found.filter((c) => c.rule === "binary").map((c) => entranceName(c)).sort(), ["binary shopd", "main"], "a command is named for its folder");
     } finally {
       remove();
     }

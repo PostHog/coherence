@@ -24,6 +24,10 @@
   ],
   "module": "index.ts",
   "syntax": {
+    "entrances": "go-entrances.ts#GO_ENTRANCES",
+    "interfaces": "go-scope.ts#GO_INTERFACES",
+    "source": "go-source.ts#GO_SOURCE",
+    "declares": "go-interfaces.ts#goDeclares",
     "topLevel": "go-top-level.ts#goDeclaresAtTop"
   },
   "ladder": {
@@ -43,10 +47,30 @@
     ]
   },
   "entrances": {
-    "rules": [],
-    "notDetected": "Go's entrances (func main, a net/http handler) are not detected yet: declare each under ## entrances"
+    "rules": [
+      {
+        "rule": "binary",
+        "plural": "binaries",
+        "detects": "the func main of a file in package main, which runs when the command starts: main.go at the module's root, cmd/<name>/main.go, or any other command's folder"
+      },
+      {
+        "rule": "http route",
+        "plural": "http routes",
+        "detects": "a handler registered on a net/http ServeMux with a pattern: http.HandleFunc(\"/path\", handler), mux.Handle(\"GET /rows/{id}\", h), or a router of the same shape (gorilla/mux's HandleFunc)"
+      },
+      {
+        "rule": "router route",
+        "plural": "router routes",
+        "detects": "a handler a router's method route names, r.GET(\"/path\", handler) (gin, echo) or r.Get(\"/path\", handler) (chi, fiber), in a file that imports that router"
+      },
+      {
+        "rule": "cgo export",
+        "plural": "cgo exports",
+        "detects": "a func under an //export Name comment, which C code calls by that name"
+      }
+    ],
+    "notDetected": "a handler written inline as a func literal or built by a call from other values (http.FileServer(dir)), a route a helper registers with a pattern it is handed, a router of another framework, a gRPC service (Register…Server), a message consumer, a cloud function (lambda.Start) and an init func are not detected"
   },
-  "notScanned": "the text scans do not read Go yet: its declarations are read by the topLevel slot, and its references by gopls",
   "ci": {
     "note": "The Go plugin grades through gopls: the steps below set up Go (a go.mod that names a newer toolchain fetches it) and install gopls.",
     "steps": [
