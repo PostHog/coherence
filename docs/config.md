@@ -277,15 +277,19 @@ record and in the line the run prints.
 
 A language with a language server can be checked without any code: declare it
 under `languages`, name it in `language`, and the chokepoint check asks that
-server, over stdio, through the language server protocol.
+server, over stdio, through the language server protocol. The server must
+report references from a document it has open but not saved, since that is
+where the refutation stages its use; one that answers only from an index on
+disk (sourcekit-lsp) cannot pass it, and its language needs a plugin
+(docs/plugins.md, "A declared language or a plugin").
 
 ```json
 {
-  "language": ["typescript", "swift"],
+  "language": ["typescript", "toy"],
   "languages": {
-    "swift": {
-      "extensions": [".swift"],
-      "server": ["sourcekit-lsp"],
+    "toy": {
+      "extensions": [".toy"],
+      "server": ["toy-language-server", "--stdio"],
       "testFilter": "{name}",
       "refute": "import {module}\nlet coherenceProbe = {name}\n"
     }
@@ -298,7 +302,7 @@ server, over stdio, through the language server protocol.
 | `extensions` | yes | The file extensions the language owns, each with its dot. An extension a built-in adapter reads (`.ts`, `.py`, `.rs`, ...) or another declared language owns is refused. |
 | `server` | yes | The language server's command as a list of arguments, speaking the protocol over stdio. A bare program name is found on the PATH; a relative path is the project's. |
 | `testFilter` | no | How a `via` becomes the test runner's filter: `{name}` is the via. Without it, the via is passed as written. |
-| `refute` | no | The unsaved document the refutation stages beside the protected thing. It must reference the thing: `{name}` is its name, `{module}` its file name without the extension, `{file}` its file relative to the staged document (`./secrets.swift`), `{path}` its file from the root. |
+| `refute` | no | The unsaved document the refutation stages beside the protected thing. It must reference the thing: `{name}` is its name, `{module}` its file name without the extension, `{file}` its file relative to the staged document (`./secrets.toy`), `{path}` its file from the root. |
 
 The name is lowercase letters, digits and hyphens, and no built-in's
 (`typescript`, `python`, `rust`). A declared language not named in `language`
@@ -318,7 +322,7 @@ thing holds a reported site: the adapter opens each file of the language
 first, since some servers answer only from open documents, and a file the
 server still reported nothing in makes the chokepoint read not run, naming the
 file, never pass. Each verdict names what answered, as
-`swift via sourcekit-lsp (declared in the config)`, and a run records the
+`toy via toy-language-server (declared in the config)`, and a run records the
 language as its instrument. The server runs in the warm server, as the
 built-in ones do, so an edit's check stays within the latency budget.
 

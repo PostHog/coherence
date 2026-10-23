@@ -304,6 +304,11 @@ export function testByLanguageName(base: string): boolean {
   return cached("testFiles", () => providers().flatMap(({ language }) => (fieldOf(language, "testFiles") ?? []).map(regex))).some((pattern) => pattern.test(base));
 }
 
+/** Whether a folder's name makes what it holds a test by one of the languages' own layouts (SwiftPM's Tests). */
+export function testByLanguageFolder(name: string): boolean {
+  return cached("testFolders", () => new Set(providers().flatMap(({ language }) => fieldOf(language, "testFolders") ?? []))).has(name);
+}
+
 /* ------------------------------------------------------------ the walk */
 
 /**

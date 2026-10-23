@@ -13,6 +13,7 @@
 
 export * from "./plugin.ts";
 export {
+  hintedFiles,
   isTestPath,
   outsideOfFolder,
   parseName,
@@ -24,6 +25,7 @@ export {
   type Definition,
   type Ladder,
   type LanguageAdapter,
+  type Occasion,
   type Position,
   type Range,
   type ReferenceSite,

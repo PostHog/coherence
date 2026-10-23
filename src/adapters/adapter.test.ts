@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isTestPath, parseName, rangeContains } from "./adapter.ts";
+import { hintedFiles, isTestPath, parseName, rangeContains } from "./adapter.ts";
 import { PYTHON_LADDER, PythonAdapter, ruleCovers, rulesNaming, type CheckerFacts } from "../../plugins/python/python.ts";
 import { RUST_LADDER } from "../../plugins/rust/rust.ts";
 import { TYPESCRIPT_LADDER } from "../../plugins/typescript/typescript.ts";
@@ -33,6 +33,15 @@ test("a path is a test when a configured folder is a segment or the file is name
   assert.equal(isTestPath("src/tests/helper.ts", folders), true, "a configured folder marks a path whatever the file is called");
   assert.equal(isTestPath("src/policy.ts", folders), false);
   assert.equal(isTestPath("tests-helpers/policy.ts", folders), false, "a folder name matches whole, not as a prefix");
+});
+
+test("a file hint names the file at that path when there is one, else every file ending with it", () => {
+  const files = ["Sources/Storage/Store.swift", "tools/fixtures/visibility/Sources/Storage/Store.swift", "a/Other.swift", "b/Other.swift"];
+  assert.deepEqual(hintedFiles(files, "Sources/Storage/Store.swift"), ["Sources/Storage/Store.swift"], "an exact path never also takes a fixture's copy");
+  assert.deepEqual(hintedFiles(files, "./Sources/Storage/Store.swift"), ["Sources/Storage/Store.swift"]);
+  assert.deepEqual(hintedFiles(files, "Storage/Store.swift"), ["Sources/Storage/Store.swift", "tools/fixtures/visibility/Sources/Storage/Store.swift"], "a suffix still names each file it ends");
+  assert.deepEqual(hintedFiles(files, "Other.swift"), ["a/Other.swift", "b/Other.swift"]);
+  assert.deepEqual(hintedFiles(files, "her.swift"), [], "a suffix ends at a folder boundary");
 });
 
 test("rangeContains is inclusive at both ends", () => {

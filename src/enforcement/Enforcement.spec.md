@@ -365,3 +365,15 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   because: a name that matched no bullet was dropped without a word, so a run of nine names whose fifth was mistyped ran eight, reported them passing and exited 0, and a refutation confirmed through it would read as witnessed for a bullet it never ran (df-5c88f106)
   refuted: let run go on without the names that match no bullet, as before -> "run refuses an --invariant that names no bullet, running nothing, and takes a bullet by its component folder and name too" went red in each.test.ts; restored (cmp), green batched and alone (2026-10-12)
   kinds: none
+- a check that lapsed is no pass: A run exits 1 when an enforcement an earlier run checked, pass or fail, reads not run now, whatever the reason, and names each with its earlier verdict and when; an enforcement no run has checked reads not run without failing the run.
+  over: a project whose chokepoint names a protected thing no file declares, run once with no earlier record and once after a record of its pass
+  via: a run that cannot check an enforcement an earlier run checked exits 1 and names it; the same not run with no earlier check exits 0
+  because: a verified chokepoint whose protected name became ambiguous read not run and the run exited 0, so a CI job running it went green over a check it no longer made (the blind Swift plugin session, 2026-10-22)
+  refuted: made runCommand's exit ignore the lapsed entries, so a run that lost a check it made before exits 0 again (cli.ts) -> "a run that cannot check an enforcement an earlier run checked exits 1 and names it; the same not run with no earlier check exits 0" went red in enforcement.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
+  kinds: none
+- a served refutation is the adapter's: The warm server hands the adapter every argument of a refutation, the exempt folder and the occasion included, so a refutation asked through it stages what the adapter asked in process stages.
+  over: the warm server's adapter and an adapter in process over one project, each asked to refute an exported function with an exempt folder, and the server asked again without one
+  via: a served refutation stages what the adapter in process stages, the exempt folder and the occasion carried
+  because: the server forwarded the protected thing and the chokepoint alone, so a served refutation of a check that exempts a folder never staged its use from outside the folder, and the occasion an adapter is told would never have reached it
+  refuted: made the server's client send the protected thing and the chokepoint alone, as before, dropping the exempt folder and the occasion (server.ts) -> "a served refutation stages what the adapter in process stages, the exempt folder and the occasion carried" went red in server.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
+  kinds: none

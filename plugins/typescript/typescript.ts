@@ -51,7 +51,7 @@ import { locateServer as locateInstalled, type ServerLocation } from "../../src/
 import { locateTsserver } from "./tsserver.ts";
 import manifest from "./plugin.json" with { type: "json" };
 import { JsonRpcClient } from "../../src/plugins/api.ts";
-import { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
+import { fileIdentity, hintedFiles, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
 
 const SERVER_BIN = "typescript-language-server";
 const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
@@ -172,7 +172,7 @@ export function filesEndingWith(root: string, hint: string): string[] {
 }
 
 function endingWith(files: readonly string[], hint: string): string[] {
-  return files.filter((rel) => rel === hint || rel.endsWith("/" + hint));
+  return hintedFiles(files, hint);
 }
 
 /** A wildcard re-export of a whole module: `export * from "./x.ts"`, `export * as ns from …`, `export type * from …`. */

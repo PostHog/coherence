@@ -97,7 +97,7 @@ import {
 import { locateServer as locateInstalled, type ServerLocation } from "../../src/plugins/api.ts";
 import { JsonRpcClient } from "../../src/plugins/api.ts";
 import manifest from "./plugin.json" with { type: "json" };
-import { horizonFolders, keepHorizonFiles, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, nestedFolder, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
+import { hintedFiles, horizonFolders, keepHorizonFiles, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, nestedFolder, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
 import { TACH_CONFIG, dottedFor, excluded, findTachConfig, locateTach, moduleLocations, moduleOf, reaches, readTachConfig, runTach, tachGovernance, tachOverCopy, witnessTach, type TachConfig, type TachModule, type TachRun, type TachWitness } from "./tach.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control server ordering. */
@@ -413,8 +413,7 @@ export function filesEndingWith(root: string, hint: string): string[] {
 }
 
 function pythonEndingWith(files: readonly string[], hint: string): string[] {
-  const suffix = hint.replace(/^\.\//, "");
-  return files.filter((rel) => rel === suffix || rel.endsWith("/" + suffix));
+  return hintedFiles(files, hint);
 }
 
 /** Whether a file's text can declare `name`: a def, a class, an assignment, or an attribute assignment. */

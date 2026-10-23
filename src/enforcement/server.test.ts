@@ -15,6 +15,8 @@ import { budget } from "./test-budgets.ts";
 import { CODE_SALT_ENV, QUICK_REQUEST_MS, REQUEST_MS, codeFingerprint, connectAdapter, openLineClient, serve, serverPaths, type HttpAppFactory, type Serving } from "./server.ts";
 import { performRun } from "./run.ts";
 import { stopWarmServers } from "./server-fixture.ts";
+import type { LanguageAdapter } from "../adapters/adapter.ts";
+import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 
 let root: string;
 let started: Promise<Serving> | undefined;
@@ -74,6 +76,25 @@ test("two clients ask the same questions; the second finds the server warm", asy
   const refutation = await second.adapter.refute(open.definition, undefined);
   assert.equal(refutation.seen, true, refutation.account);
   await second.adapter.close();
+});
+
+test("a served refutation stages what the adapter in process stages, the exempt folder and the occasion carried", async () => {
+  await warm();
+  const served = await connectAdapter(root, { spawn: false });
+  const local = new TypeScriptAdapter(root);
+  try {
+    const hint = { component: ".", testFolders: ["__tests__"] };
+    const open = await served.adapter.resolve("open", hint);
+    assert.ok(open.ok, JSON.stringify(open));
+    const staged = async (adapter: Pick<LanguageAdapter, "refute">): Promise<string[]> => (await adapter.refute(open.definition, undefined, "src", "edit")).staged.map((s) => s.what.replace(/coherence-refutation-[0-9a-f]+/, "<doc>"));
+    const there = await staged(served.adapter);
+    assert.deepEqual(there, await staged(local), "the server stages what the adapter does, outside the exempt folder");
+    const unexempt = (await served.adapter.refute(open.definition, undefined)).staged.map((s) => s.what.replace(/coherence-refutation-[0-9a-f]+/, "<doc>"));
+    assert.notDeepEqual(there, unexempt, "the exempt folder changed what was staged, so it reached the adapter");
+  } finally {
+    await local.close();
+    await served.adapter.close();
+  }
 });
 
 test("a client with spawning off fails plainly when nothing listens", async () => {

@@ -21,7 +21,7 @@ The less inference you spend on code that doesn't work, on finding bugs, and
 on reconstructing why a change was made, the more you have left for the
 work itself.
 
-![Scope's Structure view of Coherence itself: entrances on the left, components in the middle, colored routes showing how work flows from each entrance through the components, and core dependencies as rails along the bottom.](docs/images/scope-structure.jpg)
+![Scope's Structure view of Coherence itself: entrances on the left, components in the middle, colored routes showing how work flows from each entrance through the components, and core dependencies as rails along the bottom.](https://raw.githubusercontent.com/PostHog/coherence/main/docs/images/scope-structure.jpg)
 
 ## Quick setup: paste this into your agent
 
@@ -67,7 +67,7 @@ Select anything to trace it. Selecting an entrance lights its route and dims
 the rest, and the side bar lists every interface along the way and how many
 reference sites back each one:
 
-![The run and refute route selected on the Structure map: the route is lit from the entrance through Coherence (root), Enforcement, Observation, and Economy; everything else is dimmed.](docs/images/scope-structure-route.jpg)
+![The run and refute route selected on the Structure map: the route is lit from the entrance through Coherence (root), Enforcement, Observation, and Economy; everything else is dimmed.](https://raw.githubusercontent.com/PostHog/coherence/main/docs/images/scope-structure-route.jpg)
 
 When a chokepoint breaks, the component wears a red mark listing every
 bypass site, and the map opens on the worst one. An entrance whose untrusted
@@ -97,7 +97,7 @@ Each concept in Scope's Lexicon view carries its definition, the alternatives
 that were rejected and why, and its related concepts. When an agent reaches
 for a rejected name, the record of why it was rejected is already there:
 
-![A concept in the Lexicon view: chokepoint, with its definition, two rejected alternatives each with its reason, and links to related concepts.](docs/images/scope-lexicon.jpg)
+![A concept in the Lexicon view: chokepoint, with its definition, two rejected alternatives each with its reason, and links to related concepts.](https://raw.githubusercontent.com/PostHog/coherence/main/docs/images/scope-lexicon.jpg)
 
 ### Intentions live in the structure, and the structure is checked
 
@@ -122,7 +122,7 @@ and the detector went red.
   checks, not where it enters: a totality oracle counts as a control only on
   the entrances its `entrances:` line names.
 
-![The Invariants view: each invariant with its sentence, the reason it matters, its enforcement, and its latest verdict.](docs/images/scope-invariants.jpg)
+![The Invariants view: each invariant with its sentence, the reason it matters, its enforcement, and its latest verdict.](https://raw.githubusercontent.com/PostHog/coherence/main/docs/images/scope-invariants.jpg)
 
 ### Violations surface at the edit, not in review
 
@@ -218,7 +218,7 @@ Code hooks; each teammate is asked to install it at their next session.
 `coherence hooks uninstall --host claude` removes the mod too. Claude Code
 updates the mod with `claude plugin update coherence@coherence`. Codex keeps
 the settings hooks. The measurements and the mod's limits are in
-[docs/mods-spike.md](docs/mods-spike.md).
+[docs/mods-spike.md](https://github.com/PostHog/coherence/blob/main/docs/mods-spike.md).
 
 ### Decisions are never buried in a transcript
 
@@ -240,7 +240,7 @@ Here is one decision as the Journal view shows it: what was chosen, the
 alternatives rejected, the reason, the human words that prompted it, and the
 earlier decision it builds on.
 
-![A decision record in the Journal view: the choice, two rejected alternatives, the reason, the human's words as the agent attributes them, and a citation of an earlier decision.](docs/images/scope-journal.jpg)
+![A decision record in the Journal view: the choice, two rejected alternatives, the reason, the human's words as the agent attributes them, and a citation of an earlier decision.](https://raw.githubusercontent.com/PostHog/coherence/main/docs/images/scope-journal.jpg)
 
 ### Methods are kept, not rediscovered
 
@@ -309,8 +309,10 @@ Set up Coherence in this project, and report what each step found.
    with `coherence --version`. Teammates get it from the lockfile.
 
 2. Hooks. Run `coherence hooks install --host claude` (or `--host codex`).
-   From the next session on, every session starts with Coherence's
-   vocabulary, the project's standing, and the exact journal commands.
+   In Claude Code the tool hooks take effect at once, in the session that
+   installed them; from the next session on, every session also starts with
+   Coherence's vocabulary, the project's standing, and the exact journal
+   commands.
 
 3. Adopt. Run `coherence query practice "adopt Coherence"` and work through
    it: config, vocabulary, specs and entrances, the invariants that matter
@@ -503,7 +505,7 @@ and so do `CI` and `DO_NOT_TRACK=1`.
 
 ## Working on Coherence itself
 
-From this checkout, the same commands run as `node src/cli.ts <command>`:
+From this checkout, the commands run as `node src/cli.ts <command>`; in a project that installed the package, each is `coherence <command>` (`npx --no -- coherence`):
 
 ```sh
 node src/cli.ts journal                   # merged project history across every session
@@ -576,8 +578,8 @@ its git worktrees, the hooks always run that tree's own source.
 ## Lexicon workflow
 
 Coverage, preview/apply maintenance, sense review, drafting, incremental checks,
-and optional local similarity are described in [Lexicon operations](docs/lexicon-operations.md).
-Run `node src/cli.ts lexicon help` for the command surface. Coverage counts
+and optional local similarity are described in [Lexicon operations](https://github.com/PostHog/coherence/blob/main/docs/lexicon-operations.md).
+Run `coherence lexicon help` for the command surface. Coverage counts
 observations and unresolved questions; it is not a semantic-completeness score.
 
 ## Test setup

@@ -151,6 +151,21 @@ test("a project with no plugins key reads every language through the bundled plu
   assert.equal(providerOf("python")?.dir, join(BUNDLED_DIR, "python"), "a project that names none reads the bundled one again");
 });
 
+test("a plugin's testFolders name the folders its language keeps tests in, by exact name, for its project alone", () => {
+  const root = project({
+    "coherence.config.json": JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }),
+    "plugins/zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, module: "./index.ts", extensions: [".zz"], testFolders: ["Checks"] }),
+    "plugins/zz/index.ts": swapPlugin("zz", "zz", {})["plugins/zz/index.ts"]!,
+  });
+  readEnforcementConfig(root);
+  assert.ok(isTestPath("Checks/AccountChecks/fixtures.zz", []), "every file under the folder is a test, whatever it is called");
+  assert.ok(isTestPath("pkg/Checks/a.zz", []), "wherever the folder sits");
+  assert.ok(!isTestPath("app/Checks.zz", []), "a file named like the folder is not in it");
+  assert.ok(!isTestPath("checks/a.zz", []), "the name matches exactly, case and all");
+  readEnforcementConfig(project({ "coherence.config.json": JSON.stringify({ language: "typescript" }) }));
+  assert.ok(!isTestPath("Checks/AccountChecks/fixtures.zz", []), "a project that does not name the plugin keeps no such folder");
+});
+
 test("a plugin that provides a language no bundled plugin does is read as a bundled one is, for its project alone: its files, tests, folders, entrance rules, CI steps and syntax slots; a language nothing provides is refused by the spec check as by a run", () => {
   const zz = (fields: Record<string, unknown> = {}): Record<string, string> => ({
     "plugins/zz/plugin.json": JSON.stringify({

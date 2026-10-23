@@ -20,7 +20,7 @@ import { runHook, specStopText } from "../lifecycle/hook.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { deriveState } from "../spec/state.ts";
 import { checkChokepoint, classifySite } from "./check.ts";
-import { formatRun, formatStatus, refuteCommand } from "./cli.ts";
+import { formatRun, formatStatus, refuteCommand, runCommand } from "./cli.ts";
 import { readEnforcementConfig } from "./config.ts";
 import { sessionText } from "../journal/shard-fixture.ts";
 import { appendRun, entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type RunRecord } from "./record.ts";
@@ -420,6 +420,37 @@ test("reference-query failures and legacy records never masquerade as confirmed 
   appendRun(root, legacy);
   const loadedLegacy = loadRuns(root).records.find((record) => record.session === "legacy")!;
   assert.equal(loadedLegacy.invariants[0]!.sites, undefined, "an old record remains readable and honestly lacks site evidence");
+});
+
+test("a run that cannot check an enforcement an earlier run checked exits 1 and names it; the same not run with no earlier check exits 0", async () => {
+  const other = mkdtempSync(join(tmpdir(), "coherence-lapsed-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(other, path)), { recursive: true });
+    writeFileSync(join(other, path), text, "utf8");
+  };
+  put("tsconfig.json", TSCONFIG);
+  put("coherence.config.json", JSON.stringify({ language: "typescript" }));
+  put("Fixture.spec.md", "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n");
+  put("src/a.ts", "export function release(): number {\n  return 1;\n}\n");
+  const run = async (session: string): Promise<{ code: number; out: string }> => {
+    const out: string[] = [];
+    const code = await runCommand(["--form", "chokepoint", "--no-server", "--session", session, "--agent", "enforcement"], { cwd: other, out: (l) => out.push(l), err: (l) => out.push(l) });
+    return { code, out: out.join("\n") };
+  };
+  try {
+    const first = await run("never-checked");
+    assert.equal(first.code, 0, `never checked, its not run is the spec's lack, not a lapse: ${first.out}`);
+    appendRun(other, {
+      at: "2020-01-01T00:00:00.000Z", session: "checked", agent: "enforcement", commit: null, dirty: false,
+      instrument: { language: "typescript", server: "none" }, latency: 1,
+      invariants: [{ component: ".", name: "ghost door", form: "chokepoint", verdict: "pass", grade: "reference-choked", refutation: "witnessed", bypasses: [], testReferences: 0, files: ["src/a.ts"], latency: 1, reason: "every reference inside release" }],
+    });
+    const lapsed = await run("lapsed");
+    assert.equal(lapsed.code, 1, lapsed.out);
+    assert.match(lapsed.out, /1 enforcement an earlier run checked could not be checked now; a check that lapsed is no pass:\n {2}○ \.\/ghost door \(chokepoint\): pass at 2020-01-01T00:00:00\.000Z, not run now: .*GHOST/);
+  } finally {
+    rmSync(other, { recursive: true, force: true });
+  }
 });
 
 test("appendRun refuses a session that cannot name a file", () => {

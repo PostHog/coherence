@@ -274,7 +274,7 @@ the language first, and a file whose text names the thing but holds no
 reported site makes the check not run, naming the file. Without
 a template the refutation is not run, and says so, so the chokepoint reads not
 run, never pass. Every verdict names what answered
-(`swift via sourcekit-lsp (declared in the config)`).
+(`toy via toy-language-server (declared in the config)`).
 
 No reading scans a declared language's text: Structure, the economy
 prediction, mass, entrance detection and `scaffold control` name it as not
@@ -328,8 +328,12 @@ full.
 A run exits non-zero when an enforcement failed and also when the instrument
 was needed and could not answer: the totality pass runs the whole suite
 before the first question, so the run holds the warm server's idle timer open
-with a heartbeat and asks the instrument again afterwards. A run that proved
-nothing must never read like a clean one.
+with a heartbeat and asks the instrument again afterwards. It exits non-zero
+too when an enforcement an earlier run checked (pass or fail) reads not run
+now, whatever the reason (a protected name that became ambiguous, a
+chokepoint that no longer resolves), and names each with its earlier verdict:
+a check that lapsed is no pass. A run that proved nothing must never read
+like a clean one.
 
 `run --status` is a view: the latest entry per enforcement across every run;
 one the latest run skipped keeps its prior dated verdict, and the line says
@@ -359,7 +363,10 @@ down after a few idle minutes.
 
 On PostToolUse for a file-writing tool, the hook re-checks only the
 chokepoint invariants the file may involve (a prior run touched the file, or
-a protected or chokepoint name appears in it) and appends the pass as a run. A bypass is printed as additionalContext in the same turn: the
+a protected or chokepoint name appears in it, in a file written in one of the
+project's languages: a name in notes or prose starts no check) and appends the
+pass as a run, its refutation asked as an edit's (`occasion: "edit"`,
+docs/plugins.md). A bypass is printed as additionalContext in the same turn: the
 invariant, the bypass site, and the two honest options, route the reference
 through the chokepoint or escalate a retirement for a human. At Stop the
 regulation message carries the structural defects the latest run left; at

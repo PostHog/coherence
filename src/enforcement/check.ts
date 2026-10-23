@@ -61,7 +61,7 @@
  * as refused by the checker.
  */
 
-import { isTestPath, rangeContains, withinFolder, type CheckerBoundary, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
+import { isTestPath, rangeContains, withinFolder, type CheckerBoundary, type Definition, type LanguageAdapter, type Occasion, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
 import { horizonSites, projectSites, searchedHorizon } from "../adapters/project-files.ts";
 import { fromText, type ChokepointFrom } from "../spec/grammar.ts";
 import type { Bypass, Governed, Grade, ReferenceTarget, RefutationState, SiteClass, Verdict } from "./record.ts";
@@ -113,6 +113,8 @@ export interface ChokepointInput {
   from?: ChokepointFrom | undefined;
   /** Who said it: the bullet's own from: line, or the config's chokepointFrom; absent is the default. */
   fromBy?: "bullet" | "config" | undefined;
+  /** Who asks, handed to the adapter's refutation: the check at an edit, or a run; absent is a run. */
+  occasion?: Occasion | undefined;
 }
 
 /** Which references a check governs, and the folder it exempts: the component's for `outside the component`, the named one for `outside <folder>`. */
@@ -291,7 +293,7 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
   const files = [...new Set([protectedThing.file, chokepoint.file, ...sites.map((s) => s.file)])].sort();
 
   const earned = rungFor(adapter, visibility);
-  const refutation = await adapter.refute(protectedThing, chokepoint, governed.exempt);
+  const refutation = await adapter.refute(protectedThing, chokepoint, governed.exempt, input.occasion ?? "run");
   const classified = refutation.staged.map((staged) => ({
     what: staged.what,
     class: staged.site === undefined ? undefined : classifySite(staged.site, protectedThing, chokepoint, input.testFolders, governed.exempt),

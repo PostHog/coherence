@@ -146,6 +146,26 @@ test("an edit says which chokepoint invariants it could not check, and stays sil
   }
 });
 
+test("a protected name in a file of none of the project's languages starts no check at the edit; the same name in its code does", { timeout: 120_000 }, async () => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const root = repo({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    "coherence.config.json": JSON.stringify({ language: "typescript" }),
+    "Fixture.spec.md": spec,
+    "NOTES.md": "Today I renamed GHOST and kept release.\n",
+    "src/a.ts": "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  const adapter = new TypeScriptAdapter(root);
+  const edit = (file: string): Promise<string> => editContext(root, { cwd: root, session_id: "s1", tool_name: "Edit", tool_input: { file_path: join(root, file) } }, { adapter });
+  try {
+    assert.equal(await edit("NOTES.md"), "", "the notes are prose: no check starts, so none waits on the instrument");
+    assert.match(await edit("src/a.ts"), /Coherence could not check 1 chokepoint invariant at this edit/, "the same name in the project's code starts the check");
+  } finally {
+    await adapter.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a tool call's hooks spawn git a fixed number of times, whatever the number of components and practices", async () => {
   const counts: string[] = [];
   for (const n of [1, 6]) {

@@ -81,7 +81,7 @@ import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { syntaxOf } from "../plugins/languages.ts";
-import { readEnforcementConfig } from "../enforcement/config.ts";
+import { enforcedLanguageOf, readEnforcementConfig } from "../enforcement/config.ts";
 import { viaForm } from "../plugins/verify.ts";
 import { readPlugins } from "../plugins/registry.ts";
 import { changesSince, PLUGIN_API } from "../plugins/plugin.ts";
@@ -621,9 +621,12 @@ export async function editContext(root: string, input: HookInput, options: HookO
   const own = keepProjectFiles(root, written);
   const files = written.filter((file) => own.has(file));
   if (files.length === 0) return "";
+  // A name in a file of none of the project's languages is prose, never a reference (a notes file that says "write"): only the
+  // file's place in the latest run can tie it to an invariant. An unreadable config keeps every text, toward the slow path.
+  const code = codeFiles(root);
   const texts = new Map(files.map((file) => {
     const absolute = resolve(root, file);
-    return [file, existsSync(absolute) ? readProjectText(absolute, "source") : undefined] as const;
+    return [file, existsSync(absolute) && code(file) ? readProjectText(absolute, "source") : undefined] as const;
   }));
   // Every chokepoint invariant, read the light way (chokepointIndex): the specs and the run index, never the whole spec model or
   // the run history. Anything that keeps that light way from answering falls back to the whole model, as before it existed, and
@@ -648,6 +651,16 @@ export async function editContext(root: string, input: HookInput, options: HookO
   return said + (await checkAtEdit(root, input, options, files, model, touched));
 }
 
+/** Whether a project file is written in one of the project's languages, built-in, provided by a plugin or declared. */
+function codeFiles(root: string): (file: string) => boolean {
+  try {
+    const config = readEnforcementConfig(root);
+    return (file) => enforcedLanguageOf(file, config) !== undefined;
+  } catch {
+    return () => true;
+  }
+}
+
 /** A model of the touched chokepoint invariants alone, which is all the run of an edit's check reads. */
 function chokepointModel(root: string, entries: readonly ChokepointEntry[]): SpecModel {
   const folders = [...new Set(entries.map((e) => e.component))];
@@ -663,7 +676,7 @@ async function checkAtEdit(root: string, input: HookInput, options: HookOptions,
   const session = sessionOf(input) ?? "unknown-session";
   const agent = agentOf(input);
   // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
-  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false });
+  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false, occasion: "edit" });
   if (outcome.instrumentReason !== undefined) options.onEditCheck?.({ checked: 0, failed: [], unchecked: touched.length, reason: outcome.instrumentReason });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");

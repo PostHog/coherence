@@ -125,3 +125,15 @@ test("an invariant the run store graded is not demoted, removed, or renamed away
   assert.equal(decide(legacy, "demote the knob's history bullet: renamed every turn is kept", "--over", "src/widget/the knob keeps its history, kept under its old name", "--because", "a shorter name"), 0);
   assert.deepEqual(messages(legacy), []);
 });
+
+test("an invariant whose latest run could not check it names that cause before the demotion it offers", () => {
+  const door = "- the door holds: The knob turns only through the door.\n  protects: turn\n  chokepoint: door\n  because: a turn past the door is lost\n  kinds: none\n";
+  const root = project(HEAD + door);
+  const entry = (at: string, rest: Partial<RunEntry>): RunRecord => record(at, [{ component: "src/widget", name: "the door holds", form: "chokepoint", verdict: "pass", grade: "reference-choked", refutation: "automatic", bypasses: [], testReferences: 0, files: [], latency: 1, reason: "every reference inside door", ...rest }]);
+  appendRun(root, entry("2026-10-05T09:00:00.000Z", { state: "invariant" }));
+  assert.deepEqual(messages(root), []);
+  appendRun(root, entry("2026-10-05T10:00:00.000Z", { verdict: "not run", refutation: "missing", reason: "protected thing turn is declared in 2 places" }));
+  const lapsed = messages(root);
+  assert.equal(lapsed.length, 1, lapsed.join("\n"));
+  assert.match(lapsed[0]!, /^invariant src\/widget\/the door holds was graded an invariant by the run of 2026-10-05T09:00:00\.000Z and has lost its refutation, since its latest run could not check it: protected thing turn is declared in 2 places; make it checkable and run again, or, if it is retired, an invariant is not demoted silently: decide "demote /);
+});

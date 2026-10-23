@@ -214,7 +214,11 @@ const SHOWN = 6;
 
 export function formatMass(report: MassReport): string {
   const lines: string[] = [];
-  lines.push(`unreached mass: ${numbers(report.unreached)} (${share(report.unreached.lines, report.total.lines)} of lines)`);
+  // Nothing read is no coverage: a 0% over no files must never read as every line reached.
+  if (report.total.files === 0) {
+    const unread = report.languages.unread.map((u) => u.language);
+    lines.push(`unreached mass: not measured, since no source file was read${unread.length === 0 ? "" : ` (${unread.join(" and ")} NOT READ; see the languages line below)`}`);
+  } else lines.push(`unreached mass: ${numbers(report.unreached)} (${share(report.unreached.lines, report.total.lines)} of lines)`);
   lines.push(`  in no component: ${numbers(report.outside.total)}${report.outside.files.length === 0 ? "" : ` — ${report.outside.files.slice(0, SHOWN).join(", ")}${report.outside.files.length > SHOWN ? `, and ${report.outside.files.length - SHOWN} more` : ""}`}`);
   for (const c of report.components) {
     if (c.unreached.files === 0) continue;

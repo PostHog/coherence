@@ -3,8 +3,8 @@
 A plugin is what a project adds to Coherence through its config: a language
 adapter (for a language Coherence lacks, or wrapping one it has), syntax tables
 for the readings, a verifier that proves bullets, and a lexicon layer. One
-interface and one registry carry all of them (`src/plugins`). This page is the
-author's guide.
+interface carries all of them: `@posthog/coherence/plugin`, whose types ship
+in the package as `dist/plugins/api.d.ts`. This page is the author's guide.
 
 Plugins ship two ways:
 
@@ -19,6 +19,20 @@ Plugins ship two ways:
 - **By path**: a folder in the project (or anywhere the project names). This is
   how a project enhances a bundled plugin: copy it out, change it, and point
   the config at the copy.
+
+## A declared language or a plugin
+
+A language with a language server can be checked with no code at all:
+declare it under `languages` in the config (`docs/config.md`, "A language
+Coherence has no adapter for"), and the bundled `declared` plugin drives its
+server. That route stages its refutation as an unsaved document, so it works
+only for a server that reports references from documents it has open. Write a
+plugin when the server does not (sourcekit-lsp answers only from its on-disk
+index), when the language's own tools know more than its server (a package
+manifest that says which folders are tests, a compiler that refuses a private
+name), or when the readings should read the language too (its declarations,
+its entrances, its mass): a declared language gets the chokepoint check
+alone.
 
 ## Running a plugin
 
@@ -102,8 +116,8 @@ copy names it the second way, and so should a plugin you write.
   "version": "0.1.0",
   "pluginApi": 2,
   "provides": { "language": "swift" },
-  "extends": "typescript",
   "extensions": [".swift"],
+  "testFolders": ["Tests"],
   "module": "./index.ts",
   "ladder": { "top": "reference-choked", "because": "...", "rungs": [] },
   "verifiers": [
@@ -119,10 +133,10 @@ copy names it the second way, and so should a plugin you write.
 | `name`, `version` | Who the plugin is. Every run entry its adapter or verifier answers names both. |
 | `pluginApi` | The interface version it was written for. This release runs `2` and reads plugins written for `1` to `2`: a plugin written for `1` loads, and the session start names it with what changed since. Any other version is refused, naming both. |
 | `provides.language` | The language its adapter answers for. A built-in name takes the built-in's place (see the swap rule). A new name needs `extensions` (or `files`), and the config's `language` must name it; the language is then read as a bundled one is, for that project: its files, test files and folders, its entrance rules, its CI steps and every syntax slot it fills. |
-| `extends` | The language whose adapter it is handed to wrap. |
+| `extends` | The language whose adapter it is handed to wrap, as `base` (Convex extends `typescript`). A plugin for a language of its own extends nothing. |
 | `extensions` | The files a new language is written in. An extension a built-in, a declared language, or another plugin owns is refused. |
 | `module` | The module, relative to the manifest. Required for an adapter, and for a verifier with no `command`. |
-| `ladder` | The rungs the adapter grades on. Absent, the wrapped adapter's; with none, reference-choked alone, enforced by Coherence's check. |
+| `ladder` | The rungs the adapter grades on: `top`, `because`, `rungs`, and optionally `whenVacuous`, the rung a chokepoint stands on when the refutation could not see its staged uses (absent, the earned rung stands with the verdict not run). Absent, the wrapped adapter's; with none, reference-choked alone, enforced by Coherence's check. |
 | `verifiers` | The via forms it proves (below). A `command` must name `{name}`; a command that is never told what to prove is refused. An optional `match` is a regular expression its output must match for an exit 0 to pass. |
 | `lexicon` | Its lexicon layer, relative to the manifest. |
 | `syntax` | The syntax slots it fills, each `"<module beside the manifest>#<export>"` (below). |
@@ -130,9 +144,10 @@ copy names it the second way, and so should a plugin you write.
 | `source` | `except`: of the language's files, those the plain source scan leaves out (TypeScript's JavaScript, Python's stubs). |
 | `serverExtensions` | The extensions the language server can report a site in or resolve a name to. |
 | `testFiles` | Regular expressions a test file's base name matches by the language's own naming (pytest's `^test_.*\\.py$`), beside `.test.`/`.spec.` and the test folders. |
+| `testFolders` | Folder names whose files are all tests by the language's own layout, wherever they sit (SwiftPM's `Tests`), beside the config's test folders. A name matches a folder exactly, case and all. |
 | `members` | How an exported type's body reads for the lexicon's member scan: `opens`, `closes`, `field`, each a regular expression. |
 | `entrances` | The entrance detection rules (`rule`, `plural`, `detects`) and `notDetected`, what they miss: printed by the query, the page and orient. |
-| `notScanned` | Why the text scans do not read the language yet (Rust's); absent when they do. |
+| `notScanned` | Why the text scans do not read the language yet (Rust's). Present, it turns off every reading that scans the language's text, whatever slots are filled: mass, entrance detection and the Structure reading each name the language as not read, with this reason. Remove it once the `source` slot reads the language. |
 | `environmentFolders` | Folder names no project authors code in, wherever they sit (`node_modules`, `__pycache__`). |
 | `markedFolders` | Folders the language's tools make, left out by a `marker` inside (`pyvenv.cfg`) or by `name` beside a file (`target` beside `Cargo.toml`), each with its `reason`. |
 | `ci` | `note`: what the generated CI workflow says for a project that reads the language. `steps`: what it runs after the install to set up what the adapter asks (Go's toolchain and gopls), each `{ "name"?, "uses": "<owner/repo>@<40-hex commit>", "version": "<its release>", "with"? }` or `{ "name"?, "run": "<command>" }`. |
@@ -166,6 +181,30 @@ so every chokepoint it was asked about reads not run, never a pass.
 
 `bounds`, for a server that can narrow its workspace, is the folders the
 component interface reading leaves out.
+
+`root` is the project's folder as Coherence was handed it. A server may
+answer in the real path instead: on macOS `/var` and `/tmp` are links into
+`/private`, so a project under one comes back as `/private/var/...`. Map a
+path the server reports against `realpathSync(root)` as well as `root`, or
+every site falls outside the project and is dropped. (`plugin check` hands
+its scratch project's real path.)
+
+### Which files an adapter reads
+
+The helpers `@posthog/coherence/plugin` exports for listing the project
+differ in what they leave out:
+
+| Helper | Leaves out |
+|---|---|
+| `walkedProjectFiles(walkBounds(root))` | What git ignores, nested checkouts, hidden, host and environment folders, and what the config's `ignore` names. |
+| `walkedProjectFiles(walkBounds(root, []))` | The same, less the config's `ignore`: the bundled adapters' choice, since a reference from code the adoption leaves out still reaches the thing. |
+| `keepProjectFiles(root, paths)` | Of the paths given, those git ignores and those in nested checkouts; never the config's `ignore`. |
+| `projectListing(root)` | Nothing more: one listing taken once, handed to `keepProjectFiles` to answer without asking git again. |
+
+So a fixture copy under an ignored folder is still among an adapter's files.
+Resolve a `Name in <path>` hint with `hintedFiles(files, hint)`: the file at
+that exact path when there is one, and every file ending with it only when
+there is not, so the copy never makes the name ambiguous.
 
 ### The syntax slots
 
@@ -208,9 +247,9 @@ reader's side; this is the author's side.
 |---|---|
 | `ready()` | `{ ok: true }` once the instrument answers, else `{ ok: false, reason }` naming what is missing and how to get it (`gopls was not found (install it with ...)`). Never throws for a missing tool: every chokepoint then reads not run with the reason, never pass. |
 | `resolve(name, hint)` | A spec name to one `Definition`: a file, a range, and the position of the name. Read the name with `parseName`: a bare symbol, `Name in file`, or a module path. Several candidates are chosen among by `hint` (not in a test file, then under `hint.component`), and a name still ambiguous is refused with `candidates`, never guessed. |
-| `references(definition)` | Every site in the project's own files (`keepProjectFiles`) that names the thing, the declaration itself left out, as `{ file, line, character, symbol }`: the line 1-based, `symbol` the enclosing declaration's dotted path. Test files are recognized by the check from the manifest's `testFiles` and the test folders; report every site. |
+| `references(definition)` | Every site in the project's own files (`keepProjectFiles`) that names the thing, the declaration itself left out, as a `ReferenceSite`: `file`, `line` (1-based), `character` (0-based), `symbol` (the enclosing declaration's dotted path, absent at the top level); `form`, `"import"` or `"re-export"` when the site is one; `test: true` when the adapter knows the site is test code that its path does not show (Rust's `#[cfg(test)]`, a SwiftPM test target read from the package); `unread`, why, when the adapter cannot tell whether the site reaches the thing. Test files are recognized by the check from the manifest's `testFiles` and `testFolders` and the config's test folders; report every site. |
 | `visibility(definition, chokepoint?)` | Whether the language itself refuses a reference from outside the thing's module (`enforced`), whether the thing is reachable from outside it (`visible`), the `evidence` read, and the `rung` a clean chokepoint earns on it, one of the manifest's `ladder.rungs`. |
-| `refute(protected, chokepoint?, exempt?)` | The refutation, below. |
+| `refute(protected, chokepoint?, exempt?, occasion?)` | The refutation, below. |
 | `testFilter(via)` | A bullet's `via` as the project's test runner filters by it; most return it unchanged. |
 | `forget(files?)` | Make the instrument read the disk again: the named files, or all it may have open. Resolve only once the instrument has taken the change in, since the edit hook checks again right after. |
 | `close()` | Stop what the adapter started. The core closes a `base` it handed you. |
@@ -220,10 +259,22 @@ reader's side; this is the author's side.
 
 A check that could never fail proves nothing, so every chokepoint run
 refutes itself: the adapter stages uses the check must catch, and the run
-reads what it saw. Nothing may touch disk: stage each use as an unsaved
-document (`textDocument/didOpen`, or `didChange` over a file the project
-has), and close or restore every one before `refute` returns, whatever it
-returns.
+reads what it saw. The project's own files are never changed: stage each use
+as an unsaved document (`textDocument/didOpen`, or `didChange` over a file
+the project has), and close or restore every one before `refute` returns,
+whatever it returns. A server that answers only from what is on disk
+(sourcekit-lsp reads its index, never an open document) cannot see an
+unsaved use: stage it instead in a throwaway copy of the project outside it,
+as Python's tach refutation does, ask a server over the copy, map the copy's
+paths back to the project's in what you return, and remove the copy.
+
+`occasion` says who asks: `"edit"` for the check at an edit, which a hook
+waits on inside its latency budget, `"run"` for a run, `refute` and `plugin
+check`. A refutation that costs seconds (a cold index of a copy) may take a
+cheaper path at an edit, such as a copy and an index kept warm between edits
+and refreshed with the edited files, or report `seen: false` at an edit and
+leave the proof to the run, which then reads not run at the edit, never pass.
+It never reports a use it did not see.
 
 - **When Coherence's check enforces the rung** (`reference-choked`), stage
   the uses the check must call bypasses and return them as `staged`, each
