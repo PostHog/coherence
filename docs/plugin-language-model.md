@@ -82,19 +82,17 @@ These stay their own slots, since each is a feature of a tool or framework
 rather than a reading of the language: entrance rules (`candidates`,
 `manifestCandidates`), `notice`, `lists` and `boundaries`.
 
-## Every plugin has a spec
+## Every plugin is held to one abstract spec
 
-A plugin is a component, and a component without a spec is one Coherence
-cannot hold to anything. So no plugin loads without one: a plugin folder
-carries `<Name>.spec.md` beside its `plugin.json`, and the loader refuses a
-plugin whose spec is missing or lacks a bullet its manifest calls for, as it
-refuses two plugins for one language today, naming what to write.
+A plugin is a component, and Coherence holds every one to a spec, so no
+plugin is ever without one. Because the shape of a plugin is known, the spec
+is written once, in Coherence: an abstract spec, `src/plugins/Plugin.spec.md`,
+whose bullets are what any plugin owes for each role it provides and each
+reading its model gives. Every loaded plugin, bundled or by path, is held to
+every bullet that applies to its shape, whether or not its author wrote a
+line.
 
-Because the shape of a plugin is known, so are the bullets it owes. Each role
-it provides, and each reading its model gives, calls for one bullet of a known
-kind, and each reading it leaves out calls for a decline:
-
-| The plugin provides | The bullet it owes | Proved by |
+| The plugin provides | The abstract bullet it is held to | Proved by |
 |---|---|---|
 | a language (`extensions`, file rule) | its files are read and no others | `[plugin files]`: `check.json` `language` |
 | an adapter | every reference to a protected thing is found, and a chokepoint's bypasses named | `[plugin references]`, `[plugin chokepoint]` |
@@ -104,33 +102,39 @@ kind, and each reading it leaves out calls for a decline:
 | `boundaries` | the tool's declared boundaries are read | `[plugin boundaries]`: `check.json` `boundaries` (new) |
 | a verifier form | the form passes a true name and fails a false one | `[plugin <form>]`: both, from `check.json` |
 | a lexicon layer | its terms clash with none of Coherence's | `[plugin lexicon]` |
-| a reading left out | a decline: the reading, and why | a `## declines` bullet with `because:` |
 
-`declines` lives in the spec, not the manifest: a decline is a claim about
-the plugin, said where its other claims are, and the loader reads which
-readings a plugin gives from the module and which it declines from the spec.
-A reading neither given nor declined refuses the load.
+A plugin language's readings are all owed: a language plugin that gives no
+`items` is held to the `items` bullet and fails it, rather than being excused
+from it.
 
-- **The bullets are written for the author.** `coherence scaffold plugin
-  <dir>` reads the manifest and module and writes the spec: one bullet per
-  role and reading, each with its `via: [plugin ...]`, and one decline per
-  reading left out with `because: TODO`, which the loader refuses until it
-  says why.
+- **The concrete spec only overrides.** A plugin's own `<Name>.spec.md`,
+  beside its `plugin.json`, is optional. It names abstract bullets the plugin
+  does not hold, each with `because:` (Convex is no language model and gives
+  no `items`; Quint's verifier is its only role), may narrow one (Go resolves
+  a package import as a module, never a file), and adds the plugin's own
+  bullets. An override without `because:` is a spec problem, and an overridden
+  reading is said at session start and counted in mass's "not read" line as a
+  gap, as an undeclared entrance is. Absent the file, nothing is overridden:
+  the default is to be held to everything.
 - **The proof is the plugin's own sample project.** `[plugin ...]` is a via
-  form Coherence itself proves (the verifier role), graded over
-  `check.json` as `plugin check` grades its duties today. A plugin needs no
-  test runner of its own to be proved, and its bullets grade in the run of
-  whichever project holds it: Coherence's run for the bundled plugins, the
-  project's for a plugin by path.
-- **Each bullet is refuted mechanically.** The shape that tells Coherence
-  what a bullet must be also tells it how to break the bullet: swap the
-  reading for its empty answer (no items, no imports, an adapter that reports
-  nothing) and the bullet must go red. One that stays green proves nothing,
-  and the plugin is refused: this is the check that a plugin which "does
+  form Coherence itself proves (the verifier role), graded over each plugin's
+  `check.json` as `plugin check` grades its duties today, so a plugin needs no
+  test runner of its own. The abstract bullets grade once per plugin in the
+  run of whichever project holds it: Coherence's run for the bundled plugins,
+  the project's for a plugin by path. A plugin whose `check.json` lacks what a
+  bullet reads fails that bullet by name.
+- **Each abstract bullet is refuted once, for every plugin.** The shape that
+  says what a bullet must be also says how to break it: swap the reading for
+  its empty answer (no items, no imports, an adapter that reports nothing)
+  and the bullet must go red. It is refuted against the abstract spec, so no
+  plugin author witnesses a refutation, and `plugin check` repeats the swap
+  on each plugin: a bullet a plugin passes with its reading emptied proves
+  nothing for it, and fails. This is the check that a plugin which "does
   almost nothing" fails, however many slots it fills.
-- **Nothing is read silently.** A declined reading is said at session start
-  and counted in mass's "not read" line as a gap, as an undeclared entrance
-  is. `NO_SOURCE` and `NO_INTERFACES` go; `notScanned` becomes a decline of
+- **`plugin check` is the abstract spec's run.** Its duties today are the
+  first four abstract bullets; it becomes the table of every bullet: held and
+  proven, overridden with why, or failed.
+- **Nothing is read silently.** `NO_SOURCE` and `NO_INTERFACES` go; `notScanned` becomes an override of
   every reading.
 - **The core names no language.** A structural test fails on a language's
   layout word (`Cargo.toml`, `src/bin`, `__init__.py`, `go.mod`...) in a core
@@ -144,18 +148,19 @@ as they do today, and the session start names what changed. Each bundled
 plugin then moves in its own commit, with the same answers before and after
 on a real project:
 
-0. The spec requirement first, on interface 2: it does not wait for the
-   model. Each bundled plugin gets its spec (the bullets about one plugin in
-   `src/plugins/Plugins.spec.md` move into it), keyed to today's slots, and
-   the requirement holds third-party plugins from the release after, with a
-   session-start notice in between.
+0. The abstract spec first, on interface 2: it does not wait for the model.
+   Its bullets are keyed to today's slots; the bundled plugins' overrides are
+   written (Rust's and Go's empty text slots among them, which is the point),
+   and the bullets about one plugin in `src/plugins/Plugins.spec.md` move
+   into that plugin's concrete spec. Third-party plugins are held from the
+   release after, with a session-start notice in between.
 1. Rust first: `rust-source.ts` is already the model (`itemOf`,
    `manifestOf`, `binaryOf`, `codeOnly`, `testRanges`).
 2. TypeScript and Python, which fill every slot today; the derived answers
    must match theirs on Coherence itself and on PostHog.
 3. Go, which gains `items` from `go-top-level.ts` and package imports
    through the module form of `resolve`.
-4. Convex and Quint, which are not language models and decline the readings
+4. Convex and Quint, which are not language models and override the readings
    they do not give, with why.
 5. The Swift plugin, from the blind session, as the test of the module form.
 
