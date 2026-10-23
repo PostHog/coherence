@@ -136,6 +136,13 @@ export const OUTSIDE_ROOT_EXIT = 78;
  */
 export const CONTEXT_BUDGET = 9_500;
 
+/**
+ * The most of the vocabulary the start injection presents, in tokens (bytes
+ * over four): the lexicon has no ceiling, its presentation does, and what it
+ * trims is the least recently named (d-f0da2f1f).
+ */
+export const VOCABULARY_TOKENS = 2_000;
+
 /** The rule in Coherence's own repository, where its rejected names are defects everywhere; with the session block above it the whole tail stays under 120 words. */
 export const INSTRUCTION = [
   "Use these names. A rejected name in prose, a spec, a journal record, or an",
@@ -804,7 +811,7 @@ export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.e
 }
 
 /** The start injection with how the vocabulary was delivered, so a reading of the hook can say what orient carries. */
-export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; delivered: Delivered; coverage: Coverage }> {
+export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; vocabulary: string; delivered: Delivered; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
   const commands=await cliName(root);
   // The hand lists come from the last mirror reading kept, never one taken here (recorded.ts).
@@ -818,8 +825,8 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await copyBlock(root)}\n${await sessionBlock(root, input)}`;
   // The vocabulary in the order the journal last named it, so the host's budget trims what the work has not named for longest.
   const named = lastNamed(loadJournal(root).records, [...coherence.concepts, ...(project?.concepts ?? [])]);
-  const { text, delivered } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root), pluginsInUse(root, coherence), named);
-  return { text: head + text + tail, delivered, coverage: reading };
+  const { text, delivered } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root), pluginsInUse(root, coherence), named, VOCABULARY_TOKENS);
+  return { text: head + text + tail, vocabulary: text, delivered, coverage: reading };
 }
 
 /**

@@ -1,6 +1,6 @@
 - carry a lexicon change through: A change to the lexicon reaches every place that names the concept before anything uses the new name.
   when: command lexicon apply | edit docs/lexicon.json
-  step: write the first sentence as the definition a session needs at a glance; the lexicon has no token ceiling, and the start injection decays the least recently named concepts to fit the host (d-2b4c96a2)
+  step: write the first sentence as the definition a session needs at a glance; the lexicon has no token ceiling; the start injection presents at most 2,000 tokens of it and decays the least recently named concepts to fit (d-2b4c96a2, d-f0da2f1f)
   step: mark a concept "protected": true only when a human asks for it to stay whole however long the journal goes without naming it
   step: before a reject or a rename, count the findings it would create across the corpus; a word in ordinary use or a language keyword gets a qualifying rename instead of a bare rejection
   step: propose, then apply with because and over; a human ruling carries the human's words with --human, and none is ever invented

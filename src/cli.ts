@@ -51,7 +51,7 @@ import { deliveredText, renderCompact, renderCompactWithin, tokenEstimate } from
 import { lastNamed } from "./lifecycle/lexicon-recency.ts";
 import { loadJournal } from "./journal/store.ts";
 import { clashText } from "./plugins/lexicon.ts";
-import { cliName, CONTEXT_BUDGET, ECONOMY_SNAPSHOT, isHookEvent, HOOK_EVENTS, MIRROR_REFRESH, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
+import { cliName, CONTEXT_BUDGET, VOCABULARY_TOKENS, ECONOMY_SNAPSHOT, isHookEvent, HOOK_EVENTS, MIRROR_REFRESH, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { runHookServe } from "./lifecycle/hook-serve.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
@@ -242,9 +242,9 @@ async function lexiconCommand(call: CommandCall, args: string[], root: string): 
   call.stdout.write(compact);
   const estimate = tokenEstimate(compact);
   let note = "";
-  const within = renderCompactWithin(coherence, project, CONTEXT_BUDGET, "coherence", true, () => true, named);
+  const within = renderCompactWithin(coherence, project, CONTEXT_BUDGET, "coherence", true, () => true, named, VOCABULARY_TOKENS);
   if (within.delivered.name > 0 || within.delivered.out > 0) {
-    note = `; alone in an injection under ${CONTEXT_BUDGET} characters it would go ${deliveredText(within.delivered)} (~${tokenEstimate(within.text).tokens} tokens)`;
+    note = `; the start injection presents at most ${VOCABULARY_TOKENS} tokens of it, so alone it would go ${deliveredText(within.delivered)} (~${tokenEstimate(within.text).tokens} tokens)`;
   }
   call.stderr.write(`~${estimate.tokens} tokens (${estimate.bytes} bytes / 4)${note}\n`);
   return 0;

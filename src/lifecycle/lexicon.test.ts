@@ -167,6 +167,12 @@ test("renderCompactWithin keeps the vocabulary most recently named first: the ho
   assert.match(roomy.text, /vocabulary \(40 concepts, most recently named first; [^\n]*\n- thing39: [^\n]*\n- thing5: [^\n]*\n- thing0: /, "the protected concept heads its layer, then the most recently named, then the file's order");
   assert.match(roomy.text, /\(also: alias3\) \(not: other3\)/);
 
+  // The presentation's own bound in tokens trims the same way, whatever room the characters leave.
+  const bounded = renderCompactWithin(coherence, big, 1_000_000, "coherence", true, () => true, named, 600);
+  assert.ok(tokenEstimate(bounded.text).tokens <= 600, `${tokenEstimate(bounded.text).tokens} tokens`);
+  assert.ok(bounded.delivered.whole < all, JSON.stringify(bounded.delivered));
+  assert.match(bounded.text, /^- thing39: /m, "under the token bound too, a protected concept keeps its line");
+
   // Just short of everything whole: the least recently named concept is the first to lose its line.
   const short = renderCompactWithin(coherence, big, roomy.text.length - 1, "coherence", true, () => true, named);
   assert.ok(short.text.length <= roomy.text.length - 1);

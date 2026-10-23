@@ -11,13 +11,13 @@ import { journalVerbs } from "../journal/cli.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
-import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, adopterExample, adopterInstruction, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
+import { BOUNDARY_RULE, CONTEXT_BUDGET, VOCABULARY_TOKENS, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, adopterExample, adopterInstruction, runHook, startReading, sessionBlock, type WarmDoor } from "./hook.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { TRACES_DIR, recordReadTrace, recordWriteTrace } from "../economy/trace.ts";
 import { COHERENCE_LEXICON, installedRoot, PACKAGE_NAME } from "./project.ts";
 import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, EARLIER_IGNORE_TEXTS, IGNORE_FILE, IGNORE_TEXT } from "./state-files.ts";
-import { loadLexicon, rejectedNames } from "./lexicon.ts";
+import { loadLexicon, rejectedNames, tokenEstimate } from "./lexicon.ts";
 import { cli } from "./cli-fixture.ts";
 import { gapProject } from "../readings/scope/gaps-fixture.ts";
 import { undeclaredProject } from "../readings/scope/undeclared-fixture.ts";
@@ -362,9 +362,22 @@ test("the start injection stays under the budget with escalations present: the v
       const light = contextOf(await runHook("SessionStart", { cwd: one, session_id: "s-light" }, one));
       assert.ok(light.length <= CONTEXT_BUDGET);
       assert.match(light, /^Escalations awaiting a human \(1\)/);
-      assert.match(light, /^- invariant: /m, "with room to spare the vocabulary is injected in full");
+      assert.match(light, /^- invariant: /m, "with room to spare the vocabulary keeps its lines, from the head of its order");
     } finally {
       await rm(one, { recursive: true, force: true });
+    }
+
+    // No escalation and a project lexicon long enough that the host's budget would leave the vocabulary more than its own bound: the bound decides.
+    const roomyRoot = await freshRoot();
+    try {
+      await writeFile(join(roomyRoot, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, rejected: [], concepts: Array.from({ length: 40 }, (_, i) => ({ name: `thing${i}`, definition: `The ${i}th thing, described at some length so that the line is long. A second sentence follows.` })) }));
+      const roomy = await startReading(roomyRoot);
+      assert.ok(roomy.text.includes(roomy.vocabulary));
+      assert.ok(tokenEstimate(roomy.vocabulary).tokens <= VOCABULARY_TOKENS, `with room to spare the vocabulary still presents at most ${VOCABULARY_TOKENS} tokens: ${tokenEstimate(roomy.vocabulary).tokens}`);
+      assert.ok(roomy.delivered.name + roomy.delivered.out > 0, "the bound trimmed the least recently named");
+      assert.ok(roomy.text.length < CONTEXT_BUDGET - 200, `the host's budget had room left (${roomy.text.length} of ${CONTEXT_BUDGET}), so the trim was the vocabulary's own bound`);
+    } finally {
+      await rm(roomyRoot, { recursive: true, force: true });
     }
   } finally {
     await rm(dir, { recursive: true, force: true });

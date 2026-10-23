@@ -69,10 +69,11 @@ Anti-rot holds throughout: the lexicon names things and never points at code.
 
 ## Recency, not a ceiling
 
-The lexicon has no token ceiling. The start injection orders every concept by
-the latest journal record that names it (its name, an alias or an instance, in
-a record's prose), and the host's budget decides how far down that order the
-injection reaches: the most recently named concepts keep their whole lines,
+The lexicon has no token ceiling; what the start injection presents of it does,
+2,000 tokens. The injection orders every concept by the latest journal record
+that names it (its name, an alias or an instance, in a record's prose), and
+that bound, or the host's budget when it leaves less room, decides how far
+down that order the injection reaches: the most recently named concepts keep their whole lines,
 the next keep only their names, and the rest are counted and left to
 `coherence lexicon`. A concept the work stops naming decays on its own. A
 lexicon change is itself a record that names the concept, so a touched

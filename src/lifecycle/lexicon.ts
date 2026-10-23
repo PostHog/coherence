@@ -409,10 +409,11 @@ export function renderCompact(
 }
 
 /**
- * The compact form that fits `maxChars`, and how it showed the concepts. The
- * lexicon itself has no ceiling: every concept of every shown layer is put
- * in one order (byRecency) and the host's budget decides how far down it
- * reaches. The most concepts that fit keep their names, from the head; of
+ * The compact form that fits `maxChars` and `maxTokens`, and how it showed
+ * the concepts. The lexicon itself has no ceiling: every concept of every
+ * shown layer is put in one order (byRecency), and the two bounds, the room
+ * the host's budget leaves and the presentation's own, decide how far down
+ * it reaches. The most concepts that fit keep their names, from the head; of
  * those, the most that fit keep their whole lines, from the head again. A
  * concept the journal has not named for longest decays first, to its name
  * and then out, and a protected one goes last; among concepts no record
@@ -429,6 +430,7 @@ export function renderCompactWithin(
   own = true,
   shown: (layer: string) => boolean = () => true,
   lastNamed: LastNamed = new Map(),
+  maxTokens = Number.POSITIVE_INFINITY,
 ): { text: string; delivered: Delivered } {
   // Concepts no record tells apart keep this order: the project's first, whose rejected names bind in all of its text, then each shown plugin's, then Coherence's, whose names bind in an adopter only where Coherence's concepts are named.
   const visible = [
@@ -448,7 +450,7 @@ export function renderCompactWithin(
     for (let n = max; n > 0; n--) if (fits(n)) return n;
     return 0;
   };
-  const fits = (text: string): boolean => text.length <= maxChars;
+  const fits = (text: string): boolean => text.length <= maxChars && tokenEstimate(text).tokens <= maxTokens;
   const kept = largest(all.length, (n) => fits(render(n, 0)));
   if (kept === 0 && all.length > 0) return { text: renderPointer(cli), delivered: { whole: 0, name: 0, out: all.length } };
   const whole = kept < all.length ? 0 : largest(kept, (n) => fits(render(kept, n)));
