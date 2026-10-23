@@ -227,6 +227,9 @@ reading first asks for that slot:
 An `EntranceSyntax`'s `manifestCandidates(read, exists, files)` is handed the
 project's files inside the bounds as its third argument, so a language whose
 manifests lie through the tree (every Cargo.toml of a workspace) reads each.
+A candidate may carry a `name`, the one `scaffold entrances` proposes when
+the plugin knows a better one than its symbol gives (a Rust binary by the
+name its Cargo.toml gives it), so no language's layout is known in the core.
 
 Every type is exported from `@posthog/coherence/plugin`. A slot a plugin leaves empty reads as "not read for <language>", never as
 another language. A plugin answers for the project whose config names it

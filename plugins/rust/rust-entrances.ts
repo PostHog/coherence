@@ -7,19 +7,25 @@
  */
 
 import { posix } from "node:path";
-import { escape, handlerName, languageOfFile, spanOf, throughOf, type EntranceCandidate, type EntranceSyntax } from "../../src/plugins/api.ts";
-import { declaredModules, testRanges, uncommented, useLeaves } from "./rust-source.ts";
+import { handlerName, languageOfFile, spanOf, throughOf, type EntranceCandidate, type EntranceSyntax } from "../../src/plugins/api.ts";
+import { binaryOf, declaredModules, itemOf, manifestOf, testRanges, uncommented, useLeaves } from "./rust-source.ts";
 
-const FN = /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:(?:default|const|async|unsafe|extern(?:\s+"[^"]*")?)\s+)*fn\s+(?:r#)?([A-Za-z_]\w*)/;
 const ROUTE_ATTRIBUTE = /^\s*#\[\s*(?:[\w:]*::)?(get|post|put|patch|delete|head|options|route)\s*\(\s*"([^"]*)"/;
 const FOREIGN = /^\s*#\[\s*(no_mangle|unsafe\s*\(\s*no_mangle\s*\)|export_name\s*=|(?:[\w:]*::)?wasm_bindgen\b)/;
 /** A handler argument: a path, or a call wrapping one, one level deep. */
 const ARGUMENT = String.raw`([\w:]+(?:\s*\([^()]*\))?)`;
 const METHOD = new RegExp(String.raw`(?:\b(?:get|post|put|patch|delete|head|options|trace|any)|\.to)\s*\(\s*${ARGUMENT}\s*\)`, "g");
 
-/** Whether a file is a binary's root by Cargo's convention: src/main.rs, src/bin/x.rs or src/bin/x/main.rs. */
-function binaryRoot(file: string): boolean {
-  return /(^|\/)src\/main\.rs$/.test(file) || /(^|\/)src\/bin\/[^/]+\.rs$/.test(file) || /(^|\/)src\/bin\/[^/]+\/main\.rs$/.test(file);
+/** The fn a line declares, at any depth. */
+function fnOf(line: string): string | undefined {
+  const item = itemOf(line);
+  return item?.keyword === "fn" ? item.name : undefined;
+}
+
+/** Whether the line declares the module's own fn main. */
+function isMain(line: string): boolean {
+  const item = itemOf(line);
+  return item?.top === true && item.keyword === "fn" && item.name === "main";
 }
 
 /** The last segment of a path expression: handlers::create is create. */
@@ -46,18 +52,19 @@ function rustCandidates(file: string, original: string, wrappers: readonly strin
     let start = i;
     while (start > 0 && /^\s*#\[/.test(lines[start - 1] ?? "")) start -= 1;
     for (let j = i; j < lines.length; j++) {
-      const fn = FN.exec(lines[j] ?? "");
-      if (fn !== null) return { name: fn[1]!, start };
+      const fn = fnOf(lines[j] ?? "");
+      if (fn !== undefined) return { name: fn, start };
       if (!/^\s*(#\[|\/\/|$)/.test(lines[j] ?? "") && !/^\s*[)\]"]/.test(lines[j] ?? "")) return undefined;
     }
     return undefined;
   };
   const seen = new Set<number>();
   const script = /(^|\/)build\.rs$/.test(file);
+  const binary = binaryOf(file);
   lines.forEach((line, i) => {
-    const main = /^(?:pub\s+)?(?:async\s+)?fn\s+main\s*\(/.test(line);
-    if (main && binaryRoot(file)) add({ file, line: i + 1, symbol: "main", rule: "binary", why: `${file} is a binary's root by Cargo's layout, and main runs when the binary starts` }, spanOf(lines, i, RUST_ENTRANCES));
-    if (main && script) add({ file, line: i + 1, symbol: "main", rule: "build script", why: "Cargo runs build.rs's main before it compiles the crate" }, spanOf(lines, i, RUST_ENTRANCES));
+    const main = isMain(line);
+    if (main && binary !== undefined) add({ file, line: i + 1, symbol: "main", rule: "binary", name: `binary ${binary}`, why: `${file} is a binary's root by Cargo's layout, and main runs when the binary starts` }, spanOf(lines, i, RUST_ENTRANCES));
+    if (main && script) add({ file, line: i + 1, symbol: "main", rule: "build script", name: `build script ${posix.basename(posix.dirname(file)).replace(/^\.$/, "crate")}`, why: "Cargo runs build.rs's main before it compiles the crate" }, spanOf(lines, i, RUST_ENTRANCES));
     const route = ROUTE_ATTRIBUTE.exec(line);
     const foreign = FOREIGN.exec(line);
     if (route === null && foreign === null) return;
@@ -93,10 +100,9 @@ function rustCandidates(file: string, original: string, wrappers: readonly strin
 
 /** Whether the file brings in or declares the name: a use naming it, or an item or module of that name. */
 function binds(text: string, name: string): boolean {
-  const n = escape(name);
   if (useLeaves(text).some((leaf) => (leaf.alias ?? leaf.path[leaf.path.length - 1]) === name)) return true;
   if (declaredModules(text).includes(name)) return true;
-  return new RegExp(`^\\s*(?:pub(?:\\s*\\([^)]*\\))?\\s+)?(?:(?:default|const|async|unsafe|extern(?:\\s+"[^"]*")?)\\s+)*(?:fn|struct|enum|const|static)\\s+${n}\\b`, "m").test(text);
+  return text.split("\n").some((line) => itemOf(line)?.name === name);
 }
 
 /** The [[bin]] targets every Cargo.toml in the project names at a path of its own, each a binary whose main is an entrance. */
@@ -106,16 +112,14 @@ function cargoBinaries(read: (file: string) => string | undefined, exists: (file
     const text = read(manifest);
     if (text === undefined) continue;
     const folder = posix.dirname(manifest) === "." ? "" : posix.dirname(manifest);
-    for (const table of text.split(/^\s*\[\[bin\]\]\s*$/m).slice(1)) {
-      const body = table.split(/^\s*\[/m)[0]!;
-      const path = /^\s*path\s*=\s*"([^"]+)"/m.exec(body)?.[1];
-      const name = /^\s*name\s*=\s*"([^"]+)"/m.exec(body)?.[1] ?? path;
-      if (path === undefined) continue;
-      const file = posix.join(folder, path);
+    for (const bin of manifestOf(text, manifest).bins) {
+      if (bin.path === undefined) continue;
+      const file = posix.join(folder, bin.path);
       // A binary at Cargo's own layout is read from its file already.
-      if (binaryRoot(file) || !exists(file)) continue;
-      const line = (read(file) ?? "").split("\n").findIndex((l) => /^(?:pub\s+)?(?:async\s+)?fn\s+main\s*\(/.test(l));
-      out.push({ file, line: line < 0 ? 1 : line + 1, symbol: "main", rule: "binary", why: `${manifest} names the binary "${name}" at ${path}, and main runs when it starts` });
+      if (binaryOf(file) !== undefined || !exists(file)) continue;
+      const name = bin.name ?? posix.basename(bin.path).replace(/\.rs$/, "");
+      const line = (read(file) ?? "").split("\n").findIndex(isMain);
+      out.push({ file, line: line < 0 ? 1 : line + 1, symbol: "main", rule: "binary", name: `binary ${name}`, why: `${manifest} names the binary "${name}" at ${bin.path}, and main runs when it starts` });
     }
   }
   return out;

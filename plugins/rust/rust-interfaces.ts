@@ -4,7 +4,7 @@
  */
 
 import type { InterfaceSymbol } from "../../src/plugins/api.ts";
-import { RUST_ITEM } from "./rust-source.ts";
+import { itemOf } from "./rust-source.ts";
 
 /**
  * A fn or a macro has a body, and so does a struct, enum or union, whose
@@ -13,10 +13,11 @@ import { RUST_ITEM } from "./rust-source.ts";
  * counted as able to execute, so never read as bodiless.
  */
 export function rustDeclares(line: string): InterfaceSymbol["declares"] {
-  if (/^macro_rules!/.test(line)) return "body";
-  const keyword = RUST_ITEM.exec(line)?.[2];
+  const item = itemOf(line);
+  const keyword = item?.top === true ? item.keyword : undefined;
   if (keyword === undefined || keyword === "mod") return "unknown";
+  if (keyword === "macro_rules") return "body";
   if (keyword === "trait" || keyword === "type") return "type";
-  if (keyword === "const" || keyword.startsWith("static")) return "value";
+  if (keyword === "const" || keyword === "static") return "value";
   return "body";
 }

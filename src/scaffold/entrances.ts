@@ -65,25 +65,15 @@ function routePath(file: string): string {
   return (at === -1 ? parts : parts.slice(at + 1)).join("/") || stem(file);
 }
 
-/** A Rust binary's name by Cargo's layout: src/bin/serve.rs and src/bin/serve/main.rs are serve; src/main.rs and build.rs are the crate folder's, "crate" at the root. */
-function binaryName(file: string): string {
-  const parts = file.split("/");
-  const bin = parts.lastIndexOf("bin");
-  if (bin >= 0 && parts[bin + 1] !== undefined) return stem(parts[bin + 1]!);
-  const src = parts.lastIndexOf("src");
-  const folder = parts.slice(0, src >= 0 ? src : parts.length - 1);
-  return folder[folder.length - 1] ?? "crate";
-}
-
-/** The name a bullet proposes: words from the symbol; the route's path for a route export or a page; the file's for a file-grain entrance. Never a colon, which ends a name. */
-export function entranceName(c: Pick<EntranceCandidate, "file" | "symbol" | "rule">): string {
+/** The name a bullet proposes: the plugin's own when it gave one; words from the symbol; the route's path for a route export or a page; the file's for a file-grain entrance. Never a colon, which ends a name. */
+export function entranceName(c: Pick<EntranceCandidate, "file" | "symbol" | "rule" | "name">): string {
   let name: string;
-  if (c.rule === "page route") name = `page ${routePath(c.file).replace(/(?:^|\/)page$/, "") || "/"}`;
+  if (c.name !== undefined) name = c.name;
+  else if (c.rule === "page route") name = `page ${routePath(c.file).replace(/(?:^|\/)page$/, "") || "/"}`;
   else if (c.symbol === "") name = symbolWords(stem(c.file)).join(" ") || stem(c.file);
   else if (ROUTE_EXPORTS.has(c.symbol)) name = `route ${routePath(c.file)}`;
   else if (METHOD_EXPORTS.has(c.symbol)) name = `${c.symbol} ${routePath(c.file)}`;
   else if (c.symbol === "Command") name = `command ${stem(c.file)}`;
-  else if (c.rule === "binary" || c.rule === "build script") name = `${c.rule} ${binaryName(c.file)}`;
   else name = symbolWords(c.symbol).join(" ") || c.symbol;
   return name.replace(/:/g, " ").replace(/\s+/g, " ").trim();
 }

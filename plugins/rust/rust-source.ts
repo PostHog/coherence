@@ -4,19 +4,42 @@
  * module path resolves (source.ts reads them through SOURCE_SYNTAX).
  *
  * A path resolves by Cargo's layout, not by rust-analyzer: a file's crate
- * root is found from its path (crateRootOf), and a module's file is
- * <parent>/<name>.rs or <parent>/<name>/mod.rs.
- * A #[path] attribute and a module declared inline (`mod a { … }`) are not
- * followed; a path into another crate of the workspace resolves to nothing.
+ * root is found from its path (crateRootOf) or the manifests' target paths
+ * (workspaceOf), and a module's file is <parent>/<name>.rs or
+ * <parent>/<name>/mod.rs. A #[path] attribute and a module declared inline
+ * (`mod a { … }`) are not followed; a path into a crate outside the
+ * workspace resolves to nothing.
+ *
+ * This file is the plugin's one model of Rust: what an item is, what the
+ * layout and the manifests make a crate root or a binary, and what code is
+ * (comments, literals and test-only items set apart). The other files read
+ * Rust through it.
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { posix, resolve } from "node:path";
-import type { SourceSyntax } from "../../src/plugins/api.ts";
+import { parseToml, type SourceSyntax, type TomlTable, type TomlValue } from "../../src/plugins/api.ts";
 
-/** An item at column zero: under any visibility and qualifier, its keyword, then its name. */
-export const RUST_ITEM = /^(pub(?:\s*\([^)]*\))?\s+)?(?:(?:default|const|async|unsafe|extern(?:\s+"[^"]*")?)\s+)*(fn|struct|enum|union|trait|type|const|static(?:\s+mut)?|mod)\s+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)/;
-const MACRO = /^macro_rules!\s*([A-Za-z_][A-Za-z0-9_]*)/;
+/** An item: its indentation, under any visibility and qualifier, its keyword, then its name; or a macro_rules! macro. */
+const ITEM = /^(\s*)(?:(pub(?:\s*\([^)]*\))?\s+)?(?:(?:default|const|async|unsafe|extern(?:\s+"[^"]*")?)\s+)*(fn|struct|enum|union|trait|type|const|static(?:\s+mut)?|mod)\s+|(macro_rules!)\s*)(?:r#)?([A-Za-z_][A-Za-z0-9_]*)/;
+
+/** What a line declares, read the one way every Rust reading reads an item. */
+export interface RustItem {
+  /** At column zero: a module's own item, not one inside an impl, a fn or an inline mod. */
+  top: boolean;
+  /** Visible outside its file: pub in any form (pub(crate) and pub(super) included). */
+  exported: boolean;
+  /** fn, struct, enum, union, trait, type, const, static (static mut too), mod or macro_rules. */
+  keyword: string;
+  name: string;
+}
+
+/** The item a line declares, or undefined. */
+export function itemOf(line: string): RustItem | undefined {
+  const m = ITEM.exec(line);
+  if (m === null) return undefined;
+  return { top: m[1] === "", exported: m[2] !== undefined, keyword: m[4] === undefined ? m[3]!.replace(/\s+mut$/, "") : "macro_rules", name: m[5]! };
+}
 
 /** One leaf of a use tree: the path it names, with `*` for a glob and `self` for the module itself, and the name it is brought in as. */
 export interface UseLeaf {
@@ -137,6 +160,22 @@ export function crateRootOf(file: string): string | undefined {
   return posix.join(base, "lib.rs");
 }
 
+/**
+ * The binary a file is the root of by Cargo's layout, by the name Cargo
+ * gives it: src/bin/serve.rs and src/bin/serve/main.rs are serve; src/main.rs
+ * is its package's, named here by the folder holding src ("crate" at the
+ * project's root). Undefined for any other file.
+ */
+export function binaryOf(file: string): string | undefined {
+  if (crateRootOf(file) !== file) return undefined;
+  const parts = file.split("/");
+  const src = parts.lastIndexOf("src");
+  if (src < 0) return undefined;
+  if (parts[src + 1] === "bin") return parts[src + 2]!.replace(/\.rs$/, "");
+  if (parts[src + 1] !== "main.rs") return undefined;
+  return parts[src - 1] ?? "crate";
+}
+
 /** The module path a file defines within its crate: [] for the crate root, [a, b] for a/b.rs or a/b/mod.rs. */
 export function modulePathOf(file: string, crateRoot: string): string[] {
   if (file === crateRoot) return [];
@@ -186,25 +225,52 @@ function manifestText(root: string, file: string): string | undefined {
   }
 }
 
-/** The body of one [table] of a TOML text: its lines up to the next table header. */
-export function tomlTable(text: string, name: string): string | undefined {
-  const at = new RegExp(`^\\s*\\[${name.replace(/\./g, "\\.")}\\]\\s*$`, "m").exec(text);
-  if (at === null) return undefined;
-  const rest = text.slice(at.index + at[0].length);
-  return rest.slice(0, /^\s*\[/m.exec(rest)?.index ?? rest.length);
+/** What a Cargo.toml says of its targets and its workspace, its paths relative to its own folder. */
+export interface Manifest {
+  /** The package's name, - read as written. */
+  package?: string;
+  /** The [lib] path, when the manifest names one. */
+  lib?: string;
+  /** Each [[bin]] target: its name, and its path when the manifest names one. */
+  bins: { name: string | undefined; path: string | undefined }[];
+  /** The [workspace] members, globs unexpanded. */
+  members: string[];
 }
 
-/** The member folders a workspace manifest lists, a glob in the last segment (crates/*, axum-*) expanded to the folders it matches that hold a Cargo.toml. */
-function workspaceMembers(root: string, manifest: string): string[] {
-  const list = /^\s*members\s*=\s*\[([^\]]*)\]/m.exec(tomlTable(manifest, "workspace") ?? "")?.[1];
+const table = (v: TomlValue | undefined): TomlTable | undefined => (v !== undefined && typeof v === "object" && !Array.isArray(v) ? v : undefined);
+const text = (v: TomlValue | undefined): string | undefined => (typeof v === "string" ? v : undefined);
+
+/** A Cargo.toml read through the core's TOML reader; a manifest it refuses says nothing. */
+export function manifestOf(source: string, file: string): Manifest {
+  let doc: TomlTable;
+  try {
+    doc = parseToml(source, file);
+  } catch {
+    return { bins: [], members: [] };
+  }
+  const bins = Array.isArray(doc["bin"]) ? doc["bin"].map(table).filter((t) => t !== undefined) : [];
+  const members = table(doc["workspace"])?.["members"];
+  const manifest: Manifest = {
+    bins: bins.map((b) => ({ name: text(b["name"]), path: text(b["path"]) })),
+    members: Array.isArray(members) ? members.map(text).filter((m) => m !== undefined) : [],
+  };
+  const pkg = text(table(doc["package"])?.["name"]);
+  if (pkg !== undefined) manifest.package = pkg;
+  const lib = text(table(doc["lib"])?.["path"]);
+  if (lib !== undefined) manifest.lib = lib;
+  return manifest;
+}
+
+/** The member folders a workspace lists, a glob in the last segment (crates/*, axum-*) expanded to the folders it matches that hold a Cargo.toml. */
+function workspaceMembers(root: string, members: readonly string[]): string[] {
   const folders: string[] = [];
-  for (const [, member] of list?.matchAll(/"([^"]+)"/g) ?? []) {
-    if (!member!.includes("*")) {
-      folders.push(posix.normalize(member!));
+  for (const member of members) {
+    if (!member.includes("*")) {
+      folders.push(posix.normalize(member));
       continue;
     }
-    const parent = posix.dirname(member!);
-    const glob = new RegExp(`^${posix.basename(member!).replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
+    const parent = posix.dirname(member);
+    const glob = new RegExp(`^${posix.basename(member).replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
     try {
       for (const entry of readdirSync(resolve(root, parent), { withFileTypes: true })) if (entry.isDirectory() && glob.test(entry.name) && existsSync(resolve(root, parent, entry.name, "Cargo.toml"))) folders.push(posix.join(parent, entry.name));
     } catch {
@@ -240,18 +306,16 @@ export function workspaceOf(root: string): Workspace {
   const known = WORKSPACES.get(root);
   if (known !== undefined && known.at === at) return known.workspace;
   const workspace: Workspace = { crates: new Map(), roots: [] };
-  const top = manifestText(root, "Cargo.toml");
-  for (const folder of top === undefined ? [] : ["", ...workspaceMembers(root, top)]) {
-    const manifest = folder === "" ? top! : manifestText(root, posix.join(folder, "Cargo.toml"));
+  const topText = manifestText(root, "Cargo.toml");
+  const top = topText === undefined ? undefined : manifestOf(topText, "Cargo.toml");
+  for (const folder of top === undefined ? [] : ["", ...workspaceMembers(root, top.members)]) {
+    const file = posix.join(folder, "Cargo.toml");
+    const memberText = folder === "" ? undefined : manifestText(root, file);
+    const manifest = folder === "" ? top! : memberText === undefined ? undefined : manifestOf(memberText, file);
     if (manifest === undefined) continue;
-    const lib = /^\s*path\s*=\s*"([^"]+)"/m.exec(tomlTable(manifest, "lib") ?? "")?.[1];
-    if (lib !== undefined) workspace.roots.push(posix.join(folder, lib));
-    for (const table of manifest.split(/^\s*\[\[bin\]\]\s*$/m).slice(1)) {
-      const bin = /^\s*path\s*=\s*"([^"]+)"/m.exec(table.split(/^\s*\[/m)[0]!)?.[1];
-      if (bin !== undefined) workspace.roots.push(posix.join(folder, bin));
-    }
-    const pkg = /^\s*name\s*=\s*"([^"]+)"/m.exec(tomlTable(manifest, "package") ?? "")?.[1];
-    if (pkg !== undefined) workspace.crates.set(pkg.replace(/-/g, "_"), posix.join(folder, lib ?? "src/lib.rs"));
+    if (manifest.lib !== undefined) workspace.roots.push(posix.join(folder, manifest.lib));
+    for (const bin of manifest.bins) if (bin.path !== undefined) workspace.roots.push(posix.join(folder, bin.path));
+    if (manifest.package !== undefined) workspace.crates.set(manifest.package.replace(/-/g, "_"), posix.join(folder, manifest.lib ?? "src/lib.rs"));
   }
   WORKSPACES.set(root, { at, workspace });
   return workspace;
@@ -281,10 +345,8 @@ function spelled(root: string, file: string): boolean {
 /** A pub item is seen outside its file (pub(crate) and pub(super) included); a private one only in its module. */
 export const RUST_SOURCE: SourceSyntax = {
   declarationOf(line) {
-    const item = RUST_ITEM.exec(line);
-    if (item !== null) return { name: item[3]!, exported: item[1] !== undefined };
-    const macro = MACRO.exec(line);
-    return macro === null ? undefined : { name: macro[1]!, exported: false };
+    const item = itemOf(line);
+    return item === undefined || !item.top ? undefined : { name: item.name, exported: item.exported };
   },
   resolveModule(root, from, specifier, vanished) {
     const exists = (file: string): boolean => vanished.has(file) || spelled(root, file);

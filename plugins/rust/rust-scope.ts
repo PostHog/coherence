@@ -7,7 +7,7 @@
 
 import { posix } from "node:path";
 import type { InterfaceSyntax } from "../../src/plugins/api.ts";
-import { RUST_ITEM, absolutePath, crateRootOf, useLeaves, useTrees } from "./rust-source.ts";
+import { absolutePath, crateRootOf, itemOf, useLeaves, useTrees } from "./rust-source.ts";
 
 /** The module files a file glob-imports (`use crate::a::*`), in both layouts the word index may key a module by: a.rs and a/mod.rs. */
 function globModules(file: string, text: string): string[] {
@@ -30,7 +30,10 @@ function globModules(file: string, text: string): string[] {
 
 /** A type alias declares a type only; Rust has no default export; rust-analyzer reads its Cargo workspace, so it takes no bounds. */
 export const RUST_INTERFACES: InterfaceSyntax = {
-  isTypeDeclaration: (line) => RUST_ITEM.exec(line)?.[2] === "type",
+  isTypeDeclaration(line) {
+    const item = itemOf(line);
+    return item?.top === true && item.keyword === "type";
+  },
   isDefaultExport: () => false,
   serverBounds: false,
   importLists: useTrees,

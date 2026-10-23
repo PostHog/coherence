@@ -226,8 +226,8 @@ describe("entrance detection", () => {
       assert.deepEqual(names("foreign export"), ["crates/shop/src/api.rs render", "crates/shop/src/api.rs shop_init"]);
       assert.deepEqual(
         found.filter((c) => c.rule === "binary" || c.rule === "build script").map((c) => entranceName(c)).sort(),
-        ["binary daemon", "binary serve", "binary shop", "build script shop"],
-        "a binary is named for its file or its crate, so two mains never propose one name",
+        ["binary serve", "binary shop", "binary shopd", "build script shop"],
+        "a binary is named as its manifest names it, else for its file or its crate, so two mains never propose one name",
       );
     } finally {
       remove();

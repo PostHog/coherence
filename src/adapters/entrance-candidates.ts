@@ -43,6 +43,8 @@ export interface EntranceCandidate {
   symbol: string;
   /** The rule that detected it, one of the language plugin's entrance rules (its manifest's entrances). */
   rule: string;
+  /** The name a declared entrance would take, when the plugin knows a better one than its symbol gives: a Rust binary by its target's name. */
+  name?: string;
   /** Why, in words a reader can check against the file. */
   why: string;
   /** Set when the symbol is registered here and declared elsewhere (a route table, a URL pattern): a handler naming it resolves to another file. */
