@@ -86,7 +86,7 @@ import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
 import { KeptAnswers } from "./kept-answers.ts";
 import { DECLARED_NOT_READ, languagesRead, notScannedYet, unscannedOf } from "./languages-read.ts";
-import { serverExtensions, syntaxOf } from "../../plugins/languages.ts";
+import { fillsSlot, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, KeptReport, ReachReference, ScopedReading } from "./model.ts";
@@ -753,7 +753,7 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
 /** One language's reading (see readComponentInterfaces): its component code, through its adapter (started here when not given). */
 async function readLanguage(root: string, language: Language, given: LanguageAdapter | undefined, options: ReadOptions, part: LanguagePart): Promise<InterfaceReading> {
   // A language whose declarations and imports no scan reads yet is named as not read, never parsed as another language.
-  const notScanned = notScannedYet(language);
+  const notScanned = notScannedYet(language) ?? (fillsSlot(language, "interfaces") ? undefined : `the ${language} plugin fills no interfaces slot, so the reading reads no ${language} declaration or import list`);
   if (notScanned !== undefined) return { kind: "unread", because: notScanned };
   const config = readEnforcementConfig(root);
   const { model, budget, started } = part;

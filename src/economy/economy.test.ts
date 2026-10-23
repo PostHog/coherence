@@ -355,12 +355,12 @@ test("mass over a project whose only language no scan reads says it measured not
     writeFileSync(join(dir, path), text, "utf8");
   };
   try {
-    put("coherence.config.json", JSON.stringify({ language: "rust" }));
-    put("Cargo.toml", "[package]\nname = \"accounts\"\nversion = \"0.1.0\"\n");
+    put("coherence.config.json", JSON.stringify({ plugins: { go: "bundled" }, language: "go" }));
+    put("go.mod", "module accounts\n\ngo 1.22\n");
     put("src/Accounts.spec.md", "# Accounts\n\nThe accounts.\n");
-    put("src/lib.rs", "pub fn post() {}\n");
+    put("src/post.go", "package accounts\n\nfunc Post() {}\n");
     const printed = formatMass(computeMass(dir));
-    assert.match(printed.split("\n")[0]!, /^unreached mass: not measured, since no source file was read \(rust NOT READ; see the languages line below\)$/, printed);
+    assert.match(printed.split("\n")[0]!, /^unreached mass: not measured, since no source file was read \(go NOT READ; see the languages line below\)$/, printed);
     assert.doesNotMatch(printed, /0% of lines/);
   } finally {
     rmSync(dir, { recursive: true, force: true });

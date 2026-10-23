@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
 import { closureOf } from "../../enforcement/code-fingerprint.ts";
-import { languageCode, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
+import { isBasisFile, languageCode, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
 import type { KeptReport } from "./model.ts";
 
 /** Where each language's kept answers live: transient, beside the recorded reading. */
@@ -52,8 +52,6 @@ const KEPT_DIR = join(".coherence", "structure");
 
 const KEPT_VERSION = 1;
 
-/** The project files besides source that a server's answers rest on: language configuration, manifests and lockfiles, by base name. */
-const BASIS_FILE = /^(?:tsconfig(?:\.[\w-]+)*\.json|jsconfig\.json|package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|bun\.lockb?|pyproject\.toml|pyrightconfig\.json|setup\.cfg|uv\.lock|poetry\.lock|requirements[\w.-]*\.txt|coherence\.config\.json)$/;
 
 /** Where the language adapters are entered: every module it reaches is code an answer comes from. */
 const ADAPTER_ENTRY = "adapters/index.ts";
@@ -73,9 +71,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..", "..");
 
 const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
-/** The module files a changed file star-imports or wildcard re-exports: each language's plugin says (its kept slot); a language whose plugin says nothing has none. */
+/** The module files a changed file star-imports or wildcard re-exports, as the component interface reading reads them (the interfaces slot's wildcardModules); a kept slot, from a plugin written before it was read so, is read first. */
 function keptModules(language: Language, file: string, text: string): string[] {
-  return syntaxOf(language, "kept")?.(file, text) ?? [];
+  return syntaxOf(language, "kept")?.(file, text) ?? syntaxOf(language, "interfaces")?.wildcardModules(file, text) ?? [];
 }
 
 /** One kept answer and what it depends on: the files it names and the names that, spelled in a changed file, could change it. */
@@ -138,7 +136,7 @@ function basisOf(root: string, language: Language, files: readonly string[], ign
             .join("\u0000"),
         );
   for (const file of files) {
-    if (!BASIS_FILE.test(basename(file))) continue;
+    if (basename(file) !== "coherence.config.json" && !isBasisFile(basename(file))) continue;
     try {
       basis[file] = digest(readFileSync(join(root, file)));
     } catch {

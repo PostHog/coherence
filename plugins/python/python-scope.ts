@@ -2,7 +2,7 @@
  * Python's facts for the component interface reading: which declaration
  * lines are types or default exports, and what the word index and the kept
  * answers read of a file's imports (component-interfaces.ts reads them
- * through INTERFACE_SYNTAX, kept-answers.ts through KEPT_MODULES).
+ * through INTERFACE_SYNTAX, and kept-answers.ts through its wildcardModules).
  */
 
 import { resolveDotted } from "./python.ts";
@@ -33,5 +33,3 @@ export const PYTHON_INTERFACES: InterfaceSyntax = {
   wildcardModules: starModules,
 };
 
-/** The module files a changed file star-imports, in every spelling a kept answer can name them by. */
-export const pythonKeptModules: (file: string, text: string) => string[] = starModules;
