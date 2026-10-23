@@ -147,7 +147,7 @@ copy names it the second way, and so should a plugin you write.
 | `testFolders` | Folder names whose files are all tests by the language's own layout, wherever they sit (SwiftPM's `Tests`), beside the config's test folders. A name matches a folder exactly, case and all. |
 | `members` | How an exported type's body reads for the lexicon's member scan: `opens`, `closes`, `field`, each a regular expression. |
 | `entrances` | The entrance detection rules (`rule`, `plural`, `detects`) and `notDetected`, what they miss: printed by the query, the page and orient. |
-| `notScanned` | Why the text scans do not read the language yet (Rust's). Present, it turns off every reading that scans the language's text, whatever slots are filled: mass, entrance detection and the Structure reading each name the language as not read, with this reason. Remove it once the `source` slot reads the language. |
+| `notScanned` | Why the text scans do not read the language yet (Go's). Present, it turns off every reading that scans the language's text, whatever slots are filled: mass, entrance detection and the Structure reading each name the language as not read, with this reason. Remove it once the `source` slot reads the language. |
 | `environmentFolders` | Folder names no project authors code in, wherever they sit (`node_modules`, `__pycache__`). |
 | `markedFolders` | Folders the language's tools make, left out by a `marker` inside (`pyvenv.cfg`) or by `name` beside a file (`target` beside `Cargo.toml`), each with its `reason`. |
 | `ci` | `note`: what the generated CI workflow says for a project that reads the language. `steps`: what it runs after the install to set up what the adapter asks (Go's toolchain and gopls), each `{ "name"?, "uses": "<owner/repo>@<40-hex commit>", "version": "<its release>", "with"? }` or `{ "name"?, "run": "<command>" }`. |
@@ -223,6 +223,10 @@ reading first asks for that slot:
 | `lists` | declared mirrors | `(text, name) => Literal \| undefined` |
 | `topLevel` | the spec model's check that a handler, guard or mirror is declared | `(text, name) => boolean` |
 | `boundaries` | `scaffold import` and adoption | `BoundarySource`: a tool's declaration file read into modules, as tach's |
+
+An `EntranceSyntax`'s `manifestCandidates(read, exists, files)` is handed the
+project's files inside the bounds as its third argument, so a language whose
+manifests lie through the tree (every Cargo.toml of a workspace) reads each.
 
 Every type is exported from `@posthog/coherence/plugin`. A slot a plugin leaves empty reads as "not read for <language>", never as
 another language. A plugin answers for the project whose config names it

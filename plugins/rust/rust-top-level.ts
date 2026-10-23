@@ -6,9 +6,10 @@
  * FFI export, a dispatcher) is declared as TypeScript's and Python's are.
  */
 
+import { RUST_SOURCE } from "./rust-source.ts";
+
 /** Whether the text declares the name at its top level. */
 export function rustDeclaresAtTop(text: string, name: string): boolean {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return false;
-  const item = new RegExp(`^(?:pub(?:\\([^)]*\\))?\\s+)?(?:(?:default|const|async|unsafe|extern(?:\\s+"[^"]*")?)\\s+)*(?:fn|struct|enum|union|trait|type|const|static(?:\\s+mut)?|mod)\\s+${name}\\b`, "m");
-  return item.test(text) || new RegExp(`^macro_rules!\\s*${name}\\b`, "m").test(text);
+  return text.split("\n").some((line) => RUST_SOURCE.declarationOf(line.replace(/\r$/, ""))?.name === name);
 }

@@ -410,7 +410,8 @@ one (a Python backend beside a TypeScript frontend: list both languages and a
 test setup per runner, as [docs/config.md](docs/config.md#more-than-one-language) shows).
 Rust chokepoints are graded through rust-analyzer, found on the machine rather
 than installed by npm ([docs/enforcement.md](docs/enforcement.md#rust)); the
-economy and Scope readings do not read Rust yet, and say so by name.
+economy and Scope readings read Rust's text by its crates' folder layout, and detect its
+binaries, build scripts, routes and foreign exports as entrances.
 Go is an opt-in bundled plugin, `"plugins": { "go": "bundled" }`, graded
 through gopls ([docs/plugins.md](docs/plugins.md#go)); a language Coherence
 lacks is a plugin you can write, held by `coherence plugin check` to what every
