@@ -9,10 +9,12 @@ import {
   rejectedNames,
   renderCompact,
   renderCompactWithin,
+  deliveredText,
   tokenEstimate,
   loadLexicon,
 } from "./lexicon.ts";
 import { COHERENCE_LEXICON } from "./project.ts";
+import { lastNamed } from "./lexicon-recency.ts";
 
 const coherence = parseLexicon(
   {
@@ -140,7 +142,7 @@ test("renderCompact: the project lexicon renders beneath with its own header, al
   assert.doesNotMatch(text, /anti_rot|never addressed/);
 });
 
-test("renderCompactWithin steps the project layer down, then Coherence's layer to names, then to a one-line pointer, until the text fits", () => {
+test("renderCompactWithin keeps the vocabulary most recently named first: the host's budget trims the least recently named, to its name and then out, and a protected concept goes last", () => {
   const big = parseLexicon(
     {
       project: "biggish",
@@ -150,52 +152,108 @@ test("renderCompactWithin steps the project layer down, then Coherence's layer t
         definition: `The ${i}th thing, described at some length so that the line is long. A second sentence follows.`,
         aliases: [`alias${i}`],
         not_to_be_confused_with: [`other${i}: a different thing entirely`],
+        ...(i === 39 ? { protected: true } : {}),
       })),
     },
     "biggish.json",
   );
-  const full = renderCompactWithin(coherence, big, 1_000_000);
-  assert.equal(full.detail, "full");
-  assert.match(full.text, /\(also: alias3\) \(not: other3\)/);
+  // thing5 was named last, then journal; invariant and the other things never.
+  const named = new Map([["thing5", "2026-10-23T10:00:00.000Z"], ["journal", "2026-10-22T10:00:00.000Z"]]);
+  const all = 42;
 
-  const noConfusions = renderCompactWithin(coherence, big, full.text.length - 1);
-  assert.equal(noConfusions.detail, "no-confusions");
-  assert.match(noConfusions.text, /\(also: alias3\)/);
-  assert.doesNotMatch(noConfusions.text, /not: other3/);
+  const roomy = renderCompactWithin(coherence, big, 1_000_000, "coherence", true, () => true, named);
+  assert.deepEqual(roomy.delivered, { whole: all, name: 0, out: 0 }, "with room, every concept whole: the lexicon has no ceiling of its own");
+  assert.match(roomy.text, /^Coherence vocabulary \(2 concepts, most recently named first; rejected names are defects\):\n- journal: [^\n]*\n- invariant: /, "within a layer, the most recently named first");
+  assert.match(roomy.text, /vocabulary \(40 concepts, most recently named first; [^\n]*\n- thing39: [^\n]*\n- thing5: [^\n]*\n- thing0: /, "the protected concept heads its layer, then the most recently named, then the file's order");
+  assert.match(roomy.text, /\(also: alias3\) \(not: other3\)/);
 
-  const definitions = renderCompactWithin(coherence, big, noConfusions.text.length - 1);
-  assert.equal(definitions.detail, "definitions");
-  assert.match(definitions.text, /^- thing3: The 3th thing, described at some length so that the line is long\.$/m);
+  // The presentation's own bound in tokens trims the same way, whatever room the characters leave.
+  const bounded = renderCompactWithin(coherence, big, 1_000_000, "coherence", true, () => true, named, 600);
+  assert.ok(tokenEstimate(bounded.text).tokens <= 600, `${tokenEstimate(bounded.text).tokens} tokens`);
+  assert.ok(bounded.delivered.whole < all, JSON.stringify(bounded.delivered));
+  assert.match(bounded.text, /^- thing39: /m, "under the token bound too, a protected concept keeps its line");
 
-  const names = renderCompactWithin(coherence, big, definitions.text.length - 1);
-  assert.equal(names.detail, "names");
-  assert.match(names.text, /Biggish vocabulary \(40 concepts; names only here; full entries: coherence lexicon\):\nthing0, thing1, /);
-  assert.match(names.text, /^- invariant: The abstract behavioral requirement\. \[rejected: zorp\]$/m, "Coherence's layer is untouched while the project layer can still step down");
-  assert.ok(names.text.length < definitions.text.length);
+  // Just short of everything whole: the least recently named concept is the first to lose its line.
+  const short = renderCompactWithin(coherence, big, roomy.text.length - 1, "coherence", true, () => true, named);
+  assert.ok(short.text.length <= roomy.text.length - 1);
+  assert.ok(short.delivered.whole < all && short.delivered.out === 0, JSON.stringify(short.delivered));
+  assert.match(short.text, /^- thing39: /m, "a protected concept keeps its line");
+  assert.match(short.text, /^- thing5: /m, "the most recently named keeps its line");
+  assert.match(short.text, /^- journal: /m);
+  assert.match(short.text, /^Named only here \(full entries: coherence lexicon\): invariant$/m, "the first to go to its name: no record names it, and among those Coherence's own decay before the project's");
+  assert.match(short.text, /^- thing38: /m);
 
-  const coherenceNames = renderCompactWithin(coherence, big, names.text.length - 1);
-  assert.equal(coherenceNames.detail, "coherence-names", "below the project's names, Coherence's own layer steps down to names");
-  assert.match(coherenceNames.text, /^Coherence vocabulary \(2 concepts; names only here, rejected names are defects; full entries: coherence lexicon\):\ninvariant, journal\n/);
-  assert.doesNotMatch(coherenceNames.text, /rejected: zorp/);
-  assert.match(renderCompactWithin(coherence, big, names.text.length - 1, "coherence", false).text, /^Coherence vocabulary \(2 concepts; names only here, use these names when you mean Coherence's concepts; full entries: coherence lexicon\):\n/, "in an adopter the header binds Coherence's names to Coherence's concepts");
-  assert.match(renderCompact(coherence, big, "full", "full", false), /^Coherence vocabulary \(2 concepts; use these names when you mean Coherence's concepts\):\n/);
-  assert.ok(coherenceNames.text.length < names.text.length);
+  // Room for every name and no line: names only, still in order.
+  const namesOnly = renderCompactWithin(coherence, big, renderCompactWithin(coherence, big, 1_000_000, "coherence", true, () => true, named).text.length / 4, "coherence", true, () => true, named);
+  assert.ok(namesOnly.delivered.whole < 10, JSON.stringify(namesOnly.delivered));
+
+  // Room for only some names: the least recently named are left out, counted, and a protected one is the last to go.
+  const tight = renderCompactWithin(coherence, big, 560, "coherence", true, () => true, named);
+  assert.ok(tight.text.length <= 560, `${tight.text.length}`);
+  assert.equal(tight.delivered.whole, 0);
+  assert.ok(tight.delivered.out > 0 && tight.delivered.name > 0, JSON.stringify(tight.delivered));
+  assert.match(tight.text, /Named only here \(full entries: coherence lexicon\): thing39, thing5, /);
+  assert.match(tight.text, /^Coherence vocabulary [^\n]*\nNamed only here \(full entries: coherence lexicon\): journal\n1 more, the least recently named: coherence lexicon\n/m, "a recently named concept keeps its name in its own layer while one never named is left out");
+  assert.match(tight.text, /^\d+ more, the least recently named: coherence lexicon$/m);
+  assert.doesNotMatch(tight.text, /thing38/);
+
+  assert.match(renderCompactWithin(coherence, big, 1_000_000, "coherence", false).text, /^Coherence vocabulary \(2 concepts; use these names when you mean Coherence's concepts\):\n/, "in an adopter the header binds Coherence's names to Coherence's concepts; with no journal, the file's order and no claim of one");
 
   const tooSmall = renderCompactWithin(coherence, big, 10);
-  assert.equal(tooSmall.detail, "pointer", "when even the names do not fit, one line points at the lexicon command");
+  assert.deepEqual(tooSmall.delivered, { whole: 0, name: 0, out: all }, "when not even one name fits, one line points at the lexicon command");
   assert.equal(tooSmall.text, "Vocabulary omitted to stay under the host budget; full entries: coherence lexicon\n");
   assert.equal(renderCompactWithin(coherence, undefined, 10, "node src/cli.ts").text, "Vocabulary omitted to stay under the host budget; full entries: node src/cli.ts lexicon\n", "the pointer names the command the session has");
-  assert.equal(renderCompactWithin(coherence, undefined, 1_000_000).detail, "full", "without a project and with room, the full form");
+  assert.equal(deliveredText(renderCompactWithin(coherence, undefined, 1_000_000).delivered), "whole", "without a project and with room, every concept whole");
+});
+
+test("renderCompactWithin in an adopter gives the window to the project: Coherence's own concepts are one line of names in the file's order, never ranked by the journal, and the first to go", () => {
+  const widgets = parseLexicon(
+    { project: "widgetry", version: 0, concepts: Array.from({ length: 12 }, (_, i) => ({ name: `widget${i}`, definition: `The ${i}th widget, described at some length so that the line is long. More follows.` })) },
+    "widgetry.json",
+  );
+  // The adopter's journal names Coherence's journal and invariant more recently than any widget, as its records do.
+  const named = new Map([["journal", "2026-10-23T12:00:00.000Z"], ["invariant", "2026-10-23T11:00:00.000Z"], ["widget7", "2026-10-23T10:00:00.000Z"]]);
+  const all = widgets.concepts.length;
+  const mine = coherence.concepts.length;
+
+  const roomy = renderCompactWithin(coherence, widgets, 1_000_000, "coherence", false, () => true, named);
+  assert.deepEqual(roomy.delivered, { whole: all, name: mine, out: 0 }, "every project concept whole, every Coherence concept by name alone");
+  assert.match(roomy.text, /^Coherence vocabulary \(2 concepts; use these names when you mean Coherence's concepts\):\nNamed only here \(full entries: coherence lexicon\): invariant, journal\n/, "Coherence's own in the file's order, not the journal's, and no whole line");
+  assert.match(roomy.text, /^Widgetry vocabulary \(12 concepts, most recently named first; [^\n]*\n- widget7: /m, "the project's layer ranked by the journal");
+
+  // One character short: Coherence's names go, counted, before any project concept loses its line.
+  const short = renderCompactWithin(coherence, widgets, roomy.text.length - 1, "coherence", false, () => true, named);
+  assert.deepEqual(short.delivered, { whole: all, name: 0, out: mine }, JSON.stringify(short.delivered));
+  assert.match(short.text, /^Coherence vocabulary \(2 concepts; [^\n]*\n2 more: coherence lexicon\n/);
+
+  // In Coherence's own repository the same journal ranks Coherence's concepts with the rest, whole.
+  const itself = renderCompactWithin(coherence, widgets, 1_000_000, "coherence", true, () => true, named);
+  assert.deepEqual(itself.delivered, { whole: all + mine, name: 0, out: 0 });
+  assert.match(itself.text, /^- journal: /m);
+});
+
+test("lastNamed: the latest record naming each concept by name, alias or plural in its prose, never in an id or a path", () => {
+  const record = (at: string, chose: string, extra: Record<string, unknown> = {}) => ({ kind: "decision", id: `d-${at.slice(11, 13)}000000`, at, session: "s", agent: "a", chose, over: "", because: "", ...extra });
+  const widget = parseLexicon({ concepts: [{ name: "widget", definition: "A thing.", aliases: ["gadget"] }, { name: "trust level", definition: "A level." }, { name: "sprocket", definition: "Never named." }] }, "w.json");
+  const records = [
+    record("2026-10-01T01:00:00.000Z", "kept the widgets apart"),
+    record("2026-10-01T02:00:00.000Z", "a new gadget"),
+    record("2026-10-01T03:00:00.000Z", "raised the trust\nlevel"),
+    record("2026-10-01T04:00:00.000Z", "nothing named", { cites: ["src/sprocket.ts"] }),
+    record("2026-10-01T05:00:00.000Z", "widgetry is another word"),
+  ] as unknown as Parameters<typeof lastNamed>[0];
+  const named = lastNamed(records, widget.concepts);
+  assert.equal(named.get("widget"), "2026-10-01T02:00:00.000Z", "an alias names its concept; a longer word that begins with the name does not");
+  assert.equal(named.get("trust level"), "2026-10-01T03:00:00.000Z", "a name of several words across a line break");
+  assert.equal(named.has("sprocket"), false, "a citation is not prose");
 });
 
 test("tokenEstimate is bytes over four, rounded up", () => {
   assert.deepEqual(tokenEstimate("abcde"), { bytes: 5, tokens: 2 });
 });
 
-test("the compact Coherence lexicon stays under 2,000 tokens", async () => {
+test("every concept in Coherence's lexicon file is loaded", async () => {
   const lexicon = await loadLexicon(COHERENCE_LEXICON);
-  const { tokens } = tokenEstimate(renderCompact(lexicon));
-  assert.ok(tokens < 2000, `compact lexicon is ${tokens} tokens`);
   const onDisk = JSON.parse(readFileSync(COHERENCE_LEXICON, "utf8")) as { concepts: unknown[] };
   assert.equal(lexicon.concepts.length, onDisk.concepts.length, "every concept in the file is loaded");
 });
