@@ -69,7 +69,8 @@ export async function recordObservation(input: RecordInput): Promise<Observation
     else reason = ready.reason;
   }
   const unread = reason ?? (input.adapter === undefined ? "no adapter" : undefined);
-  const capture: Capture = unread === undefined ? input.capture : { ...input.capture, note: `${input.capture.note}; component interfaces and entrances not read: instrument unavailable (${unread})` };
+  const failed = map.unanswered === undefined ? "" : `; component interfaces through ${map.unanswered.map((u) => u.file).join(", ")} not read: the instrument could not answer for them (${[...new Set(map.unanswered.map((u) => u.reason))].join("; ")})`;
+  const capture: Capture = unread === undefined ? { ...input.capture, note: `${input.capture.note}${failed}` } : { ...input.capture, note: `${input.capture.note}; component interfaces and entrances not read: instrument unavailable (${unread})` };
   let realRoot = input.root;
   try {
     realRoot = realpathSync(input.root);

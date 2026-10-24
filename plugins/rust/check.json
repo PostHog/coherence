@@ -4,7 +4,8 @@
     "src/lib.rs": "pub mod store;\npub mod api;\n",
     "src/store/mod.rs": "pub const SECRET_COLUMNS: &[&str] = &[\"token\"];\n\npub fn seal(row: &mut Vec<String>) {\n    row.retain(|c| !SECRET_COLUMNS.contains(&c.as_str()));\n}\n",
     "src/api/mod.rs": "use crate::store::{seal, SECRET_COLUMNS};\n\npub fn render(row: &mut Vec<String>) -> usize {\n    seal(row);\n    SECRET_COLUMNS.len()\n}\n",
-    "README.md": "# A crate\n"
+    "README.md": "# A crate\n",
+    "src/main.rs": "fn main() {\n    let mut row = vec![\"token\".to_string()];\n    println!(\"{}\", shop::api::render(&mut row));\n}\n"
   },
   "language": {
     "files": [
@@ -49,5 +50,64 @@
   "bypasses": [
     "src/api/mod.rs:1",
     "src/api/mod.rs:5"
-  ]
+  ],
+  "readings": {
+    "declared": {
+      "src/api/mod.rs": [
+        "render"
+      ],
+      "src/lib.rs": [
+        "api",
+        "store"
+      ],
+      "src/main.rs": [
+        "main"
+      ],
+      "src/store/mod.rs": [
+        "SECRET_COLUMNS",
+        "seal"
+      ]
+    },
+    "imports": [
+      {
+        "file": "src/api/mod.rs",
+        "module": "src/store/mod.rs",
+        "names": [
+          "SECRET_COLUMNS",
+          "seal"
+        ]
+      },
+      {
+        "file": "src/lib.rs",
+        "module": "src/store/mod.rs",
+        "names": [
+          "*"
+        ]
+      },
+      {
+        "file": "src/lib.rs",
+        "module": "src/api/mod.rs",
+        "names": [
+          "*"
+        ]
+      }
+    ],
+    "interfaces": [
+      {
+        "from": "src/api",
+        "to": "src/store",
+        "symbols": [
+          "SECRET_COLUMNS",
+          "seal"
+        ]
+      }
+    ],
+    "entrances": [
+      {
+        "file": "src/main.rs",
+        "symbol": "main",
+        "rule": "binary"
+      }
+    ]
+  }
 }

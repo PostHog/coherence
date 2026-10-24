@@ -89,7 +89,7 @@ import { DECLARED_NOT_READ, languagesRead, notScannedYet, unscannedOf } from "./
 import { fillsSlot, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
-import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, KeptReport, ReachReference, ScopedReading } from "./model.ts";
+import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, InterfaceUnanswered, KeptReport, ReachReference, ScopedReading } from "./model.ts";
 
 /**
  * What the reading knows of one language's syntax without its server, each
@@ -705,6 +705,7 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
   const outsideInto = new Map<string, number>();
   for (const r of read) for (const i of r.reading.outside?.into ?? []) outsideInto.set(i.component, (outsideInto.get(i.component) ?? 0) + i.sites);
   const partials = read.flatMap((r) => (r.reading.partial === undefined ? [] : [r.reading.partial]));
+  const unanswered = read.flatMap((r) => r.reading.unanswered ?? []).sort((a, b) => a.file.localeCompare(b.file));
   const scopes = read.flatMap((r) => (r.reading.scoped === undefined ? [] : [r.reading.scoped]));
   const maybe = new Map(scopes.flatMap((sc) => sc.maybe.map((m) => [`${m.from}\u0000${m.to}`, m] as const)));
   const sum = (of: (r: Extract<InterfaceReading, { kind: "read" }>) => number): number => read.reduce((n, r) => n + of(r.reading), 0);
@@ -737,6 +738,7 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
     },
     candidates,
     ...(kept === undefined ? {} : { kept }),
+    ...(unanswered.length === 0 ? {} : { unanswered }),
     ...(partials.length === 0 ? {} : { partial: { ...partials[0]!, seconds: Math.max(...partials.map((p) => p.seconds)), unread: [...new Set(partials.flatMap((p) => p.unread))].sort() } }),
     ...(scopes.length === 0
       ? {}
@@ -911,19 +913,29 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
     };
     const asked = new Set<string>();
     const answered = new Set<string>();
+    // Files the server could not answer for (gopls has no package for a file outside this host's build): the reading goes on and names each.
+    const unanswered = new Map<string, InterfaceUnanswered>();
     // The tree holds still for one reading: git's listing is taken once and every reported site is kept against it.
     const listing = projectListing(root);
     /** Ask one declaration for its references and account for every site; false once a budget stops the reading. */
     const ask = async (d: Declared): Promise<boolean> => {
       asked.add(d.id);
-      const resolved = await resolveOf(`${d.name} in ${d.file}`, { component: d.component, testFolders }, d.name);
-      if (resolved === STOPPED) return false;
-      if (!resolved.ok || resolved.definition.file !== d.file) {
-        answered.add(d.id);
+      let resolved: Resolved | typeof STOPPED;
+      let reported: ReferenceSite[] | typeof STOPPED;
+      try {
+        resolved = await resolveOf(`${d.name} in ${d.file}`, { component: d.component, testFolders }, d.name);
+        if (resolved === STOPPED) return false;
+        if (!resolved.ok || resolved.definition.file !== d.file) {
+          answered.add(d.id);
+          return true;
+        }
+        reported = await referencesOf(resolved.definition, spellings(index, d.name), d.isDefault || index.defaults.has(d.name));
+      } catch (error) {
+        // A server that is not up ends the language's reading; one that fails a question about one file leaves that file unanswered, named, and reads on.
+        if (error instanceof NotUp) throw error;
+        if (!unanswered.has(d.file)) unanswered.set(d.file, { file: d.file, component: d.component, reason: error instanceof Error ? error.message : String(error) });
         return true;
       }
-      const definition: Definition = resolved.definition;
-      const reported = await referencesOf(definition, spellings(index, d.name), d.isDefault || index.defaults.has(d.name));
       if (reported === STOPPED) return false;
       for (const site of projectSites(root, reported, listing) as ReferenceSite[]) {
         if (isTest(site.file, testFolders)) continue;
@@ -1143,11 +1155,13 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
           seconds: Math.round((Date.now() - started) / 1000),
           unread: [...unread].sort(),
         },
+        ...(unanswered.size === 0 ? {} : { unanswered: [...unanswered.values()].sort((a, b) => a.file.localeCompare(b.file)) }),
         ...scoped,
         ...keptOf(),
       };
     }
-    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside, ...scoped, ...keptOf() };
+    const failed = unanswered.size === 0 ? {} : { unanswered: [...unanswered.values()].sort((a, b) => a.file.localeCompare(b.file)) };
+    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside, ...failed, ...scoped, ...keptOf() };
   } catch (error) {
     if (error instanceof NotUp) return { kind: "unread", because: error.message };
     return { kind: "unread", because: `the ${language} instrument failed: ${error instanceof Error ? error.message : String(error)}` };

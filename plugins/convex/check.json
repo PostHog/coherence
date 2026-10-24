@@ -71,5 +71,115 @@
     "convex/namespace.ts:3",
     "convex/passed.ts:5",
     "src/relayed.ts:3"
-  ]
+  ],
+  "readings": {
+    "declared": {
+      "convex/alias.ts": [
+        "t",
+        "viaAlias"
+      ],
+      "convex/byname.ts": [
+        "byName"
+      ],
+      "convex/crons.ts": [
+        "crons"
+      ],
+      "convex/destructure.ts": [
+        "destructured"
+      ],
+      "convex/events.ts": [
+        "record"
+      ],
+      "convex/http.ts": [
+        "http"
+      ],
+      "convex/leak.ts": [
+        "flush",
+        "said"
+      ],
+      "convex/namespace.ts": [
+        "throughNamespace"
+      ],
+      "convex/passed.ts": [
+        "register"
+      ],
+      "convex/telemetry.ts": [
+        "send",
+        "sendAll"
+      ],
+      "convex/webhooks.ts": [
+        "webhook"
+      ],
+      "src/client.ts": [
+        "query",
+        "recent"
+      ],
+      "src/lib/api.ts": [],
+      "src/relayed.ts": [
+        "relayed"
+      ]
+    },
+    "imports": [
+      {
+        "file": "convex/http.ts",
+        "module": "convex/webhooks.ts",
+        "names": [
+          "webhook"
+        ]
+      },
+      {
+        "file": "src/relayed.ts",
+        "module": "src/lib/api.ts",
+        "names": [
+          "internal"
+        ]
+      }
+    ],
+    "interfaces": [
+      {
+        "from": "src",
+        "to": "convex",
+        "symbols": [
+          "send"
+        ]
+      }
+    ],
+    "entrances": [
+      {
+        "file": "convex/alias.ts",
+        "symbol": "viaAlias",
+        "rule": "Convex function"
+      },
+      {
+        "file": "convex/byname.ts",
+        "symbol": "byName",
+        "rule": "Convex function"
+      },
+      {
+        "file": "convex/crons.ts",
+        "symbol": "send",
+        "rule": "Convex cron"
+      },
+      {
+        "file": "convex/events.ts",
+        "symbol": "record",
+        "rule": "Convex function"
+      },
+      {
+        "file": "convex/http.ts",
+        "symbol": "",
+        "rule": "Convex HTTP route"
+      },
+      {
+        "file": "convex/http.ts",
+        "symbol": "webhook",
+        "rule": "Convex HTTP route"
+      },
+      {
+        "file": "convex/leak.ts",
+        "symbol": "flush",
+        "rule": "Convex function"
+      }
+    ]
+  }
 }

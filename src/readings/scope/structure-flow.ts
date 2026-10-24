@@ -74,7 +74,7 @@ import { coverageOf, type EntranceCoverage } from "./entrance-coverage.ts";
 import { creditedByCrossingAlone, crossingChecksTrust, namesEntrance } from "../../spec/covers.ts";
 import { slug } from "./html.ts";
 import { languagesReadLine, type LanguagesRead } from "./languages-read.ts";
-import type { EntranceGuard, InterfacePartial, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
+import type { EntranceGuard, InterfacePartial, InterfaceReading, InterfaceUnanswered, InterfaceSymbol, ReachReference, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
 
 type ReadInterfaces = Extract<InterfaceReading, { kind: "read" }>;
 type InterfaceBounds = NonNullable<ReadInterfaces["bounds"]>;
@@ -499,6 +499,8 @@ export interface FlowModel {
   outside: InterfaceOutside | undefined;
   /** Present when a budget stopped the adapter's reading: the map is partial. */
   partial: InterfacePartial | undefined;
+  /** Files the language server could not answer for, which the reading left unread while it read the rest. */
+  unanswered?: InterfaceUnanswered[];
   /** Every crossing, and where the map draws it. */
   crossings: FlowCrossingPlace[];
   health: FlowHealth;
@@ -1121,6 +1123,7 @@ export function flowOf(state: ShellState): FlowModel {
     bounds: reading.kind === "read" ? reading.bounds : undefined,
     outside: reading.kind === "read" ? reading.outside : undefined,
     partial: reading.kind === "read" ? reading.partial : undefined,
+    ...(reading.kind === "read" && reading.unanswered !== undefined ? { unanswered: reading.unanswered } : {}),
     crossings,
     health,
     coverage: reading.kind === "read" ? coverageOf(state.spec.components, reading.candidates) : undefined,
@@ -1146,12 +1149,20 @@ export function flowBoundsText(model: Pick<FlowModel, "bounds" | "outside">): st
   );
 }
 
-/** Why the map is partial, in one sentence, or undefined when the reading finished. */
-export function flowPartialText(model: Pick<FlowModel, "partial">): string | undefined {
+/** Why the map is partial, in one sentence, or undefined when the reading finished and read every file. */
+export function flowPartialText(model: Pick<FlowModel, "partial" | "unanswered">): string | undefined {
   const p = model.partial;
-  if (p === undefined) return undefined;
-  const spent = p.limit === "time" ? `its time budget (${p.budget})` : `its memory budget (${p.budget}; the language server held ${p.observed ?? "more"})`;
-  return `partial map: the interface reading stopped at ${spent} after ${p.seconds} s, so the declarations of ${p.unread.length === 0 ? "no component" : p.unread.join(", ")} were not all read and interfaces may be missing; raise ${"interfaceBudget"} in the config or pass --interface-seconds / --interface-memory`;
+  const failed = model.unanswered ?? [];
+  const said: string[] = [];
+  if (p !== undefined) {
+    const spent = p.limit === "time" ? `its time budget (${p.budget})` : `its memory budget (${p.budget}; the language server held ${p.observed ?? "more"})`;
+    said.push(`partial map: the interface reading stopped at ${spent} after ${p.seconds} s, so the declarations of ${p.unread.length === 0 ? "no component" : p.unread.join(", ")} were not all read and interfaces may be missing; raise ${"interfaceBudget"} in the config or pass --interface-seconds / --interface-memory`);
+  }
+  if (failed.length > 0) {
+    const reasons = [...new Set(failed.map((f) => f.reason))];
+    said.push(`${p === undefined ? "partial map: " : ""}the language server could not answer for ${failed.length} ${failed.length === 1 ? "file, which was" : "files, which were"} left unread while the rest was read, so interfaces through ${failed.length === 1 ? "it" : "them"} may be missing: ${failed.map((f) => f.file).join(", ")} (${reasons.join("; ")})`);
+  }
+  return said.length === 0 ? undefined : said.join("; ");
 }
 
 /* ---------------------------------------------------------- selection */

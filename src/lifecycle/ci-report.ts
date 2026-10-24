@@ -37,6 +37,7 @@ export const readGaps: GapReader = async (root, model) => {
   const reading = await readAndRecord(root, () => readComponentInterfaces(root));
   if (reading.kind !== "read") return { unread: reading.because };
   if (reading.partial !== undefined) return { unread: "the Structure reading stopped at its budget, so its routes are partial" };
+  if (reading.unanswered !== undefined) return { unread: `the language server could not answer for ${reading.unanswered.map((u) => u.file).join(", ")}, so the Structure reading's routes are partial` };
   const state = structureState(root, reading);
   return { gaps: gapsOf(state, flowOf(state)).gaps };
 };
