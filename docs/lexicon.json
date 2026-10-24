@@ -790,7 +790,7 @@
     {
       "name": "scope",
       "status": "settled",
-      "definition": "The reading. One surface projecting the model (components, invariants with enforcement, grade, crossing, refutation and because, references, reliance, runs, journal records, work orders) for a human, in views. A fixed shell loads the state from the warm server and follows the stores as they change; a snapshot carries one state whole in a file. Replaces every other render.",
+      "definition": "The one surface projecting the model (components, invariants with enforcement, grade, crossing, refutation and because, references, reliance, runs, journal records, work orders) for a human, in views. A fixed shell loads the state from the warm server and follows the stores as they change; a snapshot carries one state whole in a file. Replaces every other render.",
       "rejected": [
         {
           "alternative": "panel (live TUI)",
@@ -1175,7 +1175,7 @@
         "anti_fragile": "Every attempt to introduce a name makes the lexicon stronger: a new noun in a spec, journal entry, or identifier is caught at regulate and must be declared as a new concept, mapped as an alias, or fixed if it is a rejected name. Rejected names accumulate as the record of what drift was refused.",
         "two_layers": "Coherence's own lexicon (the tool vocabulary) and each project's domain lexicon share one shape and one mechanism; scaffold for a new project begins by asking for the domain lexicon.",
         "growth": "Asymmetric, like invariants: agents propose and announce new concepts; only a human retires or renames one. Each definition change is a decision with a rejected alternative.",
-        "injection": "Compact: name, one-line definition, rejected names. Full entries through agent query.",
+        "injection": "Compact: name, first sentence, aliases, rejected names; full entries through agent query. The lexicon has no token ceiling; its presentation at session start holds 2,000 tokens, keeping the concepts the journal named most recently whole and letting the rest decay, to their names and then out; a concept marked protected heads the order, the last to lose its line or its name. In an adopter the window is the project's: Coherence's own concepts are one line of names in their file's order, never ranked, kept only while every ranked concept is whole.",
         "naming_check": "Identifiers are checked against rejected names and misused concept names by word, not by address.",
         "baseline": "What was already here when work began, remembered so only what is new speaks. In an adopter, the findings its lexicon check held at adoption, recorded as a journal decision (lexicon baseline) the check then fails only beyond; every later baseline record is intersected with the earlier ones, so it only shrinks. For a session, the vocabulary uses observed at its start. Coherence's own repository keeps no lexicon check baseline: its text is enforced whole.",
         "where_rejected_names_bind": "Coherence's rejected names bind only where Coherence's concepts are named: everywhere in Coherence's own repository; in an adopter, only in the text written to Coherence (records, spec grammar, coherence.config.json), and there as advisory. A project's own rejected names bind in all of its text, and a word the project declares in its own lexicon is its own inside it."
@@ -1535,6 +1535,14 @@
       "provenance": {
         "owner_words": "all language support is handled via plugins that ship with the product. if someone finds the existing language support wanting, they can pull it out and enhance it, swapping their enhancement for our implementation. then we ship other plugins, like Convex, Quint, etc.",
         "defined_by": "owner, 2026-10-21 (session 8efd6465, d-5ec9a20a); the entry written by plugins1 (session aa8d6a63c971fba29)"
+      }
+    },
+    {
+      "name": "reading",
+      "definition": "What the core computes from a project to answer one question about it: mass, imports, component interfaces, entrances, the mirrors, the gaps, Scope's model. A reading is derived, never kept by hand, and says which languages it could not read; a language plugin owes every reading of its language's text, and plugin check holds it to each (d-6569dec0).",
+      "provenance": {
+        "defined_by": "owner, 2026-10-23",
+        "owner_words": "broad reading is fine"
       }
     }
   ],

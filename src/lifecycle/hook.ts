@@ -96,7 +96,8 @@ import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } 
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
-import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
+import { loadLexicon, rejectedNames, renderCompactWithin, type Delivered, type Lexicon } from "./lexicon.ts";
+import { lastNamed } from "./lexicon-recency.ts";
 import { COHERENCE_LEXICON, CONFIG_FILE, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
 import { keepStateFiles } from "./state-files.ts";
 
@@ -134,6 +135,13 @@ export const OUTSIDE_ROOT_EXIT = 78;
  * The instruction rides inside this budget.
  */
 export const CONTEXT_BUDGET = 9_500;
+
+/**
+ * The most of the vocabulary the start injection presents, in tokens (bytes
+ * over four): the lexicon has no ceiling, its presentation does, and what it
+ * trims is the least recently named (d-f0da2f1f).
+ */
+export const VOCABULARY_TOKENS = 2_000;
 
 /** The rule in Coherence's own repository, where its rejected names are defects everywhere; with the session block above it the whole tail stays under 120 words. */
 export const INSTRUCTION = [
@@ -802,8 +810,8 @@ export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.e
   return versionBlock(root, await isCoherenceItself(root), env) + (earlier.length === 0 ? "" : earlier.join("\n") + "\n");
 }
 
-/** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
-export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
+/** The start injection with how the vocabulary was delivered, so a reading of the hook can say what orient carries. */
+export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; vocabulary: string; delivered: Delivered; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
   const commands=await cliName(root);
   // The hand lists come from the last mirror reading kept, never one taken here (recorded.ts).
@@ -815,8 +823,12 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   // The practices ride beside the commands that record them, after the vocabulary.
   const practices = practiceOrientText(root, commands);
   const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await copyBlock(root)}\n${await sessionBlock(root, input)}`;
-  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root), pluginsInUse(root, coherence));
-  return { text: head + text + tail, detail, coverage: reading };
+  // The vocabulary in the order the journal last named it, so the host's budget trims what the work has not named for longest.
+  const own = await isCoherenceItself(root);
+  // In an adopter Coherence's own concepts are not ranked, so the journal is read only for the concepts that are.
+  const named = lastNamed(loadJournal(root).records, [...coherence.concepts.filter((c) => own || c.layer !== undefined), ...(project?.concepts ?? [])]);
+  const { text, delivered } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), own, pluginsInUse(root, coherence), named, VOCABULARY_TOKENS);
+  return { text: head + text + tail, vocabulary: text, delivered, coverage: reading };
 }
 
 /**

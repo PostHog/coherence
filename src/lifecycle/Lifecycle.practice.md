@@ -1,22 +1,22 @@
-- carry a lexicon change through: A change to the lexicon reaches every place that names the concept, and the injection still fits, before anything uses the new name.
+- carry a lexicon change through: A change to the lexicon reaches every place that names the concept before anything uses the new name.
   when: command lexicon apply | edit docs/lexicon.json
-  step: measure the compact injection before proposing; when the change would take it past 2,000 tokens, first split a long first sentence, moving its enumeration later and dropping nothing
-    leaves: a decision per split, with the measured tokens in its because
+  step: write the first sentence as the definition a session needs at a glance; the lexicon has no token ceiling; the start injection presents at most 2,000 tokens of it and decays the least recently named concepts to fit (d-2b4c96a2, d-f0da2f1f)
+  step: mark a concept "protected": true only when a human asks for it to stay whole however long the journal goes without naming it
   step: before a reject or a rename, count the findings it would create across the corpus; a word in ordinary use or a language keyword gets a qualifying rename instead of a bare rejection
   step: propose, then apply with because and over; a human ruling carries the human's words with --human, and none is ever invented
   step: declare a new noun before any code, spec, or record uses it
   step: update every concept whose definition or related list names the changed one
   step: rename once, everywhere: files, commands, modules, Scope views, npm scripts, and refuse the old name with a one-line migration
-  step: run the vocabulary check and the compact budget test
-    leaves: lexicon check with 0 rejected names and 0 unknown nouns; the budget test green
+  step: run the vocabulary check
+    leaves: lexicon check with 0 rejected names and 0 unknown nouns
   pitfall: rejecting a bare word turned 227 uses of the TypeScript keyword into findings (d-5060eaab, rt-cdcf2a29)
-  pitfall: the budget was crossed and trimmed afterwards three times, and once the budget test was already red for the next session (d-3eb04416, d-7f5b5203, d-beedd69e, u-1c5215fe)
+  pitfall: a fixed token ceiling was crossed and trimmed afterwards three times, and once its test was already red for the next session (d-3eb04416, d-7f5b5203, d-beedd69e, u-1c5215fe); the ceiling is gone (d-2b4c96a2)
   pitfall: a rejected alternative of three words or fewer becomes a name the check enforces; write it as a sentence when the word is in ordinary use (d-7c0ecc04)
   pitfall: a rejected name sat in a concept's related list after its concept was renamed (d-572be38e)
   pitfall: new nouns were left undeclared because the lexicon was outside the work order's write scope; escalate rather than leave them (u-de8416b2)
   learned: d-14651cb4, d-3eb04416, rt-cdcf2a29, d-edf80438
   reach: internal
-  because: the lexicon is injected into every session, so a change that stops halfway teaches every later session the half; the cascade and the budget check are the steps that were skipped, and each skip cost a retraction or a trim after the fact
+  because: the lexicon is injected into every session, so a change that stops halfway teaches every later session the half; the cascade is the step that was skipped, and each skip cost a retraction after the fact
 - harvest practices: A project adopting Coherence finds the methods it already has and keeps each as a candidate practice with its evidence, before the next session has to rediscover them.
   when: explicit
   step: read where method hides: the agent instructions (CLAUDE.md, AGENTS.md), skills, saved memories, contributing and release notes, and the order of the build and release scripts

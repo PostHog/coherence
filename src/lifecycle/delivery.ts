@@ -22,6 +22,7 @@ import { busiestFolder, undeclaredNow } from "../readings/scope/undeclared.ts";
 import type { HostStatus } from "./install.ts";
 import { loadProjectLexicons } from "./project.ts";
 import { attention, type Coverage } from "./lexicon-coverage.ts";
+import { deliveredText } from "./lexicon.ts";
 
 export type Reading = "orient" | "peer feed" | "practice" | "regulate";
 
@@ -115,7 +116,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     `escalations awaiting a human: ${escalations} (shown whole, never shortened)`,
     specLine,
     `the session's own work order, when it owns one (${plural(orders, "order")} open or active in the project)`,
-    `${vocabulary}, delivered at detail "${start.detail}"`,
+    `${vocabulary}, delivered ${deliveredText(start.delivered)}`,
     vocabularySignal(start.coverage),
     gapSignal(root, gaps),
     undeclaredSignal(root),
