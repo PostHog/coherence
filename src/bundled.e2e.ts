@@ -88,7 +88,7 @@ test("the bundled plugins load from an installed package: every adapter module a
     const out = { languages: [...languages.LANGUAGES], files: {}, slots: {}, adapters: {} };
     for (const file of ["a.ts", "b.py", "c.rs"]) out.files[file] = languages.languageOfFile(file) ?? null;
     for (const language of languages.LANGUAGES) {
-      out.slots[language] = ["entrances", "interfaces", "kept", "source", "declares", "notice"].filter((slot) => languages.syntaxOf(language, slot) !== undefined);
+      out.slots[language] = ["entrances", "interfaces", "source", "declares", "notice"].filter((slot) => languages.syntaxOf(language, slot) !== undefined);
       out.adapters[language] = languages.coreAdapter(language, process.cwd()).constructor.name;
     }
     out.adapters.declared = languages.declaredAdapter({ name: "swift", extensions: [".swift"], server: ["sourcekit-lsp"] }, process.cwd()).constructor.name;
@@ -103,9 +103,9 @@ test("the bundled plugins load from an installed package: every adapter module a
   assert.deepEqual(said.languages, ["typescript", "python", "rust"]);
   assert.deepEqual(said.files, { "a.ts": "typescript", "b.py": "python", "c.rs": "rust" });
   assert.deepEqual(said.slots, {
-    typescript: ["entrances", "interfaces", "kept", "source", "declares", "notice"],
-    python: ["entrances", "interfaces", "kept", "source", "declares"],
-    rust: ["entrances", "interfaces", "kept", "source", "declares"],
+    typescript: ["entrances", "interfaces", "source", "declares", "notice"],
+    python: ["entrances", "interfaces", "source", "declares"],
+    rust: ["entrances", "interfaces", "source", "declares"],
   });
   assert.deepEqual(said.adapters, { typescript: "TypeScriptAdapter", python: "PythonAdapter", rust: "RustAdapter", declared: "DeclaredAdapter" });
 

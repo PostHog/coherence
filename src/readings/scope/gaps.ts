@@ -50,11 +50,12 @@ import { spawn } from "../../lifecycle/work-meter.ts";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { execFileSync } from "../../lifecycle/work-meter.ts";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { configIgnore, projectFiles } from "../../adapters/project-files.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { isSourceFile } from "../../economy/source.ts";
+import { isBasisFile } from "../../plugins/languages.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { decide } from "../../journal/verbs.ts";
 import { parseSpec } from "../../spec/grammar.ts";
@@ -152,8 +153,11 @@ function specShape(root: string, model = loadSpecModel(root, { runs: false })): 
   );
 }
 
-/** The root files a reading reads besides source: the config, and the manifests whose runners and bins are detected entrances. */
-const MANIFESTS: ReadonlySet<string> = new Set(["coherence.config.json", "package.json", "pyproject.toml"]);
+/** Whether a reading reads the file besides source: the config, and each language's configuration, manifests and lockfiles (isBasisFile), whose runners and bins are detected entrances. */
+function readBesidesSource(file: string, skip: ReturnType<typeof boundsOf>): boolean {
+  if (file === "coherence.config.json") return true;
+  return isBasisFile(basename(file)) && (!file.includes("/") || withinBounds(file, skip));
+}
 
 /**
  * The fingerprint of what a reading reads: every source file of each of
@@ -167,8 +171,8 @@ export function structureFingerprint(root: string, model?: SpecModel): string {
   const hash = createHash("sha256");
   hash.update(specShape(root, model)).update("\u0000");
   for (const file of projectFiles(root)) {
-    // The manifests too: the entrances the reading detects include what package.json and pyproject.toml run.
-    const counted = MANIFESTS.has(file) || (withinBounds(file, skip) && languages.some((language) => isSourceFile(file, language)));
+    // The manifests too: the entrances the reading detects include what the languages' manifests run.
+    const counted = readBesidesSource(file, skip) || (withinBounds(file, skip) && languages.some((language) => isSourceFile(file, language)));
     if (!counted) continue;
     let text: Buffer;
     try {

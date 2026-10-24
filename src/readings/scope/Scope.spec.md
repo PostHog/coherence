@@ -267,6 +267,15 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   crossing: instrument -> reading
   refuted: awaited the language server's answer without racing it against the deadline, in readComponentInterfaces' within, so a stalled server held the reading -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
+- a file the server cannot answer is named, never the language: When a language's server fails a question about one file, the component interface reading leaves that file's declarations unread, names the file with the server's words, and reads every other file of the language; the map and query structure say the map is partial and which files, and only a server that is not up leaves the language unread. The economy of a change to such a file is still said, its line naming what the server could not answer, and an observation's interface map names the file and reads the rest.
+  over: a server that fails every question about one file of a component while it answers the component's other files, and one that answers every file, through the reading, the Structure page, query structure, the economy of a change to that file and an observation's interface map
+  via: a file the language server cannot answer for is named and left unread while the rest of the language is read
+  because: gopls has no package for a Go file outside the host's build (requester/now_windows.go in rakyll/hey on macOS), and one such failure threw away the whole Go reading, so a Go project with any platform file read no Go at all (df-53e501ca); a partial map that names the file is worth more than none, and recording it lets the hooks read it instead of reading the tree again each session
+  crossing: instrument -> reading
+  refuted: made the interface reading rethrow a server's failure on one file, so the language's whole reading ends unread as before -> "a file the language server cannot answer for is named and left unread while the rest of the language is read" went red in component-interfaces.test.ts; restored, green (2026-10-23)
+  refuted: made the economy closure rethrow a server's failure on one file, so the economy of a change to it fails as before -> "a file the language server cannot answer for is named and left unread while the rest of the language is read" went red in component-interfaces.test.ts on the economy's rejection; restored, green (2026-10-23)
+  refuted: made the observation's interface map rethrow a server's failure on one file, so run --observe loses every interface as before -> "a file the language server cannot answer for is named and left unread while the rest of the language is read" went red in component-interfaces.test.ts; restored, green (2026-10-23)
+  kinds: none
 - origin tokens stay readable: An origin token shows at most four entrance names and a count of the rest, which the route's inspector lists in full.
   over: a route six entrances share
   via: an origin token shows at most four entrance names and a count of the rest; the route's inspector lists every one

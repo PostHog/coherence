@@ -266,8 +266,9 @@ entrance, and merges the languages side by side over the components
 they share: no language server reports a reference from Python into
 TypeScript, so none is drawn. A language whose server does not answer is
 named as not read, with why. Mass, the entrance detection (`scaffold
-entrances`) and `scaffold control` read TypeScript and Python; Rust has no
-text scan yet, so each of them names Rust as not read. A language declared
+entrances`) and `scaffold control` read TypeScript, Python and Rust (Rust's
+module paths by its crates' folder layout and their Cargo.toml files); a bundled
+language with no text scan yet (Go) is named as not read. A language declared
 under `languages` is read by none of the readings, and each names it as not
 read. Observation maps the
 first test setup's pass through the primary language alone and says so on its

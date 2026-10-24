@@ -55,6 +55,7 @@ import {
   type StagedSite,
   type Visibility,
 } from "../../src/plugins/api.ts";
+import { exported, importPathOf, packageClause } from "./go-source.ts";
 import manifest from "./plugin.json" with { type: "json" };
 
 const LADDER: Ladder = manifest.ladder as Ladder;
@@ -125,16 +126,6 @@ function flatten(symbols: DocumentSymbol[], prefix: string[] = []): { path: stri
     if (symbol.children !== undefined) out.push(...flatten(symbol.children, path));
   }
   return out;
-}
-
-/** Whether a Go identifier is exported: its first character is an upper-case letter. */
-export function exported(name: string): boolean {
-  return /^\p{Lu}/u.test(name);
-}
-
-/** The package clause's name in a Go file's text. */
-export function packageClause(text: string): string | undefined {
-  return /^package\s+([A-Za-z_][A-Za-z0-9_]*)/m.exec(text)?.[1];
 }
 
 /** The line, zero-based, of a file's package clause. */
@@ -453,20 +444,8 @@ export class GoAdapter implements LanguageAdapter {
 
   /** The import path of a project file's package: the nearest go.mod's module path joined with the folder below it. */
   private importPath(file: string): string | undefined {
-    let dir = dirname(join(this.root, file));
-    const folder = dir;
-    while (dir.startsWith(this.root)) {
-      const mod = join(dir, "go.mod");
-      if (existsSync(mod)) {
-        const module = /^module\s+(\S+)/m.exec(readFileSync(mod, "utf8"))?.[1];
-        if (module === undefined) return undefined;
-        const below = relative(dir, folder).split(sep).join("/");
-        return below === "" ? module : `${module}/${below}`;
-      }
-      if (dir === this.root) break;
-      dir = dirname(dir);
-    }
-    return undefined;
+    const folder = dirname(file);
+    return importPathOf(this.root, folder === "." ? "" : folder);
   }
 
   /** A use of the thing, as one package-level line: a type is used as one, a value is named. */

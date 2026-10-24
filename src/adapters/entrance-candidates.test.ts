@@ -13,6 +13,9 @@ import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import { CANDIDATE_RULES } from "../readings/scope/entrance-coverage.ts";
 import { detectEntranceCandidates, type EntranceCandidate } from "./entrance-candidates.ts";
+import { entranceName } from "../scaffold/entrances.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
+import { entranceRules } from "../plugins/languages.ts";
 
 function project(files: Record<string, string>): { root: string; files: string[]; remove: () => void } {
   const root = mkdtempSync(join(tmpdir(), "coherence-detect-"));
@@ -162,6 +165,131 @@ describe("entrance detection", () => {
       assert.deepEqual(names("management command"), ["Command"]);
       assert.deepEqual(names("console script"), ["main"]);
       assert.deepEqual(names("script"), ["scripts/seed.py"], "a script without a main block is a helper");
+    } finally {
+      remove();
+    }
+  });
+
+  test("the Rust rules detect a binary's main by Cargo's layout or a [[bin]] path, a build script, route attributes, a router's routes and foreign exports; a doc example and a test module detect nothing", () => {
+    const { root, files, remove } = project({
+      "Cargo.toml": '[workspace]\nmembers = ["crates/*"]\n',
+      "crates/shop/Cargo.toml": '[package]\nname = "shop"\n\n[[bin]]\nname = "shopd"\npath = "daemon/main.rs"\n\n[[bin]]\nname = "serve"\npath = "src/bin/serve.rs"\n',
+      "crates/shop/build.rs": "fn main() {\n    println!(\"cargo:rerun-if-changed=build.rs\");\n}\n",
+      "crates/shop/daemon/main.rs": "use shop::api;\n\n#[tokio::main]\nasync fn main() {\n    api::app();\n}\n",
+      "crates/shop/src/main.rs": "fn main() {}\n",
+      "crates/shop/src/bin/serve.rs": "fn main() {\n}\n",
+      "crates/shop/src/lib.rs": "pub mod api;\nfn main() {}\n",
+      "crates/shop/src/api.rs": [
+        "use axum::{routing::{get, post}, Router};",
+        "use crate::guard::checked;",
+        "",
+        "/// ```",
+        "/// Router::new().route(\"/doc\", get(from_a_doc));",
+        "/// ```",
+        "pub fn app() -> Router {",
+        "    Router::new()",
+        "        .route(\"/rows\", get(list_rows).post(handlers::create_row))",
+        "        .route(",
+        "            \"/rows/{id}\",",
+        "            web::delete().to(checked(remove_row)),",
+        "        )",
+        "}",
+        "",
+        "#[get(\"/health\")]",
+        "#[tracing::instrument]",
+        "async fn health() -> &'static str {",
+        "    \"ok\"",
+        "}",
+        "",
+        "#[no_mangle]",
+        "pub extern \"C\" fn shop_init() {}",
+        "",
+        "#[wasm_bindgen]",
+        "pub fn render() {}",
+        "",
+        "#[cfg(test)]",
+        "mod tests {",
+        "    #[get(\"/only-in-tests\")]",
+        "    async fn fake() {}",
+        "    fn app() { Router::new().route(\"/t\", get(test_rows)); }",
+        "}",
+      ].join("\n"),
+    });
+    try {
+      const found = detectEntranceCandidates(root, { language: "rust", files, wrappers: ["checked"], testFolders: [] });
+      const rules = new Set(CANDIDATE_RULES["rust"]!.map((r) => r.rule));
+      for (const c of found) assert.ok(rules.has(c.rule) && c.why.length > 0, `${c.rule} is a listed rule and says why`);
+      const names = (rule: string): string[] => found.filter((c) => c.rule === rule).map((c) => `${c.file} ${c.symbol}`).sort();
+      assert.deepEqual(names("binary"), ["crates/shop/daemon/main.rs main", "crates/shop/src/bin/serve.rs main", "crates/shop/src/main.rs main"], "a library's own main is no binary's, and a [[bin]] at Cargo's layout is read once");
+      assert.deepEqual(names("build script"), ["crates/shop/build.rs main"]);
+      assert.deepEqual(names("route attribute"), ["crates/shop/src/api.rs health"], "past a second attribute; never one inside #[cfg(test)]");
+      assert.deepEqual(names("route registration"), ["crates/shop/src/api.rs create_row", "crates/shop/src/api.rs list_rows", "crates/shop/src/api.rs remove_row"], "a route broken across lines is read; a doc example's is not");
+      assert.deepEqual(found.find((c) => c.symbol === "remove_row")?.through, ["checked"], "a wrapper the route's handler is passed through, bound by a use");
+      assert.deepEqual(names("foreign export"), ["crates/shop/src/api.rs render", "crates/shop/src/api.rs shop_init"]);
+      assert.deepEqual(
+        found.filter((c) => c.rule === "binary" || c.rule === "build script").map((c) => entranceName(c)).sort(),
+        ["binary serve", "binary shop", "binary shopd", "build script shop"],
+        "a binary is named as its manifest names it, else for its file or its crate, so two mains never propose one name",
+      );
+    } finally {
+      remove();
+    }
+  });
+
+  test("the Go rules detect a command's main, a handler registered on a ServeMux, a route on a router the file imports, and a cgo export; a doc comment, a string, an inline handler, a test file and a router method in a file that imports no router detect nothing", () => {
+    const { root, files, remove } = project({
+      "coherence.config.json": JSON.stringify({ language: "go", plugins: { go: "bundled" } }),
+      "go.mod": "module example.com/shop\n\ngo 1.22\n",
+      "main.go": "package main\n\nfunc main() {}\n",
+      "cmd/shopd/main.go": [
+        "package main",
+        "",
+        "import (",
+        "\t\"net/http\"",
+        "",
+        "\t\"example.com/shop/api\"",
+        ")",
+        "",
+        "// Example: http.HandleFunc(\"/doc\", fromADoc)",
+        "func main() {",
+        "\tmux := http.NewServeMux()",
+        "\tmux.HandleFunc(\"GET /rows/{id}\", api.ShowRow)",
+        "\thttp.Handle(\"/admin\", checked(",
+        "\t\thttp.HandlerFunc(adminPage),",
+        "\t))",
+        "\thttp.HandleFunc(\"/inline\", func(w http.ResponseWriter, r *http.Request) {})",
+        "\thttp.Handle(\"/static/\", http.FileServer(http.Dir(\".\")))",
+        "\tlabel := \"http.HandleFunc(\\\"/in-a-string\\\", fake)\"",
+        "\t_ = label",
+        "\thttp.ListenAndServe(\":8080\", mux)",
+        "}",
+      ].join("\n"),
+      "api/routes.go": [
+        "package api",
+        "",
+        "import \"github.com/gin-gonic/gin\"",
+        "",
+        "func Routes(r *gin.Engine) {",
+        "\tr.GET(\"/rows\", auth, listRows)",
+        "\tr.POST(\"/rows\", createRow)",
+        "}",
+      ].join("\n"),
+      "api/client.go": "package api\n\nfunc fetch(c *Client) {\n\tc.Get(\"/rows\", options)\n}\n",
+      "ffi/export.go": "package main\n\nimport \"C\"\n\n//export shop_init\nfunc shop_init() {}\n\nfunc helper() {}\n",
+      "cmd/shopd/main_test.go": "package main\n\nimport \"net/http\"\n\nfunc TestRoutes() {\n\thttp.HandleFunc(\"/test-only\", fake)\n}\n",
+    });
+    try {
+      readEnforcementConfig(root);
+      const found = detectEntranceCandidates(root, { language: "go", files, wrappers: ["checked"], testFolders: [] });
+      const rules = new Set(entranceRules("go").map((r) => r.rule));
+      for (const c of found) assert.ok(rules.has(c.rule) && c.why.length > 0, `${c.rule} is a listed rule and says why`);
+      const names = (rule: string): string[] => found.filter((c) => c.rule === rule).map((c) => `${c.file} ${c.symbol}`).sort();
+      assert.deepEqual(names("binary"), ["cmd/shopd/main.go main", "main.go main"], "package main's func main, at the module's root or under cmd/; a file of package main with no main is none");
+      assert.deepEqual(names("http route"), ["cmd/shopd/main.go ShowRow", "cmd/shopd/main.go adminPage"], "a method pattern, a handler through a wrapper across lines; never an inline func, a file server, a doc comment, a string or a test");
+      assert.deepEqual(found.find((c) => c.symbol === "adminPage")?.through, ["checked"], "a wrapper the handler is passed through");
+      assert.deepEqual(names("router route"), ["api/routes.go createRow", "api/routes.go listRows"], "the last argument is the handler, past a middleware; a Get in a file that imports no router is no route");
+      assert.deepEqual(names("cgo export"), ["ffi/export.go shop_init"]);
+      assert.deepEqual(found.filter((c) => c.rule === "binary").map((c) => entranceName(c)).sort(), ["binary shopd", "main"], "a command is named for its folder");
     } finally {
       remove();
     }

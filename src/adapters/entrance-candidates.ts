@@ -43,6 +43,8 @@ export interface EntranceCandidate {
   symbol: string;
   /** The rule that detected it, one of the language plugin's entrance rules (its manifest's entrances). */
   rule: string;
+  /** The name a declared entrance would take, when the plugin knows a better one than its symbol gives: a Rust binary by its target's name. */
+  name?: string;
   /** Why, in words a reader can check against the file. */
   why: string;
   /** Set when the symbol is registered here and declared elsewhere (a route table, a URL pattern): a handler naming it resolves to another file. */
@@ -90,8 +92,8 @@ export interface EntranceSyntax {
   decorates: boolean;
   /** The entrances the language's rules detect in one code file. */
   candidates(file: string, text: string, wrappers: readonly string[]): EntranceCandidate[];
-  /** The entrances the language's own manifest names (pyproject's console scripts), besides package.json's. */
-  manifestCandidates(read: (file: string) => string | undefined, exists: (file: string) => boolean): EntranceCandidate[];
+  /** The entrances the language's own manifests name (pyproject's console scripts, Cargo's [[bin]] targets), besides package.json's; `files` lists the project's files inside the bounds, for a language whose manifests lie through the tree. */
+  manifestCandidates(read: (file: string) => string | undefined, exists: (file: string) => boolean, files: readonly string[]): EntranceCandidate[];
   /** The entrance a code file (one isCode accepts) directly under scripts/ or bin/ (`folder`) is, or undefined when the language does not run it as a script. */
   script(file: string, folder: string, read: (file: string) => string | undefined, imported: ReadonlySet<string>): EntranceCandidate | undefined;
   /** Which code files some other one imports: only TypeScript's scripts are told apart by it. */
@@ -166,7 +168,7 @@ function scriptTargets(command: string, exists: (file: string) => boolean): stri
   return found;
 }
 
-/** Candidates the manifests name: package.json's bin and scripts, pyproject's console scripts. */
+/** Candidates the manifests name: package.json's bin and scripts, and each language's own (pyproject's console scripts, Cargo's [[bin]] targets). */
 function manifestCandidates(files: ReadonlySet<string>, syntax: EntranceSyntax, read: (file: string) => string | undefined, isTest: (file: string) => boolean): EntranceCandidate[] {
   const out: EntranceCandidate[] = [];
   // Only the project's own files inside the bounds: a manifest naming anything else names no entrance here.
@@ -191,7 +193,7 @@ function manifestCandidates(files: ReadonlySet<string>, syntax: EntranceSyntax, 
       }
     }
   }
-  out.push(...syntax.manifestCandidates(read, exists));
+  out.push(...syntax.manifestCandidates(read, exists, [...files]));
   return out;
 }
 

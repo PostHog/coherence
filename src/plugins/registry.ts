@@ -81,6 +81,10 @@ function dataProblems(raw: Record<string, unknown>, who: string): string[] {
   for (const key of ["serverExtensions", "environmentFolders", "testFolders", "wellKnown"] as const) if (raw[key] !== undefined && !strings(raw[key])) problems.push(`${who}'s ${key} is a list of names`);
   const tests = raw["testFiles"];
   if (tests !== undefined && !(Array.isArray(tests) && tests.every(compiles))) problems.push(`${who}'s testFiles is a list of regular expressions a test file's base name matches`);
+  const basis = raw["basisFiles"];
+  if (basis !== undefined && !(Array.isArray(basis) && basis.every(compiles))) problems.push(`${who}'s basisFiles is a list of regular expressions a configuration, manifest or lockfile's base name matches`);
+  const owns = raw["moduleFolders"];
+  if (owns !== undefined && !(Array.isArray(owns) && owns.every((o) => compiles(o) && new RegExp(`${o as string}|`).exec("")!.length > 1))) problems.push(`${who}'s moduleFolders is a list of regular expressions a module file's path matches, the first group the folder it owns`);
   const members = raw["members"];
   if (members !== undefined && (!isRecord(members) || !(["opens", "closes", "field"] as const).every((k) => compiles(members[k])))) problems.push(`${who}'s members is { "opens", "closes", "field" }, each a regular expression`);
   const entrances = raw["entrances"];

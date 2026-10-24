@@ -1,21 +1,42 @@
 /**
- * Rust's facts for the component interface reading: none of its text is
- * scanned yet, so readLanguage answers unread for Rust before any of these
- * is asked (component-interfaces.ts reads them through INTERFACE_SYNTAX,
- * kept-answers.ts through KEPT_MODULES).
+ * Rust's facts for the component interface reading: which declaration lines
+ * are types, what the word index reads of a file's use trees, and the
+ * modules a file glob-imports (component-interfaces.ts reads them through
+ * INTERFACE_SYNTAX, kept-answers.ts through the same wildcardModules).
  */
 
+import { posix } from "node:path";
 import type { InterfaceSyntax } from "../../src/plugins/api.ts";
+import { absolutePath, crateRootOf, itemOf, useLeaves, useTrees } from "./rust-source.ts";
 
-/** Rust is not read by this reading yet: no type-only declaration, default export, import list or glob use is read; rust-analyzer reads its Cargo workspace, so it takes no bounds. */
+/** The module files a file glob-imports (`use crate::a::*`), in both layouts the word index may key a module by: a.rs and a/mod.rs. */
+function globModules(file: string, text: string): string[] {
+  const crateRoot = crateRootOf(file);
+  if (crateRoot === undefined) return [];
+  const modules: string[] = [];
+  for (const leaf of useLeaves(text)) {
+    if (leaf.path[leaf.path.length - 1] !== "*") continue;
+    const absolute = absolutePath(file, crateRoot, leaf.path.slice(0, -1));
+    if (absolute === undefined) continue;
+    if (absolute.length === 0) {
+      modules.push(crateRoot);
+      continue;
+    }
+    const base = posix.join(posix.dirname(crateRoot), ...absolute);
+    modules.push(`${base}.rs`, `${base}/mod.rs`);
+  }
+  return modules;
+}
+
+/** A type alias declares a type only; Rust has no default export; rust-analyzer reads its Cargo workspace, so it takes no bounds. */
 export const RUST_INTERFACES: InterfaceSyntax = {
-  isTypeDeclaration: () => false,
+  isTypeDeclaration(line) {
+    const item = itemOf(line);
+    return item?.top === true && item.keyword === "type";
+  },
   isDefaultExport: () => false,
   serverBounds: false,
-  importLists: () => [],
+  importLists: useTrees,
   defaultNames: () => [],
-  wildcardModules: () => [],
+  wildcardModules: globModules,
 };
-
-/** Rust is not read by this reading yet: no glob use is scanned, so a changed file names no module a kept answer depends on. */
-export const rustKeptModules: (file: string, text: string) => string[] = () => [];

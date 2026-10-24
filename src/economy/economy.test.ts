@@ -355,12 +355,15 @@ test("mass over a project whose only language no scan reads says it measured not
     writeFileSync(join(dir, path), text, "utf8");
   };
   try {
-    put("coherence.config.json", JSON.stringify({ language: "rust" }));
-    put("Cargo.toml", "[package]\nname = \"accounts\"\nversion = \"0.1.0\"\n");
+    // A plugin that provides a language and fills no source slot: no bundled language is left unread (d-6569dec0), so the fixture brings its own.
+    put("coherence.config.json", JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }));
+    put("plugins/zz/plugin.json", JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, module: "./index.ts", extensions: [".zz"], syntax: { topLevel: "top.ts#zzDeclaresAtTop" } }));
+    put("plugins/zz/index.ts", 'export default { adapter: ({ language }) => ({ language, ladder: { top: "reference-choked", because: "a stand-in", rungs: [] }, ready: async () => ({ ok: true }), resolve: async () => ({ ok: false, reason: "a stand-in" }), references: async () => [], visibility: async () => ({ enforced: false, visible: true, evidence: "a stand-in" }), testFilter: (via) => via, refute: async () => ({ seen: false, staged: [], account: "a stand-in" }), forget: async () => {}, close: async () => {} }) };\n');
+    put("plugins/zz/top.ts", "export const zzDeclaresAtTop = (text, name) => text.split(\"\\n\").includes(`verb ${name}`);\n");
     put("src/Accounts.spec.md", "# Accounts\n\nThe accounts.\n");
-    put("src/lib.rs", "pub fn post() {}\n");
+    put("src/post.zz", "verb post\n");
     const printed = formatMass(computeMass(dir));
-    assert.match(printed.split("\n")[0]!, /^unreached mass: not measured, since no source file was read \(rust NOT READ; see the languages line below\)$/, printed);
+    assert.match(printed.split("\n")[0]!, /^unreached mass: not measured, since no source file was read \(zz NOT READ; see the languages line below\)$/, printed);
     assert.doesNotMatch(printed, /0% of lines/);
   } finally {
     rmSync(dir, { recursive: true, force: true });

@@ -159,7 +159,7 @@ copy names it the second way, and so should a plugin you write.
 | `testFolders` | Folder names whose files are all tests by the language's own layout, wherever they sit (SwiftPM's `Tests`), beside the config's test folders. A name matches a folder exactly, case and all. |
 | `members` | How an exported type's body reads for the lexicon's member scan: `opens`, `closes`, `field`, each a regular expression. |
 | `entrances` | The entrance detection rules (`rule`, `plural`, `detects`) and `notDetected`, what they miss: printed by the query, the page and orient. |
-| `notScanned` | Why the text scans do not read the language yet (Rust's). Present, it turns off every reading that scans the language's text, whatever slots are filled: mass, entrance detection and the Structure reading each name the language as not read, with this reason. Remove it once the `source` slot reads the language. |
+| `notScanned` | Why the text scans do not read the language. Present, it turns off every reading that scans the language's text, whatever slots are filled: mass, entrance detection and the Structure reading each name the language as not read, with this reason. No bundled plugin carries it, and `plugin check` fails a plugin that does: every language plugin owes the readings of its text (the reading duties below), and none is waived. It stays so that a plugin still being written says what it does not read rather than measuring as a project of no code. |
 | `environmentFolders` | Folder names no project authors code in, wherever they sit (`node_modules`, `__pycache__`). |
 | `markedFolders` | Folders the language's tools make, left out by a `marker` inside (`pyvenv.cfg`) or by `name` beside a file (`target` beside `Cargo.toml`), each with its `reason`. |
 | `ci` | `note`: what the generated CI workflow says for a project that reads the language. `steps`: what it runs after the install to set up what the adapter asks (Go's toolchain and gopls), each `{ "name"?, "uses": "<owner/repo>@<40-hex commit>", "version": "<its release>", "with"? }` or `{ "name"?, "run": "<command>" }`. |
@@ -228,7 +228,7 @@ reading first asks for that slot:
 |---|---|---|
 | `entrances` | entrance detection | `EntranceSyntax` |
 | `interfaces` | the Structure reading | `InterfaceSyntax` |
-| `kept` | the Structure reading's kept answers | `(file, text) => string[]` |
+| `kept` | the Structure reading's kept answers, when filled; else `interfaces.wildcardModules` | `(file, text) => string[]` |
 | `source` | the economy and mass | `SourceSyntax` |
 | `declares` | the observation's interface map | `(line) => "type" \| "value" \| "body" \| "unknown"` |
 | `notice` | the session start | `(root) => string` |
@@ -236,8 +236,29 @@ reading first asks for that slot:
 | `topLevel` | the spec model's check that a handler, guard or mirror is declared | `(text, name) => boolean` |
 | `boundaries` | `scaffold import` and adoption | `BoundarySource`: a tool's declaration file read into modules, as tach's |
 
+An `EntranceSyntax`'s `manifestCandidates(read, exists, files)` is handed the
+project's files inside the bounds as its third argument, so a language whose
+manifests lie through the tree (every Cargo.toml of a workspace) reads each.
+A candidate may carry a `name`, the one `scaffold entrances` proposes when
+the plugin knows a better one than its symbol gives (a Rust binary by the
+name its Cargo.toml gives it), so no language's layout is known in the core.
+
 Every type is exported from `@posthog/coherence/plugin`. A slot a plugin leaves empty reads as "not read for <language>", never as
-another language. A plugin answers for the project whose config names it
+another language: a plugin that fills no `source` slot is named not read by
+mass and every reading that scans text, and one that fills no `interfaces`
+slot by the Structure reading. The kept answers read the `interfaces` slot's
+`wildcardModules`; the `kept` slot is still read when a plugin fills it, and
+`plugin check` fails a plugin whose two slots answer with one function or
+two spelled alike (its "one answer each" duty).
+
+Two manifest fields name a language's files so the core never does:
+`basisFiles`, regular expressions a base name matches for the files besides
+source its answers and entrances rest on (configuration, manifests,
+lockfiles: `^Cargo\.toml$`), which a kept answer and the Structure reading's
+fingerprint are both read against; and `moduleFolders`, regular expressions a
+module file's path matches whose first group is the folder it owns
+(`^(.*)/__init__\.py$`), by which a chokepoint that is a module covers its
+folder's files. A plugin answers for the project whose config names it
 alone: a process serving several projects asks each one's questions under
 `forProject(root, ...)`. A plugin that provides one of the bundled languages answers
 each field and slot it declares, and the bundled plugin answers the rest, so
@@ -363,10 +384,21 @@ one wanting changes a copy of it:
    | declarations | the `topLevel` slot says which names a file declares, as `check.json` says |
    | references | the adapter reports every reference to the protected thing, and none else; one that reports none fails here, by name |
    | chokepoint | the run grades the chokepoint as `check.json` expects, bypasses named, its refutation seen or refused |
+   | mass | mass reads the language, counts each file, and the `source` slot's scan finds in each the names `check.json`'s `readings.declared` gives |
+   | imports | the `source` slot's scan reads every import `readings.imports` names, resolved to its project file, and none else: what the economy's closure walks |
+   | interfaces | with each folder `readings.interfaces` names a component, the component interface reading finds the symbols one uses of another, and none else |
+   | entrances | entrance detection finds every entrance `readings.entrances` names, by file, handler and rule, and none else |
+   | one answer each | no two of its slots answer with one function, or two spelled alike |
 
    Each duty passes, fails with why, or is not run with why (the
    language server is absent). The command exits 0 only when every one
-   passes. The bundled plugin's `check.json` for the language, as the
+   passes. The reading duties run each reading as a project's runs, through
+   the core, so a slot that answers in its type and reads nothing (a
+   `declarationOf` that always says `undefined`) fails every reading it
+   feeds, by what each missed, and so does a slot left empty: a slot's
+   success is what the readings that consume it recover. No plugin waives a
+   reading; a check project that names no `readings` fails each reading duty
+   as nothing to check. The bundled plugin's `check.json` for the language, as the
    installed package ships it, is the minimum: every plugin for that
    language is held to it, whatever its own `check.json` says. Add cases to
    the copy's `check.json` as you enhance it: they are its tests, held
@@ -389,6 +421,7 @@ one wanting changes a copy of it:
    | `references` | Every reference to `protects` as `file:line`, the line 1-based, test files' included: the adapter must report exactly these, none missed and none more. |
    | `grade` | What the run grades the chokepoint (`broken`, `reference-choked`, `visibility-choked`). |
    | `bypasses` | The references outside the chokepoint the run must name, as `file:line`; a test file's never is one. |
+   | `readings` | What each reading of the language's text must recover over `files`, each compared exactly, each with at least one answer: `declared`, `{ "<file>": ["Name", ...] }` for every non-test file of the language; `imports`, `[{ "file", "module", "names" }]`, one per file and the project file it imports from, `"*"` for the module whole; `interfaces`, `[{ "from", "to", "symbols" }]`, component folders and the symbols of `to` that `from` uses; `entrances`, `[{ "file", "symbol", "rule" }]`, `symbol` empty when the file itself is the entrance. Write it for your small project before you write a slot: it is the slot's spec. |
 4. **Swap back**: remove the `plugins` entry, and the bundled plugin answers
    again.
 
