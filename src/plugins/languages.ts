@@ -457,7 +457,8 @@ function slotExport(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
   if (!slots.has(key)) {
     const [file, name] = at.split("#") as [string, string];
     const module = load(resolve(plugin.dir, file)) as Record<string, unknown>;
-    if (!(name in module)) throw new Error(`plugin ${plugin.name}'s syntax.${slot} names ${at}, whose module exports no ${name}`);
+    // Its own export only: a name the module inherits (constructor, toString) is no slot.
+    if (!Object.hasOwn(module, name)) throw new Error(`plugin ${plugin.name}'s syntax.${slot} names ${at}, whose module exports no ${name}`);
     slots.set(key, module[name]);
   }
   return slots.get(key);
