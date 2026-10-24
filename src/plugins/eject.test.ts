@@ -11,6 +11,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
+import { budget } from "../enforcement/test-budgets.ts";
 import { cli } from "../lifecycle/cli-fixture.ts";
 import { checkPlugin } from "./check.ts";
 import { ejectedSource, ejectPlugin, EjectError, PACKAGE_SPECIFIER, PLUGIN_SOURCES } from "./eject.ts";
@@ -65,7 +66,8 @@ test("plugin eject copies a bundled plugin's source and its check.json into the 
   assert.ok(!existsSync(join(root, "elsewhere")) && !existsSync(join(root, "outside")), "a refusal writes nothing");
 });
 
-test("plugin check holds a plugin to every duty, bundled or by path, and a plugin that reports no references fails, by name", async () => {
+test("plugin check holds a plugin to every duty, bundled or by path, and a plugin that reports no references fails, by name", async (t) => {
+  budget(t, 20, "d-467bd43d");
   const bundled = await checkPlugin(process.cwd(), "typescript");
   assert.deepEqual(bundled.duties.map((o) => [o.name, o.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["references", "pass"], ["chokepoint", "pass"], ["one answer each", "pass"]], JSON.stringify(bundled.duties));
 
