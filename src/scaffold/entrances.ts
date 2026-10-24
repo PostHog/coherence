@@ -65,10 +65,11 @@ function routePath(file: string): string {
   return (at === -1 ? parts : parts.slice(at + 1)).join("/") || stem(file);
 }
 
-/** The name a bullet proposes: words from the symbol; the route's path for a route export or a page; the file's for a file-grain entrance. Never a colon, which ends a name. */
-export function entranceName(c: Pick<EntranceCandidate, "file" | "symbol" | "rule">): string {
+/** The name a bullet proposes: the plugin's own when it gave one; words from the symbol; the route's path for a route export or a page; the file's for a file-grain entrance. Never a colon, which ends a name. */
+export function entranceName(c: Pick<EntranceCandidate, "file" | "symbol" | "rule" | "name">): string {
   let name: string;
-  if (c.rule === "page route") name = `page ${routePath(c.file).replace(/(?:^|\/)page$/, "") || "/"}`;
+  if (c.name !== undefined) name = c.name;
+  else if (c.rule === "page route") name = `page ${routePath(c.file).replace(/(?:^|\/)page$/, "") || "/"}`;
   else if (c.symbol === "") name = symbolWords(stem(c.file)).join(" ") || stem(c.file);
   else if (ROUTE_EXPORTS.has(c.symbol)) name = `route ${routePath(c.file)}`;
   else if (METHOD_EXPORTS.has(c.symbol)) name = `${c.symbol} ${routePath(c.file)}`;

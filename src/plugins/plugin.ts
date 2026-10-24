@@ -139,6 +139,10 @@ export interface PluginManifest {
   testFiles?: string[];
   /** Folder names that hold the language's tests wherever they sit, besides the config's test folders (SwiftPM's Tests). */
   testFolders?: string[];
+  /** The files besides source the language's answers and detected entrances rest on (its configuration, manifests and lockfiles), as regular expressions a base name matches. */
+  basisFiles?: string[];
+  /** How a module file owns a folder (a package's __init__.py, a Rust mod.rs): regular expressions a project-relative path matches, the first group the folder whose files are the module's. */
+  moduleFolders?: string[];
   /** How an exported type's body reads, for the lexicon's member scan: the line that opens it, the one that closes it, a field inside; regular expressions. */
   members?: { opens: string; closes: string; field: string };
   /** The language's entrance detection rules and what they do not see. */

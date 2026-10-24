@@ -63,6 +63,7 @@
 
 import { isTestPath, rangeContains, withinFolder, type CheckerBoundary, type Definition, type LanguageAdapter, type Occasion, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
 import { horizonSites, projectSites, searchedHorizon } from "../adapters/project-files.ts";
+import { moduleFolderOf } from "../plugins/languages.ts";
 import { fromText, type ChokepointFrom } from "../spec/grammar.ts";
 import type { Bypass, Governed, Grade, ReferenceTarget, RefutationState, SiteClass, Verdict } from "./record.ts";
 
@@ -163,15 +164,10 @@ function ownedBy(boundary: CheckerBoundary, file: string): boolean {
   return boundary.owns.some(under) && !boundary.except.some(under);
 }
 
-/**
- * Whether a file is the module, or one of the files its module subtree owns:
- * a Python package's own files under its __init__; under a Rust `X/mod.rs`,
- * the files of `X/`; under a Rust `X.rs`, the files of its sibling `X/`; and
- * under a crate root `src/lib.rs` or `src/main.rs`, the files of `src/`.
- */
+/** Whether a file is the module, or one of the files of the folder the module owns, as its language's plugin says (moduleFolders). */
 function withinModule(file: string, moduleFile: string): boolean {
   if (file === moduleFile) return true;
-  const owned = /^(.*)\/(?:__init__\.py|mod\.rs)$/.exec(moduleFile)?.[1] ?? /^((?:.*\/)?src)\/(?:lib|main)\.rs$/.exec(moduleFile)?.[1] ?? /^(.*)\.rs$/.exec(moduleFile)?.[1];
+  const owned = moduleFolderOf(moduleFile);
   return owned !== undefined && file.startsWith(owned + "/");
 }
 

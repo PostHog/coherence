@@ -2,7 +2,7 @@
  * TypeScript's facts for the component interface reading: which declaration
  * lines are types or default exports, and what the word index and the kept
  * answers read of a file's imports (component-interfaces.ts reads them
- * through INTERFACE_SYNTAX, kept-answers.ts through KEPT_MODULES).
+ * through INTERFACE_SYNTAX, and kept-answers.ts through its wildcardModules).
  */
 
 import { specifierCandidates } from "./typescript.ts";
@@ -27,11 +27,3 @@ export const TYPESCRIPT_INTERFACES: InterfaceSyntax = {
   },
 };
 
-/**
- * The module files a changed file wildcard re-exports, in every spelling a
- * kept answer can name them by: a kept answer's module is its definition's
- * file as the server reports it, which can be JavaScript.
- */
-export function typescriptKeptModules(file: string, text: string): string[] {
-  return [...text.matchAll(TS_WILDCARD)].flatMap(([, specifier]) => specifierCandidates(file, specifier!));
-}

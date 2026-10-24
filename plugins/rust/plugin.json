@@ -11,16 +11,51 @@
   "serverExtensions": [
     ".rs"
   ],
+  "basisFiles": [
+    "^Cargo\\.toml$",
+    "^Cargo\\.lock$",
+    "^rust-toolchain(?:\\.toml)?$"
+  ],
+  "moduleFolders": [
+    "^(.*)/mod\\.rs$",
+    "^((?:.*/)?src)/(?:lib|main)\\.rs$",
+    "^(.*)\\.rs$"
+  ],
   "members": {
-    "opens": "(?!)",
-    "closes": "^[}\\]]",
-    "field": "(?!)"
+    "opens": "^pub(?:\\([^)]*\\))?\\s+(?:struct|union)\\s.*\\{\\s*$",
+    "closes": "^\\}",
+    "field": "^\\s+pub(?:\\([^)]*\\))?\\s+(?:r#)?([a-z_][a-z0-9_]*)\\s*:\\s*\\S"
   },
   "entrances": {
-    "rules": [],
-    "notDetected": "Rust is not read by this reading yet: no Rust entrance is detected"
+    "rules": [
+      {
+        "rule": "binary",
+        "plural": "binaries",
+        "detects": "the main of a binary's root: src/main.rs, src/bin/x.rs, src/bin/x/main.rs, or a [[bin]] path any Cargo.toml in the project names"
+      },
+      {
+        "rule": "build script",
+        "plural": "build scripts",
+        "detects": "the main of a crate's build.rs, which Cargo runs before it compiles the crate"
+      },
+      {
+        "rule": "route attribute",
+        "plural": "route attributes",
+        "detects": "a function carrying #[get(\"/path\")], #[post], #[put], #[patch], #[delete], #[head], #[options] or #[route] (actix-web, Rocket)"
+      },
+      {
+        "rule": "route registration",
+        "plural": "route registrations",
+        "detects": "a handler a router's .route(\"/path\", …) names: get(handler), post(handler) and the rest (axum), or .to(handler) (actix-web)"
+      },
+      {
+        "rule": "foreign export",
+        "plural": "foreign exports",
+        "detects": "a function carrying #[no_mangle], #[unsafe(no_mangle)], #[export_name = …] or #[wasm_bindgen], which code outside Rust calls by name"
+      }
+    ],
+    "notDetected": "a router built in a helper and merged in, a route macro of another framework (warp filters, poem), a trait a framework calls (a tonic gRPC service, a tower Service), a message consumer and a proc-macro are not detected"
   },
-  "notScanned": "Rust is not read by this reading yet",
   "markedFolders": [
     {
       "name": "target",
@@ -48,7 +83,6 @@
   "syntax": {
     "entrances": "rust-entrances.ts#RUST_ENTRANCES",
     "interfaces": "rust-scope.ts#RUST_INTERFACES",
-    "kept": "rust-scope.ts#rustKeptModules",
     "source": "rust-source.ts#RUST_SOURCE",
     "declares": "rust-interfaces.ts#rustDeclares",
     "topLevel": "rust-top-level.ts#rustDeclaresAtTop"
