@@ -11,6 +11,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
+import { budget } from "../enforcement/test-budgets.ts";
 import { checkPlugin } from "./check.ts";
 import { PLUGIN_SOURCES } from "./eject.ts";
 
@@ -76,7 +77,8 @@ test("every bundled language plugin's check project names what each reading reco
 });
 
 for (const [language] of PROVIDERS) {
-  test(`every bundled language plugin's check project names what each reading recovers, and the plugin recovers it: ${language}`, async () => {
+  test(`every bundled language plugin's check project names what each reading recovers, and the plugin recovers it: ${language}`, async (t) => {
+    budget(t, 20, "d-23f7f8eb");
     const checked = await checkPlugin(process.cwd(), language);
     for (const name of READINGS) {
       const duty = checked.duties.find((d) => d.name === name)!;
