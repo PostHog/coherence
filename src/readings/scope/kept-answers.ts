@@ -73,7 +73,8 @@ const COHERENCE_ROOT = resolve(here, "..", "..", "..");
 const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
 /** The module files a changed file star-imports or wildcard re-exports, as the component interface reading reads them (the interfaces slot's wildcardModules); a kept slot, from a plugin written before it was read so, is read first. */
 function keptModules(language: Language, file: string, text: string): string[] {
-  return syntaxOf(language, "kept")?.(file, text) ?? syntaxOf(language, "interfaces")?.wildcardModules(file, text) ?? [];
+  const kept = syntaxOf(language, "kept");
+  return (typeof kept === "function" ? kept(file, text) : undefined) ?? syntaxOf(language, "interfaces")?.wildcardModules(file, text) ?? [];
 }
 
 /** One kept answer and what it depends on: the files it names and the names that, spelled in a changed file, could change it. */
