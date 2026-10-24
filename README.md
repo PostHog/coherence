@@ -89,7 +89,9 @@ a **lexicon**: each concept with its definition, its aliases, and the names
 rejected for it and why. Your agent's own hooks deliver it at the start of
 every session and subagent, so agents do what you meant, not just what you
 said. `coherence lexicon --check` finds a rejected name anywhere in prose,
-specs, journal records, or identifiers, and `coherence lexicon coverage`
+specs, journal records, or identifiers; in your project those are the names
+your lexicon rejects, and a word Coherence also uses is never refused for that
+alone. `coherence lexicon coverage`
 ranks the recurring terms that still lack a definition; give it folders or files
 (`coherence lexicon coverage src/billing docs`) to read only those.
 

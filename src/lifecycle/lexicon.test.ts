@@ -197,7 +197,7 @@ test("renderCompactWithin keeps the vocabulary most recently named first: the ho
   assert.match(tight.text, /^\d+ more, the least recently named: coherence lexicon$/m);
   assert.doesNotMatch(tight.text, /thing38/);
 
-  assert.match(renderCompactWithin(coherence, big, 1_000_000, "coherence", false).text, /^Coherence vocabulary \(2 concepts; use these names when you mean Coherence's concepts\):\n/, "in an adopter the header binds Coherence's names to Coherence's concepts; with no journal, the file's order and no claim of one");
+  assert.match(renderCompactWithin(coherence, big, 1_000_000, "coherence", false).text, /^Coherence vocabulary \(2 concepts; the tool's terms, which restrict none of this project's words\):\n/, "in an adopter the header says Coherence's names restrict none of the project's words; with no journal, the file's order and no claim of one");
 
   const tooSmall = renderCompactWithin(coherence, big, 10);
   assert.deepEqual(tooSmall.delivered, { whole: 0, name: 0, out: all }, "when not even one name fits, one line points at the lexicon command");
@@ -218,7 +218,7 @@ test("renderCompactWithin in an adopter gives the window to the project: Coheren
 
   const roomy = renderCompactWithin(coherence, widgets, 1_000_000, "coherence", false, () => true, named);
   assert.deepEqual(roomy.delivered, { whole: all, name: mine, out: 0 }, "every project concept whole, every Coherence concept by name alone");
-  assert.match(roomy.text, /^Coherence vocabulary \(2 concepts; use these names when you mean Coherence's concepts\):\nNamed only here \(full entries: coherence lexicon\): invariant, journal\n/, "Coherence's own in the file's order, not the journal's, and no whole line");
+  assert.match(roomy.text, /^Coherence vocabulary \(2 concepts; the tool's terms, which restrict none of this project's words\):\nNamed only here \(full entries: coherence lexicon\): invariant, journal\n/, "Coherence's own in the file's order, not the journal's, and no whole line");
   assert.match(roomy.text, /^Widgetry vocabulary \(12 concepts, most recently named first; [^\n]*\n- widget7: /m, "the project's layer ranked by the journal");
 
   // One character short: Coherence's names go, counted, before any project concept loses its line.

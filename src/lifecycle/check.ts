@@ -13,25 +13,20 @@
  * recall: every finding is meant to be acted on with one of three answers,
  * declare it, map it, or fix it.
  *
- * Whose names bind where. Coherence's rejected names bind only where
- * Coherence's concepts are named. In Coherence's own repository that is
- * everywhere, prose, code, data and records alike, as strictly as ever. In
- * an adopter, the project's code and domain prose are the project's words
- * and Coherence's names are never matched there: a word the tool refused for
- * one of its own concepts is an ordinary word of someone else's domain. Only
- * the text written to Coherence (the journal's and work's records, a spec's
- * grammar, which is its section headings, property keys and checklist shapes
- * with their state words, and coherence.config.json) is matched, and there a
- * hit is advisory: reported as a count, never failing, since a record may
- * name the domain's thing in the domain's sense. The project's own lexicon's
- * rejected names bind in
- * everything the project writes, prose and identifiers alike, because a
- * rejected name in an identifier is the drift the lexicon exists to catch.
+ * Whose names bind where. Coherence's rejected names bind only in
+ * Coherence's own repository, where they bind everywhere, prose, code, data
+ * and records alike. In an adopter they are never read: a word the tool
+ * refused for one of its own concepts is an ordinary word of the project's,
+ * in its code, its prose, its records, its specs and its config alike, and
+ * Coherence's lexicon there only says what Coherence's own terms mean. The
+ * project's own lexicon's rejected names bind in everything the project
+ * writes, prose and identifiers alike, because a rejected name in an
+ * identifier is the drift the lexicon exists to catch.
  *
- * A project CLAIMS a word by declaring it in its own lexicon (a concept,
- * alias, or instance): a Coherence rejected name it declares is not a
- * finding there in any text, and a hit inside a longer accepted phrase (a
- * project alias that happens to contain a rejected word) is not a hit.
+ * A name the project declares in its own lexicon (a concept, alias, or
+ * instance) is never one of its rejected names' hits, and a hit inside a
+ * longer accepted phrase (an alias that happens to contain a rejected word)
+ * is not a hit.
  *
  * The findings a project held when it adopted Coherence are its BASELINE
  * (lexicon-baseline.ts): counted on one line, never failing, and never
@@ -57,7 +52,7 @@ import { STOPLIST } from "./stoplist.ts";
 import { singular } from "./inflection.ts";
 import { LOCKFILES } from "./lockfiles.ts";
 import { configIgnore, exclusionOf, projectFiles, underIgnored, walkBounds, type Bounds } from "../adapters/project-files.ts";
-import { CONFIG_FILE, isCoherenceItself, vocabularyFacts } from "./project.ts";
+import { isCoherenceItself, vocabularyFacts } from "./project.ts";
 import { PROSE_STORE_FOLDERS, isStoreFile, recordTexts } from "../journal/stores.ts";
 import { recordWords } from "../journal/record.ts";
 import { isWellKnown, wellKnown, type WellKnown } from "./well-known.ts";
@@ -97,8 +92,6 @@ export interface RejectedFinding extends Location {
    * next command.
    */
   repair: "edit" | "record";
-  /** A Coherence name in an adopter's Coherence-facing text: counted, never failing. */
-  advisory?: true;
   /** Held by the project's baseline: counted, never failing. */
   baselined?: true;
 }
@@ -653,27 +646,6 @@ function rejectedInCode(file: CorpusFile, names: NameTable, guard: Guard): Rejec
   return out;
 }
 
-/**
- * The words of a spec line written in Coherence's grammar rather than the
- * project's: a section heading ("## invariants"), a property key ("because:",
- * "crossing:"), and a checklist's shape with the state word after it
- * ("checklist: input-validation dismissed"). The component's title, a
- * requirement's name, and every sentence are the project's own words.
- */
-export function specGrammar(line: string): string {
-  const heading = /^#{2,6}\s+(.*)$/.exec(line);
-  if (heading !== null) return heading[1]!;
-  const key = /^\s+([A-Za-z][A-Za-z -]*):/.exec(line);
-  if (key === null) return "";
-  const checklist = /^\s+checklist:\s+(\S+)\s+([A-Za-z]+)/.exec(line);
-  return checklist === null ? key[1]! : `${key[1]} ${checklist[1]} ${checklist[2]}`;
-}
-
-/** Coherence's names in an adopter's spec grammar: advisory, and read only where the spec speaks Coherence's language. */
-function rejectedInSpecGrammar(file: CorpusFile, names: NameTable, guard: Guard): RejectedFinding[] {
-  return file.lines.flatMap((line, i) => rejectedInLine(file.rel, specGrammar(line), i + 1, names, guard, true));
-}
-
 /* ----------------------------------------------------------- unknown */
 
 interface Candidate {
@@ -805,28 +777,20 @@ export async function runCheck(options: CheckOptions): Promise<CheckReport> {
   const { files, unreadable } = await readCorpus(options);
   const own = options.coherenceItself ?? (await isCoherenceItself(root));
   const inForce = rejectedNamesInForce(options.coherence, options.project);
-  // In Coherence's own repository its names bind everywhere; in an adopter only the project's names do, and Coherence's are read in the text written to Coherence, advisory there.
-  const projectNames = new Set(inForce.project.map((n) => normalizeTerm(n.name)));
+  // In Coherence's own repository its names bind everywhere; in an adopter only the project's names do, and Coherence's are never read.
   const names = nameTable(own ? [...inForce.coherence, ...inForce.project] : inForce.project);
-  const tool = own ? undefined : nameTable(inForce.coherence.filter((n) => !projectNames.has(normalizeTerm(n.name))));
   const accepted = acceptedTerms(options);
   const guard = guardTable(accepted);
   const rejected: RejectedFinding[] = [];
-  const advisory = (found: RejectedFinding[]): RejectedFinding[] => found.map((f) => ({ ...f, advisory: true as const }));
   for (const file of files) {
     if (file.kind === "prose") rejected.push(...rejectedInProse(file, names, guard));
     else if (file.kind === "code") rejected.push(...rejectedInCode(file, names, guard));
     else if (file.kind === "data") rejected.push(...rejectedInData(file, names, guard));
     else rejected.push(...rejectedInRecord(file, names, guard));
-    if (tool === undefined) continue;
-    if (file.kind === "record") rejected.push(...advisory(rejectedInRecord(file, tool, guard)));
-    else if (file.rel === CONFIG_FILE) rejected.push(...advisory(rejectedInData(file, tool, guard)));
-    else if (file.kind === "prose" && file.rel.endsWith(".spec.md")) rejected.push(...advisory(rejectedInSpecGrammar(file, tool, guard)));
   }
   // A well-known name (Python, Pyright, the project's own name) needs no definition, so it is never an unknown noun.
   const famous = wellKnown(await vocabularyFacts(root), [options.coherence.project, options.project?.project].filter((n): n is string => n !== undefined));
-  const everyRejected = new Set([...names.byPhrase.keys(), ...(tool?.byPhrase.keys() ?? [])]);
-  const unknown = unknownNouns(files, new Set([...accepted, ...famous.any]), everyRejected, famous);
+  const unknown = unknownNouns(files, new Set([...accepted, ...famous.any]), new Set(names.byPhrase.keys()), famous);
   const report: CheckReport = { files: files.length, rejected, unknown, unreadable };
   const baseline = own ? undefined : readBaseline(root);
   if (baseline !== undefined) {
@@ -858,12 +822,12 @@ export async function recordVetter(root: string, coherence: Lexicon, project: Le
 
 /** The rejected-name findings that fail the check: editable, binding here, and not in the baseline. */
 export function failingRejected(report: CheckReport): RejectedFinding[] {
-  return report.rejected.filter((f) => f.repair === "edit" && f.advisory !== true && f.baselined !== true);
+  return report.rejected.filter((f) => f.repair === "edit" && f.baselined !== true);
 }
 
 /** The rejected-name findings in the append-only store that bind here: printed, never failing, since no edit can repair a record. */
 function recordedRejected(report: CheckReport): RejectedFinding[] {
-  return report.rejected.filter((f) => f.repair === "record" && f.advisory !== true);
+  return report.rejected.filter((f) => f.repair === "record");
 }
 
 export function formatReport(report: CheckReport): string {
@@ -882,13 +846,6 @@ export function formatReport(report: CheckReport): string {
   }
   for (const u of report.unreadable) lines.push(`UNREADABLE     ${u.file}  ${u.reason}`);
   const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
-  const advisory = report.rejected.filter((f) => f.advisory === true);
-  if (advisory.length > 0) {
-    const byName = new Map<string, number>();
-    for (const f of advisory) byName.set(f.name.toLowerCase(), (byName.get(f.name.toLowerCase()) ?? 0) + 1);
-    const top = [...byName].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5).map(([n, c]) => `${n} ${c}`).join(", ");
-    lines.push(`ADVISORY       ${plural(advisory.length, "Coherence name")} in text written to Coherence (records, spec grammar, ${CONFIG_FILE}): ${top}; reported, never failing, since inside the project its sense wins (--json lists each)`);
-  }
   const b = report.baseline;
   if (b !== undefined) {
     const gone = b.gone ? `; ${b.gone} no longer in the text, dropped at the next lexicon baseline` : "";

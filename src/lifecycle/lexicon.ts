@@ -337,13 +337,14 @@ export function renderPointer(cli = "coherence"): string {
   return `Vocabulary omitted to stay under the host budget; full entries: ${cli} lexicon\n`;
 }
 
-function renderConcept(concept: Concept): string {
+/** One concept's line; `rejected` false leaves its rejected names off, where they bind nothing. */
+function renderConcept(concept: Concept, rejected = true): string {
   let line = `- ${concept.name}: ${firstSentence(concept.definition)}`;
   const aliases = concept.aliases.flatMap(aliasNames);
   if (aliases.length > 0) line += ` (also: ${aliases.join(", ")})`;
   if (concept.instances?.length) line += ` (instances: ${concept.instances.join(", ")})`;
-  const rejected = concept.rejected.flatMap((r) => namesOfAlternative(r.alternative).map((n) => n.name));
-  if (rejected.length > 0) line += ` [rejected: ${rejected.join(", ")}]`;
+  const refused = rejected ? concept.rejected.flatMap((r) => namesOfAlternative(r.alternative).map((n) => n.name)) : [];
+  if (refused.length > 0) line += ` [rejected: ${refused.join(", ")}]`;
   if (concept.notToBeConfusedWith.length > 0) {
     const leads = concept.notToBeConfusedWith.map(leadOf).filter((l) => l !== "");
     if (leads.length > 0) line += ` (not: ${leads.join(", ")})`;
@@ -356,8 +357,8 @@ function capitalize(text: string): string {
 }
 
 /** One layer's concepts as shown: whole lines in order, then the names alone, then how many are left out (the least recently named, when the layer is in recency order). */
-function layerLines(concepts: readonly Concept[], show: (concept: Concept) => Shown, cli: string, recency = true): string[] {
-  const lines = concepts.filter((c) => show(c) === "whole").map(renderConcept);
+function layerLines(concepts: readonly Concept[], show: (concept: Concept) => Shown, cli: string, recency = true, rejected = true): string[] {
+  const lines = concepts.filter((c) => show(c) === "whole").map((c) => renderConcept(c, rejected));
   const named = concepts.filter((c) => show(c) === "name").map((c) => c.name);
   if (named.length > 0) lines.push(`Named only here (full entries: ${cli} lexicon): ${named.join(", ")}`);
   const out = concepts.filter((c) => show(c) === "out").length;
@@ -384,12 +385,12 @@ export function renderCompact(
 ): string {
   const lines: string[] = [];
   const order = lastNamed.size > 0 ? ", most recently named first" : "";
-  // In Coherence's own repository its rejected names are defects everywhere; in an adopter they bind only where Coherence's concepts are named.
-  const rule = own ? "rejected names are defects" : "use these names when you mean Coherence's concepts";
+  // In Coherence's own repository its rejected names are defects everywhere; in an adopter they bind nothing, so they are not shown.
+  const rule = own ? "rejected names are defects" : "the tool's terms, which restrict none of this project's words";
   // In an adopter Coherence's own concepts keep the file's order: the journal there names them in every record, so recency would rank the tool's vocabulary over the project's.
   const mine = byRecency(coherence.concepts.filter((c) => c.layer === undefined), own ? lastNamed : new Map());
   lines.push(`Coherence vocabulary (${mine.length} concepts${own ? order : ""}; ${rule}):`);
-  lines.push(...layerLines(mine, show, cli, own));
+  lines.push(...layerLines(mine, show, cli, own, own));
   // Each plugin's layer under its own header, between Coherence's and the project's; one whose surface the caller says is out of the way is left out.
   for (const layer of coherence.layers ?? []) {
     if (!shown(layer.name)) continue;

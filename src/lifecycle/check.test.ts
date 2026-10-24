@@ -5,7 +5,7 @@ import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { failingRejected, formatReport, hasFindings, identifierWords, normalizeTerm, runCheck, type CheckReport } from "./check.ts";
+import { failingRejected, formatReport, hasFindings, identifierWords, normalizeTerm, recordVetter, runCheck, type CheckReport } from "./check.ts";
 import { findingDigest, readBaseline, recordBaseline } from "./lexicon-baseline.ts";
 import { loadLexicon, parseLexicon, rejectedNames, type Lexicon } from "./lexicon.ts";
 import { COHERENCE_LEXICON, PACKAGE_NAME } from "./project.ts";
@@ -289,48 +289,31 @@ function decision(id: string, chose: string, extra: Record<string, unknown> = {}
   return JSON.stringify({ id, kind: "decision", at: `2026-09-25T00:00:0${id.length % 10}.000Z`, session: "s1", agent: "a", commit: null, dirty: false, chose, over: "none", because: "b", ...extra });
 }
 
-test("Coherence's rejected names bind only in Coherence's own text: in an adopter its code and domain prose are the project's words, and the text written to Coherence is advisory", async () => {
+test("Coherence's rejected names bind only in Coherence's own repository: in an adopter they are never read, in its code, prose, records, spec grammar or config, and the project's own rejected names bind everywhere", async () => {
   const dir = await adopter({
     "lexicon.json": JSON.stringify(projectLexicon),
     "notes.md": `The ${REJ} opens at dawn; the doohickey is gone.\n`,
     "src/a.ts": `const ${REJ}Keeper = 1;\n`,
     "src/src.spec.md": [`# Src`, "", "## invariants", "", `- ${REJ} holds: the ${REJ} opens only for members.`, `  because: members only`, `  checklist: input-validation dismissed: the ${REJ} validates`, ""].join("\n"),
     "src/grammar.spec.md": [`# Grammar`, "", `## ${REJ}s`, `  ${REJ}: a key in the tool's grammar`, ""].join("\n"),
-    ".coherence/journal/s1.jsonl": decision("d-1", `the ${REJ} passed`) + "\n",
+    ".coherence/journal/s1.jsonl": decision("d-1", `the ${REJ} passed and the ${ALT} too`) + "\n",
     "coherence.config.json": JSON.stringify({ name: "widgetry", note: REJ }) + "\n",
   });
   try {
     const lexicons = { coherence, project: await loadLexicon(join(dir, "lexicon.json")) };
     const out = await runCheck({ root: dir, ...lexicons });
-    const enforced = out.rejected.filter((f) => f.advisory !== true);
-    assert.deepEqual(enforced.map((f) => [f.file, f.name]), [["notes.md", "doohickey"]], "only the project's own rejected name binds in its prose and code");
-    const advisory = out.rejected.filter((f) => f.advisory === true).map((f) => `${f.file}:${f.line}`).sort();
-    assert.deepEqual(advisory, [".coherence/journal/s1.jsonl:1", "coherence.config.json:1", "src/grammar.spec.md:3", "src/grammar.spec.md:4"], "records, the config, and a spec's grammar; never a requirement's name or sentence");
+    assert.deepEqual(out.rejected.map((f) => [f.file, f.name]), [["notes.md", "doohickey"]], "only the project's own rejected name is a finding, anywhere");
     const text = formatReport(out);
-    assert.match(text, /^ADVISORY +4 Coherence names in text written to Coherence/m);
-    assert.ok(!/REJECTED NAME .*(src\/|spec|config|journal)/.test(text), "no advisory hit is printed as a failure");
-    assert.equal(hasFindings({ ...out, rejected: out.rejected.filter((f) => f.advisory === true) }), false, "an advisory hit never fails the check");
+    assert.ok(!text.includes(REJ) && !text.includes(ALT), `the report never names a word Coherence rejected for its own concepts:\n${text}`);
+    assert.ok(!/ADVISORY|Coherence name/.test(text), "and counts none of them");
+    const vet = await recordVetter(dir, coherence, lexicons.project);
+    assert.deepEqual(vet({ chose: `the ${REJ} and the ${ALT}` }), [], "a record the project writes is never refused for one");
     // Detected, not assumed: the same text in a folder whose package is Coherence binds everywhere.
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: PACKAGE_NAME }));
     const own = await runCheck({ root: dir, ...lexicons });
-    assert.ok(own.rejected.some((f) => f.file === "notes.md" && f.name === REJ && f.advisory !== true), "in Coherence's own repository its names bind in prose");
-    assert.ok(own.rejected.some((f) => f.file === "src/a.ts" && f.advisory !== true), "and in identifiers");
-    assert.ok(!own.rejected.some((f) => f.advisory === true), "and nothing is merely advisory there");
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-test("a project's claim wins inside it: a Coherence rejected name the project declares is no finding, advisory or enforced", async () => {
-  const claimed = { ...projectLexicon, concepts: [...projectLexicon.concepts, { name: REJ, definition: "The project's own sense of the word.", aliases: [] }] };
-  const dir = await adopter({
-    "lexicon.json": JSON.stringify(claimed),
-    ".coherence/journal/s1.jsonl": decision("d-1", `the ${REJ} passed and the ${ALT} too`) + "\n",
-  });
-  try {
-    const out = await runCheck({ root: dir, coherence, project: await loadLexicon(join(dir, "lexicon.json")) });
-    assert.deepEqual(out.rejected.map((f) => f.name), [ALT], `${REJ} is the project's word; ${ALT} is not claimed and stays advisory`);
-    assert.ok(out.rejected.every((f) => f.advisory === true));
+    assert.ok(own.rejected.some((f) => f.file === "notes.md" && f.name === REJ), "in Coherence's own repository its names bind in prose");
+    assert.ok(own.rejected.some((f) => f.file === "src/a.ts"), "and in identifiers");
+    assert.ok(own.rejected.some((f) => f.file === ".coherence/journal/s1.jsonl"), "and in records");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

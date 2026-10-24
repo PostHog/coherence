@@ -13,7 +13,8 @@ import { runHook } from "./hook.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { lexiconWorkCommand } from "./lexicon-cli.ts";
 import { FUNCTION_WORDS, STOPLIST } from "./stoplist.ts";
-import { reviewLexicon } from "./lexicon-maintain.ts";
+import { loadLexicon, rejectedNames } from "./lexicon.ts";
+import { COHERENCE_LEXICON } from "./project.ts";
 
 const COMPONENTS = ["books", "sales", "stock", "staff"];
 
@@ -144,7 +145,7 @@ function record(root: string, id: string, chose: string): void {
   );
 }
 
-test("sense review is asked only where meaning is at risk: more than one recorded sense, a rejected name beside the use, or a Coherence concept an adopter's code declares written where Coherence's grammar speaks", async () => {
+test("sense review is asked only where meaning is at risk: more than one of the project's recorded senses, or a name it rejected beside the use; a word Coherence also uses asks nothing, in code, prose, specs or records", async () => {
   const root = project();
   try {
     writeFileSync(join(root, "staff/adapter.ts"), "export function adapter(): string {\n  return 'bank';\n}\n");
@@ -154,31 +155,30 @@ test("sense review is asked only where meaning is at risk: more than one recorde
     writeFileSync(join(root, "sales/notes.md"), "The exposure is counted in USD.\nIt is not the hazard.\n");
     writeFileSync(join(root, "stock/notes.md"), "Each row states its unit basis.\n");
     writeFileSync(join(root, "staff/model.ts"), "export function scope(): string {\n  return 'staff';\n}\n");
-    writeFileSync(join(root, "staff/notes.md"), "The scope of a shift is one day.\n");
+    // A word Coherence rejected for its own scope concept, beside the adopter's scope: an ordinary word of the project's.
+    const tool = rejectedNames(await loadLexicon(COHERENCE_LEXICON)).find((n) => n.concept === "scope" && !n.name.includes(" "))!.name;
+    writeFileSync(join(root, "staff/notes.md"), `The scope of a shift is one day.\nThe scope of a shift is its ${tool}.\n`);
     record(root, "d-1", "narrow the scope to one shift");
-    record(root, "d-2", "drive the python language adapter");
-    record(root, "d-3", "keep the language adapter language adapter pairing");
+    record(root, "d-2", "retry the chase adapter after it broke");
     const report = await lexiconCoverage(root);
     const risk = (term: string, component: string): string | undefined =>
       report.terms.find((t) => t.term === term)?.contexts.find((c) => c.component === component)?.risk;
     assert.equal(risk("exposure", "books"), undefined, "an ordinary use of a defined word asks no review");
-    assert.match(risk("exposure", "sales") ?? "", /hazard/, "a name rejected for the concept beside its use puts the sense at risk");
-    assert.match(risk("unit basis", "stock") ?? "", /more than one recorded sense/, "a name with two recorded senses is at risk");
-    assert.equal(risk("adapter", "staff"), undefined, "a spelling the adopter's lexicon declares is the project's sense in its code and domain prose, whatever Coherence's lexicon records");
-    assert.equal(risk("adapter", "."), undefined, "a record writing Coherence's longer name (language adapter) does not write the adopter's adapter, even twice in a row");
-    assert.equal(report.terms.find((t) => t.term === "language adapter")?.layer, "coherence", "Coherence's own name still resolves in a record");
-    assert.match(risk("adapter", "stock") ?? "", /more than one recorded sense: language adapter, adapter/, "in a spec's grammar Coherence's sense speaks too, so the two senses meet");
-    assert.equal(risk("scope", "staff"), undefined, "a Coherence concept the adopter's code declares is the project's sense in its code and its domain prose");
-    assert.match(risk("scope", ".") ?? "", /declared in this project's code \(staff\/model\.ts:1\).*text Coherence reads as its own \(\.coherence\/journal\/payroll\.jsonl:1\)/, "the same name in a record, text written to Coherence, is where the two senses meet");
+    assert.match(risk("exposure", "sales") ?? "", /hazard/, "a name the project rejected for the concept beside its use puts the sense at risk");
+    assert.match(risk("unit basis", "stock") ?? "", /more than one recorded sense/, "a name with two of the project's senses is at risk");
+    for (const [term, component] of [["adapter", "staff"], ["adapter", "stock"], ["adapter", "."], ["scope", "staff"], ["scope", "."]] as const)
+      assert.equal(risk(term, component), undefined, `${term} in ${component}: a word Coherence also uses is the project's word, in its code, prose, spec grammar and records alike`);
+    assert.equal(report.terms.find((t) => t.term === "scope")?.layer, "coherence", "Coherence's own name still resolves, as a reference");
+    assert.notEqual(report.terms.find((t) => t.term === tool.toLowerCase())?.state, "rejected", `${tool}, which Coherence rejected for its own concept, is never labelled rejected in an adopter`);
     const at = attention(report).senses.map((s) => `${s.term}@${s.component}`).sort();
-    assert.deepEqual(at, ["adapter@stock", "exposure@sales", "scope@.", "unit basis@stock"]);
-    assert.equal(report.totals.unreviewedContexts, 4, "only at-risk contexts await review");
+    assert.deepEqual(at, ["exposure@sales", "unit basis@stock"]);
+    assert.equal(report.totals.unreviewedContexts, 2, "only at-risk contexts await review");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("a Coherence name an adopter's code declares is the project's own sense: its code, its domain prose and its specs' sentences ask nothing, its specs' grammar does", async () => {
+test("a Coherence name an adopter's code declares is the project's own sense everywhere: its code, its domain prose, its specs' sentences and grammar, and its records ask nothing", async () => {
   const root = project();
   try {
     writeFileSync(
@@ -191,52 +191,13 @@ test("a Coherence name an adopter's code declares is the project's own sense: it
       join(root, "books/Books.spec.md"),
       "# books\n\n## invariants\n- books balance: Each run of the books balances within one scope, under one config and spec.\n  because: the structure of a book is its run\n\n## structure\n",
     );
+    record(root, "d-1", "keep one run per scope, one spec per config and one structure per book");
     const report = await lexiconCoverage(root);
-    const risk = (term: string): string | undefined =>
-      report.terms.find((t) => t.term === term)?.contexts.find((c) => c.component === "books")?.risk;
-    for (const name of ["config", "run", "spec", "scope"]) {
-      assert.ok(report.terms.find((t) => t.term === name)?.contexts.some((c) => c.component === "books"), `${name} is observed in books`);
-      assert.equal(risk(name), undefined, `${name}, declared in the adopter's code, written in its code, prose and spec sentences, is the project's sense`);
+    for (const name of ["config", "run", "spec", "scope", "structure"]) {
+      const contexts = report.terms.find((t) => t.term === name)?.contexts ?? [];
+      assert.ok(contexts.some((c) => c.component === "books"), `${name} is observed in books`);
+      assert.deepEqual(contexts.filter((c) => c.risk !== undefined).map((c) => `${c.component}: ${c.risk}`), [], `${name}, declared in the adopter's code, is the project's sense wherever it is written`);
     }
-    assert.match(risk("structure") ?? "", /Books\.spec\.md:7/, "a declared name in a spec's grammar (its ## structure heading) is where Coherence's sense speaks too");
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("an adopter's own name written bare in a record meets Coherence's sense of the same spelling, and a ruling on it holds for its component", async () => {
-  const root = project();
-  try {
-    record(root, "d-1", "retry the chase adapter after it broke");
-    const context = async () => (await lexiconCoverage(root)).terms.find((t) => t.term === "adapter")!.contexts.find((c) => c.component === ".")!;
-    const first = await context();
-    assert.match(first.risk ?? "", /more than one recorded sense: language adapter, adapter/, "a record is text Coherence reads as its own, so its sense of the spelling speaks there");
-    const who = { session: "ruling-test", agent: "test" };
-    await reviewLexicon(root, "adapter", ".", first.fingerprint, "not-domain", who, "a bank's importer", ["Coherence's language adapter"], "owner: a bank's importer");
-    record(root, "d-2", "rewrite the amex adapter");
-    const later = await context();
-    assert.equal(later.fingerprint, first.fingerprint, "the evidence is the term and component, not the uses");
-    assert.equal(later.disposition, "not-domain", "a new use of the same name keeps the ruling");
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("a ruling on a Coherence name an adopter's code declares holds for its component: a new use of the same name does not reopen it, and settling it still needs a person", async () => {
-  const root = project();
-  try {
-    writeFileSync(join(root, "staff/model.ts"), "export function scope(): string {\n  return 'staff';\n}\n");
-    record(root, "d-1", "narrow the scope to one shift");
-    const context = async () => (await lexiconCoverage(root)).terms.find((t) => t.term === "scope")!.contexts.find((c) => c.component === ".")!;
-    const first = await context();
-    assert.ok(first.risk !== undefined, "the record puts the declared name's sense at risk");
-    const who = { session: "ruling-test", agent: "test" };
-    await assert.rejects(reviewLexicon(root, "scope", ".", first.fingerprint, "not-domain", who, "the payroll scope", ["Coherence's scope"]), /human/);
-    await reviewLexicon(root, "scope", ".", first.fingerprint, "not-domain", who, "the payroll scope is a shift's span", ["Coherence's scope"], "owner: a shift's span");
-    record(root, "d-2", "widen the scope to a fortnight");
-    const later = await context();
-    assert.equal(later.fingerprint, first.fingerprint, "the evidence is the term and component, not the uses");
-    assert.equal(later.disposition, "not-domain", "a new use of the same name keeps the ruling");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
