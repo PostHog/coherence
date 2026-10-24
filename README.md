@@ -345,7 +345,11 @@ that clone until they are reinstalled: if one sits beside your project, run
 `npx --no -- coherence hooks install --host claude` (or `--host codex`)
 after upgrading, since the clone cannot tell you so. Once the installed
 package runs, the session start and `coherence hooks --check` name hooks of
-that earlier form with the same command. To run a project against a
+that earlier form with the same command. Hooks that Coherence 0.x
+(`@danilocampos/coherence`) wrote run a launcher script beside the agent host
+settings, which starts a program this release does not ship; the same install
+replaces them, and until it runs, the session start and the check name them
+too. To run a project against a
 Coherence checkout you are developing, see
 [Working on Coherence itself](#working-on-coherence-itself).
 To add the project's own words to an event, write

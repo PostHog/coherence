@@ -8,8 +8,9 @@
  * Codex: https://learn.chatgpt.com/docs/hooks). Install merges: an existing
  * entry for another command is kept; a command Coherence wrote earlier is
  * replaced, and only a command that names this tool's binary or its own cli
- * path counts as Coherence's; everything outside `hooks` is untouched. No
- * hook that is not ours is ever deleted.
+ * path, or runs the launcher Coherence 0.x kept beside the host's settings,
+ * counts as Coherence's; everything outside `hooks` is untouched. No hook
+ * that is not ours is ever deleted.
  *
  * Uninstall is the same ownership rule run the other way: every command that
  * is ours leaves, and an entry, an event list, or a `hooks` object that this
@@ -29,11 +30,12 @@
  * when the package's cli is not where npm puts it). A hook an earlier
  * Coherence wrote also looked in a `coherence` folder beside the project,
  * before the installed package; it is named by the check and at every
- * session start with the command that reinstalls it. Coherence's own
- * repository runs its own source instead, in its main checkout and in each
- * of its worktrees. The committed command names no one's absolute
- * path, so it is the same on every teammate's machine and the check agrees
- * across them. When nothing is found, or node is not on the PATH, the hook
+ * session start with the command that reinstalls it, as is a hook that runs
+ * the 0.x launcher. Coherence's own repository runs its own source instead,
+ * in its main checkout and in each of its worktrees. The committed command
+ * names no one's absolute path, so it is the same on every teammate's machine
+ * and the check agrees across them. When nothing is found, or node is not on
+ * the PATH, the hook
  * prints one line as a systemMessage (both hosts show it to the user), exits
  * 0, and does nothing else.
  *
@@ -56,13 +58,13 @@ import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
 import { DURABLE_FOLDERS, HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, SIBLING, isHost, type Host } from "./project.ts";
 import { nestedFolder, repositoryTop } from "../adapters/project-files.ts";
 import { registryOf } from "../adapters/project-config.ts";
-import { EARLIER_SEARCH, earlierMatcher, searchesCheckoutFirst } from "./version.ts";
+import { EARLIER_LAUNCHER, EARLIER_SEARCH, earlierMatcher, isLauncherHook, searchesCheckoutFirst } from "./version.ts";
 import { modInstalled } from "./mod-install.ts";
 import { isOwnHook } from "./hook-command.ts";
 import { CLAUDE_WRITER_MATCHER, writersUnmatched } from "./host-tools.ts";
 import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, IGNORE_FILE, IGNORE_TEXT, STATE_DIR, keepAttributes, keepIgnore, removeStateFiles, type AttributesAction, type IgnoreAction } from "./state-files.ts";
 export { DURABLE_FOLDERS, HOME_VAR, SIBLING };
-export { EARLIER_SEARCH, earlierHookLines, searchesCheckoutFirst } from "./version.ts";
+export { EARLIER_LAUNCHER, EARLIER_SEARCH, earlierHookLines, isLauncherHook, searchesCheckoutFirst } from "./version.ts";
 
 // Where each host keeps its settings, and which hosts there are, live in the project
 // layer: the hook reads them to know which tree it was installed for.
@@ -91,11 +93,13 @@ const START_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "SubagentStar
  * (`coherence`, bare, at the end of a path such as node_modules/.bin, or the
  * `$coherence` the located command runs) or this tool's own cli path
  * (`src/cli.ts`, as Coherence's own checkout wires it), followed by `hook
- * <Event>`. A stranger's cli.ts, or a program whose name merely contains
- * "coherence", is never ours and is never touched.
+ * <Event>`, or the launcher Coherence 0.x wrote (`.claude/coherence-hook` or
+ * `.codex/coherence-hook`, run with the event name). A stranger's cli.ts, or
+ * a program whose name merely contains "coherence", is never ours and is
+ * never touched.
  */
 function isMine(command: unknown): command is string {
-  return typeof command === "string" && HOOK_EVENTS.some((event) => isOwnHook(command, event));
+  return typeof command === "string" && HOOK_EVENTS.some((event) => isOwnHook(command, event) || isLauncherHook(command, event));
 }
 
 interface HookCommand {
@@ -525,6 +529,7 @@ export function formatCheck(result: CheckResult): string {
     else lines.push(`  ${d.event}: extra Coherence entry (${d.reason}): ${d.found}`);
   }
   if (result.drift.some((d) => d.kind !== "missing" && searchesCheckoutFirst(d.found))) lines.push(`  these hooks were ${EARLIER_SEARCH}; reinstall them`);
+  if (result.drift.some((d) => d.kind !== "missing" && isLauncherHook(d.found))) lines.push(`  these hooks were ${EARLIER_LAUNCHER}; reinstall them`);
   const unmatched = result.drift.flatMap((d) => (d.kind === "stale" ? (d.unmatched ?? []) : []));
   if (unmatched.length > 0) lines.push(`  ${earlierMatcher(unmatched)}; reinstall them`);
   lines.push(`converge with: hooks install --host ${result.host}`);
