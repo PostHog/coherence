@@ -17,9 +17,9 @@
  * here and does exactly the work it did before plugins.
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { createRequire } from "node:module";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { createRequire, registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { landsWithin } from "./within.ts";
 import { MANIFEST, OLDEST_PLUGIN_API, PLUGIN_API, SYNTAX_SLOTS, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
@@ -256,6 +256,52 @@ export function verifierForms(plugins: readonly LoadedPlugin[]): string[] {
   return plugins.flatMap((p) => (p.manifest.verifiers ?? []).map((v) => `[${v.form}] (${p.name})`));
 }
 
+/** How a plugin names the core: the package's plugin export (src/plugins/api.ts, built to dist/plugins/api.js). */
+export const PACKAGE_SPECIFIER = "@posthog/coherence/plugin";
+
+/** Every name a plugin may write for the plugin interface: the export, and the built file the package's dist/* export reaches it by. */
+const INTERFACE_SPECIFIERS: ReadonlySet<string> = new Set([PACKAGE_SPECIFIER, "@posthog/coherence/dist/plugins/api.js"]);
+
+/** The plugin interface of the Coherence running this process: api.ts beside this module in a checkout, api.js beside it installed. */
+const THIS_INTERFACE = new URL(`./api${extname(fileURLToPath(import.meta.url))}`, import.meta.url).href;
+
+/** The folders of the project plugins loaded in this process, as file URL prefixes, each as written and as its real path. */
+const pluginFolders = new Set<string>();
+let redirecting = false;
+
+/**
+ * Before a project's plugin code loads, its folder joins those whose imports
+ * of the plugin interface resolve to the interface of the Coherence that runs,
+ * never to the copy the plugin's own folder would find (a project's
+ * node_modules while a global install or a checkout runs): the interface's
+ * helpers read the registry this process filled, and a second copy holds an
+ * empty one, so languageOfFile and every helper like it would answer nothing,
+ * silently. The resolve hook is registered once per process (and thread),
+ * only when a plugin the project names loads; a file outside every plugin's
+ * folder resolves as it always did. A bundled plugin imports the interface by
+ * its path beside the core, so it needs none of this.
+ */
+export function throughThisCore(plugin: LoadedPlugin): void {
+  if (plugin.source === "bundled") return;
+  const folders = [plugin.dir];
+  try {
+    folders.push(realpathSync(plugin.dir));
+  } catch {
+    // A folder that is not there loads nothing; the load that follows says so.
+  }
+  for (const folder of folders) pluginFolders.add(`${pathToFileURL(folder).href.replace(/\/$/, "")}/`);
+  if (redirecting) return;
+  redirecting = true;
+  registerHooks({
+    resolve(specifier, context, nextResolve) {
+      if (!INTERFACE_SPECIFIERS.has(specifier)) return nextResolve(specifier, context);
+      const importer = context.parentURL;
+      if (importer === undefined || ![...pluginFolders].some((folder) => importer.startsWith(folder))) return nextResolve(specifier, context);
+      return { url: THIS_INTERFACE, shortCircuit: true };
+    },
+  });
+}
+
 const modules = new Map<string, Promise<PluginModule>>();
 
 /** The plugin's module, imported once per process and only when its code first runs. */
@@ -263,6 +309,7 @@ export function moduleOf(plugin: LoadedPlugin): Promise<PluginModule> {
   const module = plugin.manifest.module;
   if (module === undefined) return Promise.reject(new PluginRefused(`plugin ${plugin.name} has no module`));
   const path = resolve(plugin.dir, module);
+  throughThisCore(plugin);
   // Keyed by the file as it is now: Node keeps a module it loaded under its URL for the process's life, so an edited module is a new URL.
   let version = "missing";
   try {
@@ -302,6 +349,7 @@ export function moduleSyncOf(plugin: LoadedPlugin): PluginModule {
   const module = plugin.manifest.module;
   if (module === undefined) throw new PluginRefused(`plugin ${plugin.name} has no module`);
   const path = resolve(plugin.dir, module);
+  throughThisCore(plugin);
   const loaded = load(path) as { default?: unknown };
   if (!isRecord(loaded.default)) throw new PluginRefused(`plugin ${plugin.name}'s module ${path} has no default export of its adapter or verify`);
   refuseModuleSyntax(plugin, loaded.default);

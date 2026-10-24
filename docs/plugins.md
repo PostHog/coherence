@@ -101,6 +101,18 @@ package as `dist/plugins/api.d.ts`; a tsconfig that typechecks the folder
 needs `"allowImportingTsExtensions": true` with `noEmit`, and `@types/node`
 as a dev dependency, since the interface names Node's types.
 
+When Coherence loads a plugin a project names, the plugin's imports of
+`@posthog/coherence/plugin` (and of `@posthog/coherence/dist/plugins/api.js`)
+are answered by the Coherence that is running, whichever copy the plugin's
+folder would find on its own: the project's `node_modules`, while a global
+install, `npx`, another workspace's install or a checkout runs the check.
+Several helpers (`languageOfFile` among them) read what the running
+Coherence registered when it read the config, and a second copy has
+registered nothing, so a plugin reading through one would answer nothing
+without saying why. Only files inside a plugin's folder are redirected; the
+project's other files resolve the package as they always did. The installed
+copy still gives an editor and a typecheck the interface's types.
+
 The bundled plugins are the fullest examples, shipped in the package under
 `plugins/`: `go` for a language Coherence lacks, `rust` for an adapter over a
 language server with no npm package, `typescript`, `python` (with tach) and
@@ -321,7 +333,7 @@ one wanting changes a copy of it:
    project's config. The copy imports Coherence only through
    `@posthog/coherence/plugin`: the bundled plugins import the core through
    that one module (`src/plugins/api.ts`), so the copy reads from the
-   installed package what it read bundled. The copy is TypeScript run as
+   Coherence that runs it what it read bundled. The copy is TypeScript run as
    written, its imports naming `.ts` files: it needs Node 22.18 or later
    (which runs TypeScript without a flag), and a project that typechecks it
    needs `"allowImportingTsExtensions": true` (with `noEmit`) in the
