@@ -158,6 +158,8 @@ test("sense review is asked only where meaning is at risk: more than one of the 
     // A word Coherence rejected for its own scope concept, beside the adopter's scope: an ordinary word of the project's.
     const tool = rejectedNames(await loadLexicon(COHERENCE_LEXICON)).find((n) => n.concept === "scope" && !n.name.includes(" "))!.name;
     writeFileSync(join(root, "staff/notes.md"), `The scope of a shift is one day.\nThe scope of a shift is its ${tool}.\n`);
+    const Tool = tool[0]!.toUpperCase() + tool.slice(1);
+    writeFileSync(join(root, "books/floor.md"), `We open the ${Tool} at dawn.\nEach night the ${Tool} is shut.\nNobody climbs the ${Tool} twice.\n`);
     record(root, "d-1", "narrow the scope to one shift");
     record(root, "d-2", "retry the chase adapter after it broke");
     const report = await lexiconCoverage(root);
@@ -170,6 +172,7 @@ test("sense review is asked only where meaning is at risk: more than one of the 
       assert.equal(risk(term, component), undefined, `${term} in ${component}: a word Coherence also uses is the project's word, in its code, prose, spec grammar and records alike`);
     assert.equal(report.terms.find((t) => t.term === "scope")?.layer, "coherence", "Coherence's own name still resolves, as a reference");
     assert.notEqual(report.terms.find((t) => t.term === tool.toLowerCase())?.state, "rejected", `${tool}, which Coherence rejected for its own concept, is never labelled rejected in an adopter`);
+    assert.ok(!candidates(report).includes(tool.toLowerCase()), `nor offered as a term that lacks a definition, recurring as the project's name: ${candidates(report).join(", ")}`);
     const at = attention(report).senses.map((s) => `${s.term}@${s.component}`).sort();
     assert.deepEqual(at, ["exposure@sales", "unit basis@stock"]);
     assert.equal(report.totals.unreviewedContexts, 2, "only at-risk contexts await review");

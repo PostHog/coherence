@@ -790,7 +790,9 @@ export async function runCheck(options: CheckOptions): Promise<CheckReport> {
   }
   // A well-known name (Python, Pyright, the project's own name) needs no definition, so it is never an unknown noun.
   const famous = wellKnown(await vocabularyFacts(root), [options.coherence.project, options.project?.project].filter((n): n is string => n !== undefined));
-  const unknown = unknownNouns(files, new Set([...accepted, ...famous.any]), new Set(names.byPhrase.keys()), famous);
+  // A word Coherence rejected for one of its own concepts is no finding in an adopter, and no unknown noun either: the project's word, unremarked.
+  const unnamed = new Set([...names.byPhrase.keys(), ...inForce.coherence.map((n) => normalizeTerm(n.name))]);
+  const unknown = unknownNouns(files, new Set([...accepted, ...famous.any]), unnamed, famous);
   const report: CheckReport = { files: files.length, rejected, unknown, unreadable };
   const baseline = own ? undefined : readBaseline(root);
   if (baseline !== undefined) {

@@ -550,6 +550,8 @@ export async function lexiconReading(
   const rejected = new Map(
     (own ? rejectedNames(coherence) : []).map((r) => [clean(r.name), r]),
   );
+  // In an adopter they are no candidates either: the project's words, unremarked.
+  const unremarked = new Set(own ? [] : rejectedNames(coherence).map((r) => clean(r.name)));
   if (project) {
     table(project, "project", known, propertyOwners, projectSenses);
     for (const r of rejectedNames(project)) rejected.set(clean(r.name), r);
@@ -616,7 +618,7 @@ export async function lexiconReading(
       if (site && !known.has(term) && !rejected.has(term)) add(term, site);
       return;
     }
-    if (confusables.has(term) || isWellKnown(famous, term, n.spelling)) return;
+    if (confusables.has(term) || unremarked.has(term) || isWellKnown(famous, term, n.spelling)) return;
     // Grammar, never a name: a phrase made only of function words is refused even capitalized ("Via", "And Or").
     if (term.split(" ").every((w) => FUNCTION_WORD_SET.has(w))) return;
     // A proper noun is a name even when the word is common; any other source must not be common words alone.

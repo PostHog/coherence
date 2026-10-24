@@ -293,6 +293,7 @@ test("Coherence's rejected names bind only in Coherence's own repository: in an 
   const dir = await adopter({
     "lexicon.json": JSON.stringify(projectLexicon),
     "notes.md": `The ${REJ} opens at dawn; the doohickey is gone.\n`,
+    "guide.md": [`We open the ${Rej} at dawn.`, `Each night the ${Rej} is shut.`, `Nobody climbs the ${Rej} twice.`, ""].join("\n"),
     "src/a.ts": `const ${REJ}Keeper = 1;\n`,
     "src/src.spec.md": [`# Src`, "", "## invariants", "", `- ${REJ} holds: the ${REJ} opens only for members.`, `  because: members only`, `  checklist: input-validation dismissed: the ${REJ} validates`, ""].join("\n"),
     "src/grammar.spec.md": [`# Grammar`, "", `## ${REJ}s`, `  ${REJ}: a key in the tool's grammar`, ""].join("\n"),
@@ -303,6 +304,7 @@ test("Coherence's rejected names bind only in Coherence's own repository: in an 
     const lexicons = { coherence, project: await loadLexicon(join(dir, "lexicon.json")) };
     const out = await runCheck({ root: dir, ...lexicons });
     assert.deepEqual(out.rejected.map((f) => [f.file, f.name]), [["notes.md", "doohickey"]], "only the project's own rejected name is a finding, anywhere");
+    assert.deepEqual(out.unknown.map((u) => u.term), [], "and a word Coherence rejected, recurring as the project's name, is no unknown noun either");
     const text = formatReport(out);
     assert.ok(!text.includes(REJ) && !text.includes(ALT), `the report never names a word Coherence rejected for its own concepts:\n${text}`);
     assert.ok(!/ADVISORY|Coherence name/.test(text), "and counts none of them");
