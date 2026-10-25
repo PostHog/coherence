@@ -158,7 +158,7 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
     const was = held === 1 ? "was" : "were";
     lines.push(`**Spec gaps:** ${plural(open.length, "entrance")} ${takes} input from outside this code (trust outside or unknown), and the spec names no check on that input.${held === 0 ? "" : ` ${held} more ${was} already open when Coherence was adopted, so ${held === 1 ? "it is" : "they are"} not listed.`}`, "");
     for (const g of open) lines.push(`- \`${g.specPath}\` entrance **${cell(g.name)}** (trust ${cell(g.trust.join(", ") || "unknown")}), route: ${cell(g.route.stops.join(" -> "))}${mark(g.file, g.specPath)}`);
-    if (open.length > 0) lines.push("", `To close a gap, write in its spec what checks that input. In spec terms: ${CLOSE_WAYS}. \`coherence scaffold control "<entrance>"\` proposes the line.`);
+    if (open.length > 0) lines.push("", `To close a gap, write in its spec what checks that input. In spec terms: ${cell(CLOSE_WAYS)}. \`coherence scaffold control "<entrance>"\` proposes the line.`);
     lines.push("");
   }
 
@@ -187,17 +187,23 @@ function order(e: RunEntry): number {
 }
 
 /** Whether there is anything to fix, and which findings this pull request's own files hold, when the report knows them. */
-function findingsLead(projects: readonly ProjectReport[], findings: number, touched: number, unfinished: readonly string[]): string[] {
+/** Where the report read changed files: each project, and the registry top when it has problems of its own. */
+interface ChangedWhere {
+  where: string;
+  changed: ChangedRead | undefined;
+}
+
+function findingsLead(projects: readonly ProjectReport[], reads: readonly ChangedWhere[], findings: number, touched: number, unfinished: readonly string[]): string[] {
   if (findings === 0) {
     if (unfinished.length > 0 || projects.some((p) => "unread" in p.gaps)) return ["Coherence could not check everything, so this might not list every finding.", ""];
     return ["Nothing to fix.", ""];
   }
-  const changed = projects.filter((p) => p.changed !== undefined);
+  const changed = reads.filter((r) => r.changed !== undefined);
   if (changed.length === 0) return ["These findings do not fail this check. Some can come from files this pull request did not change.", ""];
   const lines = ["These findings do not fail this check.", ""];
-  const allRead = changed.every((p) => "files" in p.changed!);
-  for (const p of changed) if ("unread" in p.changed!) lines.push(`Coherence could not tell which files this pull request changed${p.name === "." ? "" : ` in ${cell(p.name)}`}: ${cell(p.changed.unread)}.`, "");
-  if (changed.some((p) => "files" in p.changed!)) {
+  const allRead = changed.every((r) => "files" in r.changed!);
+  for (const r of changed) if ("unread" in r.changed!) lines.push(`Coherence could not tell which files this pull request changed${r.where}: ${cell(r.changed.unread)}.`, "");
+  if (changed.some((r) => "files" in r.changed!)) {
     if (touched === 0) lines.push(allRead ? "None of these findings are in files this pull request changed." : "None of the findings Coherence could check are in files this pull request changed.", "");
     else if (touched === 1) lines.push("1 of these findings is in a file this pull request changed. It is marked below.", "");
     else lines.push(`${touched} of these findings are in files this pull request changed. They are marked below.`, "");
@@ -233,7 +239,9 @@ export function renderReport(
   const guards = projects.reduce((n, p) => n + (p.model.defects?.guardFailures.length ?? 0), 0);
   const head = [REPORT_MARKER, "## Coherence", ""];
   head.push(`**${plural(problems, "spec problem")} · ${plural(fails, "failing chokepoint")} · ${plural(gaps, "spec gap")} · ${plural(guards, "guard failure")}**${projects.length > 1 ? ` across ${plural(projects.length, "project")}` : ""}`, "");
-  head.push(...findingsLead(projects, problems + fails + gaps + guards, touched, unfinished));
+  const reads: ChangedWhere[] = projects.map((p) => ({ where: p.name === "." ? "" : ` in ${cell(p.name)}`, changed: p.changed }));
+  if (registry !== undefined && registry.problems.length > 0) reads.push({ where: " at the registry top", changed: registry.changed });
+  head.push(...findingsLead(projects, reads, problems + fails + gaps + guards, touched, unfinished));
   if (unfinished.length > 0) {
     head.push("> [!WARNING]", "> Coherence did not finish, so this report is incomplete and the check fails:");
     for (const line of unfinished) head.push(`> - ${cell(line)}`);
