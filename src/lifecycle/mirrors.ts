@@ -416,7 +416,8 @@ function readLiteral(root: string, file: string, name: string): { literal: Liter
   if (!existsSync(absolute)) return { gone: `${file} is gone` };
   // A list in a language whose plugin fills the lists slot is read by that plugin's reader; any other file, by the TypeScript reader here.
   const language = languageOfFile(file);
-  const reader = (language === undefined ? undefined : syntaxOf(language, "lists")) ?? literalOf;
+  const provided = language === undefined ? undefined : syntaxOf(language, "lists");
+  const reader = typeof provided === "function" ? provided : literalOf;
   const literal = reader(readProjectText(absolute, "source"), name);
   if (literal === undefined) return { gone: `${name} is no longer set to an array or object literal at the top of ${file}` };
   return { literal };
