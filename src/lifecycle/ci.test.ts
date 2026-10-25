@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { sessionFiles } from "../journal/shard-fixture.ts";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -113,7 +114,7 @@ test("ci install writes the comment mode for pnpm: findings never fail the job, 
   assert.equal(steps[0], "pnpm install --frozen-lockfile");
   assert.equal(steps[1], "pnpm exec coherence spec --check || [ $? -eq 1 ]", "a spec problem is a finding; any other exit breaks the job");
   assert.equal(steps[2], 'pnpm exec coherence run --form chokepoint --no-server --session "ci-${{ github.run_id }}" --agent ci || [ $? -eq 1 ]');
-  assert.match(steps[3]!, /pnpm exec coherence ci report --session "ci-\$\{\{ github.run_id \}\}" > "\$RUNNER_TEMP\/coherence-report.md" \|\| status=\$\?/);
+  assert.match(steps[3]!, /pnpm exec coherence ci report --session "ci-\$\{\{ github.run_id \}\}" --base "\$\{\{ github.event.pull_request.base.sha \}\}" > "\$RUNNER_TEMP\/coherence-report.md" \|\| status=\$\?/);
   assert.match(steps[3]!, />> "\$GITHUB_STEP_SUMMARY"\nexit "\$status"$/, "the report reaches the job summary, then its exit stands");
   assert.ok(steps[4]!.includes(`startswith("${REPORT_MARKER}")`), "the comment is found by the report's marker");
   assert.match(steps[4]!, /gh api --method PATCH "repos\/\$REPO\/issues\/comments\/\$id" -F body=@"\$body"/, "an existing comment is updated in place");
@@ -312,7 +313,7 @@ const UNNAMED = "# a\n\nThe a product.\n\n## invariants\n- ROWS leave only throu
 const WEBHOOK: Gap = { component: ".", name: "webhook", specPath: "A.spec.md", handler: "hook in src/hook.ts", file: "src/hook.ts", trust: ["outside"], route: { id: "r", first: "webhook", entrances: 1, stops: [".", "store"] } };
 
 describe("ci report says what each finding means and what to do", () => {
-  for (const { finding, spec, runs, gaps, baselined, says } of [
+  for (const { finding, spec, runs, gaps, baselined, changed, says } of [
     { finding: "nothing", spec: SPEC("a"), runs: [{ name: "a door" }], gaps: [], baselined: [], says: [/\*\*\n\nNothing to fix\.\n/] },
     {
       finding: "a spec problem",
@@ -334,14 +335,42 @@ describe("ci report says what each finding means and what to do", () => {
         /\nTo close a gap, add one of these to its spec: `guard: <chokepoint>` when a verified chokepoint checks the input; the entrance's name on the `entrances:` line of an invariant that covers it; or `control: none — <reason>` when it needs no check\. `coherence scaffold control "<entrance>"` proposes the line\.\n/,
       ],
     },
-  ] satisfies { finding: string; spec: string; runs: Partial<RunEntry>[]; gaps: Gap[]; baselined: string[]; says: RegExp[] }[]) {
+    {
+      finding: "a spec problem in a file the pull request changed",
+      spec: UNNAMED,
+      runs: [],
+      gaps: [],
+      baselined: [],
+      changed: ["A.spec.md"],
+      says: [/\n\n1 of these findings is in a file this pull request changed\. It is marked below\.\n/, /- `A\.spec\.md:6` [^\n]+ · \*\*changed in this pull request\*\*\n/],
+    },
+    { finding: "a spec gap whose handler the pull request changed", spec: SPEC("a"), runs: [{ name: "a door" }], gaps: [WEBHOOK], baselined: [], changed: ["src/hook.ts"], says: [/route: \. -\\> store · \*\*changed in this pull request\*\*\n/] },
+    { finding: "findings in no file the pull request changed", spec: UNNAMED, runs: [], gaps: [WEBHOOK], baselined: [], changed: ["src/other.ts"], says: [/\n\nNone of these findings are in files this pull request changed\.\n/] },
+    { finding: "changed files git could not list", spec: UNNAMED, runs: [], gaps: [], baselined: [], changed: "git diff main failed: bad revision", says: [/\n\nCoherence could not tell which files this pull request changed: git diff main failed: bad revision\.\n/] },
+  ] satisfies { finding: string; spec: string; runs: Partial<RunEntry>[]; gaps: Gap[]; baselined: string[]; changed?: string[] | string; says: RegExp[] }[]) {
     test(finding, () => {
       const root = repository({ "A.spec.md": spec });
       const model = loadSpecModel(root);
-      const report = renderReport([{ name: ".", model, runs: [record("ci-7", runs)], gaps: { gaps }, baselined: new Set(baselined.map((n) => `.\u0000${n}`)) }], "ci-7", undefined);
+      const report = renderReport([{ name: ".", model, runs: [record("ci-7", runs)], gaps: { gaps }, baselined: new Set(baselined.map((n) => `.\u0000${n}`)), changed: changed === undefined ? undefined : typeof changed === "string" ? { unread: changed } : { files: new Set(changed) } }], "ci-7", undefined);
       for (const said of says) assert.match(report.markdown, said);
     });
   }
+
+  test("ci report --base reads the files changed since that commit", async () => {
+    const root = repository({ "A.spec.md": SPEC("a") });
+    const git = (...args: string[]): string => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: root, encoding: "utf8" }).trim();
+    rmSync(join(root, ".git"), { recursive: true });
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-q", "-m", "base");
+    const base = git("rev-parse", "HEAD");
+    writeFileSync(join(root, "A.spec.md"), UNNAMED);
+    git("commit", "-q", "-am", "the change");
+    appendRun(root, record("ci-7", []));
+    const said = capture(root);
+    assert.equal(await ciReportCommand(["--session", "ci-7", "--base", base], said.io, async () => ({ gaps: [] })), 0);
+    assert.match(said.out.join("\n"), /1 of these findings is in a file this pull request changed[\s\S]*- `A\.spec\.md:6` [^\n]+ · \*\*changed in this pull request\*\*/);
+  });
 });
 
 test("run at a registry's top runs each listed project from its own folder, its records in each", async () => {

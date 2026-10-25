@@ -6,7 +6,7 @@
  * updated in place on every push (ci-report.ts builds it).
  *
  *   coherence ci install --host github --mode fail|comment [--write]
- *   coherence ci report --session <id>
+ *   coherence ci report --session <id> [--base <commit>]
  *
  * Install prints the workflow it would write, and with --write writes
  * .github/workflows/coherence.yml at the repository top; a file already
@@ -47,7 +47,7 @@ export const MODE_TEXT: Record<CiMode, string> = {
 
 export const CI_USAGE = [
   `  ci install --host <${CI_HOSTS.join("|")}> --mode <${CI_MODES.join("|")}> [--write]   the workflow that runs Coherence on every pull request: --mode fail ${MODE_TEXT.fail}; --mode comment ${MODE_TEXT.comment}; printed, and with --write written to ${WORKFLOW_PATH.split(sep).join("/")}, never over a file already there`,
-  "  ci report --session <id>   the pull request report as Markdown: problems, chokepoint verdicts, spec gaps and guard failures for every project; exit 1 when the session's run is missing or a chokepoint was not run",
+  "  ci report --session <id> [--base <commit>]   the pull request report as Markdown: problems, chokepoint verdicts, spec gaps and guard failures for every project, marking those in files changed since --base; exit 1 when the session's run is missing or a chokepoint was not run",
 ].join("\n");
 
 /** The actions the workflow uses, pinned by commit; the comment names the release. */
@@ -347,7 +347,7 @@ export function workflowText(plan: CiPlan): string {
     ...where,
     "        run: |",
     "          status=0",
-    `          ${cli} ci report --session "ci-\${{ github.run_id }}" > "$RUNNER_TEMP/coherence-report.md" || status=$?`,
+    `          ${cli} ci report --session "ci-\${{ github.run_id }}" --base "\${{ github.event.pull_request.base.sha }}" > "$RUNNER_TEMP/coherence-report.md" || status=$?`,
     '          cat "$RUNNER_TEMP/coherence-report.md" >> "$GITHUB_STEP_SUMMARY"',
     '          exit "$status"',
     "",

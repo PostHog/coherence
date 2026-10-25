@@ -19,12 +19,16 @@ import type { Io } from "../journal/cli.ts";
 import { readComponentInterfaces } from "../readings/scope/component-interfaces.ts";
 import { currentGaps, gapsOf, readAndRecord, readGapBaseline, structureState, type Gap } from "../readings/scope/gaps.ts";
 import { flowOf } from "../readings/scope/structure-flow.ts";
+import { changedSince } from "../observation/observed.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { CI_USAGE, REPORT_MARKER } from "./ci.ts";
 import { mayHaveGaps } from "./hook.ts";
 
 /** The spec gaps of one project, or why they are not known. */
 export type GapsRead = { gaps: Gap[] } | { unread: string };
+
+/** The files a pull request changed, relative to the project, or why they are not known. */
+export type ChangedRead = { files: Set<string> } | { unread: string };
 
 /** How the report learns a project's gaps; a test hands in one that needs no language server. */
 export type GapReader = (root: string, model: SpecModel) => Promise<GapsRead>;
@@ -51,6 +55,8 @@ export interface ProjectReport {
   gaps: GapsRead;
   /** Gap keys the adoption baseline holds. */
   baselined: Set<string>;
+  /** Undefined when the report was given no base to diff against. */
+  changed?: ChangedRead | undefined;
 }
 
 export interface Report {
@@ -90,10 +96,20 @@ function bullet(e: RunEntry): string {
 
 const MARK: Record<string, string> = { pass: "✓", fail: "✕", "not run": "○" };
 
+const CHANGED_HERE = " · **changed in this pull request**";
+
+
 /** One project's section, and why its part did not finish. */
-function projectSection(p: ProjectReport, session: string, heading: boolean): { lines: string[]; unfinished: string[] } {
+function projectSection(p: ProjectReport, session: string, heading: boolean): { lines: string[]; unfinished: string[]; touched: number } {
   const lines: string[] = [];
   const unfinished: string[] = [];
+  let touched = 0;
+  const changed = p.changed !== undefined && "files" in p.changed ? p.changed.files : new Set<string>();
+  const mark = (...files: (string | undefined)[]): string => {
+    if (!files.some((f) => f !== undefined && changed.has(f))) return "";
+    touched++;
+    return CHANGED_HERE;
+  };
   const where = p.name === "." ? "" : ` in ${p.name}`;
   const c = p.model.counts;
   if (heading) lines.push(`### ${cell(p.name)}`, "");
@@ -101,7 +117,7 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
 
   if (p.model.problems.length > 0) {
     lines.push(`**Spec problems** (spec --check${where}): lines Coherence cannot read as written. Fix each one, then run \`coherence spec --check\` until it finds 0 problems.`, "");
-    for (const problem of p.model.problems) lines.push(`- \`${problem.file}:${problem.line}\` ${cell(problem.message)}`);
+    for (const problem of p.model.problems) lines.push(`- \`${problem.file}:${problem.line}\` ${cell(problem.message)}${mark(problem.file)}`);
     lines.push("");
   }
 
@@ -117,7 +133,7 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
     lines.push(`**Chokepoints:** ${entries.length - fails - notRun.length} pass, ${fails} fail, ${notRun.length} not run`, "");
     if (fails > 0) lines.push("A chokepoint fails when code reaches what it protects without going through it. Send each bypass below through the chokepoint, or fix the spec if the rule is wrong.", "");
     for (const e of [...entries].sort((a, b) => order(a) - order(b))) {
-      lines.push(`- ${MARK[e.verdict]} \`${bullet(e)}\` ${e.grade ?? e.verdict}: ${cell(e.reason)}`);
+      lines.push(`- ${MARK[e.verdict]} \`${bullet(e)}\` ${e.grade ?? e.verdict}: ${cell(e.reason)}${e.verdict === "fail" ? mark(...e.bypasses.map((b) => b.file)) : ""}`);
       for (const b of e.bypasses.slice(0, BYPASSES)) lines.push(`  - bypass \`${b.file}:${b.line}\` in ${cell(b.symbol)}`);
       if (e.bypasses.length > BYPASSES) lines.push(`  - and ${e.bypasses.length - BYPASSES} more; run --form chokepoint names them all`);
     }
@@ -133,7 +149,7 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
     const takes = open.length === 1 ? "takes" : "take";
     const was = held === 1 ? "was" : "were";
     lines.push(`**Spec gaps:** ${plural(open.length, "entrance")} ${takes} input from outside this code (trust outside or unknown), and the spec names no check on that input.${held === 0 ? "" : ` ${held} more ${was} already open when Coherence was adopted, so ${held === 1 ? "it is" : "they are"} not listed.`}`, "");
-    for (const g of open) lines.push(`- \`${g.specPath}\` entrance **${cell(g.name)}** (trust ${cell(g.trust.join(", ") || "unknown")}), route: ${cell(g.route.stops.join(" -> "))}`);
+    for (const g of open) lines.push(`- \`${g.specPath}\` entrance **${cell(g.name)}** (trust ${cell(g.trust.join(", ") || "unknown")}), route: ${cell(g.route.stops.join(" -> "))}${mark(g.file, g.specPath)}`);
     if (open.length > 0) lines.push("", "To close a gap, add one of these to its spec: `guard: <chokepoint>` when a verified chokepoint checks the input; the entrance's name on the `entrances:` line of an invariant that covers it; or `control: none — <reason>` when it needs no check. `coherence scaffold control \"<entrance>\"` proposes the line.");
     lines.push("");
   }
@@ -144,7 +160,7 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
     for (const g of failures) lines.push(`- ${g.id} in class ${cell(g.class)}, which ${cell(g.guard)} has guarded since ${g.resolution} closed ${g.guardedBy}`);
     lines.push("");
   }
-  return { lines, unfinished };
+  return { lines, unfinished, touched };
 }
 
 /** How many bypass sites one verdict lists before it counts the rest. */
@@ -155,14 +171,31 @@ function order(e: RunEntry): number {
   return e.verdict === "fail" ? 0 : e.verdict === "not run" ? 1 : 2;
 }
 
+/** Whether there is anything to fix, and which findings this pull request's own files hold, when the report knows them. */
+function findingsLead(projects: readonly ProjectReport[], findings: number, touched: number): string[] {
+  if (findings === 0) return ["Nothing to fix.", ""];
+  const changed = projects.filter((p) => p.changed !== undefined);
+  if (changed.length === 0) return ["These findings do not fail this check. Some can come from files this pull request did not change.", ""];
+  const lines = ["These findings do not fail this check.", ""];
+  for (const p of changed) if ("unread" in p.changed!) lines.push(`Coherence could not tell which files this pull request changed${p.name === "." ? "" : ` in ${cell(p.name)}`}: ${cell(p.changed.unread)}.`, "");
+  if (changed.some((p) => "files" in p.changed!)) {
+    if (touched === 0) lines.push("None of these findings are in files this pull request changed.", "");
+    else if (touched === 1) lines.push("1 of these findings is in a file this pull request changed. It is marked below.", "");
+    else lines.push(`${touched} of these findings are in files this pull request changed. They are marked below.`, "");
+  }
+  return lines;
+}
+
 /** The report over the projects, with the registry's own problems when the report ran at its top. */
 export function renderReport(projects: readonly ProjectReport[], session: string, registry: { problems: { file: string; message: string }[] } | undefined): Report {
   const unfinished: string[] = [];
   const sections: string[] = [];
+  let touched = 0;
   for (const p of projects) {
     const section = projectSection(p, session, projects.length > 1 || p.name !== ".");
     sections.push(...section.lines);
     unfinished.push(...section.unfinished);
+    touched += section.touched;
   }
   const problems = projects.reduce((n, p) => n + p.model.problems.length, 0) + (registry?.problems.length ?? 0);
   const fails = projects.reduce((n, p) => n + chokepointEntries(p.runs).filter((e) => e.verdict === "fail").length, 0);
@@ -170,7 +203,7 @@ export function renderReport(projects: readonly ProjectReport[], session: string
   const guards = projects.reduce((n, p) => n + (p.model.defects?.guardFailures.length ?? 0), 0);
   const head = [REPORT_MARKER, "## Coherence", ""];
   head.push(`**${plural(problems, "spec problem")} · ${plural(fails, "failing chokepoint")} · ${plural(gaps, "spec gap")} · ${plural(guards, "guard failure")}**${projects.length > 1 ? ` across ${plural(projects.length, "project")}` : ""}`, "");
-  head.push(problems + fails + gaps + guards === 0 ? "Nothing to fix." : "These findings do not fail this check. Some can come from files this pull request did not change.", "");
+  head.push(...findingsLead(projects, problems + fails + gaps + guards, touched));
   if (unfinished.length > 0) {
     head.push("> [!WARNING]", "> Coherence did not finish, so this report is incomplete and the check fails:");
     for (const line of unfinished) head.push(`> - ${cell(line)}`);
@@ -186,7 +219,7 @@ export function renderReport(projects: readonly ProjectReport[], session: string
 }
 
 /** Build the report for `root`: every project a registry lists when `root` is its top, else `root` itself. */
-export async function buildReport(given: string, session: string, readGapsOf: GapReader = readGaps): Promise<Report> {
+export async function buildReport(given: string, session: string, readGapsOf: GapReader = readGaps, base?: string): Promise<Report> {
   const root = realOr(given);
   const registry = registryOf(root);
   // At a registry's top, which is no project of its own, the report covers every listed project, as spec --check and run do there.
@@ -203,18 +236,26 @@ export async function buildReport(given: string, session: string, readGapsOf: Ga
       runs,
       gaps: await readGapsOf(project, model),
       baselined: baseline?.entrances ?? new Set(),
+      changed: base === undefined ? undefined : changedRead(changedSince(project, base)),
     });
   }
   return renderReport(projects, session, atTop ? { problems: registryProblems(registry.top) } : undefined);
 }
 
-/** ci report --session <id>: the Markdown on stdout; exit 1 when Coherence did not finish. */
+function changedRead(files: string[] | string): ChangedRead {
+  return typeof files === "string" ? { unread: files } : { files: new Set(files) };
+}
+
+/** ci report --session <id> [--base <commit>]: the Markdown on stdout; exit 1 when Coherence did not finish. */
 export async function ciReportCommand(argv: string[], io: Io, readGapsOf: GapReader = readGaps): Promise<number> {
   let session: string | undefined;
+  let base: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--session") session = argv[++i];
     else if (arg.startsWith("--session=")) session = arg.slice("--session=".length);
+    else if (arg === "--base") base = argv[++i];
+    else if (arg.startsWith("--base=")) base = arg.slice("--base=".length);
     else {
       io.err(`ci report: unexpected ${arg}\n${CI_USAGE}`);
       return 64;
@@ -224,7 +265,7 @@ export async function ciReportCommand(argv: string[], io: Io, readGapsOf: GapRea
     io.err(`ci report: --session names the run's session, as the chokepoint run recorded it\n${CI_USAGE}`);
     return 64;
   }
-  const report = await buildReport(io.cwd, session, readGapsOf);
+  const report = await buildReport(io.cwd, session, readGapsOf, base);
   io.out(report.markdown.trimEnd());
   for (const line of report.unfinished) io.err(`ci report: ${line}`);
   return report.unfinished.length > 0 ? 1 : 0;

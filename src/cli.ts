@@ -25,7 +25,7 @@
  *   coherence hooks --check --host <host>           exit 1 with each event's drift from what install would write
  *   coherence hooks status             the wiring per agent host and what each event delivers for this project
  *   coherence ci install --host github --mode fail|comment [--write]   the workflow that runs Coherence on every pull request (ci.ts)
- *   coherence ci report --session <id>   the pull request report as Markdown (ci-report.ts)
+ *   coherence ci report --session <id> [--base <commit>]   the pull request report as Markdown (ci-report.ts)
  *   coherence telemetry on | off | status | show | reset-id   opt-in fleet telemetry (telemetry.ts)
  *   coherence version (--version, -v)  the running version, where it is, and the newest published one (version.ts)
  *   coherence help (--help, -h)        this usage, on stdout
