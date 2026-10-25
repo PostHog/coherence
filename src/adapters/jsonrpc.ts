@@ -43,7 +43,10 @@ export class JsonRpcClient {
     child.stdout!.on("data", (chunk: Buffer) => this.receive(chunk));
     child.on("exit", (code, signal) => this.fail(new Error(`language server exited (${code ?? signal})`)));
     child.on("error", (error) => this.fail(error));
-    child.stdin!.on("error", (error) => this.fail(error));
+    child.stdin!.on("error", (error) => {
+      this.fail(error);
+      this.kill();
+    });
   }
 
   private fail(error: Error): void {
