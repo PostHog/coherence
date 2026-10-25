@@ -604,7 +604,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
           const head = bullet[1]!;
           const colon = head.indexOf(":");
           if (colon <= 0) {
-            problem(line, "an invariant bullet starts with <name>: <sentence>");
+            problem(line, "an invariant bullet starts with a short name and a colon, as in \"- <name>: <sentence>\"");
             current = { name: head.trim(), sentence: "", line, fields: [] };
             return;
           }

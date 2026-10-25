@@ -199,7 +199,7 @@ describe("a cited commit is no commit only where git can tell", () => {
         git(tmpdir(), "clone", "-q", "--depth", "1", `file://${origin}`, root);
       }
       const messages = loadSpecModel(root, { runs: false }).problems.map((p) => p.message);
-      assert.equal(messages.some((m) => /which is no commit in this repository/.test(m)), problem, messages.join("\n"));
+      assert.equal(messages.some((m) => /^practice "[^"]+" cites \S+, but no branch in this repository has that commit\. If its pull request was squash-merged, cite the merge commit instead\.$/.test(m)), problem, messages.join("\n"));
     });
   }
 });

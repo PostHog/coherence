@@ -531,7 +531,7 @@ node src/cli.ts hooks uninstall --host claude|codex   # removes only Coherence's
 node src/cli.ts hooks --check --host claude|codex     # exit 1 naming each event missing, stale, or extra against what install would write
 node src/cli.ts hooks status                          # the wiring per agent host, and what each event delivers for this project
 node src/cli.ts ci install --host github --mode fail|comment [--write]   # the workflow that runs Coherence on every pull request; never over a file already there
-node src/cli.ts ci report --session <id>              # the pull request report as Markdown, from that session's run
+node src/cli.ts ci report --session <id> [--base <commit>]   # the pull request report as Markdown, from that session's run; --base marks findings in files changed since that commit (on GitHub Actions, the pull request's base branch by default)
 npm run spec:check                        # the spec check alone
 npm test                                  # typecheck, tests, vocabulary check, spec check; any one failing fails the tree
 ```
@@ -624,8 +624,9 @@ repository all build. `node-llama-cpp` is an optional peer: a project that
 wants the local embedding pass installs it beside Coherence.
 
 To release, merge a change that bumps `version` in package.json, and the same
-`version` in `mods/coherence/.claude-plugin/plugin.json` (a test holds them
-equal), into main.
+`version` in `mods/coherence/.claude-plugin/plugin.json` and in each bundled
+plugin that ships at the package's version (`plugins/declared`, `python`,
+`rust` and `typescript`; tests hold them equal), into main.
 The Release workflow sees a version npm does not have, publishes it through
 npm trusted publishing from `.github/workflows/release.yml` in the `Release`
 environment, with provenance and no stored token, and tags it as a GitHub

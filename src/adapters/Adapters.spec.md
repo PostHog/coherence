@@ -19,6 +19,14 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: project-source -> instrument
   refuted: left an open document to the file watcher on forget, as the adapter did before -> "the check reads the current disk text after a forget, with the instrument's watcher blind to the file: a loop of edit-then-check yields zero wrong verdicts" went red in enforcement.test.ts with two of six verdicts answered from pre-edit text; restored, green (2026-09-18)
   kinds: none
+- a broken pipe is a server gone: A write the language server can no longer read fails the client the way the server exiting does, rejecting every pending request and refusing new ones, ends the server process, since no caller kills a client that is no longer alive, and never raises an uncaught error in the process that talks to it.
+  over: a server that closes its input while it still runs, then notifications and a request sent to it
+  via: a write to a server that closed its input fails the client and ends the server, never the process
+  because: the TypeScript adapter's close sends exit after shutdown; when the server had already gone, the write's EPIPE went to a stream with no error listener and crashed a CI test run in code the run was not about
+  crossing: instrument -> instrument
+  refuted: removed the stdin error listener in jsonrpc.ts -> the test, then named "a write to a server that closed its input fails the client, never the process", went red in jsonrpc.test.ts with an uncaught EPIPE; restored byte for byte, green (2026-10-25)
+  refuted: left the server running after its input pipe failed in jsonrpc.ts -> "a write to a server that closed its input fails the client and ends the server, never the process" went red in jsonrpc.test.ts, the process still there; restored byte for byte, green (2026-10-25)
+  kinds: none
 - every site is a reference: Every site the language server reports for the protected thing is a reference, an import or re-export specifier included; the adapter reports the syntactic form it read at the site and never exempts one, and the check alone decides what the form means.
   over: every reference site either adapter reports, import and export specifiers included
   via: every site the language server reports is a reference: a bypass beneath a semicolon-less bare import is a bypass, and an import outside the chokepoint is one too

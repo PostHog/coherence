@@ -41,16 +41,18 @@ export class JsonRpcClient {
   constructor(child: ChildProcess) {
     this.child = child;
     child.stdout!.on("data", (chunk: Buffer) => this.receive(chunk));
-    child.on("exit", (code, signal) => {
-      this.exited = new Error(`language server exited (${code ?? signal})`);
-      for (const p of this.pending.values()) p.reject(this.exited);
-      this.pending.clear();
+    child.on("exit", (code, signal) => this.fail(new Error(`language server exited (${code ?? signal})`)));
+    child.on("error", (error) => this.fail(error));
+    child.stdin!.on("error", (error) => {
+      this.fail(error);
+      this.kill();
     });
-    child.on("error", (error) => {
-      this.exited = error;
-      for (const p of this.pending.values()) p.reject(error);
-      this.pending.clear();
-    });
+  }
+
+  private fail(error: Error): void {
+    this.exited ??= error;
+    for (const p of this.pending.values()) p.reject(error);
+    this.pending.clear();
   }
 
   static spawn(command: string, args: string[], cwd: string, env?: Record<string, string>): JsonRpcClient {
