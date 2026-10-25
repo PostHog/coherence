@@ -30,6 +30,11 @@ export type GapsRead = { gaps: Gap[] } | { unread: string };
 /** The files a pull request changed, relative to the project, or why they are not known. */
 export type ChangedRead = { files: Set<string> } | { unread: string };
 
+/** The changed files a read holds, or none when there is no read or it failed. */
+function changedFiles(changed: ChangedRead | undefined): Set<string> {
+  return changed !== undefined && "files" in changed ? changed.files : new Set();
+}
+
 /** How the report learns a project's gaps; a test hands in one that needs no language server. */
 export type GapReader = (root: string, model: SpecModel) => Promise<GapsRead>;
 
@@ -103,7 +108,7 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
   const lines: string[] = [];
   const unfinished: string[] = [];
   let touched = 0;
-  const changed = p.changed !== undefined && "files" in p.changed ? p.changed.files : new Set<string>();
+  const changed = changedFiles(p.changed);
   const mark = (...files: (string | undefined)[]): string => {
     if (!files.some((f) => f !== undefined && changed.has(f))) return "";
     touched++;
@@ -202,7 +207,7 @@ function findingsLead(projects: readonly ProjectReport[], findings: number, touc
 
 /** Whether a registry problem's file is one this pull request changed. */
 function registryMark(problem: { file: string }, changed: ChangedRead | undefined): string {
-  return changed !== undefined && "files" in changed && changed.files.has(problem.file) ? CHANGED_HERE : "";
+  return changedFiles(changed).has(problem.file) ? CHANGED_HERE : "";
 }
 
 /** The report over the projects, with the registry's own problems when the report ran at its top. */
