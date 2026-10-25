@@ -73,6 +73,13 @@ const RECORD_VERSION = 1;
 /** The three ways a gap closes, in the words orient, regulate and the scaffold share. */
 export const CLOSE_WAYS = "declare guard: <chokepoint> where a verified chokepoint wraps it, name it on the entrances: line of an invariant whose crossing enters from its trust, or record control: none — <reason>";
 
+/** The same three ways, as plain steps for a reader who does not know the spec's terms; keep the two in step. */
+export const CLOSE_STEPS: readonly string[] = [
+  "If the input needs no check, add `control: none - <reason>`.",
+  "If all of the input goes through one function that a rule in the spec protects, add `guard: <function>`.",
+  "If a rule in the spec already checks this input, add the place's name to the `entrances:` line of that rule.",
+];
+
 /** An entrance with outside or unknown trust whose route has no traced control, and which declares no control: none. */
 export interface Gap {
   /** The folder of the component whose spec declares it. */
