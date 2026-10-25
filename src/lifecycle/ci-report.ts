@@ -153,7 +153,7 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
     const was = held === 1 ? "was" : "were";
     lines.push(`**Spec gaps:** ${plural(open.length, "entrance")} ${takes} input from outside this code (trust outside or unknown), and the spec names no check on that input.${held === 0 ? "" : ` ${held} more ${was} already open when Coherence was adopted, so ${held === 1 ? "it is" : "they are"} not listed.`}`, "");
     for (const g of open) lines.push(`- \`${g.specPath}\` entrance **${cell(g.name)}** (trust ${cell(g.trust.join(", ") || "unknown")}), route: ${cell(g.route.stops.join(" -> "))}${mark(g.file, g.specPath)}`);
-    if (open.length > 0) lines.push("", `To close a gap, ${CLOSE_WAYS}. \`coherence scaffold control "<entrance>"\` proposes the line.`);
+    if (open.length > 0) lines.push("", `To close a gap, write in its spec what checks that input. In spec terms: ${CLOSE_WAYS}. \`coherence scaffold control "<entrance>"\` proposes the line.`);
     lines.push("");
   }
 

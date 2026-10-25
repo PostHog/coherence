@@ -350,7 +350,7 @@ describe("ci report says what each finding means and what to do", () => {
       baselined: ["old"],
       says: [
         /\*\*Spec gaps:\*\* 1 entrance takes input from outside this code \(trust outside or unknown\), and the spec names no check on that input\. 1 more was already open when Coherence was adopted, so it is not listed\.\n\n- `A\.spec\.md` entrance \*\*webhook\*\* \(trust outside\), route: \. -\\> store\n/,
-        /\nTo close a gap, declare guard: <chokepoint> where a verified chokepoint wraps it, name it on the entrances: line of an invariant whose crossing enters from its trust, or record control: none — <reason>\. `coherence scaffold control "<entrance>"` proposes the line\.\n/,
+        /\nTo close a gap, write in its spec what checks that input\. In spec terms: declare guard: <chokepoint> where a verified chokepoint wraps it, name it on the entrances: line of an invariant whose crossing enters from its trust, or record control: none — <reason>\. `coherence scaffold control "<entrance>"` proposes the line\.\n/,
       ],
     },
     {
