@@ -130,7 +130,6 @@ function whatThisMeans(...paragraphs: string[]): string[] {
   return ["", ...folded("What this means", ...paragraphs)];
 }
 
-/** The route's stops beyond the entrance's own component, as a short plain clause, e.g. " It reaches: `store`."; empty when the route goes no further. */
 /** Text as one Markdown code span whatever it holds: a fence longer than its longest run of backticks, padded where it starts or ends with one. */
 function code(text: string): string {
   const flat = text.replace(/\r?\n/g, " ");
@@ -140,8 +139,9 @@ function code(text: string): string {
   return `${fence}${pad}${flat}${pad}${fence}`;
 }
 
+/** The route's stops after its first, where the entrance is declared, as a short plain clause, e.g. " It reaches: `store`."; empty when the route goes no further. */
 function routeReach(g: Gap): string {
-  const rest = g.route.stops.filter((stop) => stop !== g.component);
+  const rest = g.route.stops.slice(1);
   return rest.length === 0 ? "" : ` It reaches: ${code(rest.join(" -> "))}.`;
 }
 

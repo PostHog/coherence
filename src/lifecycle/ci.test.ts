@@ -458,6 +458,22 @@ describe("ci report says what each finding means and what to do", () => {
     assert.match(unrun.markdown, /\(session `ci_7`\)/, "no escape backslash shows inside a code span");
   });
 
+  test("an unchecked input reaches the stops after its route's first, whatever folder declared it", () => {
+    const root = repository({ "A.spec.md": SPEC("a") });
+    const model = loadSpecModel(root);
+    const nested: Gap = { ...WEBHOOK, component: "a/b/c", route: { ...WEBHOOK.route, stops: ["a", "store"] } };
+    const report = renderReport([{ name: ".", model, runs: [record("ci-7", [{ name: "a door" }])], gaps: { gaps: [nested] }, baselined: new Set() }], "ci-7", undefined);
+    assert.match(report.markdown, /The input comes from: outside\. It reaches: `store`\.\n/);
+  });
+
+  test("the rules counted in the fold add up across projects", () => {
+    const root = repository({ "A.spec.md": SPEC("a") });
+    const model = loadSpecModel(root);
+    const project = (name: string, verdict: "pass" | "fail"): ProjectReport => ({ name, model, runs: [record("ci-7", [{ name: "a door", verdict }])], gaps: { gaps: [] }, baselined: new Set() });
+    const report = renderReport([project("one", "pass"), project("two", "fail")], "ci-7", undefined);
+    assert.match(report.markdown, /This check read 2 parts of the code and 2 rules\. It checked 2 rules\. 1 rule passes\.\n/);
+  });
+
   test("a file name git would quote still matches its finding", async () => {
     const root = repository({ "A.spec.md": SPEC("a") });
     const git = (...args: string[]): string => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: root, encoding: "utf8" }).trim();
