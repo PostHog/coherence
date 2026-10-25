@@ -70,8 +70,27 @@ export const STRUCTURE_DIR = join(".coherence", "structure");
 
 const RECORD_VERSION = 1;
 
+/** The three ways a gap closes, each in the words orient, regulate and the scaffold share and as a plain step for a reader who does not know the spec's terms: guard, entrances, control none. One list, so the two forms cannot drift apart. */
+const CLOSE_PARTS: readonly { spec: string; plain: string }[] = [
+  {
+    spec: "declare guard: <chokepoint> where a verified chokepoint wraps it",
+    plain: "If all of the input goes through one function that a rule in the spec protects, add `guard: <function>`.",
+  },
+  {
+    spec: "name it on the entrances: line of an invariant whose crossing enters from its trust",
+    plain: "If a rule in the spec already checks input from the same source, add the place's name to the `entrances:` line of that rule.",
+  },
+  {
+    spec: "record control: none — <reason>",
+    plain: "If the input needs no check, add `control: none - <reason>`.",
+  },
+];
+
 /** The three ways a gap closes, in the words orient, regulate and the scaffold share. */
-export const CLOSE_WAYS = "declare guard: <chokepoint> where a verified chokepoint wraps it, name it on the entrances: line of an invariant whose crossing enters from its trust, or record control: none — <reason>";
+export const CLOSE_WAYS = `${CLOSE_PARTS[0]!.spec}, ${CLOSE_PARTS[1]!.spec}, or ${CLOSE_PARTS[2]!.spec}`;
+
+/** The same three ways, as plain steps for a reader who does not know the spec's terms; built from the same list as CLOSE_WAYS, so the two stay in step. */
+export const CLOSE_STEPS: readonly string[] = CLOSE_PARTS.map((p) => p.plain);
 
 /** An entrance with outside or unknown trust whose route has no traced control, and which declares no control: none. */
 export interface Gap {
