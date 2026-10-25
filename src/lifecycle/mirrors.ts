@@ -16,9 +16,10 @@
  * At a watched edit, each of its mirrors is read again from the files on
  * disk, without the TypeScript compiler: a regular expression finds the
  * list's declaration, a scan that skips strings and comments finds its
- * literal's top-level members, and another reads value imports, kept per
- * file by size and modification time so only the files that changed are
- * read. A disagreement is said as advice in the hook's context, never a
+ * literal's top-level members (in a language whose plugin fills the lists
+ * slot, that plugin's reader does both), and another reads value imports,
+ * kept per file by size and modification time so only the files that
+ * changed are read. A disagreement is said as advice in the hook's context, never a
  * block, and once per session until it changes; a list or a partner that is
  * gone is said too, never skipped.
  */
@@ -26,6 +27,8 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { readProjectText } from "./work-meter.ts";
+import { languageOfFile } from "../adapters/language-files.ts";
+import { syntaxOf } from "../plugins/languages.ts";
 import { escapeRegExp } from "../enforcement/totality.ts";
 import { mirrorRecipeText, type MirrorRecipe } from "../spec/grammar.ts";
 import { declaredMirrors, SPEC_SUFFIX, type ModelMirror } from "../spec/model.ts";
@@ -411,7 +414,10 @@ function declaredAt(mirror: IndexedMirror): string {
 function readLiteral(root: string, file: string, name: string): { literal: Literal } | { gone: string } {
   const absolute = resolve(root, file);
   if (!existsSync(absolute)) return { gone: `${file} is gone` };
-  const literal = literalOf(readProjectText(absolute, "source"), name);
+  // A list in a language whose plugin fills the lists slot is read by that plugin's reader; any other file, by the TypeScript reader here.
+  const language = languageOfFile(file);
+  const reader = (language === undefined ? undefined : syntaxOf(language, "lists")) ?? literalOf;
+  const literal = reader(readProjectText(absolute, "source"), name);
   if (literal === undefined) return { gone: `${name} is no longer set to an array or object literal at the top of ${file}` };
   return { literal };
 }

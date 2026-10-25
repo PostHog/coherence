@@ -176,6 +176,18 @@ export function binaryOf(file: string): string | undefined {
   return parts[src - 1] ?? "crate";
 }
 
+/**
+ * The example a file is the root of by Cargo's default paths, by the name
+ * cargo run --example takes: examples/demo.rs and examples/demo/main.rs are
+ * demo. Undefined for any other file, and for an examples folder inside a
+ * src/ folder, which is a module's and no package's.
+ */
+export function exampleOf(file: string): string | undefined {
+  const m = /(?:^|\/)examples\/([^/]+?)(?:\.rs|\/main\.rs)$/.exec(file);
+  if (m === null) return undefined;
+  return file.slice(0, m.index).split("/").includes("src") ? undefined : m[1];
+}
+
 /** The module path a file defines within its crate: [] for the crate root, [a, b] for a/b.rs or a/b/mod.rs. */
 export function modulePathOf(file: string, crateRoot: string): string[] {
   if (file === crateRoot) return [];
