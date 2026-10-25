@@ -141,7 +141,7 @@ export function practiceProblems(checks: PracticeChecks): Problem[] {
     if (isRecord(c)) {
       if (!known.has(c) && !elsewhere.has(c)) problems.push({ file: p.file, line, message: `practice ${p.name} cites ${c}, which no journal or work record has, here or on another branch` });
     } else if (absent !== undefined && absent.has(c)) {
-      problems.push({ file: p.file, line, message: `practice ${p.name} cites ${c}, which is no commit in this repository` });
+      problems.push({ file: p.file, line, message: `practice "${p.name}" cites ${c}, but no branch in this repository has that commit. If its pull request was squash-merged, cite the merge commit instead.` });
     }
   }
 

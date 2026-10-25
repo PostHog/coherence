@@ -11,10 +11,11 @@ import { sessionFiles } from "../journal/shard-fixture.ts";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { after, test } from "node:test";
+import { after, describe, test } from "node:test";
 import { appendRun, type RunEntry, type RunRecord } from "../enforcement/record.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import type { Io } from "../journal/cli.ts";
+import type { Gap } from "../readings/scope/gaps.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { buildReport, ciReportCommand, renderReport, type GapReader } from "./ci-report.ts";
 import { cli } from "./cli-fixture.ts";
@@ -280,9 +281,9 @@ test("ci report carries each project's problems, chokepoint verdicts, spec gaps 
   assert.ok(md.startsWith(`${REPORT_MARKER}\n## Coherence\n`), "the marker the workflow finds its comment by comes first");
   assert.match(md, /\*\*1 spec problem · 1 failing chokepoint · 1 spec gap · 0 guard failures\*\* across 2 projects/);
   assert.match(md, /### products\/a[\s\S]*✓ `a door` reference-choked|### products\/a[\s\S]*✓ `a door` pass/);
-  assert.match(md, /### products\/b[\s\S]*\*\*Spec problems\*\* \(spec --check in products\/b\)\n\n- `Extra\.spec\.md:1` a folder holds one spec/);
+  assert.match(md, /### products\/b[\s\S]*\*\*Spec problems\*\* \(spec --check in products\/b\): [^\n]+\n\n- `Extra\.spec\.md:1` a folder holds one spec/);
   assert.match(md, /✕ `b door` broken: 1 reference to ROWS outside door: src\/leak\.ts:3 in leak\n {2}- bypass `src\/leak\.ts:3` in leak/);
-  assert.match(md, /\*\*Spec gaps:\*\* 1 entrance with outside or unknown trust and no traced control\n\n- `A\.spec\.md` entrance webhook \(trust outside\): \. -\\> store/);
+  assert.match(md, /\*\*Spec gaps:\*\* 1 entrance takes input from outside this code [^\n]+\n\n- `A\.spec\.md` entrance \*\*webhook\*\* \(trust outside\), route: \. -\\> store/);
   assert.match(md, /\*\*Spec gaps:\*\* not read: the language server never answered\./, "a gap reading that failed is said, never shown as none");
   assert.deepEqual(report.unfinished, [], "findings alone leave the report finished");
   assert.doesNotMatch(md, /someone-else|\[!WARNING\]/, "only the CI session's run is read");
@@ -303,8 +304,44 @@ test("ci report carries each project's problems, chokepoint verdicts, spec gaps 
   model.defects = { recorded: 2, closed: 1, guarded: 1, decided: 0, unguarded: [], undeclared: [], guardFailures: [{ id: "df-2", class: "bypass", guard: "products/a/a door", guardedBy: "df-1", resolution: "rs-1" }] };
   const guarded = renderReport([{ name: ".", model, runs: [record("ci-7", [{ name: "a door" }])], gaps: { gaps: [] }, baselined: new Set() }], "ci-7", undefined);
   assert.match(guarded.markdown, /0 spec gaps · 1 guard failure\*\*/);
-  assert.match(guarded.markdown, /\*\*Guard failures:\*\* 1\n\n- df-2 in class bypass, which products\/a\/a door has guarded since rs-1 closed df-1/);
+  assert.match(guarded.markdown, /\*\*Guard failures:\*\* 1\n\n[^\n]+\n\n- df-2 in class bypass, which products\/a\/a door has guarded since rs-1 closed df-1/);
   assert.doesNotMatch(guarded.markdown, /^### /m, "one project at the root needs no heading");
+});
+
+const UNNAMED = "# a\n\nThe a product.\n\n## invariants\n- ROWS leave only through door.\n";
+const WEBHOOK: Gap = { component: ".", name: "webhook", specPath: "A.spec.md", handler: "hook in src/hook.ts", file: "src/hook.ts", trust: ["outside"], route: { id: "r", first: "webhook", entrances: 1, stops: [".", "store"] } };
+
+describe("ci report says what each finding means and what to do", () => {
+  for (const { finding, spec, runs, gaps, baselined, says } of [
+    { finding: "nothing", spec: SPEC("a"), runs: [{ name: "a door" }], gaps: [], baselined: [], says: [/\*\*\n\nNothing to fix\.\n/] },
+    {
+      finding: "a spec problem",
+      spec: UNNAMED,
+      runs: [],
+      gaps: [],
+      baselined: [],
+      says: [/\n\nThese findings do not fail this check\. Some can come from files this pull request did not change\.\n/, /\*\*Spec problems\*\* \(spec --check\): lines Coherence cannot read as written\. Fix each one, then run `coherence spec --check` until it finds 0 problems\.\n\n- `A\.spec\.md:6` an invariant bullet starts with a short name and a colon, as in "- \\<name\\>: \\<sentence\\>"\n/],
+    },
+    { finding: "a failing chokepoint", spec: SPEC("a"), runs: [{ name: "a door", verdict: "fail", grade: "broken" }], gaps: [], baselined: [], says: [/\*\*Chokepoints:\*\* 0 pass, 1 fail, 0 not run\n\nA chokepoint fails when code reaches what it protects without going through it\. Send each bypass below through the chokepoint, or fix the spec if the rule is wrong\.\n/] },
+    {
+      finding: "a spec gap and one the baseline holds",
+      spec: SPEC("a"),
+      runs: [{ name: "a door" }],
+      gaps: [WEBHOOK, { ...WEBHOOK, name: "old" }],
+      baselined: ["old"],
+      says: [
+        /\*\*Spec gaps:\*\* 1 entrance takes input from outside this code \(trust outside or unknown\), and the spec names no check on that input\. 1 more was already open when Coherence was adopted, so it is not listed\.\n\n- `A\.spec\.md` entrance \*\*webhook\*\* \(trust outside\), route: \. -\\> store\n/,
+        /\nTo close a gap, add one of these to its spec: `guard: <chokepoint>` when a verified chokepoint checks the input; the entrance's name on the `entrances:` line of an invariant that covers it; or `control: none — <reason>` when it needs no check\. `coherence scaffold control "<entrance>"` proposes the line\.\n/,
+      ],
+    },
+  ] satisfies { finding: string; spec: string; runs: Partial<RunEntry>[]; gaps: Gap[]; baselined: string[]; says: RegExp[] }[]) {
+    test(finding, () => {
+      const root = repository({ "A.spec.md": spec });
+      const model = loadSpecModel(root);
+      const report = renderReport([{ name: ".", model, runs: [record("ci-7", runs)], gaps: { gaps }, baselined: new Set(baselined.map((n) => `.\u0000${n}`)) }], "ci-7", undefined);
+      for (const said of says) assert.match(report.markdown, said);
+    });
+  }
 });
 
 test("run at a registry's top runs each listed project from its own folder, its records in each", async () => {

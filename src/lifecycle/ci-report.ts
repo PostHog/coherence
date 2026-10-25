@@ -97,10 +97,10 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
   const where = p.name === "." ? "" : ` in ${p.name}`;
   const c = p.model.counts;
   if (heading) lines.push(`### ${cell(p.name)}`, "");
-  lines.push(`${plural(c.components, "component")}, ${plural(c.bullets, "bullet")} (${plural(c.invariants, "invariant")}, ${plural(c.requirements, "requirement")}), ${plural(c.problems, "problem")}`, "");
+  lines.push(`Spec size: ${plural(c.components, "component")}, ${plural(c.bullets, "bullet")} (${plural(c.invariants, "invariant")}, ${plural(c.requirements, "requirement")})`, "");
 
   if (p.model.problems.length > 0) {
-    lines.push(`**Spec problems** (spec --check${where})`, "");
+    lines.push(`**Spec problems** (spec --check${where}): lines Coherence cannot read as written. Fix each one, then run \`coherence spec --check\` until it finds 0 problems.`, "");
     for (const problem of p.model.problems) lines.push(`- \`${problem.file}:${problem.line}\` ${cell(problem.message)}`);
     lines.push("");
   }
@@ -115,6 +115,7 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
     const fails = entries.filter((e) => e.verdict === "fail").length;
     const notRun = entries.filter((e) => e.verdict === "not run");
     lines.push(`**Chokepoints:** ${entries.length - fails - notRun.length} pass, ${fails} fail, ${notRun.length} not run`, "");
+    if (fails > 0) lines.push("A chokepoint fails when code reaches what it protects without going through it. Send each bypass below through the chokepoint, or fix the spec if the rule is wrong.", "");
     for (const e of [...entries].sort((a, b) => order(a) - order(b))) {
       lines.push(`- ${MARK[e.verdict]} \`${bullet(e)}\` ${e.grade ?? e.verdict}: ${cell(e.reason)}`);
       for (const b of e.bypasses.slice(0, BYPASSES)) lines.push(`  - bypass \`${b.file}:${b.line}\` in ${cell(b.symbol)}`);
@@ -129,15 +130,17 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
   } else {
     const open = p.gaps.gaps.filter((g) => !p.baselined.has(`${g.component}\u0000${g.name}`));
     const held = p.gaps.gaps.length - open.length;
-    lines.push(`**Spec gaps:** ${plural(open.length, "entrance")} with outside or unknown trust and no traced control${held === 0 ? "" : `, and ${held} more held by the adoption baseline`}`, "");
-    for (const g of open) lines.push(`- \`${g.specPath}\` entrance ${cell(g.name)} (trust ${cell(g.trust.join(", ") || "unknown")}): ${cell(g.route.stops.join(" -> "))}`);
-    if (open.length > 0) lines.push("", "Close one with `guard: <chokepoint>`, an invariant that names it on its `entrances:` line, or `control: none — <reason>`; `scaffold control` proposes it.");
+    const takes = open.length === 1 ? "takes" : "take";
+    const was = held === 1 ? "was" : "were";
+    lines.push(`**Spec gaps:** ${plural(open.length, "entrance")} ${takes} input from outside this code (trust outside or unknown), and the spec names no check on that input.${held === 0 ? "" : ` ${held} more ${was} already open when Coherence was adopted, so ${held === 1 ? "it is" : "they are"} not listed.`}`, "");
+    for (const g of open) lines.push(`- \`${g.specPath}\` entrance **${cell(g.name)}** (trust ${cell(g.trust.join(", ") || "unknown")}), route: ${cell(g.route.stops.join(" -> "))}`);
+    if (open.length > 0) lines.push("", "To close a gap, add one of these to its spec: `guard: <chokepoint>` when a verified chokepoint checks the input; the entrance's name on the `entrances:` line of an invariant that covers it; or `control: none — <reason>` when it needs no check. `coherence scaffold control \"<entrance>\"` proposes the line.");
     lines.push("");
   }
 
   const failures = p.model.defects?.guardFailures ?? [];
   if (failures.length > 0) {
-    lines.push(`**Guard failures:** ${failures.length}`, "");
+    lines.push(`**Guard failures:** ${failures.length}`, "", "A defect came back in a class that a guard was meant to stop. Check why each guard below let it through.", "");
     for (const g of failures) lines.push(`- ${g.id} in class ${cell(g.class)}, which ${cell(g.guard)} has guarded since ${g.resolution} closed ${g.guardedBy}`);
     lines.push("");
   }
@@ -167,6 +170,7 @@ export function renderReport(projects: readonly ProjectReport[], session: string
   const guards = projects.reduce((n, p) => n + (p.model.defects?.guardFailures.length ?? 0), 0);
   const head = [REPORT_MARKER, "## Coherence", ""];
   head.push(`**${plural(problems, "spec problem")} · ${plural(fails, "failing chokepoint")} · ${plural(gaps, "spec gap")} · ${plural(guards, "guard failure")}**${projects.length > 1 ? ` across ${plural(projects.length, "project")}` : ""}`, "");
+  head.push(problems + fails + gaps + guards === 0 ? "Nothing to fix." : "These findings do not fail this check. Some can come from files this pull request did not change.", "");
   if (unfinished.length > 0) {
     head.push("> [!WARNING]", "> Coherence did not finish, so this report is incomplete and the check fails:");
     for (const line of unfinished) head.push(`> - ${cell(line)}`);
