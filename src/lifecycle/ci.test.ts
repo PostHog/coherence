@@ -314,14 +314,14 @@ const WEBHOOK: Gap = { component: ".", name: "webhook", specPath: "A.spec.md", h
 
 describe("ci report says what each finding means and what to do", () => {
   for (const { finding, spec, runs, gaps, baselined, changed, says } of [
-    { finding: "nothing", spec: SPEC("a"), runs: [{ name: "a door" }], gaps: [], baselined: [], says: [/\*\*\n\n<details>\n<summary>What is Coherence\?<\/summary>\n\nCoherence compares the code with its spec files \(`\*\.spec\.md`\)\. A spec file lists the rules for one part of the code\.\n\nThis check read 1 part of the code and 1 rule\. 1 rule passes\.\n\n<\/details>\n\n> \[!TIP\]\n> Nothing to fix\.\n/] },
+    { finding: "nothing", spec: SPEC("a"), runs: [{ name: "a door" }], gaps: [], baselined: [], says: [/\*\*\n\n<details>\n<summary>What is Coherence\?<\/summary>\n\nCoherence compares the code with its spec files \(`\*\.spec\.md`\)\. A spec file lists the rules for one part of the code\.\n\nThis check read 1 part of the code and 1 rule\. It checked 1 rule\. 1 rule passes\.\n\n<\/details>\n\n> \[!TIP\]\n> Nothing to fix\.\n/] },
     {
       finding: "a spec problem",
       spec: UNNAMED,
       runs: [],
       gaps: [],
       baselined: [],
-      says: [/> \[!NOTE\]\n> These findings do not make this check fail\. Some findings can come from files that this pull request does not change\.\n/, /\*\*📄 Spec file errors \(1\)\*\*\n\n- `A\.spec\.md:6` an invariant bullet starts with a short name and a colon, as in "- \\<name\\>: \\<sentence\\>"\n\n<details>\n<summary>What this means and how to fix it<\/summary>\n\nCoherence cannot read these lines in the spec files\. Fix each line\. Then run `npx --no -- coherence spec --check` again\.\n\n<\/details>\n/],
+      says: [/This check read 1 part of the code and 1 rule\.\n\n<\/details>/, /> \[!NOTE\]\n> These findings do not make this check fail\. Some findings can come from files that this pull request does not change\.\n/, /\*\*📄 Spec file errors \(1\)\*\*\n\n- `A\.spec\.md:6` an invariant bullet starts with a short name and a colon, as in "- \\<name\\>: \\<sentence\\>"\n\n<details>\n<summary>What this means and how to fix it<\/summary>\n\nCoherence cannot read these lines in the spec files\. Fix each line\. Then run `npx --no -- coherence spec --check` again\.\n\n<\/details>\n/],
     },
     {
       finding: "a failing chokepoint",
@@ -446,6 +446,16 @@ describe("ci report says what each finding means and what to do", () => {
     const report = renderReport([project], "ci-7", { problems: [{ file: "coherence.config.json", message: "lists a folder that is not there" }], changed: { unread: "git diff main failed" } });
     assert.match(report.markdown, /\n> Coherence could not find the files that this pull request changes for the list of projects in `coherence\.config\.json`: git diff main failed\.\n/);
     assert.match(report.markdown, /\n> None of the findings that Coherence could check are in files that this pull request changes\.\n/);
+  });
+
+  test("a path, name or id with backticks or Markdown stays one code span", () => {
+    const root = repository({ "A.spec.md": SPEC("a") });
+    const model = loadSpecModel(root);
+    const gap: Gap = { ...WEBHOOK, specPath: "s`p/A.spec.md", route: { ...WEBHOOK.route, stops: [".", "a`b](https://x.test)"] } };
+    const report = renderReport([{ name: ".", model, runs: [record("ci-7", [{ name: "a door" }])], gaps: { gaps: [gap] }, baselined: new Set() }], "ci-7", undefined);
+    assert.match(report.markdown, /in ``s`p\/A\.spec\.md``\. The input comes from: outside\. It reaches: ``a`b\]\(https:\/\/x\.test\)``\.\n/);
+    const unrun = renderReport([{ name: ".", model, runs: [], gaps: { gaps: [] }, baselined: new Set() }], "ci_7", undefined);
+    assert.match(unrun.markdown, /\(session `ci_7`\)/, "no escape backslash shows inside a code span");
   });
 
   test("a file name git would quote still matches its finding", async () => {
