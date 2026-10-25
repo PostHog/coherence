@@ -280,12 +280,12 @@ test("ci report carries each project's problems, chokepoint verdicts, spec gaps 
   const report = await buildReport(top, "ci-7", gaps);
   const md = report.markdown;
   assert.ok(md.startsWith(`${REPORT_MARKER}\n## Coherence\n`), "the marker the workflow finds its comment by comes first");
-  assert.match(md, /\*\*1 spec file error · 1 broken rule · 1 unchecked input · 0 bugs that came back\*\* in 2 projects/);
+  assert.match(md, /\*\*📄 1 spec file error · ⛔ 1 broken rule · 🚪 1 unchecked input · 🐛 0 bugs that came back\*\* in 2 projects/);
   assert.doesNotMatch(md, /`a door`/, "a rule that holds is not listed");
-  assert.match(md, /### products\/b[\s\S]*\*\*Spec file errors \(1\)\*\*\n\nCoherence cannot read these lines in the spec files\. Fix each line\. Then run `npx coherence spec --check` in `products\/b` again\.\n\n- `Extra\.spec\.md:1` a folder holds one spec/);
+  assert.match(md, /### products\/b[\s\S]*\*\*📄 Spec file errors \(1\)\*\*\n\n- `Extra\.spec\.md:1` a folder holds one spec[^\n]*\n\n<details>\n<summary>What this means and how to fix it<\/summary>\n\nCoherence cannot read these lines in the spec files\. Fix each line\. Then run `npx coherence spec --check` in `products\/b` again\./);
   assert.match(md, /- ✕ `b door`: 1 reference to ROWS outside door: src\/leak\.ts:3 in leak\n {2}- used without the function at `src\/leak\.ts:3`, in leak\n/);
-  assert.match(md, /\*\*Unchecked inputs \(1\)\*\*\n\n[^\n]+\n\n- \*\*webhook\*\* in `A\.spec\.md`\. The input comes from: outside\.\n/);
-  assert.match(md, /\*\*Unchecked inputs:\*\* Coherence could not trace the code: the language server never answered\./, "a gap reading that failed is said, never shown as none");
+  assert.match(md, /\*\*🚪 Unchecked inputs \(1\)\*\*\n\n- \*\*webhook\*\* in `A\.spec\.md`\. The input comes from: outside\.\n/);
+  assert.match(md, /\*\*🚪 Unchecked inputs:\*\* Coherence could not trace the code: the language server never answered\./, "a gap reading that failed is said, never shown as none");
   assert.deepEqual(report.unfinished, [], "findings alone leave the report finished");
   assert.doesNotMatch(md, /someone-else|\[!WARNING\]/, "only the CI session's run is read");
 
@@ -304,8 +304,8 @@ test("ci report carries each project's problems, chokepoint verdicts, spec gaps 
   const model = loadSpecModel(a);
   model.defects = { recorded: 2, closed: 1, guarded: 1, decided: 0, unguarded: [], undeclared: [], guardFailures: [{ id: "df-2", class: "bypass", guard: "products/a/a door", guardedBy: "df-1", resolution: "rs-1" }] };
   const guarded = renderReport([{ name: ".", model, runs: [record("ci-7", [{ name: "a door" }])], gaps: { gaps: [] }, baselined: new Set() }], "ci-7", undefined);
-  assert.match(guarded.markdown, /0 unchecked inputs · 1 bug that came back\*\*/);
-  assert.match(guarded.markdown, /\*\*Bugs that came back \(1\)\*\*\n\nA guard is a rule that was added to stop one kind of bug\. These bugs came back after their guard was added\. Find out why the guard did not stop each one\. Coherence cannot tell if this pull request caused them\.\n\n- `df-2`: kind `bypass`\. Guard: `products\/a\/a door`, added when `rs-1` closed `df-1`\.\n/);
+  assert.match(guarded.markdown, /🚪 0 unchecked inputs · 🐛 1 bug that came back\*\*/);
+  assert.match(guarded.markdown, /\*\*🐛 Bugs that came back \(1\)\*\*\n\n- `df-2`: kind `bypass`\. Guard: `products\/a\/a door`, added when `rs-1` closed `df-1`\.\n\n<details>\n<summary>What this means and how to fix it<\/summary>\n\nA guard is a rule that was added to stop one kind of bug\. These bugs came back after their guard was added\. Find out why the guard did not stop each one\. Coherence cannot tell if this pull request caused them\.\n\n<\/details>\n/);
   assert.doesNotMatch(guarded.markdown, /^### /m, "one project at the root needs no heading");
 });
 
@@ -314,14 +314,14 @@ const WEBHOOK: Gap = { component: ".", name: "webhook", specPath: "A.spec.md", h
 
 describe("ci report says what each finding means and what to do", () => {
   for (const { finding, spec, runs, gaps, baselined, changed, says } of [
-    { finding: "nothing", spec: SPEC("a"), runs: [{ name: "a door" }], gaps: [], baselined: [], says: [/\*\*\n\nCoherence compares the code with its spec files \(`\*\.spec\.md`\)\. A spec file lists the rules for one part of the code\.\n\nNothing to fix\.\n/] },
+    { finding: "nothing", spec: SPEC("a"), runs: [{ name: "a door" }], gaps: [], baselined: [], says: [/\*\*\n\n<details>\n<summary>What is Coherence\?<\/summary>\n\nCoherence compares the code with its spec files \(`\*\.spec\.md`\)\. A spec file lists the rules for one part of the code\.\n\n<\/details>\n\n> \[!TIP\]\n> Nothing to fix\.\n/] },
     {
       finding: "a spec problem",
       spec: UNNAMED,
       runs: [],
       gaps: [],
       baselined: [],
-      says: [/\n\nThese findings do not make this check fail\. Some findings can come from files that this pull request does not change\.\n/, /\*\*Spec file errors \(1\)\*\*\n\nCoherence cannot read these lines in the spec files\. Fix each line\. Then run `npx coherence spec --check` again\.\n\n- `A\.spec\.md:6` an invariant bullet starts with a short name and a colon, as in "- \\<name\\>: \\<sentence\\>"\n/],
+      says: [/> \[!NOTE\]\n> These findings do not make this check fail\. Some findings can come from files that this pull request does not change\.\n/, /\*\*📄 Spec file errors \(1\)\*\*\n\n- `A\.spec\.md:6` an invariant bullet starts with a short name and a colon, as in "- \\<name\\>: \\<sentence\\>"\n\n<details>\n<summary>What this means and how to fix it<\/summary>\n\nCoherence cannot read these lines in the spec files\. Fix each line\. Then run `npx coherence spec --check` again\.\n\n<\/details>\n/],
     },
     {
       finding: "a failing chokepoint",
@@ -330,7 +330,7 @@ describe("ci report says what each finding means and what to do", () => {
       gaps: [],
       baselined: [],
       says: [
-        /\*\*Broken rules \(1\)\*\*\n\nEach of these rules says that some code or data must only be used through one function\. The code below uses it without that function\. Change the code to use the function\. If the rule is wrong, change the rule in the spec\.\n\n- ✕ `a door`: /,
+        /\*\*⛔ Broken rules \(1\)\*\*\n\n- ✕ `a door`: [^\n]*\n\n<details>\n<summary>What this means and how to fix it<\/summary>\n\nEach of these rules says that some code or data must only be used through one function\. The code above uses it without that function\. Change the code to use the function\. If the rule is wrong, change the rule in the spec\.\n/,
       ],
     },
     {
@@ -340,7 +340,7 @@ describe("ci report says what each finding means and what to do", () => {
       gaps: [],
       baselined: [],
       changed: ["src/door.ts"],
-      says: [/- ✕ `a door`: [^\n]+ · \*\*changed in this pull request\*\*\n/],
+      says: [/- ✕ `a door`: [^\n]+ · 📍 \*\*changed in this pull request\*\*\n/],
     },
     {
       finding: "a spec gap and one the baseline holds",
@@ -349,8 +349,8 @@ describe("ci report says what each finding means and what to do", () => {
       gaps: [WEBHOOK, { ...WEBHOOK, name: "old" }],
       baselined: ["old"],
       says: [
-        /\*\*Unchecked inputs \(1\)\*\*\n\nInput from outside this code comes in at these places\. The spec does not say what checks that input\. 1 more place was already like this when Coherence was added\. This list does not show it\.\n\n- \*\*webhook\*\* in `A\.spec\.md`\. The input comes from: outside\.\n/,
-        /\nTo close one of these, find the place by its name in the `## entrances` section of its spec file\. Add one line under it:\n\n- If the input needs no check, add `control: none - <reason>`\.\n- If all of the input goes through one function that a rule in the spec protects, add `guard: <function>`\.\n- If a rule in the spec already checks this input, add the place's name to the `entrances:` line of that rule\.\n\nTo get the line to add, run `npx coherence scaffold control \"<name>\"`\.\n/,
+        /\*\*🚪 Unchecked inputs \(1\)\*\*\n\n- \*\*webhook\*\* in `A\.spec\.md`\. The input comes from: outside\.\n\n<details>\n<summary>What this means and how to fix it<\/summary>\n\nInput from outside this code comes in at these places\. The spec does not say what checks that input\. 1 more place was already like this when Coherence was added\. This list does not show it\.\n/,
+        /\nTo close one of these, find the place by its name in the `## entrances` section of its spec file\. Add one line under it:\n\n- If the input needs no check, add `control: none - <reason>`\.\n- If all of the input goes through one function that a rule in the spec protects, add `guard: <function>`\.\n- If a rule in the spec already checks this input, add the place's name to the `entrances:` line of that rule\.\n\nTo get the line to add, run `npx coherence scaffold control \"<name>\"`\.\n\n<\/details>\n/,
       ],
     },
     {
@@ -360,18 +360,18 @@ describe("ci report says what each finding means and what to do", () => {
       gaps: [],
       baselined: [],
       changed: ["A.spec.md"],
-      says: [/\n\n1 finding is in a file that this pull request changes\. It has the mark \*\*changed in this pull request\*\*\.\n/, /- `A\.spec\.md:6` [^\n]+ · \*\*changed in this pull request\*\*\n/],
+      says: [/> \[!IMPORTANT\]\n> These findings do not make this check fail\.\n>\n> 1 finding is in a file that this pull request changes\. It has the mark 📍 \*\*changed in this pull request\*\*\.\n/, /- `A\.spec\.md:6` [^\n]+ · 📍 \*\*changed in this pull request\*\*\n/],
     },
-    { finding: "a spec gap whose handler the pull request changed", spec: SPEC("a"), runs: [{ name: "a door" }], gaps: [WEBHOOK], baselined: [], changed: ["src/hook.ts"], says: [/The input comes from: outside\. · \*\*changed in this pull request\*\*\n/] },
-    { finding: "findings in no file the pull request changed", spec: UNNAMED, runs: [], gaps: [WEBHOOK], baselined: [], changed: ["src/other.ts"], says: [/\n\nNone of these findings are in files that this pull request changes\. You do not need to fix them in this pull request\.\n/] },
-    { finding: "changed files git could not list", spec: UNNAMED, runs: [], gaps: [], baselined: [], changed: "git diff main failed: bad revision", says: [/\n\nCoherence could not find the files that this pull request changes: git diff main failed: bad revision\.\n/] },
+    { finding: "a spec gap whose handler the pull request changed", spec: SPEC("a"), runs: [{ name: "a door" }], gaps: [WEBHOOK], baselined: [], changed: ["src/hook.ts"], says: [/The input comes from: outside\. · 📍 \*\*changed in this pull request\*\*\n/] },
+    { finding: "findings in no file the pull request changed", spec: UNNAMED, runs: [], gaps: [WEBHOOK], baselined: [], changed: ["src/other.ts"], says: [/\n> None of these findings are in files that this pull request changes\. You do not need to fix them in this pull request\.\n/] },
+    { finding: "changed files git could not list", spec: UNNAMED, runs: [], gaps: [], baselined: [], changed: "git diff main failed: bad revision", says: [/\n> Coherence could not find the files that this pull request changes: git diff main failed: bad revision\.\n/] },
     {
       finding: "no chokepoint run, so there is nothing to fix only in appearance",
       spec: SPEC("a"),
       runs: [{ name: "a door", verdict: "not run", reason: "the instrument never answered" }],
       gaps: [],
       baselined: [],
-      says: [/\n\nCoherence could not check everything\. This list can be incomplete\.\n/, /\*\*Rules Coherence could not check \(1\)\*\*\n\n- ○ `a door`: the instrument never answered\n/],
+      says: [/> \[!WARNING\]\n> Coherence could not check everything\. This list can be incomplete\.\n/, /\*\*⏸️ Rules Coherence could not check \(1\)\*\*\n\n- ○ `a door`: the instrument never answered\n/],
     },
   ] satisfies { finding: string; spec: string; runs: Partial<RunEntry>[]; gaps: Gap[]; baselined: string[]; changed?: string[] | string; says: RegExp[] }[]) {
     test(finding, () => {
@@ -386,7 +386,7 @@ describe("ci report says what each finding means and what to do", () => {
     const root = repository({ "A.spec.md": SPEC("a") });
     const model = loadSpecModel(root);
     const report = renderReport([{ name: ".", model, runs: [record("ci-7", [{ name: "a door" }])], gaps: { unread: "the language server never answered" }, baselined: new Set() }], "ci-7", undefined);
-    assert.match(report.markdown, /\n\nCoherence could not check everything\. This list can be incomplete\.\n/);
+    assert.match(report.markdown, /> \[!WARNING\]\n> Coherence could not check everything\. This list can be incomplete\.\n/);
   });
 
   test("a project whose changed files were read beside one that was not keeps the lead from claiming none of the findings changed", () => {
@@ -407,8 +407,8 @@ describe("ci report says what each finding means and what to do", () => {
       "ci-7",
       { problems: [{ file: "coherence.config.json", message: "projects is a list of folders relative to the repository top" }], changed: { files: new Set(["coherence.config.json"]) } },
     );
-    assert.match(changedReport.markdown, /\*\*Project list errors \(1\)\*\*\n\nCoherence cannot read the list of projects in `coherence\.config\.json`\. Fix each line below\.\n\n/);
-    assert.match(changedReport.markdown, /- `coherence\.config\.json` projects is a list of folders relative to the repository top · \*\*changed in this pull request\*\*\n/);
+    assert.match(changedReport.markdown, /\*\*⚙️ Project list errors \(1\)\*\*\n\n- `coherence\.config\.json` [^\n]+\n\n<details>\n<summary>What this means and how to fix it<\/summary>\n\nCoherence cannot read the list of projects in `coherence\.config\.json`\. Fix each line above\.\n/);
+    assert.match(changedReport.markdown, /- `coherence\.config\.json` projects is a list of folders relative to the repository top · 📍 \*\*changed in this pull request\*\*\n/);
     const unchangedReport = renderReport(
       [{ name: ".", model, runs: [record("ci-7", [{ name: "a door" }])], gaps: { gaps: [] }, baselined: new Set() }],
       "ci-7",
@@ -421,8 +421,8 @@ describe("ci report says what each finding means and what to do", () => {
     const root = repository({ "A.spec.md": SPEC("a") });
     const project = { name: "products/a", model: loadSpecModel(root), runs: [record("ci-7", [{ name: "a door" }])], gaps: { gaps: [] }, baselined: new Set<string>(), changed: { files: new Set<string>() } };
     const report = renderReport([project], "ci-7", { problems: [{ file: "coherence.config.json", message: "lists a folder that is not there" }], changed: { unread: "git diff main failed" } });
-    assert.match(report.markdown, /\n\nCoherence could not find the files that this pull request changes at the registry top: git diff main failed\.\n/);
-    assert.match(report.markdown, /\n\nNone of the findings that Coherence could check are in files that this pull request changes\.\n/);
+    assert.match(report.markdown, /\n> Coherence could not find the files that this pull request changes at the registry top: git diff main failed\.\n/);
+    assert.match(report.markdown, /\n> None of the findings that Coherence could check are in files that this pull request changes\.\n/);
   });
 
   test("a file name git would quote still matches its finding", async () => {
@@ -439,7 +439,7 @@ describe("ci report says what each finding means and what to do", () => {
     appendRun(root, record("ci-7", [{ name: "a door" }]));
     const said = capture(root);
     assert.equal(await ciReportCommand(["--session", "ci-7", "--base", base], said.io, async () => ({ gaps: [] }), {}), 0);
-    assert.match(said.out.join("\n"), /- `Café\.spec\.md:1` [^\n]+ · \*\*changed in this pull request\*\*/);
+    assert.match(said.out.join("\n"), /- `Café\.spec\.md:1` [^\n]+ · 📍 \*\*changed in this pull request\*\*/);
   });
 
   test("ci report --base, or a pull request's base branch on GitHub Actions, reads the files changed since that commit", async () => {
@@ -455,7 +455,7 @@ describe("ci report says what each finding means and what to do", () => {
     appendRun(root, record("ci-7", []));
     const said = capture(root);
     assert.equal(await ciReportCommand(["--session", "ci-7", "--base", base], said.io, async () => ({ gaps: [] })), 0);
-    const marked = /1 finding is in a file that this pull request changes[\s\S]*- `A\.spec\.md:6` [^\n]+ · \*\*changed in this pull request\*\*/;
+    const marked = /1 finding is in a file that this pull request changes[\s\S]*- `A\.spec\.md:6` [^\n]+ · 📍 \*\*changed in this pull request\*\*/;
     assert.match(said.out.join("\n"), marked);
 
     git("update-ref", "refs/remotes/origin/main", base);

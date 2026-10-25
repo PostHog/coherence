@@ -101,12 +101,19 @@ function bullet(e: RunEntry): string {
 
 const MARK = { fail: "✕", "not run": "○" } as const;
 
-const CHANGED_HERE = " · **changed in this pull request**";
+const CHANGED_HERE = " · 📍 **changed in this pull request**";
 
-/** A section's bold title, with its count when it lists findings. */
-function title(name: string, count?: number): string {
-  return count === undefined ? `**${name}:**` : `**${name} (${count})**`;
+/** A section's bold title with its icon, and its count when it lists findings. */
+function title(icon: string, name: string, count?: number): string {
+  return count === undefined ? `**${icon} ${name}:**` : `**${icon} ${name} (${count})**`;
 }
+
+/** Text a familiar reader can skip, folded under a summary line; GitHub needs the blank lines to read Markdown inside it. */
+function folded(summary: string, ...paragraphs: string[]): string[] {
+  return ["<details>", `<summary>${summary}</summary>`, "", ...paragraphs.flatMap((paragraph) => [paragraph, ""]), "</details>", ""];
+}
+
+const HOW_TO_FIX = "What this means and how to fix it";
 
 /** One project's section, and why its part did not finish. */
 function projectSection(p: ProjectReport, session: string, heading: boolean): { lines: string[]; unfinished: string[]; touched: number } {
@@ -124,34 +131,35 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
 
   if (p.model.problems.length > 0) {
     const runIn = p.name === "." ? "" : ` in \`${p.name}\``;
-    lines.push(title("Spec file errors", p.model.problems.length), "", `Coherence cannot read these lines in the spec files. Fix each line. Then run \`npx coherence spec --check\`${runIn} again.`, "");
+    lines.push(title("📄", "Spec file errors", p.model.problems.length), "");
     for (const problem of p.model.problems) lines.push(`- \`${problem.file}:${problem.line}\` ${cell(problem.message)}${mark(problem.file)}`);
-    lines.push("");
+    lines.push("", ...folded(HOW_TO_FIX, `Coherence cannot read these lines in the spec files. Fix each line. Then run \`npx coherence spec --check\`${runIn} again.`));
   }
 
   const entries = chokepointEntries(p.runs);
   if (p.runs.length === 0) {
     unfinished.push(`no check run was recorded for session ${session}${where}`);
-    lines.push(`${title("Rules")} Coherence has no record of a check run for session ${cell(session)}${where}, so it did not check the rules.`, "");
+    lines.push(`${title("⛔", "Rules")} Coherence has no record of a check run for session ${cell(session)}${where}, so it did not check the rules.`, "");
   } else {
     const fails = entries.filter((e) => e.verdict === "fail");
     const notRun = entries.filter((e) => e.verdict === "not run");
     if (fails.length > 0) {
-      lines.push(
-        title("Broken rules", fails.length),
-        "",
-        "Each of these rules says that some code or data must only be used through one function. The code below uses it without that function. Change the code to use the function. If the rule is wrong, change the rule in the spec.",
-        "",
-      );
+      lines.push(title("⛔", "Broken rules", fails.length), "");
       for (const e of fails) {
         lines.push(`- ${MARK.fail} \`${bullet(e)}\`: ${cell(e.reason)}${mark(...e.files, ...e.bypasses.map((b) => b.file))}`);
         for (const b of e.bypasses.slice(0, BYPASSES)) lines.push(`  - used without the function at \`${b.file}:${b.line}\`, in ${cell(b.symbol)}`);
         if (e.bypasses.length > BYPASSES) lines.push(`  - and ${e.bypasses.length - BYPASSES} more. To see all of them, run \`npx coherence run --form chokepoint\`.`);
       }
-      lines.push("");
+      lines.push(
+        "",
+        ...folded(
+          HOW_TO_FIX,
+          "Each of these rules says that some code or data must only be used through one function. The code above uses it without that function. Change the code to use the function. If the rule is wrong, change the rule in the spec.",
+        ),
+      );
     }
     if (notRun.length > 0) {
-      lines.push(title("Rules Coherence could not check", notRun.length), "");
+      lines.push(title("⏸️", "Rules Coherence could not check", notRun.length), "");
       for (const e of notRun) lines.push(`- ${MARK["not run"]} \`${bullet(e)}\`: ${cell(e.reason)}`);
       lines.push("");
     }
@@ -159,31 +167,41 @@ function projectSection(p: ProjectReport, session: string, heading: boolean): { 
   }
 
   if ("unread" in p.gaps) {
-    lines.push(`${title("Unchecked inputs")} Coherence could not trace the code: ${cell(p.gaps.unread)}.`, "");
+    lines.push(`${title("🚪", "Unchecked inputs")} Coherence could not trace the code: ${cell(p.gaps.unread)}.`, "");
   } else {
     const open = p.gaps.gaps.filter((g) => !p.baselined.has(`${g.component}\u0000${g.name}`));
     const held = p.gaps.gaps.length - open.length;
     if (open.length > 0) {
       const older = held === 0 ? "" : held === 1 ? " 1 more place was already like this when Coherence was added. This list does not show it." : ` ${held} more places were already like this when Coherence was added. This list does not show them.`;
-      lines.push(title("Unchecked inputs", open.length), "", `Input from outside this code comes in at these places. The spec does not say what checks that input.${older}`, "");
+      lines.push(title("🚪", "Unchecked inputs", open.length), "");
       for (const g of open) {
         const from = g.trust.length === 0 ? "The spec does not say where the input comes from." : `The input comes from: ${cell(g.trust.join(", "))}.`;
         lines.push(`- **${cell(g.name)}** in \`${g.specPath}\`. ${from}${mark(g.file, g.specPath)}`);
       }
-      lines.push("", "To close one of these, find the place by its name in the `## entrances` section of its spec file. Add one line under it:", "", ...CLOSE_STEPS.map((step) => `- ${step}`), "", 'To get the line to add, run `npx coherence scaffold control "<name>"`.', "");
+      lines.push(
+        "",
+        ...folded(
+          HOW_TO_FIX,
+          `Input from outside this code comes in at these places. The spec does not say what checks that input.${older}`,
+          "To close one of these, find the place by its name in the `## entrances` section of its spec file. Add one line under it:",
+          CLOSE_STEPS.map((step) => `- ${step}`).join("\n"),
+          'To get the line to add, run `npx coherence scaffold control "<name>"`.',
+        ),
+      );
     }
   }
 
   const failures = p.model.defects?.guardFailures ?? [];
   if (failures.length > 0) {
-    lines.push(
-      title("Bugs that came back", failures.length),
-      "",
-      "A guard is a rule that was added to stop one kind of bug. These bugs came back after their guard was added. Find out why the guard did not stop each one. Coherence cannot tell if this pull request caused them.",
-      "",
-    );
+    lines.push(title("🐛", "Bugs that came back", failures.length), "");
     for (const g of failures) lines.push(`- \`${g.id}\`: kind \`${cell(g.class)}\`. Guard: \`${cell(g.guard)}\`, added when \`${g.resolution}\` closed \`${g.guardedBy}\`.`);
-    lines.push("");
+    lines.push(
+      "",
+      ...folded(
+        HOW_TO_FIX,
+        "A guard is a rule that was added to stop one kind of bug. These bugs came back after their guard was added. Find out why the guard did not stop each one. Coherence cannot tell if this pull request caused them.",
+      ),
+    );
   }
   return { lines, unfinished, touched };
 }
@@ -197,23 +215,31 @@ interface ChangedWhere {
   changed: ChangedRead | undefined;
 }
 
+/** The colour GitHub gives a quoted alert block: green, blue, purple, or yellow. */
+type AlertKind = "TIP" | "NOTE" | "IMPORTANT" | "WARNING";
+
+/** Sentences as one GitHub alert block, a quoted blank line between them. */
+function alert(kind: AlertKind, sentences: readonly string[]): string[] {
+  return [`> [!${kind}]`, ...sentences.flatMap((sentence, i) => (i === 0 ? [`> ${sentence}`] : [">", `> ${sentence}`])), ""];
+}
+
 /** Whether there is anything to fix, and which findings this pull request's own files hold, when the report knows them. */
 function findingsLead(projects: readonly ProjectReport[], reads: readonly ChangedWhere[], findings: number, touched: number, unfinished: readonly string[]): string[] {
   if (findings === 0) {
-    if (unfinished.length > 0 || projects.some((p) => "unread" in p.gaps)) return ["Coherence could not check everything. This list can be incomplete.", ""];
-    return ["Nothing to fix.", ""];
+    if (unfinished.length > 0 || projects.some((p) => "unread" in p.gaps)) return alert("WARNING", ["Coherence could not check everything. This list can be incomplete."]);
+    return alert("TIP", ["Nothing to fix."]);
   }
   const changed = reads.filter((r) => r.changed !== undefined);
-  if (changed.length === 0) return ["These findings do not make this check fail. Some findings can come from files that this pull request does not change.", ""];
-  const lines = ["These findings do not make this check fail.", ""];
+  if (changed.length === 0) return alert("NOTE", ["These findings do not make this check fail. Some findings can come from files that this pull request does not change."]);
+  const sentences = ["These findings do not make this check fail."];
   const allRead = changed.every((r) => "files" in r.changed!);
-  for (const r of changed) if ("unread" in r.changed!) lines.push(`Coherence could not find the files that this pull request changes${r.where}: ${cell(r.changed.unread)}.`, "");
+  for (const r of changed) if ("unread" in r.changed!) sentences.push(`Coherence could not find the files that this pull request changes${r.where}: ${cell(r.changed.unread)}.`);
   if (changed.some((r) => "files" in r.changed!)) {
-    if (touched === 0) lines.push(allRead ? "None of these findings are in files that this pull request changes. You do not need to fix them in this pull request." : "None of the findings that Coherence could check are in files that this pull request changes.", "");
-    else if (touched === 1) lines.push("1 finding is in a file that this pull request changes. It has the mark **changed in this pull request**.", "");
-    else lines.push(`${touched} findings are in files that this pull request changes. They have the mark **changed in this pull request**.`, "");
+    if (touched === 0) sentences.push(allRead ? "None of these findings are in files that this pull request changes. You do not need to fix them in this pull request." : "None of the findings that Coherence could check are in files that this pull request changes.");
+    else if (touched === 1) sentences.push("1 finding is in a file that this pull request changes. It has the mark 📍 **changed in this pull request**.");
+    else sentences.push(`${touched} findings are in files that this pull request changes. They have the mark 📍 **changed in this pull request**.`);
   }
-  return lines;
+  return alert(touched > 0 ? "IMPORTANT" : "NOTE", sentences);
 }
 
 /** Whether a registry problem's file is one this pull request changed. */
@@ -247,10 +273,9 @@ export function renderReport(
   const guards = projects.reduce((n, p) => n + (p.model.defects?.guardFailures.length ?? 0), 0);
   const head = [REPORT_MARKER, "## Coherence", ""];
   head.push(
-    `**${plural(problems, "spec file error")} · ${plural(fails, "broken rule")} · ${plural(gaps, "unchecked input")} · ${plural(guards, "bug that came back", "bugs that came back")}**${projects.length > 1 ? ` in ${plural(projects.length, "project")}` : ""}`,
+    `**📄 ${plural(problems, "spec file error")} · ⛔ ${plural(fails, "broken rule")} · 🚪 ${plural(gaps, "unchecked input")} · 🐛 ${plural(guards, "bug that came back", "bugs that came back")}**${projects.length > 1 ? ` in ${plural(projects.length, "project")}` : ""}`,
     "",
-    ABOUT,
-    "",
+    ...folded("What is Coherence?", ABOUT),
   );
   const reads: ChangedWhere[] = projects.map((p) => ({ where: p.name === "." ? "" : ` in ${cell(p.name)}`, changed: p.changed }));
   if (registry !== undefined && registry.problems.length > 0) reads.push({ where: " at the registry top", changed: registry.changed });
@@ -261,9 +286,9 @@ export function renderReport(
     head.push("");
   }
   if (registry !== undefined && registry.problems.length > 0) {
-    head.push(title("Project list errors", registry.problems.length), "", "Coherence cannot read the list of projects in `coherence.config.json`. Fix each line below.", "");
+    head.push(title("⚙️", "Project list errors", registry.problems.length), "");
     registry.problems.forEach((problem, i) => head.push(`- \`${problem.file}\` ${cell(problem.message)}${registryMarks[i]}`));
-    head.push("");
+    head.push("", ...folded(HOW_TO_FIX, "Coherence cannot read the list of projects in `coherence.config.json`. Fix each line above."));
   }
   const markdown = [...head, ...sections].join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
   return { markdown, unfinished };
