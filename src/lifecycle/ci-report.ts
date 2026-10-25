@@ -246,8 +246,11 @@ function changedRead(files: string[] | string): ChangedRead {
   return typeof files === "string" ? { unread: files } : { files: new Set(files) };
 }
 
-/** ci report --session <id> [--base <commit>]: the Markdown on stdout; exit 1 when Coherence did not finish. */
-export async function ciReportCommand(argv: string[], io: Io, readGapsOf: GapReader = readGaps): Promise<number> {
+/**
+ * ci report --session <id> [--base <commit>]: the Markdown on stdout; exit 1 when Coherence did not finish.
+ * Without --base, a pull request's run on GitHub Actions compares against its base branch, which GITHUB_BASE_REF names.
+ */
+export async function ciReportCommand(argv: string[], io: Io, readGapsOf: GapReader = readGaps, env: NodeJS.ProcessEnv = process.env): Promise<number> {
   let session: string | undefined;
   let base: string | undefined;
   for (let i = 0; i < argv.length; i++) {
@@ -265,6 +268,7 @@ export async function ciReportCommand(argv: string[], io: Io, readGapsOf: GapRea
     io.err(`ci report: --session names the run's session, as the chokepoint run recorded it\n${CI_USAGE}`);
     return 64;
   }
+  if (base === undefined && env.GITHUB_BASE_REF) base = `origin/${env.GITHUB_BASE_REF}`;
   const report = await buildReport(io.cwd, session, readGapsOf, base);
   io.out(report.markdown.trimEnd());
   for (const line of report.unfinished) io.err(`ci report: ${line}`);

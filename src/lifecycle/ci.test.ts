@@ -114,7 +114,7 @@ test("ci install writes the comment mode for pnpm: findings never fail the job, 
   assert.equal(steps[0], "pnpm install --frozen-lockfile");
   assert.equal(steps[1], "pnpm exec coherence spec --check || [ $? -eq 1 ]", "a spec problem is a finding; any other exit breaks the job");
   assert.equal(steps[2], 'pnpm exec coherence run --form chokepoint --no-server --session "ci-${{ github.run_id }}" --agent ci || [ $? -eq 1 ]');
-  assert.match(steps[3]!, /pnpm exec coherence ci report --session "ci-\$\{\{ github.run_id \}\}" --base "\$\{\{ github.event.pull_request.base.sha \}\}" > "\$RUNNER_TEMP\/coherence-report.md" \|\| status=\$\?/);
+  assert.match(steps[3]!, /pnpm exec coherence ci report --session "ci-\$\{\{ github.run_id \}\}" > "\$RUNNER_TEMP\/coherence-report.md" \|\| status=\$\?/);
   assert.match(steps[3]!, />> "\$GITHUB_STEP_SUMMARY"\nexit "\$status"$/, "the report reaches the job summary, then its exit stands");
   assert.ok(steps[4]!.includes(`startswith("${REPORT_MARKER}")`), "the comment is found by the report's marker");
   assert.match(steps[4]!, /gh api --method PATCH "repos\/\$REPO\/issues\/comments\/\$id" -F body=@"\$body"/, "an existing comment is updated in place");
@@ -356,7 +356,7 @@ describe("ci report says what each finding means and what to do", () => {
     });
   }
 
-  test("ci report --base reads the files changed since that commit", async () => {
+  test("ci report --base, or a pull request's base branch on GitHub Actions, reads the files changed since that commit", async () => {
     const root = repository({ "A.spec.md": SPEC("a") });
     const git = (...args: string[]): string => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: root, encoding: "utf8" }).trim();
     rmSync(join(root, ".git"), { recursive: true });
@@ -369,7 +369,17 @@ describe("ci report says what each finding means and what to do", () => {
     appendRun(root, record("ci-7", []));
     const said = capture(root);
     assert.equal(await ciReportCommand(["--session", "ci-7", "--base", base], said.io, async () => ({ gaps: [] })), 0);
-    assert.match(said.out.join("\n"), /1 of these findings is in a file this pull request changed[\s\S]*- `A\.spec\.md:6` [^\n]+ · \*\*changed in this pull request\*\*/);
+    const marked = /1 of these findings is in a file this pull request changed[\s\S]*- `A\.spec\.md:6` [^\n]+ · \*\*changed in this pull request\*\*/;
+    assert.match(said.out.join("\n"), marked);
+
+    git("update-ref", "refs/remotes/origin/main", base);
+    const onActions = capture(root);
+    assert.equal(await ciReportCommand(["--session", "ci-7"], onActions.io, async () => ({ gaps: [] }), { GITHUB_BASE_REF: "main" }), 0);
+    assert.match(onActions.out.join("\n"), marked, "GITHUB_BASE_REF names the base when --base does not");
+
+    const elsewhere = capture(root);
+    assert.equal(await ciReportCommand(["--session", "ci-7"], elsewhere.io, async () => ({ gaps: [] }), {}), 0);
+    assert.match(elsewhere.out.join("\n"), /These findings do not fail this check\. Some can come from files this pull request did not change\./, "with neither, no files are compared");
   });
 });
 

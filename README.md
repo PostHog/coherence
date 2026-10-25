@@ -531,7 +531,7 @@ node src/cli.ts hooks uninstall --host claude|codex   # removes only Coherence's
 node src/cli.ts hooks --check --host claude|codex     # exit 1 naming each event missing, stale, or extra against what install would write
 node src/cli.ts hooks status                          # the wiring per agent host, and what each event delivers for this project
 node src/cli.ts ci install --host github --mode fail|comment [--write]   # the workflow that runs Coherence on every pull request; never over a file already there
-node src/cli.ts ci report --session <id> [--base <commit>]   # the pull request report as Markdown, from that session's run; --base marks findings in files changed since that commit
+node src/cli.ts ci report --session <id> [--base <commit>]   # the pull request report as Markdown, from that session's run; --base marks findings in files changed since that commit (on GitHub Actions, the pull request's base branch by default)
 npm run spec:check                        # the spec check alone
 npm test                                  # typecheck, tests, vocabulary check, spec check; any one failing fails the tree
 ```
