@@ -624,8 +624,9 @@ repository all build. `node-llama-cpp` is an optional peer: a project that
 wants the local embedding pass installs it beside Coherence.
 
 To release, merge a change that bumps `version` in package.json, and the same
-`version` in `mods/coherence/.claude-plugin/plugin.json` (a test holds them
-equal), into main.
+`version` in `mods/coherence/.claude-plugin/plugin.json` and in each bundled
+plugin that ships at the package's version (`plugins/declared`, `python`,
+`rust` and `typescript`; tests hold them equal), into main.
 The Release workflow sees a version npm does not have, publishes it through
 npm trusted publishing from `.github/workflows/release.yml` in the `Release`
 environment, with provenance and no stored token, and tags it as a GitHub

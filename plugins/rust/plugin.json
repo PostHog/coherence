@@ -1,6 +1,6 @@
 {
   "name": "rust",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "pluginApi": 2,
   "provides": {
     "language": "rust"
