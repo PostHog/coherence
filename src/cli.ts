@@ -238,11 +238,12 @@ async function lexiconCommand(call: CommandCall, args: string[], root: string): 
   }
   // In the order the start injection keeps, so what is printed first is what the host's budget trims last.
   const named = lastNamed(loadJournal(root).records, [...coherence.concepts, ...(project?.concepts ?? [])]);
-  const compact = renderCompact(coherence, project, true, () => true, named);
+  const own = await isCoherenceItself(root);
+  const compact = renderCompact(coherence, project, own, () => true, named);
   call.stdout.write(compact);
   const estimate = tokenEstimate(compact);
   let note = "";
-  const within = renderCompactWithin(coherence, project, CONTEXT_BUDGET, "coherence", await isCoherenceItself(root), () => true, named, VOCABULARY_TOKENS);
+  const within = renderCompactWithin(coherence, project, CONTEXT_BUDGET, "coherence", own, () => true, named, VOCABULARY_TOKENS);
   if (within.delivered.name > 0 || within.delivered.out > 0) {
     note = `; the start injection presents at most ${VOCABULARY_TOKENS} tokens of it, so alone it would go ${deliveredText(within.delivered)} (~${tokenEstimate(within.text).tokens} tokens)`;
   }

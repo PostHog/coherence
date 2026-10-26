@@ -150,15 +150,16 @@ baseline, and its text is enforced whole.
 
 ## Whose rejected names bind where
 
-Coherence's rejected names bind only where Coherence's concepts are named. In this
-repository that is everywhere. In an adopter, the project's code and domain prose
-are its own words and Coherence's names are never matched there; the text written
-to Coherence (journal and work records, a spec's section headings, property keys
-and checklist shapes with their state words, and `coherence.config.json`) is
-matched, and a hit there is advisory: one `ADVISORY` line, never a failure. The
-project's own lexicon's rejected names bind in all of its text, as before. A project
-claims a word Coherence refused by declaring it in its own lexicon (a concept,
-alias, or instance); the claim silences that name everywhere in the project.
+Coherence's rejected names bind only in this repository, where they bind
+everywhere. In an adopter they are never read: a word Coherence refused for one of
+its own concepts is an ordinary word of the project's, in its code, prose, specs,
+journal records and `coherence.config.json` alike, and no check, stop, record or
+label names it. Coherence's lexicon there only says what Coherence's own terms
+mean. A word Coherence also defines is the project's word in the project's sense
+wherever the project writes it, and asks no sense review; sense review in an
+adopter counts only the project's own senses and rejected names. The project's own
+lexicon's rejected names bind in all of its text, and a name the project declares
+in its lexicon is never one of their hits.
 Start hooks explain the current unresolved population and maintenance commands.
 After delivery, they establish the session's baseline. Later tool/prompt boundaries
 show bounded new or changed contexts, and advance only after the host receives the

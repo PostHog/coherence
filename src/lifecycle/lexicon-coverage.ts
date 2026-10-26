@@ -23,16 +23,12 @@
  * conjunction, determiner, pronoun, or auxiliary) never is, however written.
  *
  * Sense review is asked only where meaning is at risk: a name with more than
- * one recorded sense, a use on or beside a prose line carrying a name
- * rejected for that same concept, or a Coherence concept an adopter's code
- * declares, written in text Coherence reads as its own: the journal's and
- * work's records, and a spec's or practice's grammar (its headings, property
- * keys and checklist shapes, check.ts's specGrammar). An adopter's code and
- * its domain prose are the project's words, so a Coherence name declared
- * there is the project's sense and asks nothing; only where Coherence's
- * grammar also speaks can the two senses meet. Such a context's ruling is
- * keyed to the term and the component, not the content, so a new use of the
- * same name does not reopen it.
+ * one recorded sense, or a use on or beside a prose line carrying a name
+ * rejected for that same concept. In an adopter only the project's own
+ * senses and rejected names count: a word Coherence also uses is the
+ * project's word wherever the project writes it, records and spec grammar
+ * included, and Coherence's lexicon there only says what Coherence's own
+ * terms mean.
  */
 import { existsSync, realpathSync } from "node:fs";
 import { exclusionOf, projectFilesEnding, walkBounds } from "../adapters/project-files.ts";
@@ -48,7 +44,6 @@ import { countWork } from "./work-meter.ts";
 import {
   corpusFiles,
   readCorpus,
-  specGrammar,
   type UnreadablePath,
 } from "./check.ts";
 import {
@@ -551,9 +546,12 @@ export async function lexiconReading(
   const projectSenses = new Map<string, Set<string>>();
   const propertyOwners = new Map<string, { concept: Concept; layer: LexiconLayer }[]>();
   table(coherence, "coherence", known, propertyOwners, coherenceSenses);
+  // Coherence's rejected names bind only in its own repository: in an adopter they are ordinary words of the project's, never read as refusals.
   const rejected = new Map(
-    rejectedNames(coherence).map((r) => [clean(r.name), r]),
+    (own ? rejectedNames(coherence) : []).map((r) => [clean(r.name), r]),
   );
+  // In an adopter they are no candidates either: the project's words, unremarked.
+  const unremarked = new Set(own ? [] : rejectedNames(coherence).map((r) => clean(r.name)));
   if (project) {
     table(project, "project", known, propertyOwners, projectSenses);
     for (const r of rejectedNames(project)) rejected.set(clean(r.name), r);
@@ -570,10 +568,6 @@ export async function lexiconReading(
     ? new Set([...acceptedNames(project)].map(clean))
     : new Set<string>();
   for (const name of projectNames) rejected.delete(name);
-  // Only a name that binds here marks a sense at risk beside it: Coherence's rejected names bind in an adopter's prose never, the project's own always (check.ts).
-  const binding = new Set(
-    own ? rejected.keys() : (project ? rejectedNames(project) : []).map((r) => clean(r.name)).filter((n) => rejected.has(n)),
-  );
   // The lexicon's "not:" entries name things it already knows are something else (Pyright, Python): never candidates.
   const confusables = new Set<string>();
   for (const g of [coherence, project])
@@ -612,10 +606,6 @@ export async function lexiconReading(
   };
   /** Rejected names on each line, keyed by file then line: sense is at risk beside them. */
   const rejectedLines = new Map<string, Map<number, string[]>>();
-  /** Names code declares, by their words: a Coherence concept an adopter declares carries the adopter's sense there. */
-  const declarations = new Map<string, VocabularyUse[]>();
-  /** Each use's words in text Coherence reads as its own (a record's prose, a spec's or practice's grammar), normalized: where an adopter's declared sense can meet Coherence's. */
-  const grammarOf = new Map<VocabularyUse, string>();
   const pool = new Map<string, Pool>();
   /** The files whose code declares each nominated name. */
   const declaredBy = new Map<string, Set<string>>();
@@ -628,7 +618,7 @@ export async function lexiconReading(
       if (site && !known.has(term) && !rejected.has(term)) add(term, site);
       return;
     }
-    if (confusables.has(term) || isWellKnown(famous, term, n.spelling)) return;
+    if (confusables.has(term) || unremarked.has(term) || isWellKnown(famous, term, n.spelling)) return;
     // Grammar, never a name: a phrase made only of function words is refused even capitalized ("Via", "And Or").
     if (term.split(" ").every((w) => FUNCTION_WORD_SET.has(w))) return;
     // A proper noun is a name even when the word is common; any other source must not be common words alone.
@@ -698,17 +688,7 @@ export async function lexiconReading(
           spans.push(phrase);
         }
       }
-      // A record's prose is written to Coherence whole; a spec or practice only in its grammar, while its sentences are the project's.
-      if (!own && project) {
-        const grammar =
-          f.kind === "record"
-            ? recordProse(observed).join(" ")
-            : f.kind === "prose" && /\.(spec|practice)\.md$/.test(f.rel)
-              ? specGrammar(observed)
-              : "";
-        if (grammar.trim() !== "") grammarOf.set(use, " " + clean(grammar).replace(/[^a-z0-9 ]/g, " ") + " ");
-      }
-      const refused = spans.filter((p) => binding.has(p));
+      const refused = spans.filter((p) => rejected.has(p));
       // Only prose a person can still edit puts a sense at risk: code shares words with the language (Promise), and a record is history.
       if (refused.length && f.kind === "prose") {
         // A rejected word inside a longer known name on the same line is that name, not the refusal.
@@ -723,11 +703,7 @@ export async function lexiconReading(
       if (f.kind === "code") {
         const name = declaredName(observed);
         if (name !== undefined && !name.startsWith("_")) {
-          const term = clean(name);
-          const sites = declarations.get(term) ?? [];
-          sites.push(use);
-          declarations.set(term, sites);
-          nominate({ term, spelling: name, proper: false }, use, true);
+          nominate({ term: clean(name), spelling: name, proper: false }, use, true);
         }
         const member = memberName(observed, exported, scan);
         if (member !== undefined) nominate({ term: clean(member), spelling: member, proper: false }, use, true);
@@ -895,40 +871,17 @@ export async function lexiconReading(
         propertyOwners: alternatives ?? null,
         rejected: refused ?? null,
       });
-      const projectSense = own ? undefined : projectSenses.get(term);
-      const toolSense = coherenceSenses.get(term);
-      // A longer known name holding this one ("language adapter" holding "adapter") is that name where it is written, not this one.
-      const holders = projectSense && toolSense ? phrases.filter((p) => p !== term && (" " + p + " ").includes(" " + term + " ")) : [];
-      const writesInGrammar = (u: VocabularyUse): boolean => {
-        const grammar = grammarOf.get(u);
-        if (grammar === undefined) return false;
-        return maskPhrases(grammar, holders).includes(" " + term + " ");
+      // In an adopter only the project's own senses can differ: Coherence's sense of a word the project also uses is the tool's, and inside the project the project's sense wins.
+      const senses = own ? alternatives : alternatives?.filter((a) => a.layer === "project");
+      const recorded = (own ? coherenceSenses : projectSenses).get(term) ?? new Set<string>();
+      const multiple = (): string | undefined => {
+        if (senses && senses.length > 1) return `more than one recorded sense: ${senses.map((a) => `${a.concept} (${a.layer})`).join(", ")}`;
+        return recorded.size > 1 ? `more than one recorded sense: ${[...recorded].join(", ")}` : undefined;
       };
-      const multiple = (here: VocabularyUse[]): { risk: string; declared: boolean } | undefined => {
-        if (alternatives && alternatives.length > 1)
-          return { risk: `more than one recorded sense: ${alternatives.map((a) => `${a.concept} (${a.layer})`).join(", ")}`, declared: false };
-        // In an adopter, a name its lexicon declares is the project's sense; Coherence's sense of the same spelling counts only where Coherence's grammar speaks.
-        const toolSpeaks = projectSense === undefined || here.some(writesInGrammar);
-        const recorded = new Set([...(toolSpeaks ? (toolSense ?? []) : []), ...(projectSense ?? [])]);
-        if (recorded.size <= 1) return undefined;
-        // Senses that meet only because Coherence's grammar writes the project's one-sense name are one question per term and component, as a code-declared name's are.
-        return { risk: `more than one recorded sense: ${[...recorded].join(", ")}`, declared: projectSense !== undefined && projectSense.size === 1 };
-      };
-      // Why a context's sense is at risk, and whether that reason is the declared sense alone, whose ruling is keyed to the term and component.
-      const atRisk = (here: VocabularyUse[]): { risk: string; declared: boolean } | undefined => {
+      // Why a context's sense is at risk, if it is.
+      const atRisk = (here: VocabularyUse[]): string | undefined => {
         if (candidate || refused || !item || (!item.concept && !alternatives?.length)) return undefined;
-        const several = multiple(here);
-        if (several) return several;
-        const beside = item.concept ? near(here, item.concept.name) : undefined;
-        if (beside) return { risk: beside, declared: false };
-        // In an adopter a Coherence name its code declares is the project's sense: at risk only where Coherence's grammar writes it too.
-        if (!own && project && item.layer === "coherence") {
-          const declared = declarations.get(term)?.[0];
-          const written = declared ? here.find((u) => grammarOf.get(u)?.includes(" " + term + " ")) : undefined;
-          if (declared && written)
-            return { risk: `declared in this project's code (${declared.file}:${declared.line}) with its own sense, and written in text Coherence reads as its own (${written.file}:${written.line}), where the definition is Coherence's`, declared: true };
-        }
-        return undefined;
+        return multiple() ?? (item.concept ? near(here, item.concept.name) : undefined);
       };
       const contexts = [...new Set(locations.map((u) => u.component))]
         .sort()
@@ -936,21 +889,18 @@ export async function lexiconReading(
           const here = locations.filter((u) => u.component === component);
           const risk = atRisk(here);
           // Content, not line numbers, identifies a context; moving a line does not erase a human's answer.
-          // A declared sense is one question per term and component, whichever uses raise it: a new use does not reopen its ruling.
-          const evidence = risk?.declared
-            ? digest({ fingerprint, component, declared: term })
-            : digest({
-                fingerprint,
-                component,
-                uses: [...new Set(here.map((u) => u.fingerprint + ":" + u.text))].sort(),
-              });
+          const evidence = digest({
+            fingerprint,
+            component,
+            uses: [...new Set(here.map((u) => u.fingerprint + ":" + u.text))].sort(),
+          });
           const ruling = decisions.get(evidence);
           return {
             component,
             fingerprint: evidence,
             disposition: ruling?.disposition ?? "unreviewed",
             because: ruling?.because ?? null,
-            ...(risk ? { risk: risk.risk } : {}),
+            ...(risk ? { risk } : {}),
           };
         });
       return {
@@ -988,7 +938,7 @@ export async function lexiconReading(
     limits: [
       "No exhaustive extraction or automatic proof of meaning.",
       "SQL/data/notebook bodies are text, not resolved language symbols; unsupported/binary files and symlinks are reported as excluded.",
-      "Sense review is asked only where meaning is at risk: more than one recorded sense, a use on or beside a line with a name rejected for that concept, or a Coherence concept the project's code declares with its own sense written in a record or a spec's or practice's grammar. A matched spelling elsewhere is not a confirmed meaning either.",
+      "Sense review is asked only where meaning is at risk: more than one recorded sense, or a use on or beside a line with a name rejected for that concept; in an adopter only the project's own senses and rejected names count. A matched spelling elsewhere is not a confirmed meaning either.",
       "Unknowns and deferred reviews are not covered. Journal review decisions do not nominate themselves.",
       "Totals are population facts about this reading, not a to-do count.",
     ],
