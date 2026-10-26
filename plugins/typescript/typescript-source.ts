@@ -13,6 +13,9 @@ const TS_NAMED = /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
 const TS_DEFAULT = /import\s+(?:type\s+)?([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\})?\s*from\s*["']([^"']+)["']/g;
 const TS_NAMESPACE = /import\s+(?:type\s+)?\*\s+as\s+[A-Za-z_$][\w$]*\s+from\s*["']([^"']+)["']/g;
 const TS_SIDE = /(?:^|\n)\s*import\s*["']([^"']+)["']/g;
+/** A re-export: the file depends on the module it re-exports from, by name or whole. */
+const TS_REEXPORT = /export\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
+const TS_REEXPORT_ALL = /export\s+(?:type\s+)?\*(?:\s+as\s+[A-Za-z_$][\w$]*)?\s+from\s*["']([^"']+)["']/g;
 
 /** A declaration is exported when its line says `export`; only a relative specifier names a project file. */
 export const TYPESCRIPT_SOURCE: SourceSyntax = {
@@ -48,5 +51,12 @@ export const TYPESCRIPT_SOURCE: SourceSyntax = {
     for (const m of text.matchAll(TS_DEFAULT)) add("default", m[2]!);
     for (const m of text.matchAll(TS_NAMESPACE)) add(undefined, m[1]!);
     for (const m of text.matchAll(TS_SIDE)) add(undefined, m[1]!);
+    for (const m of text.matchAll(TS_REEXPORT)) {
+      for (const piece of m[1]!.split(",")) {
+        const original = piece.replace(/^\s*type\s+/, "").trim().split(/\s+as\s+/)[0]!.trim();
+        if (original !== "") add(original, m[2]!);
+      }
+    }
+    for (const m of text.matchAll(TS_REEXPORT_ALL)) add(undefined, m[1]!);
   },
 };

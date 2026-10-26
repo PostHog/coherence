@@ -107,6 +107,7 @@ test("a Go line declares a package-level func, type, var or const at column zero
     ["Rows", true],
     ["List", true],
     ["limit", false],
+    ["depth", false],
     ["usage", false],
     ["Write", true],
     ["Table", true],

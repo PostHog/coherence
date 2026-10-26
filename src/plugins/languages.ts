@@ -487,10 +487,16 @@ export function sourceProvider(language: string): LoadedPlugin | undefined {
   return fills(swap, "source") ? swap : baseProvider(language);
 }
 
-/** The reader of a language's text through its parser: the source provider's, when it names one; undefined otherwise. */
+/**
+ * The reader of a language's text through its parser: the source provider's,
+ * when it names one; undefined otherwise, and undefined too when a plugin
+ * extending the language wraps its source slot, so the readings answer
+ * through the wrapped slot and the extending plugin is never passed over.
+ */
 export function treeReaderFor(language: string): TreeReader | undefined {
   const plugin = sourceProvider(language);
-  return plugin === undefined ? undefined : treeReaderOf(plugin, rootNow());
+  if (plugin === undefined || extendersOf(language).some((p) => p.manifest.syntax?.source !== undefined)) return undefined;
+  return treeReaderOf(plugin, rootNow());
 }
 
 /**
@@ -503,6 +509,8 @@ function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
   if (slots.has(key)) return slots.get(key);
   // The project asking, at each call: the table is built once, and each project's parses are kept in its own folder.
   const reader = (): TreeReader => treeReaderOf(plugin, rootNow())!;
+  // A question about one line (what it declares) parses the line alone: no project's store keeps it, since no file is that line.
+  const lineReader = (): TreeReader => treeReaderOf(plugin)!;
   const resolution = (): ModuleResolution => {
     const value = exportAt(plugin, plugin.manifest.treeSitter!.resolve, "treeSitter.resolve") as ModuleResolution;
     if (typeof value?.resolveModule !== "function" || typeof value.modulePaths !== "function") throw new Error(`plugin ${plugin.name}'s treeSitter.resolve names ${plugin.manifest.treeSitter!.resolve}, which is no { resolveModule, modulePaths }`);
@@ -512,7 +520,7 @@ function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
   if (slot === "source") {
     table = {
       declarationOf: (line: string) => {
-        const declared = reader().declarations(line)[0];
+        const declared = lineReader().declarations(line)[0];
         return declared === undefined ? undefined : { name: declared.name, exported: declared.exported };
       },
       resolveModule: (root: string, from: string, specifier: string, vanished: ReadonlySet<string>) => resolution().resolveModule(root, from, specifier, vanished),
@@ -521,7 +529,7 @@ function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
         for (const imported of reader().imports(text)) if (imported.glob !== true) add(imported.name, imported.specifier);
       },
     } satisfies SourceSyntax;
-  } else if (slot === "declares") table = (line: string) => reader().declarations(line)[0]?.declares ?? "unknown";
+  } else if (slot === "declares") table = (line: string) => lineReader().declarations(line)[0]?.declares ?? "unknown";
   else if (slot === "topLevel") table = (text: string, name: string) => reader().topLevel(text).has(name);
   else if (slot === "interfaces") {
     // The language's own facts the plugin's interfaces table states (whether its server narrows to bounds, its default exports); the import answers are the parser's alone.
@@ -529,7 +537,7 @@ function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
     const twice = (["importLists", "wildcardModules"] as const).filter((answer) => facts?.[answer] !== undefined);
     if (twice.length > 0) throw new Error(`plugin ${plugin.name} reads its text through treeSitter, so its interfaces table's ${twice.join(" and ")} would read its imports a second time; the core derives them from the parser: remove them`);
     table = {
-      isTypeDeclaration: (line: string) => reader().declarations(line)[0]?.declares === "type",
+      isTypeDeclaration: (line: string) => lineReader().declarations(line)[0]?.declares === "type",
       isDefaultExport: () => false,
       serverBounds: false,
       defaultNames: () => [],

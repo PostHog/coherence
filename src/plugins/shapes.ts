@@ -11,14 +11,14 @@
  * no imports. Advisory: a reading, never a duty, and it fails nothing.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { configIgnore } from "../adapters/project-files.ts";
-import { sourceFiles } from "../economy/source.ts";
+import { resolveModule, sourceFiles } from "../economy/source.ts";
+import { checkProjects, inScratch } from "./check.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { forProject, sourceProvider } from "./languages.ts";
 import type { LoadedPlugin } from "./plugin.ts";
-import { BUNDLED_DIR } from "./registry.ts";
 import { capturesStatements, IMPORT_SHAPES, importShapes, type ImportShape } from "./syntax-trees.ts";
 
 /** One shape's count in the project and in the plugin's check projects, with where the project first writes it. */
@@ -32,32 +32,44 @@ export interface ShapeRow {
 /** One language's census, or why it was not taken. */
 export type LanguageShapes = { language: string; plugin: string; files: number; rows: ShapeRow[]; blocksKnown: boolean } | { language: string; plugin: string | undefined; notRead: string };
 
-/** The check projects plugin check holds a language's plugin to: the bundled one for the language and the plugin's own, each read as its files. */
-function checkTexts(plugin: LoadedPlugin): string[] {
-  const texts: string[] = [];
-  for (const file of [join(BUNDLED_DIR, plugin.name, "check.json"), join(plugin.dir, "check.json")]) {
-    if (!existsSync(file)) continue;
-    try {
-      const project = JSON.parse(readFileSync(file, "utf8")) as { files?: Record<string, string>; language?: { files?: string[] } };
-      for (const path of project.language?.files ?? []) {
-        const text = project.files?.[path];
-        if (text !== undefined && !texts.includes(text)) texts.push(text);
+/**
+ * The shapes each check project plugin check holds the plugin to puts to it:
+ * the projects plugin check reads (the bundled one for the language, and the
+ * plugin's own), and of their imports only those that resolve to a file of
+ * the check project, which are the ones the imports duty compares; an import
+ * of something outside it is in the text and checked by nothing.
+ */
+async function checkedShapes(plugin: LoadedPlugin, language: string): Promise<Map<ImportShape, number>> {
+  const counted = new Map<ImportShape, number>();
+  const projects = checkProjects(plugin, language);
+  if ("refusal" in projects) return counted;
+  const seen = new Set<string>();
+  for (const { project } of projects) {
+    await inScratch(project, plugin, language, (scratch) => {
+      for (const file of project.language.files) {
+        const text = project.files[file];
+        if (text === undefined || seen.has(`${file}\u0000${text}`)) continue;
+        seen.add(`${file}\u0000${text}`);
+        for (const { shapes, specifier } of importShapes(plugin, text)) {
+          if (resolveModule(scratch, file, specifier, language) === undefined) continue;
+          for (const shape of shapes) counted.set(shape, (counted.get(shape) ?? 0) + 1);
+        }
       }
-    } catch {
-      // A check.json that will not read is plugin check's to refuse; the census counts what it can.
-    }
+    });
   }
-  return texts;
+  return counted;
 }
 
 /** The census of every language the project reads. */
-export function shapeCensus(rootGiven: string): LanguageShapes[] {
+export async function shapeCensus(rootGiven: string): Promise<LanguageShapes[]> {
   const root = resolve(rootGiven);
   const config = readEnforcementConfig(root);
   const ignore = configIgnore(root);
-  return forProject(root, () =>
-    config.languages.map((language): LanguageShapes => {
-      const plugin = sourceProvider(language);
+  const out: LanguageShapes[] = [];
+  for (const language of config.languages) {
+    const plugin = forProject(root, () => sourceProvider(language));
+    const checked = plugin?.manifest.treeSitter === undefined ? new Map<ImportShape, number>() : await checkedShapes(plugin, language);
+    out.push(forProject(root, (): LanguageShapes => {
       if (plugin === undefined) return { language, plugin: undefined, notRead: "no plugin provides it" };
       if (plugin.manifest.treeSitter === undefined) return { language, plugin: plugin.name, notRead: `plugin ${plugin.name} reads ${language} with hand-written readers, not a parser, so its imports' shapes are not read` };
       const rows = new Map<ImportShape, ShapeRow>(IMPORT_SHAPES.map((shape) => [shape, { shape, here: 0, checked: 0 }]));
@@ -77,10 +89,11 @@ export function shapeCensus(rootGiven: string): LanguageShapes[] {
           }
         }
       }
-      for (const text of checkTexts(plugin)) for (const { shapes } of importShapes(plugin, text)) for (const shape of shapes) rows.get(shape)!.checked++;
+      for (const [shape, count] of checked) rows.get(shape)!.checked = count;
       return { language, plugin: plugin.name, files: files.length, rows: [...rows.values()], blocksKnown: capturesStatements(plugin) };
-    }),
-  );
+    }));
+  }
+  return out;
 }
 
 /** The census as the command prints it: each shape's count here and in the check projects, and each the project writes that no check project holds named. */

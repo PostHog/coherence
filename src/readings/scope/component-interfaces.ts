@@ -866,7 +866,8 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
       const lines = text.split("\n");
       for (const declaration of declarationsOf(text, language)) {
         const line = lines[declaration.line - 1] ?? "";
-        const type = isTypeDeclaration(line, language);
+        // A language read through a parser says what each declaration declares in the same parse; another answers by its line.
+        const type = declaration.declares !== undefined ? declaration.declares === "type" : isTypeDeclaration(line, language);
         const id = `${file}#${declaration.name}`;
         const isDefault = interfaceSyntax(language).isDefaultExport(line);
         declared.push({ id, component: owner, name: declaration.name, file, type, exported: declaration.exported, isDefault });

@@ -473,7 +473,7 @@ export const GO_SOURCE: SourceSyntax = {
       if (MEMBERS.size >= MEMBERS_BOUND) MEMBERS.clear();
       MEMBERS.set(line.replace(/\r$/, ""), declared);
     }
-    return { name: declared.names[0]!, exported: declared.exported };
+    return { name: declared.names[0]!, exported: declared.exported, ...(declared.names.length > 1 ? { also: declared.names.slice(1) } : {}) };
   },
   resolveModule(root, from, specifier, vanished) {
     const folder = packageFolderOf(root, from, specifier);

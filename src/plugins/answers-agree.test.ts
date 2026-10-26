@@ -37,7 +37,7 @@ function oldReaders(render: string): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-answers-agree-"));
   fixtures.push(root);
   const files: Record<string, string> = {
-    "zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, extensions: [".zz"], module: "./index.ts", syntax: { source: "readers.ts#SOURCE", interfaces: "readers.ts#INTERFACES", topLevel: "readers.ts#topLevel" } }),
+    "zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 3, provides: { language: "zz" }, extensions: [".zz"], module: "./index.ts", syntax: { source: "readers.ts#SOURCE", interfaces: "readers.ts#INTERFACES", topLevel: "readers.ts#topLevel" } }),
     "zz/index.ts": STAND_IN,
     "zz/readers.ts": OLD_READERS,
     "zz/check.json": JSON.stringify({

@@ -114,9 +114,14 @@ project's other files resolve the package as they always did. The installed
 copy still gives an editor and a typecheck the interface's types.
 
 The bundled plugins are the fullest examples, shipped in the package under
-`plugins/`: `go` for a language Coherence lacks, `rust` for an adapter over a
-language server with no npm package, `typescript`, `python` (with tach) and
-`declared`. Their sources import the core as `../../src/plugins/api.ts`, the
+`plugins/`. For a language Coherence lacks, start from `python`: it reads its
+text through a tree-sitter parser and queries (below, reading through a
+parser), so the readings come from one parse and no hand-written reader of
+its text can disagree with another or miss a statement that spans lines.
+`go` and `rust` still read their text with hand-written syntax slots; take
+them as examples of an adapter over a language server (`go` drives gopls,
+`rust` a server with no npm package), not of how to read text. `typescript`
+and `declared` complete the set. Their sources import the core as `../../src/plugins/api.ts`, the
 same module the package exports as `@posthog/coherence/plugin`; an ejected
 copy names it the second way, and so should a plugin you write.
 
@@ -126,11 +131,12 @@ copy names it the second way, and so should a plugin you write.
 {
   "name": "sample",
   "version": "0.1.0",
-  "pluginApi": 2,
+  "pluginApi": 3,
   "provides": { "language": "swift" },
   "extensions": [".swift"],
   "testFolders": ["Tests"],
   "module": "./index.ts",
+  "treeSitter": { "parser": "tree-sitter-swift.wasm", "queries": "swift.scm", "resolve": "swift-resolve.ts#SWIFT_RESOLVE" },
   "ladder": { "top": "reference-choked", "because": "...", "rungs": [] },
   "verifiers": [
     { "form": "sample prove", "evidence": "model-checked" },
@@ -143,7 +149,7 @@ copy names it the second way, and so should a plugin you write.
 | Key | Meaning |
 |---|---|
 | `name`, `version` | Who the plugin is. Every run entry its adapter or verifier answers names both. |
-| `pluginApi` | The interface version it was written for. This release runs `2` and reads plugins written for `1` to `2`: a plugin written for `1` loads, and the session start names it with what changed since. Any other version is refused, naming both. |
+| `pluginApi` | The interface version it was written for. This release runs `3` and reads plugins written for `1` to `3`: a plugin written for an older one loads, and the session start names it with what changed since. Any other version is refused, naming both. Version 3 brought the parser path (`treeSitter`), imports that resolve to a module of several files, the adapter's `topLevelSymbols`, and `check.json`'s `reference` map; `plugin check` holds a plugin to the reference reading and server agrees duties from 3, and tells a plugin written for 2 they are not held. |
 | `provides.language` | The language its adapter answers for. A built-in name takes the built-in's place (see the swap rule). A new name needs `extensions` (or `files`), and the config's `language` must name it; the language is then read as a bundled one is, for that project: its files, test files and folders, its entrance rules, its CI steps and every syntax slot it fills. |
 | `extends` | The language whose adapter it is handed to wrap, as `base` (Convex extends `typescript`). A plugin for a language of its own extends nothing. |
 | `extensions` | The files a new language is written in. An extension a built-in, a declared language, or another plugin owns is refused. |
@@ -221,6 +227,13 @@ there is not, so the copy never makes the name ambiguous.
 
 ### The syntax slots
 
+A language plugin should read its text through a parser (below, reading
+through a parser), which derives the `source`, `declares` and `topLevel`
+slots and the `interfaces` slot's import answers; it still fills the slots no
+parse answers (`entrances`, `notice`, `lists`, `boundaries`, the
+`interfaces` table's language facts). A plugin with no parser for its
+language reads by hand-written slots, as `go` and `rust` do today.
+
 The readings scan a language by the tables its plugin's manifest names under
 `syntax`, each as `"<module>#<export>"`, loaded synchronously, once, when a
 reading first asks for that slot:
@@ -289,7 +302,7 @@ plugin reads this way (`plugins/python`).
 
 | Key | Meaning |
 |---|---|
-| `parser` | The language's parser compiled to WebAssembly, beside the manifest. Many grammars' npm packages ship one (`tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-java`, `tree-sitter-c`): copy the `.wasm` out of the package. For a grammar that ships none (`tree-sitter-swift`, `tree-sitter-kotlin`), run `tree-sitter build --wasm` in the grammar's repository; the tree-sitter CLI compiles it with Emscripten, or with Docker or Podman when Emscripten is not installed. Coherence runs web-tree-sitter 0.27, which loads parsers built for language ABI 13 to 15. |
+| `parser` | The language's parser compiled to WebAssembly, beside the manifest. Many grammars' npm packages ship one (`tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-java`, `tree-sitter-c`): copy the `.wasm` out of the package. For a grammar whose npm package ships none, look on the grammar's GitHub releases first: `tree-sitter-swift` attaches `tree-sitter-swift.wasm` to each release. Failing that, run `tree-sitter build --wasm` in the grammar's repository; the tree-sitter CLI compiles it with Emscripten, or with Docker or Podman when Emscripten is not installed. Coherence runs web-tree-sitter 0.27, which loads parsers built for language ABI 13 to 15. |
 | `queries` | A file of tree-sitter queries, beside the manifest, whose captures are the names below. A query that does not compile against the parser, or a capture Coherence reads nothing by, is refused naming the plugin. |
 | `resolve` | `"<module>#<export>"`: a `ModuleResolution`, `{ resolveModule(root, from, specifier, vanished), modulePaths(from, specifier) }`. Where an import leads is the language's rule, not its syntax, so it stays code: `resolveModule` names the project file a specifier leads to, or, where the language's module is several files (a Go package, a SwiftPM target), the module as `{ module: "<folder>", files: ["<every file of it>"] }`, or `undefined` outside the project. `modulePaths` gives every spelling of the files a glob import names. |
 | `privateName` | For a language that exports by name rather than by a keyword: a regular expression a name it keeps private matches (Python's `^_`). A language that exports by keyword captures `@exported` instead. |
@@ -359,13 +372,17 @@ files: the declarations the server reports too, each it does not (a misread,
 with its file and line), and what the server reports that the reading leaves
 out, counted by symbol kind. An adapter takes part by offering
 `topLevelSymbols(file)`, the server's top-level symbols with their lines and
-LSP kinds; the bundled adapters do.
+LSP kinds; the bundled adapters do, and from pluginApi 3 every adapter over
+a language server must.
 
 `coherence plugin shapes`, run in a project, counts each shape of import
 its code writes (named, renamed, glob, whole module, spans lines, inside a
 block) through each language's parser, beside how many of each the plugin's
-check projects hold, and names each shape the project writes that no check
-project holds as untested: plugin check never puts that shape to the
+check projects put to it (an import there counts only when it resolves to a
+file of the check project, since only those are what the imports duty
+compares; the check projects are the ones plugin check reads, found by
+language), and names each shape the project writes that no check project
+puts to the plugin as untested: plugin check never puts that shape to the
 plugin, so a reader could miss every one and pass. Add one to the plugin's
 `check.json` files and `readings.imports`. Capture each import's whole
 statement as `@import` so the census can tell an import inside a block.
@@ -396,6 +413,7 @@ reader's side; this is the author's side.
 | `forget(files?)` | Make the instrument read the disk again: the named files, or all it may have open. Resolve only once the instrument has taken the change in, since the edit hook checks again right after. |
 | `close()` | Stop what the adapter started. The core closes a `base` it handed you. |
 | `serverPid()` | Optional: the server's process id, so a reading can bound its memory. |
+| `topLevelSymbols(file)` | Required from pluginApi 3 for an adapter over a language server: the symbols the server reports a file declaring at its top level, each `{ name, line, kind }` (one-based line, LSP SymbolKind), from `textDocument/documentSymbol`'s top level (a flat answer's symbols with a container left out). `plugin check`'s server agrees duty and `coherence plugin calibrate` hold the text readings to it. An adapter that extends a language may leave it to the one it wraps. |
 
 ### The refutation
 
@@ -491,9 +509,9 @@ one wanting changes a copy of it:
    |---|---|
    | file rule | the files `check.json` names as the language's are, and the others are not |
    | declarations | the `topLevel` slot says which names a file declares, as `check.json` says |
-   | reference reading | the readings recover, over the check project, every relation of the reference project its `reference` map places there (below) |
+   | reference reading | the readings recover, over the check project, every relation of the reference project its `reference` map places there (below); held from pluginApi 3 |
    | references | the adapter reports every reference to the protected thing, and none else; one that reports none fails here, by name |
-   | server agrees | every name the text reading finds a file declaring is a top-level symbol the language server reports for that file (the adapter's optional `topLevelSymbols`); not run when the adapter offers none |
+   | server agrees | every name the text reading finds a file declaring is a top-level symbol the language server reports for that file (the adapter's `topLevelSymbols`, required from pluginApi 3; a plugin written for 2 is told it is not held) |
    | chokepoint | the run grades the chokepoint as `check.json` expects, bypasses named, its refutation seen or refused |
    | mass | mass reads the language, counts each file, and the `source` slot's scan finds in each the names `check.json`'s `readings.declared` gives |
    | imports | the `source` slot's scan reads every import `readings.imports` names, resolved to its project file, and none else: what the economy's closure walks |

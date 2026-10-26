@@ -339,7 +339,7 @@ async function pluginCommand(call: CommandCall, args: string[], root: string): P
   }
   if (verb === "shapes") {
     if (given !== undefined || flags.size > 0) fail(`plugin shapes: no arguments; it reads the project it runs in\n${USAGE}`);
-    call.stdout.write(`${shapesText(shapeCensus(root))}\n`);
+    call.stdout.write(`${shapesText(await shapeCensus(root))}\n`);
     return 0;
   }
   if (given === undefined || more.length > 0 || (verb !== "eject" && verb !== "check")) fail(`plugin: eject <name> [--to <dir>], check <plugin>, or shapes\n${USAGE}`);

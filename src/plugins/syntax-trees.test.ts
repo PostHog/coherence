@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, test } from "node:test";
@@ -16,7 +16,7 @@ import { declarationsOf, importsOf } from "../economy/source.ts";
 import { forProject, registerProjectPlugins, syntaxOf } from "./languages.ts";
 import type { LoadedPlugin, PluginManifest } from "./plugin.ts";
 import { BUNDLED_DIR, readManifest } from "./registry.ts";
-import { treeReaderOf } from "./syntax-trees.ts";
+import { treeReaderOf, warmParses } from "./syntax-trees.ts";
 import { Parser, Tree } from "web-tree-sitter";
 
 const fixtures: string[] = [];
@@ -195,4 +195,51 @@ test("an import that resolves to a module joins, of its files, those that declar
   } finally {
     registerProjectPlugins(root, []);
   }
+});
+
+test("the parse store never reaches past the project's own folders: a link on its path keeps no parses and touches nothing, a store or log the project brings is never read or written through, and only the store's own files are removed", () => {
+  const plugin: LoadedPlugin = { name: "python", version: "0", dir: PYTHON, source: "bundled", manifest: { name: "python", version: "0", pluginApi: 2, treeSitter: { parser: "tree-sitter-python.wasm", queries: "python.scm", resolve: "python-source.ts#PYTHON_RESOLVE" } } };
+  const texts = ["from a import (\n    b,\n)\n", "X = 1\n"];
+
+  // A repository that commits .coherence/parses/python as a link to a folder outside it.
+  const victim = mkdtempSync(join(tmpdir(), "coherence-victim-"));
+  fixtures.push(victim);
+  writeFileSync(join(victim, "id_rsa"), "secret\n");
+  const linked = mkdtempSync(join(tmpdir(), "coherence-linked-"));
+  fixtures.push(linked);
+  mkdirSync(join(linked, ".coherence", "parses"), { recursive: true });
+  symlinkSync(victim, join(linked, ".coherence", "parses", "python"));
+  assert.deepEqual(warmParses(plugin, linked, texts), { read: 0, parsed: 0, skipped: true }, "a link on the store's path keeps no parses");
+  assert.deepEqual(readdirSync(victim), ["id_rsa"], "the link's target is untouched");
+
+  // A real store folder holding a forged store, a log that links out, and a file of someone else's.
+  const project = mkdtempSync(join(tmpdir(), "coherence-forged-"));
+  fixtures.push(project);
+  const store = join(project, ".coherence", "parses", "python");
+  mkdirSync(store, { recursive: true });
+  const reader = treeReaderOf(plugin, project)! as ReturnType<typeof treeReaderOf> & { keyOf(text: string): string };
+  const elsewhere = join(victim, "appended");
+  writeFileSync(elsewhere, "");
+  // The forged store names a text's digest with a made-up import; the log links to a file outside the project.
+  const forgedKey = reader.keyOf(texts[0]!);
+  const names = (): string[] => readdirSync(store).sort();
+  writeFileSync(join(store, "notes.txt"), "someone else's\n");
+  const first = warmParses(plugin, project, texts);
+  assert.deepEqual(first, { read: 2, parsed: 2 });
+  const [own] = names().filter((n) => n.endsWith(".json"));
+  assert.ok(own !== undefined, names().join(", "));
+  const fp = own.slice(0, -".json".length);
+  writeFileSync(join(store, own), JSON.stringify({ [forgedKey]: [[["import.from", "forged", 1], ["import.name", "made_up", 1]]] }));
+  symlinkSync(elsewhere, join(store, `${fp}.added.jsonl`));
+  // A fresh process's reader: the unsigned store is never read, so the text is parsed again and reads what it holds.
+  const probe = `import { startParsers, treeReaderOf } from ${JSON.stringify(resolve("src/plugins/syntax-trees.ts"))};
+    await startParsers();
+    const reader = treeReaderOf(${JSON.stringify(plugin)}, ${JSON.stringify(project)});
+    const texts = Array.from({ length: 20 }, (_, i) => "Y" + i + " = 1\\n");
+    for (const text of texts) reader.imports(text);
+    console.log(JSON.stringify(reader.imports(${JSON.stringify(texts[0])}).map((i) => i.name + " <- " + i.specifier)));`;
+  const said = execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", probe], { encoding: "utf8" });
+  assert.deepEqual(JSON.parse(said), ["b <- a"], "a store the project brings, unsigned, is never read");
+  assert.equal(readFileSync(elsewhere, "utf8"), "", "nothing is appended through a link");
+  assert.ok(names().includes("notes.txt"), "a file that is not the store's own is never removed");
 });

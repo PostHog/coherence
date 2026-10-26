@@ -123,6 +123,7 @@ function treeSitterProblems(raw: Record<string, unknown>, dir: string, language:
   for (const key of ["parser", "queries"] as const) {
     const path = declared[key];
     if (typeof path !== "string" || path === "" || isAbsolute(path)) problems.push(shape);
+    else if (relative(dir, resolve(dir, path)).startsWith("..")) problems.push(`${who}'s treeSitter.${key} names ${path}, which leaves the plugin's folder`);
     else if (!existsSync(join(dir, path))) problems.push(`${who}'s treeSitter.${key} names ${path}, which is not beside its ${MANIFEST}`);
   }
   if (typeof declared["resolve"] !== "string" || !/^[^#/][^#]*#[A-Za-z_$][\w$]*$/.test(declared["resolve"])) problems.push(shape);

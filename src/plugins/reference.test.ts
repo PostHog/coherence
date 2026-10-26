@@ -5,7 +5,7 @@
  */
 
 import assert from "node:assert/strict";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
@@ -20,18 +20,18 @@ after(() => {
 const PYTHON = join(BUNDLED_DIR, "python");
 
 /** A plugin by path reading a language "zz" through Python's parser, whose resolve gives an import of the module store its first file alone, as two blind Swift plugins did. */
-function oneFileRule(): string {
+function oneFileRule(render = "import store\n\ndef render(row):\n    return store.seal(store.Row(row)), store.SECRET_COLUMNS\n", modules: Record<string, string> = { store: "store/rows.zz", "api.render": "api/render.zz" }): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-reference-"));
   fixtures.push(root);
   const files: Record<string, string> = {
-    "zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, extensions: [".zz"], module: "./index.ts", treeSitter: { parser: "zz.wasm", queries: "zz.scm", resolve: "resolve.ts#RESOLVE" } }),
+    "zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 3, provides: { language: "zz" }, extensions: [".zz"], module: "./index.ts", treeSitter: { parser: "zz.wasm", queries: "zz.scm", resolve: "resolve.ts#RESOLVE" } }),
     "zz/index.ts": "export default {};\n",
-    "zz/resolve.ts": 'export const RESOLVE = { resolveModule: (root, from, specifier) => ({ store: "store/rows.zz", "api.render": "api/render.zz" })[specifier], modulePaths: () => [] };\n',
+    "zz/resolve.ts": `export const RESOLVE = { resolveModule: (root, from, specifier) => (${JSON.stringify(modules)})[specifier], modulePaths: () => [] };\n`,
     "zz/check.json": JSON.stringify({
       files: {
         "store/rows.zz": "class Row:\n    pass\n",
         "store/secrets.zz": "SECRET_COLUMNS = []\n\ndef seal(row):\n    return row\n",
-        "api/render.zz": "import store\n\ndef render(row):\n    return store.seal(store.Row(row)), store.SECRET_COLUMNS\n",
+        "api/render.zz": render,
         "app/main.zz": "from api.render import render\n",
       },
       language: { files: ["store/rows.zz", "store/secrets.zz", "api/render.zz", "app/main.zz"], not: [] },
@@ -65,4 +65,27 @@ test("plugin compare lays every language plugin's reading of the reference proje
   const duty = (await checkPlugin(root, "./zz")).duties.find((d) => d.name === "reference reading")!;
   assert.equal(duty.verdict, "fail", duty.reason);
   assert.match(duty.reason, /render imports SECRET_COLUMNS, seal from secrets: api\/render\.zz read importing nothing from store\/secrets\.zz/);
+});
+
+test("a whole-module import reaches a name of the reference project only where the importer spells it: an import of the secrets module whose names render never uses holds no relation to them", async () => {
+  const unused = oneFileRule("import store.secrets\nfrom store.rows import Row\n\ndef render(row):\n    return Row(row)\n", { "store.secrets": "store/secrets.zz", "store.rows": "store/rows.zz", "api.render": "api/render.zz" });
+  const zz = (await compareReference([pluginAt(unused, "./zz")])).find((r) => r.plugin === "zz")!;
+  assert.ok("held" in zz, JSON.stringify(zz));
+  assert.deepEqual(zz.missed, ["render imports SECRET_COLUMNS, seal from secrets: api/render.zz read importing no SECRET_COLUMNS, seal from store/secrets.zz"]);
+
+  const used = oneFileRule("import store.secrets\nfrom store.rows import Row\n\ndef render(row):\n    return store.secrets.seal(Row(row)), store.secrets.SECRET_COLUMNS\n", { "store.secrets": "store/secrets.zz", "store.rows": "store/rows.zz", "api.render": "api/render.zz" });
+  const read = (await compareReference([pluginAt(used, "./zz")])).find((r) => r.plugin === "zz")!;
+  assert.ok("held" in read && read.missed.length === 0, JSON.stringify(read));
+});
+
+test("a plugin written for an older interface version is told a duty newer than it is not held, and never failed by it: reference reading and server agrees hold from pluginApi 3", async () => {
+  const root = oneFileRule();
+  const manifest = join(root, "zz", "plugin.json");
+  writeFileSync(manifest, readFileSync(manifest, "utf8").replace('"pluginApi":3', '"pluginApi":2'));
+  const duties = (await checkPlugin(root, "./zz")).duties;
+  for (const name of ["reference reading", "server agrees"] as const) {
+    const duty = duties.find((d) => d.name === name)!;
+    assert.equal(duty.verdict, "pass", `${name}: ${duty.reason}`);
+    assert.match(duty.reason, new RegExp(`not held: plugin zz is written for pluginApi 2, and ${name} holds from pluginApi 3`));
+  }
 });

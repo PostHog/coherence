@@ -99,12 +99,15 @@ interface DocumentSymbol {
   range: Range;
   selectionRange: Range;
   children?: DocumentSymbol[];
+  /** Set where the server answered a flat SymbolInformation list naming the symbol's container: no top-level symbol. */
+  nested?: true;
 }
 
 interface SymbolInformation {
   name: string;
   kind: number;
   location: { uri: string; range: Range };
+  containerName?: string;
 }
 
 interface Location {
@@ -511,7 +514,7 @@ export class RustAdapter implements LanguageAdapter {
 
   /** The file's top-level symbols as the server reports them: the independent account plugin check and plugin calibrate hold the text readings to. */
   async topLevelSymbols(file: string): Promise<ServerSymbol[]> {
-    return (await this.documentSymbols(file)).map((s) => ({ name: s.name, line: s.selectionRange.start.line + 1, kind: s.kind }));
+    return (await this.documentSymbols(file)).filter((s) => s.nested !== true).map((s) => ({ name: s.name, line: s.selectionRange.start.line + 1, kind: s.kind }));
   }
 
   private async documentSymbols(file: string): Promise<DocumentSymbol[]> {
@@ -522,7 +525,7 @@ export class RustAdapter implements LanguageAdapter {
       return [];
     }
     const result = await this.ask<DocumentSymbol[] | SymbolInformation[] | null>("textDocument/documentSymbol", { textDocument: { uri: this.uri(file) } });
-    const symbols: DocumentSymbol[] = (result ?? []).map((s) => ("location" in s ? { name: s.name, kind: s.kind, range: s.location.range, selectionRange: s.location.range } : s));
+    const symbols: DocumentSymbol[] = (result ?? []).map((s) => ("location" in s ? { name: s.name, kind: s.kind, range: s.location.range, selectionRange: s.location.range, ...(s.containerName ? { nested: true as const } : {}) } : s));
     this.symbolCache.set(file, symbols);
     return symbols;
   }

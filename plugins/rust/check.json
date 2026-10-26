@@ -5,7 +5,7 @@
     "src/store/mod.rs": "pub const SECRET_COLUMNS: &[&str] = &[\"token\"];\n\npub fn seal(row: &mut Vec<String>) {\n    row.retain(|c| !SECRET_COLUMNS.contains(&c.as_str()));\n}\n\npub mod rows;\n",
     "src/api/mod.rs": "use crate::store::{seal, SECRET_COLUMNS};\nuse crate::store::rows::Row;\n\npub fn render(row: &mut Row) -> usize {\n    seal(&mut row.0);\n    SECRET_COLUMNS.len()\n}\n",
     "README.md": "# A crate\n",
-    "src/main.rs": "fn main() {\n    let mut row = shop::store::rows::Row(vec![\"token\".to_string()]);\n    println!(\"{}\", shop::api::render(&mut row));\n}\n",
+    "src/main.rs": "use shop::api::render;\nuse shop::store::rows::Row;\n\nfn main() {\n    let mut row = Row(vec![\"token\".to_string()]);\n    println!(\"{}\", render(&mut row));\n}\n",
     "src/store/rows.rs": "/// One stored row, by column.\npub struct Row(pub Vec<String>);\n"
   },
   "language": {
@@ -110,6 +110,20 @@
         "names": [
           "*"
         ]
+      },
+      {
+        "file": "src/main.rs",
+        "module": "src/api/mod.rs",
+        "names": [
+          "render"
+        ]
+      },
+      {
+        "file": "src/main.rs",
+        "module": "src/store/rows.rs",
+        "names": [
+          "Row"
+        ]
       }
     ],
     "interfaces": [
@@ -137,7 +151,7 @@
       "secrets": "src/store/mod.rs",
       "rows": "src/store/rows.rs",
       "render": "src/api/mod.rs",
-      "main": "src/lib.rs"
+      "main": "src/main.rs"
     },
     "names": {
       "SECRET_COLUMNS": "SECRET_COLUMNS",

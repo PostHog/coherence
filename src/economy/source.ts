@@ -53,8 +53,8 @@ export function toRelative(root: string, path: string): string | undefined {
  * resolves no specifier here, never reads as another language.
  */
 export interface SourceSyntax {
-  /** The name a line declares at the top level and whether its file exports it, or undefined when it declares none. */
-  declarationOf(line: string): { name: string; exported: boolean } | undefined;
+  /** The name a line declares at the top level and whether its file exports it, or undefined when it declares none; `also`, the further names one line declares (Go's const A, B = 1, 2). */
+  declarationOf(line: string): { name: string; exported: boolean; also?: string[] } | undefined;
   /** resolveModule for the language: the file a specifier names, or the module of several files it names (a Go package, a SwiftPM target). */
   resolveModule(root: string, from: string, specifier: string, vanished: ReadonlySet<string>): ImportTarget | undefined;
   /** Hands `add` each name the text imports with the specifier it comes from: undefined for a whole-module import. */
@@ -87,9 +87,12 @@ export function declarationsOf(text: string, language: Language): Declaration[] 
   text.split("\n").forEach((raw, index) => {
     const line = raw.replace(/\r$/, "");
     const declared = syntax.declarationOf(line);
-    if (declared === undefined || seen.has(declared.name)) return;
-    seen.add(declared.name);
-    found.push({ name: declared.name, line: index + 1, exported: declared.exported });
+    if (declared === undefined) return;
+    for (const name of [declared.name, ...(declared.also ?? [])]) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      found.push({ name, line: index + 1, exported: declared.exported });
+    }
   });
   return found;
 }
@@ -127,8 +130,8 @@ function declaredIn(root: string, file: string, language: Language): Set<string>
   const path = resolve(root, file);
   let stamp: string;
   try {
-    const stat = statSync(path);
-    stamp = `${stat.mtimeMs} ${stat.size}`;
+    const stat = statSync(path, { bigint: true });
+    stamp = `${stat.mtimeNs} ${stat.ctimeNs} ${stat.size}`;
   } catch {
     return new Set();
   }

@@ -300,7 +300,7 @@ test("a session start names each plugin written for an older pluginApi with what
       ...swapPlugin("pyx", "python", { pluginApi }),
     });
   const older = (await startReading(at(PLUGIN_API - 1))).text;
-  assert.match(older, new RegExp(`^Plugins written for an older pluginApi \\(this Coherence runs ${PLUGIN_API}\\): pyx \\(${PLUGIN_API - 1}; since: ${PLUGIN_API}: syntax slots moved from the module's syntax export to plugin\\.json[^\\n]*\\)\\.$`, "m"), older);
+  assert.match(older, new RegExp(`^Plugins written for an older pluginApi \\(this Coherence runs ${PLUGIN_API}\\): pyx \\(${PLUGIN_API - 1}; since: ${PLUGIN_API}: a language plugin may read its text through a tree-sitter parser[^\\n]*\\)\\.$`, "m"), older);
   assert.equal(older.match(/older pluginApi/g)?.length, 1, "one line");
   assert.doesNotMatch((await startReading(at(PLUGIN_API))).text, /older pluginApi/, "a plugin on the interface this Coherence runs");
 });

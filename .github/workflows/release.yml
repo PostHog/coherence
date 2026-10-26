@@ -92,7 +92,8 @@ jobs:
       - name: Publish
         run: |
           tag=latest
-          case "$VERSION" in *-*) tag=$(printf '%s' "${VERSION#*-}" | sed 's/[.0-9]*$//') ;; esac
+          # The prerelease identifier's leading letters (beta.1 -> beta, alpha-2.3 -> alpha, rc.2 -> rc); next when it has none (1.11.0-0).
+          case "$VERSION" in *-*) tag=$(printf '%s' "${VERSION#*-}" | sed 's/[^A-Za-z].*$//'); [ -n "$tag" ] || tag=next ;; esac
           npm publish posthog-coherence-*.tgz --access public --provenance --tag "$tag"
 
       - name: Tag the release on GitHub
