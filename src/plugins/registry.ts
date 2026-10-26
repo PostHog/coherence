@@ -55,6 +55,17 @@ function compiles(value: unknown): value is string {
   }
 }
 
+/** Whether a value is a regular expression read with Unicode's character classes (\p{Lu}), as a treeSitter privateName is. */
+function compilesUnicode(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    new RegExp(value, "u");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Whether a value is one CI step: an action pinned to a full commit, or one command, never both, each value one line. */
 function ciStep(value: unknown): boolean {
   if (!isRecord(value)) return false;
@@ -127,7 +138,7 @@ function treeSitterProblems(raw: Record<string, unknown>, dir: string, language:
     else if (!existsSync(join(dir, path))) problems.push(`${who}'s treeSitter.${key} names ${path}, which is not beside its ${MANIFEST}`);
   }
   if (typeof declared["resolve"] !== "string" || !/^[^#/][^#]*#[A-Za-z_$][\w$]*$/.test(declared["resolve"])) problems.push(shape);
-  if (declared["privateName"] !== undefined && !compiles(declared["privateName"])) problems.push(shape);
+  if (declared["privateName"] !== undefined && !compilesUnicode(declared["privateName"])) problems.push(shape);
   if (language === undefined) problems.push(`${who} names a treeSitter parser but provides no language for it to read`);
   const syntax = isRecord(raw["syntax"]) ? raw["syntax"] : {};
   const twice = DERIVED_SLOTS.filter((slot) => syntax[slot] !== undefined);

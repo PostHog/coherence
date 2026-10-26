@@ -3,10 +3,11 @@
  * queries its text is read through (its manifest's treeSitter), and the core
  * derives the plugin's text readings from them: the names a file declares at
  * its top level, what each declares, and every name it imports and from
- * where. One parse answers each reading, so no two readings of one language
- * can disagree about its text, as two hand-written readers of Python's
- * imports did (df-7ac38ee4); and a statement is read whole, whatever lines it
- * spans.
+ * where, a whole module's narrowed to the names the file uses through the
+ * name it binds where the queries capture those uses (Go's st.Seal). One
+ * parse answers each reading, so no two readings of one language can
+ * disagree about its text, as two hand-written readers of Python's imports
+ * did (df-7ac38ee4); and a statement is read whole, whatever lines it spans.
  *
  * The runtime starts once per process (startParsers, which the CLI awaits
  * before any command); a parser loads on first use and stays. A project's
@@ -79,13 +80,15 @@ export interface TreeReader {
   declarations(text: string): TreeDeclaration[];
   /** Every name the text binds at its top level: each declaration's, and each a @bound match names (Python's lowercase module variables). */
   topLevel(text: string): Set<string>;
+  /** Every name the text uses through a qualifier (@use.qualifier, @use.name: Go's st.Seal), by the qualifier; empty for a language whose queries capture no use. */
+  uses(text: string): Map<string, Set<string>>;
 }
 
 /** The capture names a plugin's queries may use: any other is refused by name, never passed over. */
-export const CAPTURES = ["import", "import.from", "import.module", "import.name", "import.alias", "import.glob", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported"] as const;
+export const CAPTURES = ["import", "import.from", "import.module", "import.name", "import.alias", "import.glob", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported", "use.qualifier", "use.name"] as const;
 
 /** The captures whose text a reading reads; every other capture is read by its name and line. */
-const TEXT_READ = new Set(["import.from", "import.module", "import.name", "import.alias", "name"]);
+const TEXT_READ = new Set(["import.from", "import.module", "import.name", "import.alias", "name", "use.qualifier", "use.name"]);
 
 let started: Promise<void> | undefined;
 let ready = false;
@@ -189,7 +192,8 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
   const unknown = query.captureNames.filter((name) => !(CAPTURES as readonly string[]).includes(name));
   if (unknown.length > 0) throw new Error(`plugin ${plugin.name}'s queries capture ${unknown.map((n) => `@${n}`).join(", ")}, which Coherence reads nothing by; the captures are ${CAPTURES.map((c) => `@${c}`).join(", ")}`);
   // A language whose queries mark what is exported says it by @exported; one with no such mark exports by name, unless its privateName says otherwise.
-  const privateName = declared.privateName === undefined ? undefined : new RegExp(declared.privateName);
+  // Read with Unicode's classes (\p{Lu}), since a language that exports by name may say it by a letter's case (Go).
+  const privateName = declared.privateName === undefined ? undefined : new RegExp(declared.privateName, "u");
   const parser = new Parser();
   parser.setLanguage(language);
   return {
@@ -294,6 +298,18 @@ function readerOver(compiled: Compiled, store: ParseStore | undefined): TreeRead
         if (name !== undefined && captures.some((c) => c.name === "bound" || c.name.startsWith("declaration."))) names.add(name.text);
       }
       return names;
+    },
+    uses(text) {
+      const used = new Map<string, Set<string>>();
+      for (const captures of matches(text)) {
+        const qualifier = captures.find((c) => c.name === "use.qualifier");
+        const name = captures.find((c) => c.name === "use.name");
+        if (qualifier === undefined || name === undefined) continue;
+        const names = used.get(qualifier.text) ?? new Set<string>();
+        names.add(name.text);
+        used.set(qualifier.text, names);
+      }
+      return used;
     },
     store,
     keyOf,

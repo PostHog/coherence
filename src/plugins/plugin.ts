@@ -187,7 +187,7 @@ export interface TreeSitterManifest {
   queries: string;
   /** "<module beside the manifest>#<export>": where an import leads, which no parse can say. */
   resolve: string;
-  /** For a language that exports by name rather than by a keyword its queries capture as @exported: a regular expression a name it keeps private matches (Python's "^_"). */
+  /** For a language that exports by name rather than by a keyword its queries capture as @exported: a regular expression a name it keeps private matches (Python's "^_", Go's "^\P{Lu}"), read with Unicode's character classes. */
   privateName?: string;
 }
 
@@ -197,6 +197,8 @@ export interface ModuleResolution {
   resolveModule(root: string, from: string, specifier: string, vanished: ReadonlySet<string>): ImportTarget | undefined;
   /** Every spelling of the files a module specifier names from a file, resolved or not, for the word index's wildcard keys. */
   modulePaths(from: string, specifier: string): string[];
+  /** The name a whole-module import binds in the importing file when the import gives none (a Go package's name, from its path), which the names the file uses through it are qualified by; absent, the specifier's last path element. */
+  boundName?(specifier: string): string;
 }
 
 /** The slots the core derives for a plugin on the parser path, which its manifest may not also fill. */

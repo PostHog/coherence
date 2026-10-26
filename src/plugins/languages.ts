@@ -516,6 +516,7 @@ function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
     if (typeof value?.resolveModule !== "function" || typeof value.modulePaths !== "function") throw new Error(`plugin ${plugin.name}'s treeSitter.resolve names ${plugin.manifest.treeSitter!.resolve}, which is no { resolveModule, modulePaths }`);
     return value;
   };
+  const boundName = (specifier: string): string => resolution().boundName?.(specifier) ?? specifier.split("/").pop() ?? specifier;
   let table: unknown;
   if (slot === "source") {
     table = {
@@ -525,8 +526,15 @@ function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
       },
       resolveModule: (root: string, from: string, specifier: string, vanished: ReadonlySet<string>) => resolution().resolveModule(root, from, specifier, vanished),
       // A glob brings in no name of its own: the kept answers and the word index read it, through wildcardModules.
+      // A whole module whose names the text uses through the name the import binds (st.Seal, where the queries capture uses) brings in those names, each joined to the module's file that declares it; one the text uses no name of stays whole.
       importsOf: (text: string, add: (name: string | undefined, specifier: string) => void) => {
-        for (const imported of reader().imports(text)) if (imported.glob !== true) add(imported.name, imported.specifier);
+        const uses = reader().uses(text);
+        for (const imported of reader().imports(text)) {
+          if (imported.glob === true) continue;
+          const used = imported.name === undefined && uses.size > 0 ? uses.get(imported.alias ?? boundName(imported.specifier)) : undefined;
+          if (used === undefined) add(imported.name, imported.specifier);
+          else for (const name of [...used].sort()) add(name, imported.specifier);
+        }
       },
     } satisfies SourceSyntax;
   } else if (slot === "declares") table = (line: string) => lineReader().declarations(line)[0]?.declares ?? "unknown";

@@ -197,6 +197,41 @@ test("an import that resolves to a module joins, of its files, those that declar
   }
 });
 
+test("a whole module the text uses names of through the name its import binds brings in those names, each joined to the module's file that declares it; one it uses no name of that way stays whole", () => {
+  // Python's parser with uses captured as Go's queries capture them: an attribute of a bare name is a name used through a qualifier.
+  const queries = `${readFileSync(join(PYTHON, "python.scm"), "utf8")}\n(attribute object: (identifier) @use.qualifier attribute: (identifier) @use.name)\n`;
+  const files = '["store/cache.zz", "store/rows.zz", "store/secrets.zz"]';
+  const bound = parserPlugin({ treeSitter: { parser: "zz.wasm", queries: "zz.scm", resolve: "module.ts#MODULE" } }, {
+    "zz.scm": queries,
+    "module.ts": `export const MODULE = { resolveModule: (root, from, specifier) => (specifier === "lib.store" ? { module: "store", files: ${files} } : undefined), modulePaths: () => [], boundName: (specifier) => specifier.split(".").pop() };\n`,
+  });
+  const unbound = parserPlugin({ treeSitter: { parser: "zz.wasm", queries: "zz.scm", resolve: "module.ts#MODULE" } }, {
+    "zz.scm": queries,
+    "module.ts": `export const MODULE = { resolveModule: (root, from, specifier) => (specifier === "store" ? { module: "store", files: ${files} } : undefined), modulePaths: () => [] };\n`,
+  });
+  const root = mkdtempSync(join(tmpdir(), "coherence-qualified-uses-"));
+  fixtures.push(root);
+  mkdirSync(join(root, "store"));
+  writeFileSync(join(root, "store", "cache.zz"), "CACHE = {}\n");
+  writeFileSync(join(root, "store", "rows.zz"), "class Row:\n    pass\n");
+  writeFileSync(join(root, "store", "secrets.zz"), "SECRET_COLUMNS = ['token']\n\ndef seal(row):\n    return row\n");
+  const joined = (text: string): string[] => importsOf(root, "api/render.zz", text, "zz").map((i) => `${i.name ?? "*"} <- ${i.module}`);
+  const whole = ["* <- store/cache.zz", "* <- store/rows.zz", "* <- store/secrets.zz"];
+  try {
+    registerProjectPlugins(root, [bound]);
+    forProject(root, () => {
+      assert.deepEqual(joined("import lib.store\nstore.seal(store.Row())\n"), ["Row <- store/rows.zz", "seal <- store/secrets.zz"], "each name used through the name the resolution says the import binds joins the file that declares it");
+      assert.deepEqual(joined("import lib.store as st\nst.seal(row)\n"), ["seal <- store/secrets.zz"], "an alias the import gives is the name it binds");
+      assert.deepEqual(joined("import lib.store as st\nstore.seal(row)\n"), whole, "a use through a name the import does not bind is no use of it");
+      assert.deepEqual(joined("import lib.store\nother.seal(row)\n"), whole, "a module the text uses no name of is imported whole");
+    });
+    registerProjectPlugins(root, [unbound]);
+    forProject(root, () => assert.deepEqual(joined("import store\nstore.CACHE\n"), ["CACHE <- store/cache.zz"], "a resolution that names no binding binds the specifier's last path element"));
+  } finally {
+    registerProjectPlugins(root, []);
+  }
+});
+
 test("the parse store never reaches past the project's own folders: a link on its path keeps no parses and touches nothing, a store or log the project brings is never read or written through, and only the store's own files are removed", () => {
   const plugin: LoadedPlugin = { name: "python", version: "0", dir: PYTHON, source: "bundled", manifest: { name: "python", version: "0", pluginApi: 2, treeSitter: { parser: "tree-sitter-python.wasm", queries: "python.scm", resolve: "python-source.ts#PYTHON_RESOLVE" } } };
   const texts = ["from a import (\n    b,\n)\n", "X = 1\n"];
