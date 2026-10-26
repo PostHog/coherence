@@ -75,6 +75,10 @@ import { startTelemetry } from "./lifecycle/telemetry.ts";
 import { reachNote, refreshLatest, startUpdateCheck, versionText } from "./lifecycle/version.ts";
 import { startParsers } from "./plugins/syntax-trees.ts";
 import { warmProjectParses } from "./economy/warm-parses.ts";
+import { shapeCensus, shapesText } from "./plugins/shapes.ts";
+import { calibrate, calibrationText } from "./plugins/calibrate.ts";
+import { compareReference, compareText } from "./plugins/check.ts";
+import { readEnforcementConfig } from "./enforcement/config.ts";
 
 type CommandResult = number | Promise<number>;
 type RootCommand = (argv: string[], io: Io) => CommandResult;
@@ -92,6 +96,9 @@ ${ECONOMY_USAGE}
 ${QUERY_USAGE}
 ${SCOPE_USAGE}
   coherence plugin eject <name> [--to <dir>]   copy a bundled plugin's source and its check.json into the project (coherence-plugins/<name> by default) and point the config's plugins at the copy, which then answers in the bundled plugin's place
+  coherence plugin compare   every language plugin's reading of the reference project side by side (the bundled ones and the project's), each relation one row, each plugin that reads one another way named; exit 1 when any does
+  coherence plugin calibrate [--files <n>]   hold each language's text reading to its language server over the project's first n source files (200): the declarations the server reports too, those it does not (misreads), and what the server reports that the reading leaves out, by kind
+  coherence plugin shapes   count each shape of import the project's code takes (named, renamed, glob, whole module, spans lines, inside a block), through its languages' parsers, beside the plugin's check projects; a shape the project writes and no check project holds is named untested
   coherence plugin check <plugin>   hold a plugin, bundled by name or a folder, to what every language plugin owes (file rule, declarations, references, a chokepoint graded) over its check.json's project; pass or fail per duty, exit 1 unless all pass
   coherence adopt <folder>   list the folder in the registry (projects in coherence.config.json at the repository top), creating it when absent
   coherence hook <${HOOK_EVENTS.join("|")}>
@@ -315,9 +322,27 @@ const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
 
 /** plugin eject <name> [--to <dir>] | plugin check <plugin>: the eject, enhance and swap workflow (docs/plugins.md). */
 async function pluginCommand(call: CommandCall, args: string[], root: string): Promise<number> {
-  const { flags, positionals } = parse(args, new Set(["to"]));
+  const { flags, positionals } = parse(args, new Set(["to", "files"]));
   const [verb, given, ...more] = positionals;
-  if (given === undefined || more.length > 0 || (verb !== "eject" && verb !== "check")) fail(`plugin: eject <name> [--to <dir>], or check <plugin>\n${USAGE}`);
+  if (verb === "compare") {
+    if (given !== undefined || flags.size > 0) fail(`plugin compare: no arguments; it reads every language plugin's check project\n${USAGE}`);
+    const readings = await compareReference(readEnforcementConfig(root).plugins);
+    call.stdout.write(`${compareText(readings)}\n`);
+    return readings.some((r) => !("held" in r) || r.missed.length > 0) ? 1 : 0;
+  }
+  if (verb === "calibrate") {
+    const files = flags.get("files");
+    const limit = files === undefined ? 200 : Number(files);
+    if (given !== undefined || files === true || !Number.isInteger(limit) || limit < 1 || [...flags.keys()].some((f) => f !== "files")) fail(`plugin calibrate: [--files <n>]; it reads the project it runs in\n${USAGE}`);
+    call.stdout.write(`${calibrationText(await calibrate(root, limit))}\n`);
+    return 0;
+  }
+  if (verb === "shapes") {
+    if (given !== undefined || flags.size > 0) fail(`plugin shapes: no arguments; it reads the project it runs in\n${USAGE}`);
+    call.stdout.write(`${shapesText(shapeCensus(root))}\n`);
+    return 0;
+  }
+  if (given === undefined || more.length > 0 || (verb !== "eject" && verb !== "check")) fail(`plugin: eject <name> [--to <dir>], check <plugin>, or shapes\n${USAGE}`);
   if (verb === "check" && flags.size > 0) fail(`plugin check: no flags\n${USAGE}`);
   const to = flags.get("to");
   if (to === true) fail(`plugin eject: --to names a folder\n${USAGE}`);

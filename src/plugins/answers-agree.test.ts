@@ -17,7 +17,7 @@ after(() => {
   for (const dir of fixtures) rmSync(dir, { recursive: true, force: true });
 });
 
-const STAND_IN = 'export default { adapter: ({ language }) => ({ language, ladder: { top: "reference-choked", because: "a stand-in", rungs: [] }, ready: async () => ({ ok: true }), resolve: async () => ({ ok: false, reason: "a stand-in" }), references: async () => [], visibility: async () => ({ enforced: false, visible: true, evidence: "a stand-in" }), testFilter: (via) => via, refute: async () => ({ seen: false, staged: [], account: "a stand-in" }), forget: async () => {}, close: async () => {} }) };\n';
+const STAND_IN = 'const SYMBOLS = { "store/secrets.zz": ["SECRET_COLUMNS", "seal"], "api/render.zz": ["TEMPLATE", "render"] };\nexport default { adapter: ({ language }) => ({ language, ladder: { top: "reference-choked", because: "a stand-in", rungs: [] }, ready: async () => ({ ok: true }), topLevelSymbols: async (file) => (SYMBOLS[file] ?? []).map((name) => ({ name, line: 1, kind: 12 })), resolve: async () => ({ ok: false, reason: "a stand-in" }), references: async () => [], visibility: async () => ({ enforced: false, visible: true, evidence: "a stand-in" }), testFilter: (via) => via, refute: async () => ({ seen: false, staged: [], account: "a stand-in" }), forget: async () => {}, close: async () => {} }) };\n';
 
 /** Python's readers before its parser, by the same expressions: the source scan reads a from-import to the end of its first line, the interfaces slot reads a parenthesized list whole. */
 const OLD_READERS = `
@@ -64,4 +64,13 @@ test("plugin check fails a plugin whose two readers of one text disagree: an imp
   const oneLine = oldReaders("from store.secrets import SECRET_COLUMNS, seal as sealed\n\ndef render(row):\n    return sealed(row)\n");
   const agreed = (await checkPlugin(oneLine, "./zz")).duties.find((d) => d.name === "answers agree")!;
   assert.equal(agreed.verdict, "pass", agreed.reason);
+});
+
+test("plugin check fails a plugin whose text reading declares a name the language server reports no top-level symbol of, named by file and line", async () => {
+  // A class written inside a string: the line scan reads it as declared, the server knows no such symbol.
+  const misread = oldReaders(["from store.secrets import seal", "", "TEMPLATE = '''", "class Fake:", "    pass", "'''", "", "def render(row):", "    return seal(row)", ""].join("\n"));
+  const failed = (await checkPlugin(misread, "./zz")).duties.find((d) => d.name === "server agrees")!;
+  assert.equal(failed.verdict, "fail", failed.reason);
+  assert.match(failed.reason, /api\/render\.zz:4: the text reading declares Fake, which the language server reports no top-level symbol of/);
+  assert.doesNotMatch(failed.reason, /declares (render|seal|TEMPLATE)\b/, "a name the server reports is no failure");
 });

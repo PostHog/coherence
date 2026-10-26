@@ -50,6 +50,27 @@ export interface TreeDeclaration {
   declares: Declares;
 }
 
+/** The shapes an import takes, as the census counts them: what it brings in, and how it is written. */
+export const IMPORT_SHAPES = ["named", "renamed", "glob", "whole module", "spans lines", "inside a block"] as const;
+export type ImportShape = (typeof IMPORT_SHAPES)[number];
+
+/**
+ * The shape of every import in a text, through the plugin's parser and
+ * queries: one entry per import the queries match, at the line its statement
+ * starts. Inside a block is known only where the queries capture the whole
+ * statement as @import.
+ */
+export function importShapes(plugin: LoadedPlugin, text: string): { line: number; shapes: ImportShape[] }[] {
+  treeReaderOf(plugin);
+  return compiled.get(plugin.dir)!.census(text);
+}
+
+/** Whether a plugin's queries capture an import's whole statement (@import), so the census can say whether it sits inside a block. */
+export function capturesStatements(plugin: LoadedPlugin): boolean {
+  treeReaderOf(plugin);
+  return compiled.get(plugin.dir)!.capturesStatements;
+}
+
 /** What the core reads of a language's text through its parser. */
 export interface TreeReader {
   imports(text: string): TreeImport[];
@@ -59,7 +80,7 @@ export interface TreeReader {
 }
 
 /** The capture names a plugin's queries may use: any other is refused by name, never passed over. */
-export const CAPTURES = ["import.from", "import.module", "import.name", "import.alias", "import.glob", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported"] as const;
+export const CAPTURES = ["import", "import.from", "import.module", "import.name", "import.alias", "import.glob", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported"] as const;
 
 /** The captures whose text a reading reads; every other capture is read by its name and line. */
 const TEXT_READ = new Set(["import.from", "import.module", "import.name", "import.alias", "name"]);
@@ -81,6 +102,8 @@ type Found = [name: string, text: string, line: number][][];
 /** A parser compiled once per plugin: what every reader of its language shares. */
 interface Compiled {
   parse(text: string): Found;
+  census(text: string): { line: number; shapes: ImportShape[] }[];
+  capturesStatements: boolean;
   marksExports: boolean;
   exportedName(name: string): boolean;
   /** The parser's and queries' digest: a parse kept under another is never read as this one's. */
@@ -97,7 +120,7 @@ const RECENT = 4;
 const DIRECT_PARSES = 16;
 
 /** Bumped when what a kept parse holds changes, so an older store is never read as this one's. */
-const STORE_FORMAT = 2;
+const STORE_FORMAT = 3;
 
 /**
  * The reader of a plugin's language through its parser and queries, built on
@@ -163,8 +186,31 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
   parser.setLanguage(language);
   return {
     marksExports: query.captureNames.includes("exported"),
+    capturesStatements: query.captureNames.includes("import"),
     exportedName: (name) => privateName === undefined || !privateName.test(name),
     fingerprint: createHash("sha256").update(binary).update("\u0000").update(source).update(`\u0000${STORE_FORMAT}`).digest("base64url").slice(0, 16),
+    census(text) {
+      const tree = parser.parse(text);
+      if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
+      try {
+        return query.matches(tree.rootNode).flatMap((match) => {
+          const of = (name: string) => match.captures.find((c) => c.name === name)?.node;
+          if (of("import.from") === undefined && of("import.module") === undefined) return [];
+          const statement = of("import");
+          const nodes = statement === undefined ? match.captures.map((c) => c.node) : [statement];
+          const start = Math.min(...nodes.map((n) => n.startPosition.row));
+          const end = Math.max(...nodes.map((n) => n.endPosition.row));
+          const shapes: ImportShape[] = [of("import.module") !== undefined ? "whole module" : of("import.glob") !== undefined ? "glob" : "named"];
+          if (of("import.alias") !== undefined) shapes.push("renamed");
+          if (end > start) shapes.push("spans lines");
+          // Inside a block only where the queries say which node is the statement: an indented line is no evidence (Go's import block indents).
+          if (statement !== undefined && statement.parent !== null && statement.parent.type !== tree.rootNode.type) shapes.push("inside a block");
+          return [{ line: start + 1, shapes }];
+        });
+      } finally {
+        tree.delete();
+      }
+    },
     // Every match of the queries over the text: read inside the tree's life, and the tree freed however the read ends.
     parse(text) {
       const tree = parser.parse(text);

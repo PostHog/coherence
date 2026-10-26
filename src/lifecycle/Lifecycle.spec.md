@@ -809,7 +809,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   kinds: none
 - a tool hook over the latency budget says so: Every hook call's time is kept, counted from its process's start; a PreToolUse or PostToolUse over the latency budget (3 s unless the config declares one) names its own time in its own answer, regulate names the session's calls over it with what the tool hooks cost in all, and orient the last week's.
   over: a tool hook within the budget, one over it, a session and a week of recorded calls, and a config's own budget
-  via: a tool hook over the latency budget says so in its own answer, and regulate and orient name the calls over it
+  via: a tool hook over the latency budget says so in its own answer, regulate and orient name the calls over it, and regulate names stops over it
   because: the tool hooks run around every tool call, so their time is paid over and over, and a call cycle that feels sluggish gets Coherence switched off, which loses every check at once; a count of git spawns guards the known shape, and the measured time catches what no count names
   refuted: counted a hook call's time from the call's own start, leaving out its process's start -> "a tool hook over the latency budget says so in its own answer, and regulate and orient name the calls over it" went red in stop-delivery.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: budget

@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { after, test } from "node:test";
+import { after, describe, test } from "node:test";
 import { budget } from "../enforcement/test-budgets.ts";
 import { checkPlugin } from "./check.ts";
 import { PLUGIN_SOURCES } from "./eject.ts";
@@ -53,8 +53,8 @@ test("plugin check holds a language plugin to every reading of its text: a sourc
   const byName = (name: string) => blind.duties.find((d) => d.name === name)!;
   for (const name of ["mass", "imports", "interfaces"]) assert.equal(byName(name).verdict, "fail", `${name}: ${byName(name).reason}`);
   assert.match(byName("mass").reason, /src\/store\/secrets\.ts: missed SECRET_COLUMNS, seal/);
-  assert.match(byName("imports").reason, /missed src\/api\/render\.ts -> src\/store\/secrets\.ts \(SECRET_COLUMNS, seal\)/);
-  assert.match(byName("interfaces").reason, /missed src\/api -> src\/store \(SECRET_COLUMNS, seal\)/);
+  assert.match(byName("imports").reason, /missed .*src\/api\/render\.ts -> src\/store\/secrets\.ts \(SECRET_COLUMNS, seal\)/);
+  assert.match(byName("interfaces").reason, /missed src\/api -> src\/store \(Row, SECRET_COLUMNS, seal\)/);
   assert.equal(byName("entrances").verdict, "pass", "entrance detection reads its own slot, which the blind plugin leaves the bundled one");
 
   const zz = await checkPlugin(root, "./zz");
@@ -71,18 +71,25 @@ const PROVIDERS = readdirSync(PLUGIN_SOURCES)
   .map((name) => [name, JSON.parse(readFileSync(join(PLUGIN_SOURCES, name, "plugin.json"), "utf8")) as { provides?: { language?: string }; notScanned?: string }] as const)
   .filter(([, manifest]) => manifest.provides?.language !== undefined);
 
-test("every bundled language plugin's check project names what each reading recovers, and the plugin recovers it: the bundled language plugins, none carrying notScanned", () => {
-  assert.deepEqual(PROVIDERS.map(([name]) => name).sort(), ["go", "python", "rust", "typescript"]);
-  assert.deepEqual(PROVIDERS.filter(([, manifest]) => manifest.notScanned !== undefined).map(([name]) => name), [], "no bundled plugin carries notScanned");
-});
+// Grouped under the titles the bullets name, so a run that maps tests back by exact title finds every one (a via names a test or a group, never a prefix of titles).
+describe("every bundled language plugin's check project names what each reading recovers, and the plugin recovers it", () => {
+  test("the bundled language plugins, none carrying notScanned", () => {
+    assert.deepEqual(PROVIDERS.map(([name]) => name).sort(), ["go", "python", "rust", "typescript"]);
+    assert.deepEqual(PROVIDERS.filter(([, manifest]) => manifest.notScanned !== undefined).map(([name]) => name), [], "no bundled plugin carries notScanned");
+  });
 
-for (const [language] of PROVIDERS) {
-  test(`every bundled language plugin's check project names what each reading recovers, and the plugin recovers it: ${language}`, async (t) => {
-    budget(t, 20, "d-23f7f8eb");
-    const checked = await checkPlugin(process.cwd(), language);
-    for (const name of READINGS) {
-      const duty = checked.duties.find((d) => d.name === name)!;
-      assert.equal(duty.verdict, "pass", `${language} ${name}: ${duty.reason}`);
+  describe("every bundled language plugin passes every duty of its own plugin check", () => {
+    for (const [language] of PROVIDERS) {
+      test(language, async (t) => {
+        budget(t, 20, "d-23f7f8eb");
+        const checked = await checkPlugin(process.cwd(), language);
+        for (const name of READINGS) {
+          const duty = checked.duties.find((d) => d.name === name)!;
+          assert.equal(duty.verdict, "pass", `${language} ${name}: ${duty.reason}`);
+        }
+        // Every duty, the adapter's among them: a check project edited for one duty and stale for another fails here, not at an adopter's plugin check (df-11317061).
+        assert.deepEqual(checked.duties.filter((d) => d.verdict !== "pass").map((d) => `${d.name}: ${d.reason}`), [], `${language}'s own plugin check`);
+      });
     }
   });
-}
+});

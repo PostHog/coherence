@@ -340,6 +340,36 @@ that changed (PostHog's 20,000 Python files: 30 s for the first warm-up,
 it directly and never loads the store. Changing the parser or the queries
 changes the fingerprint, so nothing kept under the old ones is read.
 
+Every language plugin's `check.json` maps its files and names onto one
+reference project, the same in every language, under `reference`:
+`files` names the file playing each role (`secrets`, declaring
+`SECRET_COLUMNS` and `seal`; `rows`, declaring `Row`, in the same module as
+`secrets`; `render`, using all three; `main`, using `render`), and `names`
+the language's spelling of each of `SECRET_COLUMNS`, `seal`, `Row` and
+`render`. The reference reading duty holds the plugin to recover each
+relation over it, and `coherence plugin compare` lays every language
+plugin's reading of it side by side, the bundled ones and the project's,
+naming each that reads a relation another way (exit 1). A store of two files
+is the point: a plugin that resolves an import of a module to one file of it
+misses the other here.
+
+`coherence plugin calibrate [--files <n>]`, run in a project, holds each
+language's text reading to its language server over the first n source
+files: the declarations the server reports too, each it does not (a misread,
+with its file and line), and what the server reports that the reading leaves
+out, counted by symbol kind. An adapter takes part by offering
+`topLevelSymbols(file)`, the server's top-level symbols with their lines and
+LSP kinds; the bundled adapters do.
+
+`coherence plugin shapes`, run in a project, counts each shape of import
+its code writes (named, renamed, glob, whole module, spans lines, inside a
+block) through each language's parser, beside how many of each the plugin's
+check projects hold, and names each shape the project writes that no check
+project holds as untested: plugin check never puts that shape to the
+plugin, so a reader could miss every one and pass. Add one to the plugin's
+`check.json` files and `readings.imports`. Capture each import's whole
+statement as `@import` so the census can tell an import inside a block.
+
 The parser runtime starts once per process, before any command. Code that
 imports Coherence's modules and asks a reading itself, outside its CLI,
 first awaits `startParsers()` (`@posthog/coherence/dist/plugins/syntax-trees.js`);
@@ -461,7 +491,9 @@ one wanting changes a copy of it:
    |---|---|
    | file rule | the files `check.json` names as the language's are, and the others are not |
    | declarations | the `topLevel` slot says which names a file declares, as `check.json` says |
+   | reference reading | the readings recover, over the check project, every relation of the reference project its `reference` map places there (below) |
    | references | the adapter reports every reference to the protected thing, and none else; one that reports none fails here, by name |
+   | server agrees | every name the text reading finds a file declaring is a top-level symbol the language server reports for that file (the adapter's optional `topLevelSymbols`); not run when the adapter offers none |
    | chokepoint | the run grades the chokepoint as `check.json` expects, bypasses named, its refutation seen or refused |
    | mass | mass reads the language, counts each file, and the `source` slot's scan finds in each the names `check.json`'s `readings.declared` gives |
    | imports | the `source` slot's scan reads every import `readings.imports` names, resolved to its project file, and none else: what the economy's closure walks |

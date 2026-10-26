@@ -5,16 +5,18 @@
     "shop/store/__init__.py": "",
     "shop/store/secrets.py": "SECRET_COLUMNS = {\"tokens\": [\"token\"]}\n\n\ndef seal(pattern, row):\n    out = dict(row)\n    for column in SECRET_COLUMNS.get(pattern, []):\n        out.pop(column, None)\n    return out\n",
     "shop/api/__init__.py": "",
-    "shop/api/render.py": "from shop.store.secrets import (\n    SECRET_COLUMNS,\n    seal,\n)\n\n\ndef render(pattern, row):\n    sealed = seal(pattern, row)\n    leaked = SECRET_COLUMNS.get(pattern)\n    return {\"sealed\": sealed, \"leaked\": leaked}\n",
+    "shop/api/render.py": "import shop.store.secrets\nfrom shop.store.secrets import (\n    SECRET_COLUMNS,\n    seal as sealed,\n)\nfrom shop.store import *\nfrom shop.store.rows import Row\n\n\ndef render(pattern, row):\n    from shop.store.secrets import seal\n\n    sealed_row = sealed(pattern, Row(row))\n    leaked = SECRET_COLUMNS.get(pattern)\n    return {\"sealed\": sealed_row, \"leaked\": leaked, \"again\": seal(pattern, row)}\n",
     "tests/test_secrets.py": "from shop.store.secrets import SECRET_COLUMNS\n\n\ndef test_columns():\n    assert SECRET_COLUMNS\n",
     "README.md": "# A project\n",
-    "shop/api/app.py": "from shop.api.render import render\n\n\nclass App:\n    def get(self, path):\n        def wrap(fn):\n            return fn\n\n        return wrap\n\n\napp = App()\n\n\n@app.get(\"/rows\")\ndef rows(row):\n    return render(\"tokens\", row)\n"
+    "shop/api/app.py": "from shop.api.render import render\n\n\nclass App:\n    def get(self, path):\n        def wrap(fn):\n            return fn\n\n        return wrap\n\n\napp = App()\n\n\n@app.get(\"/rows\")\ndef rows(row):\n    return render(\"tokens\", row)\n",
+    "shop/store/rows.py": "class Row(dict):\n    \"\"\"One stored row, by column.\"\"\"\n"
   },
   "language": {
     "files": [
       "shop/store/secrets.py",
       "shop/api/render.py",
-      "shop/stubs.pyi"
+      "shop/stubs.pyi",
+      "shop/store/rows.py"
     ],
     "not": [
       "README.md",
@@ -47,16 +49,16 @@
   "protects": "SECRET_COLUMNS",
   "chokepoint": "seal",
   "references": [
-    "shop/api/render.py:1",
-    "shop/api/render.py:6",
+    "shop/api/render.py:3",
+    "shop/api/render.py:14",
     "shop/store/secrets.py:6",
     "tests/test_secrets.py:1",
     "tests/test_secrets.py:5"
   ],
   "grade": "broken",
   "bypasses": [
-    "shop/api/render.py:1",
-    "shop/api/render.py:6"
+    "shop/api/render.py:3",
+    "shop/api/render.py:14"
   ],
   "readings": {
     "declared": {
@@ -73,6 +75,9 @@
       "shop/store/secrets.py": [
         "SECRET_COLUMNS",
         "seal"
+      ],
+      "shop/store/rows.py": [
+        "Row"
       ]
     },
     "imports": [
@@ -87,8 +92,16 @@
         "file": "shop/api/render.py",
         "module": "shop/store/secrets.py",
         "names": [
+          "*",
           "SECRET_COLUMNS",
           "seal"
+        ]
+      },
+      {
+        "file": "shop/api/render.py",
+        "module": "shop/store/rows.py",
+        "names": [
+          "Row"
         ]
       }
     ],
@@ -97,6 +110,7 @@
         "from": "shop/api",
         "to": "shop/store",
         "symbols": [
+          "Row",
           "SECRET_COLUMNS",
           "seal"
         ]
@@ -109,5 +123,19 @@
         "rule": "route decorator"
       }
     ]
+  },
+  "reference": {
+    "files": {
+      "secrets": "shop/store/secrets.py",
+      "rows": "shop/store/rows.py",
+      "render": "shop/api/render.py",
+      "main": "shop/api/app.py"
+    },
+    "names": {
+      "SECRET_COLUMNS": "SECRET_COLUMNS",
+      "seal": "seal",
+      "Row": "Row",
+      "render": "render"
+    }
   }
 }

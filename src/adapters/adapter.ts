@@ -235,6 +235,20 @@ export interface LanguageAdapter {
   close(): Promise<void>;
   /** The language server's process id while it runs, so a reading can bound that server's memory; absent where the adapter cannot say. */
   serverPid?(): number | undefined;
+  /**
+   * The symbols the language server says a file declares at its top level,
+   * each with its one-based line and LSP symbol kind: the independent account
+   * the text readings are calibrated against (plugin check's server agrees
+   * duty, coherence plugin calibrate). Absent where the adapter cannot ask.
+   */
+  topLevelSymbols?(file: string): Promise<ServerSymbol[]>;
+}
+
+/** A symbol as the language server reports it: its name, the one-based line its name stands on, and its LSP SymbolKind. */
+export interface ServerSymbol {
+  name: string;
+  line: number;
+  kind: number;
 }
 
 /**

@@ -37,6 +37,7 @@ import {
   type Definition,
   type Ladder,
   type LanguageAdapter,
+  type ServerSymbol,
   type Position,
   type Range,
   type ReferenceSite,
@@ -393,6 +394,11 @@ export class TypeScriptAdapter implements LanguageAdapter {
     this.client!.notify("textDocument/didClose", { textDocument: { uri: this.uri(file) } });
     this.opened.delete(file);
     this.documents.delete(file);
+  }
+
+  /** The file's top-level symbols as the server reports them: the independent account plugin check and plugin calibrate hold the text readings to. */
+  async topLevelSymbols(file: string): Promise<ServerSymbol[]> {
+    return (await this.documentSymbols(file)).map((s) => ({ name: s.name, line: s.selectionRange.start.line + 1, kind: s.kind }));
   }
 
   private async documentSymbols(file: string): Promise<DocumentSymbol[]> {

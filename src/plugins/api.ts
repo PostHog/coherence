@@ -25,6 +25,7 @@ export {
   type Definition,
   type Ladder,
   type LanguageAdapter,
+  type ServerSymbol,
   type Occasion,
   type Position,
   type Range,

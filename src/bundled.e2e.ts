@@ -140,7 +140,7 @@ test("an ejected plugin, swapped in from an installed package, passes plugin che
     return { verdict: String(entry["verdict"]), grade: String(entry["grade"]), refutation: String(entry["refutation"]), bypasses: ((entry["bypasses"] ?? []) as { file: string; line: number }[]).map((b) => `${b.file}:${b.line}`), plugins: entry["plugins"] };
   };
   const before = graded("bundled");
-  assert.deepEqual({ ...before, plugins: undefined }, { verdict: "fail", grade: "broken", refutation: "automatic", bypasses: ["src/api/render.ts:1", "src/api/render.ts:5"], plugins: undefined });
+  assert.deepEqual({ ...before, plugins: undefined }, { verdict: "fail", grade: "broken", refutation: "automatic", bypasses: ["src/api/render.ts:1", "src/api/render.ts:6"], plugins: undefined });
   assert.match(coherence("plugin", "eject", "typescript"), /^ejected plugin typescript into \.\/coherence-plugins\/typescript/m);
   assert.match(coherence("plugin", "check", "./coherence-plugins/typescript"), /^plugin check typescript \(\.\/coherence-plugins\/typescript, typescript, [^)]*\): pass$/m, "the copy, reading Coherence through @posthog/coherence/plugin, owes what the bundled one does");
   const after = graded("ejected");

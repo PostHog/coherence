@@ -2,17 +2,19 @@
   "files": {
     "tsconfig.json": "{ \"compilerOptions\": { \"target\": \"ES2022\", \"module\": \"NodeNext\", \"moduleResolution\": \"NodeNext\", \"strict\": true, \"noEmit\": true, \"allowImportingTsExtensions\": true }, \"include\": [\"src/**/*.ts\"] }\n",
     "src/store/secrets.ts": "/** The protected thing. */\nexport const SECRET_COLUMNS: Record<string, string[]> = { tokens: [\"token\"] };\n\n/** The chokepoint: the one way a row leaves without its secrets. */\nexport function seal(pattern: string, row: Record<string, unknown>): Record<string, unknown> {\n  const out = { ...row };\n  for (const column of SECRET_COLUMNS[pattern] ?? []) delete out[column];\n  return out;\n}\n",
-    "src/api/render.ts": "import { SECRET_COLUMNS, seal } from \"../store/secrets.ts\";\n\nexport function render(pattern: string, row: Record<string, unknown>): string {\n  const sealed = seal(pattern, row);\n  const leaked = SECRET_COLUMNS[pattern];\n  return JSON.stringify({ sealed, leaked });\n}\n",
+    "src/api/render.ts": "import { SECRET_COLUMNS, seal } from \"../store/secrets.ts\";\nimport type { Row } from \"../store/rows.ts\";\n\nexport function render(pattern: string, row: Row): string {\n  const sealed = seal(pattern, row);\n  const leaked = SECRET_COLUMNS[pattern];\n  return JSON.stringify({ sealed, leaked });\n}\n",
     "src/__tests__/secrets.test.ts": "import { SECRET_COLUMNS } from \"../store/secrets.ts\";\nexport const t = SECRET_COLUMNS;\n",
     "README.md": "# A project\n",
-    "src/api/routes.ts": "import { render } from \"./render.ts\";\n\nexport const app = {\n  get(path: string, handler: (row: Record<string, unknown>) => string): readonly [string, (row: Record<string, unknown>) => string] {\n    return [path, handler] as const;\n  },\n};\n\nexport function rows(row: Record<string, unknown>): string {\n  return render(\"tokens\", row);\n}\n\napp.get(\"/rows\", rows);\n"
+    "src/api/routes.ts": "import { render } from \"./render.ts\";\n\nexport const app = {\n  get(path: string, handler: (row: Record<string, unknown>) => string): readonly [string, (row: Record<string, unknown>) => string] {\n    return [path, handler] as const;\n  },\n};\n\nexport function rows(row: Record<string, unknown>): string {\n  return render(\"tokens\", row);\n}\n\napp.get(\"/rows\", rows);\n",
+    "src/store/rows.ts": "/** One stored row, by column. */\nexport type Row = Record<string, unknown>;\n"
   },
   "language": {
     "files": [
       "src/store/secrets.ts",
       "src/api/render.ts",
       "src/app.tsx",
-      "src/legacy.mjs"
+      "src/legacy.mjs",
+      "src/store/rows.ts"
     ],
     "not": [
       "README.md",
@@ -48,13 +50,13 @@
     "src/__tests__/secrets.test.ts:1",
     "src/__tests__/secrets.test.ts:2",
     "src/api/render.ts:1",
-    "src/api/render.ts:5",
+    "src/api/render.ts:6",
     "src/store/secrets.ts:7"
   ],
   "grade": "broken",
   "bypasses": [
     "src/api/render.ts:1",
-    "src/api/render.ts:5"
+    "src/api/render.ts:6"
   ],
   "readings": {
     "declared": {
@@ -68,6 +70,9 @@
       "src/store/secrets.ts": [
         "SECRET_COLUMNS",
         "seal"
+      ],
+      "src/store/rows.ts": [
+        "Row"
       ]
     },
     "imports": [
@@ -85,6 +90,13 @@
         "names": [
           "render"
         ]
+      },
+      {
+        "file": "src/api/render.ts",
+        "module": "src/store/rows.ts",
+        "names": [
+          "Row"
+        ]
       }
     ],
     "interfaces": [
@@ -92,6 +104,7 @@
         "from": "src/api",
         "to": "src/store",
         "symbols": [
+          "Row",
           "SECRET_COLUMNS",
           "seal"
         ]
@@ -104,5 +117,19 @@
         "rule": "route method"
       }
     ]
+  },
+  "reference": {
+    "files": {
+      "secrets": "src/store/secrets.ts",
+      "rows": "src/store/rows.ts",
+      "render": "src/api/render.ts",
+      "main": "src/api/routes.ts"
+    },
+    "names": {
+      "SECRET_COLUMNS": "SECRET_COLUMNS",
+      "seal": "seal",
+      "Row": "Row",
+      "render": "render"
+    }
   }
 }

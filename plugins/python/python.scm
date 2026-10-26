@@ -4,22 +4,22 @@
 ; from m import a, b as c, (d, e) -- one match per imported name, whatever lines the statement spans
 (import_from_statement
   module_name: (_) @import.from
-  name: (dotted_name) @import.name)
+  name: (dotted_name) @import.name) @import
 (import_from_statement
   module_name: (_) @import.from
-  name: (aliased_import name: (dotted_name) @import.name alias: (identifier) @import.alias))
+  name: (aliased_import name: (dotted_name) @import.name alias: (identifier) @import.alias)) @import
 (import_from_statement
   module_name: (_) @import.from
-  (wildcard_import) @import.glob)
+  (wildcard_import) @import.glob) @import
 
 ; from __future__ import annotations -- a statement of its own kind, whose module is the keyword
 (future_import_statement
   "__future__" @import.from
-  name: (dotted_name) @import.name)
+  name: (dotted_name) @import.name) @import
 
 ; import a.b, import a.b as c -- the whole module
-(import_statement name: (dotted_name) @import.module)
-(import_statement name: (aliased_import name: (dotted_name) @import.module alias: (identifier) @import.alias))
+(import_statement name: (dotted_name) @import.module) @import
+(import_statement name: (aliased_import name: (dotted_name) @import.module alias: (identifier) @import.alias)) @import
 
 ; a def or class at the top level, decorated or not, declares a body
 (module (function_definition name: (identifier) @name) @declaration.body)
