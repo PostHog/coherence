@@ -7,7 +7,7 @@
 
 import { posix } from "node:path";
 import { handlerName, languageOfFile, throughOf, type EntranceCandidate, type EntranceSyntax } from "../../src/plugins/api.ts";
-import { codeOnly, declarationsIn, importsIn, packageClause, uncommented } from "./go-source.ts";
+import { codeOnly, packageClause, uncommented } from "./go-source.ts";
 
 /** A registration on a ServeMux: `mux.HandleFunc(`, `http.Handle(`, with a string pattern first. */
 const SERVE_MUX = /\b[A-Za-z_]\w*\s*\.\s*(HandleFunc|Handle)\s*\(\s*("(?:[^"\\\n]|\\.)*"|`[^`]*`)\s*,/g;
@@ -52,6 +52,18 @@ function goHandlerName(expression: string): string {
   return /([A-Za-z_]\w*)\s*\(\s*\)\s*$/.exec(e)?.[1] ?? "";
 }
 
+/** Each package-level func of the code-only text, by name, with its one-based line: `func main(`, `func Map[K any](`; a method's receiver comes before its name, so a method is none. */
+function funcsIn(code: string): { name: string; line: number }[] {
+  return [...code.matchAll(/^func[ \t]+([A-Za-z_]\w*)[ \t]*[[(]/gm)].map((m) => ({ name: m[1]!, line: lineAt(code, m.index) }));
+}
+
+/** Whether the file imports one of the routers: a quoted path of one in its imports, which Go puts before any other declaration, so the text before the first is read. */
+function importsRouter(text: string, code: string): boolean {
+  const first = /^(?:func|type|var|const)\b/m.exec(code);
+  const imports = text.slice(0, first === null ? text.length : first.index);
+  return [...imports.matchAll(/"((?:[^"\\\n]|\\.)*)"|`([^`]*)`/g)].some((m) => ROUTERS.test(m[1] ?? m[2] ?? ""));
+}
+
 /** The one-based line of a character offset in the text. */
 function lineAt(text: string, index: number): number {
   let line = 1;
@@ -68,9 +80,9 @@ function goCandidates(file: string, original: string, wrappers: readonly string[
     const through = throughOf(span, text, wrappers, GO_ENTRANCES);
     out.push(through === undefined ? c : { ...c, through });
   };
-  const declarations = declarationsIn(original);
+  const funcs = funcsIn(code);
   if (packageClause(text) === "main") {
-    const main = declarations.find((d) => d.form === "func" && d.names[0] === "main");
+    const main = funcs.find((d) => d.name === "main");
     if (main !== undefined) {
       const folder = posix.dirname(file);
       const command = folder === "." ? undefined : posix.basename(folder);
@@ -92,15 +104,14 @@ function goCandidates(file: string, original: string, wrappers: readonly string[
     }
   };
   register(SERVE_MUX, "http route", (method, path, handler) => `${method}("${path}") registers ${handler} on a ServeMux`, (path) => PATTERN.test(path));
-  if (importsIn(original).some((spec) => ROUTERS.test(spec.path))) {
+  if (importsRouter(text, code)) {
     register(ROUTER_METHOD, "router route", (method, path, handler) => `a router's ${method}("${path}") is handled by ${handler}`, (path) => path === "" || path.startsWith("/"));
   }
   // A cgo export: `//export Name` directly above func Name, which C calls by that name.
   const lines = original.split("\n");
-  for (const d of declarations) {
-    if (d.form !== "func") continue;
+  for (const d of funcs) {
     const above = lines[d.line - 2]?.replace(/\r$/, "");
-    if (above !== undefined && new RegExp(`^//export\\s+${d.names[0]}\\s*$`).test(above)) add({ file, line: d.line, symbol: d.names[0]!, rule: "cgo export", why: `${d.names[0]} carries //export: C code calls it by that name` }, "");
+    if (above !== undefined && new RegExp(`^//export\\s+${d.name}\\s*$`).test(above)) add({ file, line: d.line, symbol: d.name, rule: "cgo export", why: `${d.name} carries //export: C code calls it by that name` }, "");
   }
   return out;
 }

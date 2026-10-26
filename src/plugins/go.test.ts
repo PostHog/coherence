@@ -9,12 +9,22 @@
  */
 
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
-import { goDeclaresAtTop } from "../../plugins/go/go-top-level.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
 import { locateGopls } from "../../plugins/go/go.ts";
 import { checkPlugin } from "./check.ts";
+import { syntaxOf } from "./languages.ts";
 
 test("Go's top level is read by its slot: a func, a type, a var or const alone or grouped is declared; a method, a local and another package's name are not", () => {
+  // A project that names the Go plugin, so its slots answer for "go": the topLevel slot is derived from its parser.
+  const root = mkdtempSync(join(tmpdir(), "coherence-go-top-level-"));
+  writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ language: "go", plugins: { go: "bundled" } }));
+  readEnforcementConfig(root);
+  rmSync(root, { recursive: true, force: true });
+  const goDeclaresAtTop = syntaxOf("go", "topLevel")!;
   const text = [
     "package store",
     "",
