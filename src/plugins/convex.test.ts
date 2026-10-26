@@ -149,7 +149,7 @@ test("a project that does not name the Convex plugin pays nothing for it: no fil
 test("plugin check holds a plugin that extends a language to that language's duties: the Convex plugin passes TypeScript's minimum and its own check project, a Convex chokepoint graded through it", async () => {
   const checked = await checkPlugin(process.cwd(), "convex");
   assert.equal(checked.language, "typescript", "the language it extends");
-  assert.deepEqual(checked.duties.map((d) => [d.name, d.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["references", "pass"], ["chokepoint", "pass"], ["mass", "pass"], ["imports", "pass"], ["interfaces", "pass"], ["entrances", "pass"], ["one answer each", "pass"]], JSON.stringify(checked.duties));
+  assert.deepEqual(checked.duties.map((d) => [d.name, d.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["answers agree", "pass"], ["references", "pass"], ["chokepoint", "pass"], ["mass", "pass"], ["imports", "pass"], ["interfaces", "pass"], ["entrances", "pass"], ["one answer each", "pass"]], JSON.stringify(checked.duties));
   for (const duty of checked.duties.filter((d) => d.name !== "one answer each")) assert.match(duty.reason, /the bundled minimum: .*; plugin convex's own: /, `${duty.name} is held over both projects`);
   assert.match(checked.duties.find((d) => d.name === "references")!.reason, /plugin convex's own: 9 of 9 references to send/);
 });

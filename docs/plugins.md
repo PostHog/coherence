@@ -467,6 +467,7 @@ one wanting changes a copy of it:
    | imports | the `source` slot's scan reads every import `readings.imports` names, resolved to its project file, and none else: what the economy's closure walks |
    | interfaces | with each folder `readings.interfaces` names a component, the component interface reading finds the symbols one uses of another, and none else |
    | entrances | entrance detection finds every entrance `readings.entrances` names, by file, handler and rule, and none else |
+   | answers agree | where two slots answer one question of the same text, they agree over every file: a name `source` declares is one `topLevel` finds; a type declaration where `interfaces` and `declares` both say so; a name an `interfaces` import list renames is one `source` reads imported |
    | one answer each | no two of its slots answer with one function, or two spelled alike |
 
    Each duty passes, fails with why, or is not run with why (the

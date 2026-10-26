@@ -13,6 +13,9 @@
  *   chokepoint     the check grades the protected thing through the
  *                  chokepoint as check.json expects, bypasses named, its
  *                  refutation seen or refused, never missing
+ *   answers agree  where two of its slots answer one question of the same
+ *                  text (a declaration, a renamed import), their answers
+ *                  agree over every file of the check project
  *   one answer each  no two of its slots answer with one function, or two
  *                  spelled alike: a question asked of the language belongs
  *                  to one slot, or its answers drift apart
@@ -91,7 +94,7 @@ type ReadingDuty = (typeof READING_DUTIES)[number];
 /** One duty's outcome. */
 export interface Duty {
   /** A language plugin's duties, or a verifier's one per form it declares, as a bullet writes it ("[quint run]"). */
-  name: "file rule" | "declarations" | "references" | "chokepoint" | "one answer each" | ReadingDuty | `[${string}]`;
+  name: "file rule" | "declarations" | "answers agree" | "references" | "chokepoint" | "one answer each" | ReadingDuty | `[${string}]`;
   verdict: "pass" | "fail" | "not run";
   reason: string;
 }
@@ -154,7 +157,7 @@ export function checkProjectProblem(value: unknown): string | undefined {
   return wrong.length === 0 ? undefined : `it lacks ${wrong.join("; ")}`;
 }
 
-const DUTIES = ["file rule", "declarations", "references", "chokepoint"] as const;
+const DUTIES = ["file rule", "declarations", "answers agree", "references", "chokepoint"] as const;
 
 /** The check projects a plugin is held over: the minimum (the bundled plugin's check.json for its language, as the installed package ships it, which no copy edits) and, when it adds to that, the plugin's own. */
 function checkProjects(plugin: LoadedPlugin, language: string): { label: string; project: CheckProject }[] | { refusal: string } {
@@ -286,7 +289,7 @@ async function overProject(project: CheckProject, plugin: LoadedPlugin, language
       const readings = project.readings;
       // The plain scans read the scratch project before the adapter's duties write any spec into it.
       const scans = readings === undefined ? [] : [await guarded("mass", () => massRead(scratch, project, readings, language)), await guarded("imports", () => importsRead(scratch, project, readings, language)), await guarded("entrances", () => entrancesRead(scratch, readings, language))];
-      return [await guarded("file rule", () => fileRule(project, language)), await guarded("declarations", () => declarations(project, language)), ...scans, ...(await instrument(scratch, project, plugin, language))];
+      return [await guarded("file rule", () => fileRule(project, language)), await guarded("declarations", () => declarations(project, language)), await guarded("answers agree", () => answersAgree(project, language)), ...scans, ...(await instrument(scratch, project, plugin, language))];
     });
   } finally {
     rmSync(scratch, { recursive: true, force: true });
@@ -309,6 +312,60 @@ function declarations(project: CheckProject, language: string): Duty {
   if (topLevel === undefined) return { name: "declarations", verdict: "fail", reason: `no topLevel slot says what a ${language} file declares` };
   const wrong = project.declarations.filter((d) => topLevel(project.files[d.file] ?? "", d.name) !== d.declared).map((d) => `${d.name} in ${d.file} read as ${d.declared ? "not declared" : "declared"}`);
   return wrong.length === 0 ? { name: "declarations", verdict: "pass", reason: `${project.declarations.length} of ${project.declarations.length} read as expected` } : { name: "declarations", verdict: "fail", reason: wrong.join("; ") };
+}
+
+/**
+ * answers agree: where two of the language's slots answer one question of the
+ * same text, their answers agree over every file of the check project. A
+ * name the source scan finds declared is one the topLevel slot finds at the
+ * top level, and a type declaration where the interfaces slot reads one exactly
+ * where the declares slot reads a type; and every name an
+ * interfaces import list renames is one the source scan reads imported. Two
+ * readers of one text that disagree are how a reading misses what another
+ * finds (df-7ac38ee4: Python's source scan read nothing of a from-import
+ * split across lines, which its interfaces slot read whole).
+ */
+function answersAgree(project: CheckProject, language: string): Duty {
+  const source = syntaxOf(language, "source");
+  const topLevel = syntaxOf(language, "topLevel");
+  const declares = syntaxOf(language, "declares");
+  const interfaces = syntaxOf(language, "interfaces");
+  const files = project.language.files.filter((f) => project.files[f] !== undefined);
+  const wrong: string[] = [];
+  let compared = 0;
+  for (const file of files) {
+    const text = project.files[file]!;
+    const lines = text.split("\n");
+    for (const d of declarationsOf(text, language)) {
+      const line = (lines[d.line - 1] ?? "").replace(/\r$/, "");
+      if (topLevel !== undefined) {
+        compared++;
+        if (!topLevel(text, d.name)) wrong.push(`${file}:${d.line}: source declares ${d.name}, which topLevel finds no top-level declaration of`);
+      }
+      // What it declares, where two slots say: unknown is no answer (a call's result may or may not execute), so only two answers are compared.
+      const kind = d.declares ?? declares?.(line);
+      if (interfaces !== undefined && kind !== undefined && kind !== "unknown") {
+        compared++;
+        if (interfaces.isTypeDeclaration(line) !== (kind === "type")) wrong.push(`${file}:${d.line}: interfaces reads ${d.name}'s line as ${interfaces.isTypeDeclaration(line) ? "" : "no "}type declaration, declares as ${kind}`);
+      }
+    }
+    if (source !== undefined && interfaces !== undefined) {
+      const imported = new Set<string>();
+      source.importsOf(text, (name, specifier) => {
+        if (name !== undefined) imported.add(name);
+        imported.add(specifier);
+        imported.add(specifier.split(/[./:\\]+/).filter((s) => s !== "").pop() ?? specifier);
+      });
+      for (const list of interfaces.importLists(text)) {
+        for (const [, original] of list.matchAll(/([A-Za-z_$][\w$.:]*)\s+as\s+[A-Za-z_$][\w$]*/g)) {
+          compared++;
+          if (!imported.has(original!)) wrong.push(`${file}: interfaces.importLists renames ${original}, which source.importsOf reads no import of`);
+        }
+      }
+    }
+  }
+  if (compared === 0) return { name: "answers agree", verdict: "fail", reason: "nothing to check: no file of the check project gives two slots one question to answer (a declaration, or a renamed import)" };
+  return wrong.length === 0 ? { name: "answers agree", verdict: "pass", reason: `${compared} answers of two slots to one question agree` } : { name: "answers agree", verdict: "fail", reason: wrong.join("; ") };
 }
 
 /** Two sorted lists' difference, said: what the reading missed and what it found that the check project names none of. */
