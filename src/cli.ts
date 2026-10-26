@@ -73,6 +73,8 @@ import { CI_USAGE, ciInstallCommand, ciSuggestion } from "./lifecycle/ci.ts";
 import { ciReportCommand } from "./lifecycle/ci-report.ts";
 import { startTelemetry } from "./lifecycle/telemetry.ts";
 import { reachNote, refreshLatest, startUpdateCheck, versionText } from "./lifecycle/version.ts";
+import { startParsers } from "./plugins/syntax-trees.ts";
+import { warmProjectParses } from "./economy/warm-parses.ts";
 
 type CommandResult = number | Promise<number>;
 type RootCommand = (argv: string[], io: Io) => CommandResult;
@@ -525,6 +527,8 @@ export async function main(argv: string[], call: CommandCall): Promise<number> {
   // A command that made Coherence's folder (a first run, a first journal record, without hooks install) writes its git files with it,
   // so git never offers the regenerated state for a commit; a folder that was already there keeps whatever its adopter left.
   const fresh = !existsSync(join(root, STATE_DIR));
+  // The parser runtime starts before any command, so a reading of a language read through a parser finds it started (syntax-trees.ts).
+  await startParsers();
   try {
     return await dispatch(argv, call, root);
   } finally {
@@ -563,10 +567,18 @@ async function dispatch(argv: string[], call: CommandCall, root: string): Promis
       return runCommand(rest, io);
     case "refute":
       return refuteCommand(rest, io);
-    case "warm":
-      // Internal: the hook starts this detached so the instrument is loaded before the stop that needs it.
-      await warmInstrument(root);
+    case "warm": {
+      // Internal: the hook starts this detached so the instrument is loaded before the stop that needs it,
+      // and so every file the project reads through a parser is parsed once and kept before a whole-project reading asks.
+      const instrument = warmInstrument(root);
+      try {
+        warmProjectParses(root);
+      } catch {
+        // A pre-read that fails only means the first whole-project reading parses every file itself.
+      }
+      await instrument;
       return 0;
+    }
     case "serve":
       // The warm server answers the live Scope reading over HTTP besides the instrument over its socket.
       return serveCommand(rest, io, { http: scopeApp() });

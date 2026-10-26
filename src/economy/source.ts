@@ -1,9 +1,11 @@
 /**
  * What economy and mass read from the tree without an instrument: which
  * files are source, which top-level names a file declares, which names it
- * imports and from where, and which component a file lies in. A plain scan,
- * never a parse; the adapter confirms what matters through resolve and
- * references, and mass says when a number came from the scan alone.
+ * imports and from where, and which component a file lies in. A language
+ * whose plugin names a parser is read through it (syntax-trees.ts); any other
+ * by its plugin's plain scan. Neither asks a server: the adapter confirms
+ * what matters through resolve and references, and mass says when a number
+ * came from the scan alone.
  */
 
 import { isAbsolute, relative, resolve, sep } from "node:path";
@@ -11,7 +13,8 @@ import { isTestPath } from "../adapters/adapter.ts";
 import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import { languageOfFile } from "../adapters/language-files.ts";
-import { leftOutOfSource, syntaxOf } from "../plugins/languages.ts";
+import { leftOutOfSource, syntaxOf, treeReaderFor } from "../plugins/languages.ts";
+import type { Declares } from "../plugins/syntax-trees.ts";
 import type { Component, SpecModel } from "../spec/model.ts";
 
 /**
@@ -69,10 +72,14 @@ export interface Declaration {
   /** One-based. */
   line: number;
   exported: boolean;
+  /** What it declares, when the language is read through a parser, which says it in the same parse. */
+  declares?: Declares;
 }
 
-/** The top-level names a file declares, by a plain scan of line starts. */
+/** The top-level names a file declares: through the language's parser when its plugin names one, else by a plain scan of line starts. */
 export function declarationsOf(text: string, language: Language): Declaration[] {
+  const tree = treeReaderFor(language);
+  if (tree !== undefined) return tree.declarations(text);
   const found: Declaration[] = [];
   const seen = new Set<string>();
   const syntax = sourceSyntax(language);

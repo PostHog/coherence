@@ -161,12 +161,42 @@ export interface PluginManifest {
   module?: string;
   /** Each syntax slot the plugin fills: "<module beside the manifest>#<export>". */
   syntax?: Partial<Record<SyntaxSlot, string>>;
+  /**
+   * The parser the language's text is read through, and the queries over it
+   * (syntax-trees.ts): the core derives the source, declares and topLevel
+   * slots, and the interfaces slot's importLists and wildcardModules, from
+   * them, so the plugin fills none of those itself.
+   */
+  treeSitter?: TreeSitterManifest;
   /** The rungs the plugin's adapter grades on; absent, the wrapped adapter's, else reference-choked alone. */
   ladder?: Ladder;
   verifiers?: VerifierForm[];
   /** The lexicon fragment, relative to the manifest. */
   lexicon?: string;
 }
+
+/** A manifest's treeSitter: paths relative to the manifest. */
+export interface TreeSitterManifest {
+  /** The language's tree-sitter parser, compiled to WebAssembly (tree-sitter build --wasm, or the .wasm a grammar's npm package ships). */
+  parser: string;
+  /** The queries, in tree-sitter's query language, capturing what syntax-trees.ts's CAPTURES name. */
+  queries: string;
+  /** "<module beside the manifest>#<export>": where an import leads, which no parse can say. */
+  resolve: string;
+  /** For a language that exports by name rather than by a keyword its queries capture as @exported: a regular expression a name it keeps private matches (Python's "^_"). */
+  privateName?: string;
+}
+
+/** Where an import leads: a plugin on the parser path supplies this as code, since a module's place is the language's rule, not its syntax. */
+export interface ModuleResolution {
+  /** The project-relative file a specifier names from a file, or undefined outside the project; `vanished` as for the source slot's. */
+  resolveModule(root: string, from: string, specifier: string, vanished: ReadonlySet<string>): string | undefined;
+  /** Every spelling of the files a module specifier names from a file, resolved or not, for the word index's wildcard keys. */
+  modulePaths(from: string, specifier: string): string[];
+}
+
+/** The slots the core derives for a plugin on the parser path, which its manifest may not also fill. */
+export const DERIVED_SLOTS = ["source", "declares", "topLevel", "kept"] as const;
 
 /** What a verifier is asked. */
 export interface VerifyRequest {

@@ -69,7 +69,7 @@ for (const file of files(plugins)) {
     const text = readFileSync(file, "utf8");
     // Every module a manifest names (its module and each syntax slot's) by the .js the build wrote.
     writeFileSync((mkdirSync(dirname(join(bundled, at)), { recursive: true }), join(bundled, at)), basename(file) === "plugin.json" ? text.replace(/("[A-Za-z]+":\s*"[^"#/]+)\.ts(["#])/g, "$1.js$2") : text);
-  }
+  } else if (/\.(wasm|scm)$/.test(file)) copy(file, join(bundled, at)); // A plugin's parser and its queries (its manifest's treeSitter), as they are.
 }
 
 // The same modules the page joins, found the same way: from the entry, by what each imports at run time.

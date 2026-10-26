@@ -1,0 +1,349 @@
+/**
+ * The parser path: a language plugin may name a tree-sitter parser and the
+ * queries its text is read through (its manifest's treeSitter), and the core
+ * derives the plugin's text readings from them: the names a file declares at
+ * its top level, what each declares, and every name it imports and from
+ * where. One parse answers each reading, so no two readings of one language
+ * can disagree about its text, as two hand-written readers of Python's
+ * imports did (df-7ac38ee4); and a statement is read whole, whatever lines it
+ * spans.
+ *
+ * The runtime starts once per process (startParsers, which the CLI awaits
+ * before any command); a parser loads on first use and stays. A project's
+ * parses are kept under .coherence/parses by each text's digest: the warm-up
+ * a session start launches reads every file once (warmParses), and a later
+ * reading of the whole project parses only what changed. Every tree is
+ * freed before the reader returns: web-tree-sitter trees hold WebAssembly
+ * memory only delete() returns, and the old harness crashed an adopter at
+ * parse #638 of one file by never freeing them.
+ */
+
+import { createHash } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { Language, Parser, Query } from "web-tree-sitter";
+import type { LoadedPlugin, TreeSitterManifest } from "./plugin.ts";
+
+/** What a declaration declares, as the observation's interface reading names it. */
+export type Declares = "body" | "value" | "type" | "unknown";
+
+/** One imported name, or a whole module, as the plugin's queries read it. */
+export interface TreeImport {
+  /** The name brought in; undefined for a whole-module import. */
+  name: string | undefined;
+  /** The name it is bound to here, when the import renames it. */
+  alias?: string;
+  /** Whether the import brings in every name the module exports. */
+  glob?: true;
+  /** The module as the text names it. */
+  specifier: string;
+  /** One-based. */
+  line: number;
+}
+
+/** One name a file declares at its top level. */
+export interface TreeDeclaration {
+  name: string;
+  /** One-based: the line its name stands on. */
+  line: number;
+  exported: boolean;
+  declares: Declares;
+}
+
+/** What the core reads of a language's text through its parser. */
+export interface TreeReader {
+  imports(text: string): TreeImport[];
+  declarations(text: string): TreeDeclaration[];
+  /** Every name the text binds at its top level: each declaration's, and each a @bound match names (Python's lowercase module variables). */
+  topLevel(text: string): Set<string>;
+}
+
+/** The capture names a plugin's queries may use: any other is refused by name, never passed over. */
+export const CAPTURES = ["import.from", "import.module", "import.name", "import.alias", "import.glob", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported"] as const;
+
+/** The captures whose text a reading reads; every other capture is read by its name and line. */
+const TEXT_READ = new Set(["import.from", "import.module", "import.name", "import.alias", "name"]);
+
+let started: Promise<void> | undefined;
+let ready = false;
+
+/** Start the parser runtime: once per process, before any reading of a language read through a parser. */
+export function startParsers(): Promise<void> {
+  started ??= Parser.init().then(() => {
+    ready = true;
+  });
+  return started;
+}
+
+/** One match's captures, as a parse keeps them: each capture's name, its text and its one-based line. */
+type Found = [name: string, text: string, line: number][][];
+
+/** A parser compiled once per plugin: what every reader of its language shares. */
+interface Compiled {
+  parse(text: string): Found;
+  marksExports: boolean;
+  exportedName(name: string): boolean;
+  /** The parser's and queries' digest: a parse kept under another is never read as this one's. */
+  fingerprint: string;
+}
+
+const compiled = new Map<string, Compiled>();
+const readers = new Map<string, TreeReader & { store: ParseStore | undefined; keyOf(text: string): string }>();
+
+/** How many texts' matches a reader keeps in memory: enough for the readings one pass asks of a file in turn, few enough to hold no project. */
+const RECENT = 4;
+
+/** Parses a process makes itself before it reads the project's kept parses: a hook that reads a file or two parses them, cheaper than loading every file's. */
+const DIRECT_PARSES = 16;
+
+/** Bumped when what a kept parse holds changes, so an older store is never read as this one's. */
+const STORE_FORMAT = 2;
+
+/**
+ * The reader of a plugin's language through its parser and queries, built on
+ * first use; undefined for a plugin that names no parser. With a project
+ * root, its parses are kept in the project's .coherence/parses by each text's
+ * digest, so a later process parses only the files that changed since.
+ */
+export function treeReaderOf(plugin: LoadedPlugin, root?: string): TreeReader | undefined {
+  if (plugin.manifest.treeSitter === undefined) return undefined;
+  const key = `${plugin.dir}\u0000${root ?? ""}`;
+  let reader = readers.get(key);
+  if (reader === undefined) {
+    if (!ready) throw new Error(`plugin ${plugin.name} reads its language through a parser, and the parser runtime is not started: await startParsers() (src/plugins/syntax-trees.ts) before a reading, as the CLI does`);
+    let parser = compiled.get(plugin.dir);
+    if (parser === undefined) {
+      parser = compile(plugin, plugin.manifest.treeSitter);
+      compiled.set(plugin.dir, parser);
+    }
+    reader = readerOver(parser, root === undefined ? undefined : ParseStore.of(root, plugin.name, parser.fingerprint));
+    readers.set(key, reader);
+  }
+  return reader;
+}
+
+/**
+ * Pre-read a project's files of one plugin's language, as the warm-up a
+ * session start launches does: every text is read through the parser (a kept
+ * parse answering where the text is unchanged), and the project's kept
+ * parses are rewritten to hold exactly these texts', so a file deleted or
+ * changed since leaves nothing behind.
+ */
+export function warmParses(plugin: LoadedPlugin, root: string, texts: Iterable<string>): { read: number; parsed: number } {
+  const reader = treeReaderOf(plugin, root) as (TreeReader & { store: ParseStore | undefined; keyOf(text: string): string }) | undefined;
+  if (reader === undefined || reader.store === undefined) return { read: 0, parsed: 0 };
+  const keep = new Set<string>();
+  let read = 0;
+  const before = reader.store.parsed;
+  for (const text of texts) {
+    reader.imports(text);
+    keep.add(reader.keyOf(text));
+    read++;
+  }
+  const parsed = reader.store.parsed - before;
+  reader.store.rewrite(keep);
+  return { read, parsed };
+}
+
+function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
+  const binary = readFileSync(resolve(plugin.dir, declared.parser));
+  const source = readFileSync(resolve(plugin.dir, declared.queries), "utf8");
+  const language = Language.loadSync(new WebAssembly.Module(binary));
+  let query: Query;
+  try {
+    query = new Query(language, source);
+  } catch (error) {
+    throw new Error(`plugin ${plugin.name}'s queries (${declared.queries}) do not compile against its parser: ${(error as Error).message}`);
+  }
+  const unknown = query.captureNames.filter((name) => !(CAPTURES as readonly string[]).includes(name));
+  if (unknown.length > 0) throw new Error(`plugin ${plugin.name}'s queries capture ${unknown.map((n) => `@${n}`).join(", ")}, which Coherence reads nothing by; the captures are ${CAPTURES.map((c) => `@${c}`).join(", ")}`);
+  // A language whose queries mark what is exported says it by @exported; one with no such mark exports by name, unless its privateName says otherwise.
+  const privateName = declared.privateName === undefined ? undefined : new RegExp(declared.privateName);
+  const parser = new Parser();
+  parser.setLanguage(language);
+  return {
+    marksExports: query.captureNames.includes("exported"),
+    exportedName: (name) => privateName === undefined || !privateName.test(name),
+    fingerprint: createHash("sha256").update(binary).update("\u0000").update(source).update(`\u0000${STORE_FORMAT}`).digest("base64url").slice(0, 16),
+    // Every match of the queries over the text: read inside the tree's life, and the tree freed however the read ends.
+    parse(text) {
+      const tree = parser.parse(text);
+      if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
+      try {
+        // A capture whose text no reading reads (a declaration's whole node, @bound, @exported) keeps its name and line alone, so a kept parse holds names, not bodies.
+        return query.matches(tree.rootNode).map((match) => match.captures.map((c) => [c.name, TEXT_READ.has(c.name) ? c.node.text : "", c.node.startPosition.row + 1] as [string, string, number]));
+      } finally {
+        tree.delete();
+      }
+    },
+  };
+}
+
+function readerOver(compiled: Compiled, store: ParseStore | undefined): TreeReader & { store: ParseStore | undefined; keyOf(text: string): string } {
+  const { marksExports, exportedName } = compiled;
+  const keyOf = (text: string): string => createHash("sha256").update(text).digest("base64url").slice(0, 22);
+  // The last few texts' matches in memory, so the readings a pass asks of one file (its declarations, then its imports) share one parse;
+  // past the first few parses, the project's kept parses, so a file unchanged since an earlier process is not parsed again.
+  const recent: { text: string; found: Found }[] = [];
+  let direct = 0;
+  const raw = (text: string): Found => {
+    const kept = recent.find((r) => r.text === text);
+    if (kept !== undefined) return kept.found;
+    const key = store === undefined ? undefined : keyOf(text);
+    let found = key !== undefined && direct >= DIRECT_PARSES ? store!.get(key) : undefined;
+    if (found === undefined) {
+      found = compiled.parse(text);
+      direct++;
+      if (key !== undefined) store!.put(key, found);
+    }
+    recent.unshift({ text, found });
+    recent.length = Math.min(recent.length, RECENT);
+    return found;
+  };
+  const matches = (text: string): { name: string; text: string; line: number }[][] => raw(text).map((captures) => captures.map(([name, value, line]) => ({ name, text: value, line })));
+
+  return {
+    imports(text) {
+      const found: TreeImport[] = [];
+      for (const captures of matches(text)) {
+        const of = (name: string) => captures.find((c) => c.name === name);
+        const from = of("import.from");
+        const module = of("import.module");
+        if (from === undefined && module === undefined) continue;
+        const alias = of("import.alias")?.text;
+        if (module !== undefined) found.push({ name: undefined, specifier: module.text, line: module.line, ...(alias === undefined ? {} : { alias }) });
+        else if (of("import.glob") !== undefined) found.push({ name: undefined, glob: true, specifier: from!.text, line: from!.line });
+        else {
+          const name = of("import.name");
+          if (name !== undefined) found.push({ name: name.text, specifier: from!.text, line: name.line, ...(alias === undefined ? {} : { alias }) });
+        }
+      }
+      return found;
+    },
+    declarations(text) {
+      const found: TreeDeclaration[] = [];
+      for (const captures of matches(text)) {
+        const kind = captures.find((c) => c.name.startsWith("declaration."));
+        const name = captures.find((c) => c.name === "name");
+        if (kind === undefined || name === undefined) continue;
+        const exported = marksExports ? captures.some((c) => c.name === "exported") : exportedName(name.text);
+        found.push({ name: name.text, line: name.line, exported, declares: kind.name.slice("declaration.".length) as Declares });
+      }
+      // A name declared twice is the first declaration's, as a reader going down the file meets it.
+      const seen = new Set<string>();
+      return found.sort((a, b) => a.line - b.line).filter((d) => !seen.has(d.name) && seen.add(d.name) !== undefined);
+    },
+    topLevel(text) {
+      const names = new Set<string>();
+      for (const captures of matches(text)) {
+        const name = captures.find((c) => c.name === "name");
+        if (name !== undefined && captures.some((c) => c.name === "bound" || c.name.startsWith("declaration."))) names.add(name.text);
+      }
+      return names;
+    },
+    store,
+    keyOf,
+  };
+}
+
+/**
+ * A project's kept parses for one plugin: .coherence/parses/<plugin>/<fingerprint>.json,
+ * what the last warm-up read, and beside it an appended log of what each
+ * process parsed since, read together. Loaded only when first asked, and
+ * written only where the project already has its .coherence folder, so a
+ * project Coherence never ran in gains none.
+ */
+class ParseStore {
+  private static stores = new Map<string, ParseStore>();
+  private entries: Map<string, Found> | undefined;
+  private added: [string, Found][] = [];
+  /** Texts this store's process parsed itself. */
+  parsed = 0;
+
+  static of(root: string, plugin: string, fingerprint: string): ParseStore {
+    const dir = join(resolve(root), ".coherence", "parses", plugin);
+    const key = `${dir}\u0000${fingerprint}`;
+    let store = ParseStore.stores.get(key);
+    if (store === undefined) {
+      store = new ParseStore(dir, fingerprint);
+      ParseStore.stores.set(key, store);
+      if (ParseStore.stores.size === 1) process.once("exit", () => ParseStore.stores.forEach((s) => s.flush()));
+    }
+    return store;
+  }
+
+  private readonly dir: string;
+  private readonly fingerprint: string;
+
+  private constructor(dir: string, fingerprint: string) {
+    this.dir = dir;
+    this.fingerprint = fingerprint;
+  }
+
+  private get base(): string {
+    return join(this.dir, `${this.fingerprint}.json`);
+  }
+
+  private get log(): string {
+    return join(this.dir, `${this.fingerprint}.added.jsonl`);
+  }
+
+  get(key: string): Found | undefined {
+    if (this.entries === undefined) {
+      const entries = new Map<string, Found>();
+      try {
+        for (const [k, found] of Object.entries(JSON.parse(readFileSync(this.base, "utf8")) as Record<string, Found>)) entries.set(k, found);
+      } catch {
+        // No warm-up has kept any yet, or what it kept is unreadable: every text is parsed, and the next warm-up writes it again.
+      }
+      try {
+        for (const line of readFileSync(this.log, "utf8").split("\n")) {
+          if (line === "") continue;
+          try {
+            const [k, found] = JSON.parse(line) as [string, Found];
+            entries.set(k, found);
+          } catch {
+            // A line a process was killed while writing: that text is parsed again.
+          }
+        }
+      } catch {
+        // Nothing appended since the warm-up.
+      }
+      for (const [k, found] of this.added) entries.set(k, found);
+      this.entries = entries;
+    }
+    return this.entries.get(key);
+  }
+
+  put(key: string, found: Found): void {
+    this.parsed++;
+    this.added.push([key, found]);
+    this.entries?.set(key, found);
+  }
+
+  /** Append what this process parsed, where the project has its .coherence folder. */
+  flush(): void {
+    if (this.added.length === 0 || !existsSync(dirname(dirname(this.dir)))) return;
+    try {
+      mkdirSync(this.dir, { recursive: true });
+      appendFileSync(this.log, this.added.map((entry) => `${JSON.stringify(entry)}\n`).join(""));
+    } catch {
+      // A store that cannot be written only means the next process parses again.
+    }
+    this.added = [];
+  }
+
+  /** Keep exactly the texts named, from what is held and what this process parsed, in one file: the log and every other fingerprint's store go. */
+  rewrite(keep: ReadonlySet<string>): void {
+    if (!existsSync(dirname(dirname(this.dir)))) return;
+    this.get("");
+    const kept: Record<string, Found> = {};
+    for (const [k, found] of this.entries!) if (keep.has(k)) kept[k] = found;
+    mkdirSync(this.dir, { recursive: true });
+    const temporary = `${this.base}.${process.pid}`;
+    writeFileSync(temporary, JSON.stringify(kept));
+    renameSync(temporary, this.base);
+    for (const name of readdirSync(this.dir)) if (name !== `${this.fingerprint}.json`) rmSync(join(this.dir, name), { force: true });
+    this.added = [];
+  }
+}

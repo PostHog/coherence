@@ -22,7 +22,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 
 import { createRequire, registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { landsWithin } from "./within.ts";
-import { MANIFEST, OLDEST_PLUGIN_API, PLUGIN_API, SYNTAX_SLOTS, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
+import { DERIVED_SLOTS, MANIFEST, OLDEST_PLUGIN_API, PLUGIN_API, SYNTAX_SLOTS, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -108,6 +108,32 @@ function dataProblems(raw: Record<string, unknown>, who: string): string[] {
   return problems;
 }
 
+/**
+ * A manifest's treeSitter, checked: its parser and queries files beside the
+ * manifest, its resolve "<module>#<export>", only on a plugin that provides a
+ * language, and no slot the core derives from the parser filled by hand too:
+ * a second reader of the same text is how two readings of it disagree.
+ */
+function treeSitterProblems(raw: Record<string, unknown>, dir: string, language: string | undefined, who: string): string[] {
+  const declared = raw["treeSitter"];
+  if (declared === undefined) return [];
+  const shape = `${who}'s treeSitter is { "parser": "<.wasm beside the manifest>", "queries": "<.scm beside the manifest>", "resolve": "<module>#<export>", "privateName"?: "<regular expression>" }`;
+  if (!isRecord(declared)) return [shape];
+  const problems: string[] = [];
+  for (const key of ["parser", "queries"] as const) {
+    const path = declared[key];
+    if (typeof path !== "string" || path === "" || isAbsolute(path)) problems.push(shape);
+    else if (!existsSync(join(dir, path))) problems.push(`${who}'s treeSitter.${key} names ${path}, which is not beside its ${MANIFEST}`);
+  }
+  if (typeof declared["resolve"] !== "string" || !/^[^#/][^#]*#[A-Za-z_$][\w$]*$/.test(declared["resolve"])) problems.push(shape);
+  if (declared["privateName"] !== undefined && !compiles(declared["privateName"])) problems.push(shape);
+  if (language === undefined) problems.push(`${who} names a treeSitter parser but provides no language for it to read`);
+  const syntax = isRecord(raw["syntax"]) ? raw["syntax"] : {};
+  const twice = DERIVED_SLOTS.filter((slot) => syntax[slot] !== undefined);
+  if (twice.length > 0) problems.push(`${who} reads its text through treeSitter, so ${twice.map((s) => `syntax.${s}`).join(" and ")} would read it a second time: the core derives ${twice.length === 1 ? "that slot" : "those slots"} from the parser; remove ${twice.length === 1 ? "it" : "them"}`);
+  return [...new Set(problems)];
+}
+
 /** The manifest at `dir`, checked against the interface; every fault named. */
 export function readManifest(name: string, dir: string, where: string): { manifest?: PluginManifest; problems: string[] } {
   const file = join(dir, MANIFEST);
@@ -152,6 +178,7 @@ export function readManifest(name: string, dir: string, where: string): { manife
   if (verifierForms.some((v) => v.command === undefined) && raw["module"] === undefined) problems.push(`${where}: plugin ${name} proves a via form with no command and has no module to verify it`);
   const language = isRecord(provides) && typeof provides["language"] === "string" ? provides["language"] : undefined;
   if ((language !== undefined || typeof raw["extends"] === "string" || isRecord(provides) && provides["declaredLanguages"] === true) && raw["module"] === undefined) problems.push(`${where}: plugin ${name} provides or extends a language adapter but names no module`);
+  problems.push(...treeSitterProblems(raw, dir, language, `${where}: plugin ${name}`));
   if (problems.length > 0) return { problems };
   return { manifest: raw as unknown as PluginManifest, problems };
 }

@@ -152,6 +152,7 @@ copy names it the second way, and so should a plugin you write.
 | `verifiers` | The via forms it proves (below). A `command` must name `{name}`; a command that is never told what to prove is refused. An optional `match` is a regular expression its output must match for an exit 0 to pass. |
 | `lexicon` | Its lexicon layer, relative to the manifest. |
 | `syntax` | The syntax slots it fills, each `"<module beside the manifest>#<export>"` (below). |
+| `treeSitter` | The tree-sitter parser its language's text is read through, and the queries over it (below, reading through a parser). The core then derives the `source`, `declares` and `topLevel` slots and the `interfaces` slot's import answers from the parse, so the plugin fills none of those itself. |
 | `files` | The files a language is written in, as a regular expression `pattern` with an optional `except` (TypeScript, as JSON writes them: `\\.(?:[cm]?[tj]sx?)$` except `\\.d\\.ts$`); `extensions` is the short form for a plain list. |
 | `source` | `except`: of the language's files, those the plain source scan leaves out (TypeScript's JavaScript, Python's stubs). |
 | `serverExtensions` | The extensions the language server can report a site in or resolve a name to. |
@@ -265,6 +266,75 @@ each field and slot it declares, and the bundled plugin answers the rest, so
 an enhancement of the adapter alone keeps every reading of the language. Its
 file rule is one rule: a plugin that names its files, by `files` or
 `extensions`, owns them whole.
+
+### Reading through a parser
+
+A plugin that provides a language can hand Coherence a
+[tree-sitter](https://tree-sitter.github.io/) parser for it, and queries
+over its syntax tree, in place of hand-written readers. Coherence parses
+each file once per reading and derives every reading of its text from the
+same parse: the names a file declares at its top level, what each declares,
+and every import. A statement is read whole, whatever lines it spans; text
+inside a string or a comment is never read as code. The bundled Python
+plugin reads this way (`plugins/python`).
+
+```json
+"treeSitter": {
+  "parser": "tree-sitter-python.wasm",
+  "queries": "python.scm",
+  "resolve": "python-source.ts#PYTHON_RESOLVE",
+  "privateName": "^_"
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `parser` | The language's parser compiled to WebAssembly, beside the manifest. Many grammars' npm packages ship one (`tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-java`, `tree-sitter-c`): copy the `.wasm` out of the package. For a grammar that ships none (`tree-sitter-swift`, `tree-sitter-kotlin`), run `tree-sitter build --wasm` in the grammar's repository; the tree-sitter CLI compiles it with Emscripten, or with Docker or Podman when Emscripten is not installed. Coherence runs web-tree-sitter 0.27, which loads parsers built for language ABI 13 to 15. |
+| `queries` | A file of tree-sitter queries, beside the manifest, whose captures are the names below. A query that does not compile against the parser, or a capture Coherence reads nothing by, is refused naming the plugin. |
+| `resolve` | `"<module>#<export>"`: a `ModuleResolution`, `{ resolveModule(root, from, specifier, vanished), modulePaths(from, specifier) }`. Where an import leads is the language's rule, not its syntax, so it stays code: `resolveModule` names the project file a specifier leads to (or `undefined` outside the project), `modulePaths` every spelling of the files a glob import names. |
+| `privateName` | For a language that exports by name rather than by a keyword: a regular expression a name it keeps private matches (Python's `^_`). A language that exports by keyword captures `@exported` instead. |
+
+The captures:
+
+| Capture | On | Means |
+|---|---|---|
+| `@import.from` | the module node of an import that names what it brings in | the specifier, as written (`..pkg.mod`) |
+| `@import.name` | each name it brings in, one match per name | the name |
+| `@import.alias` | the name it is bound to, when renamed | the alias |
+| `@import.glob` | the glob (`*`) | every name the module exports |
+| `@import.module` | the module of a whole-module import (`import os.path`) | the specifier |
+| `@declaration.body`, `@declaration.value`, `@declaration.type`, `@declaration.unknown` | a top-level declaration, by what it declares | the declaration; its line is its `@name`'s |
+| `@name` | the declaration's name | the name |
+| `@bound` | a top-level name the file binds without declaring it (Python's lowercase module variables) | the spec model's check that a handler, guard or mirror exists reads it; mass does not |
+| `@exported` | anything in a declaration's match | the file exports it |
+
+Python's queries (`plugins/python/python.scm`) are the worked example:
+one pattern per shape of import, then one per kind of declaration, each
+anchored to the module so a nested definition is no top-level one.
+
+The plugin still fills the slots no parse answers: `entrances` (a
+framework's rules), `notice`, `lists`, `boundaries`, and an `interfaces`
+table for the language's own facts (whether its server narrows to bounds,
+its default exports). A manifest that names a parser and also fills
+`source`, `declares`, `topLevel` or `kept`, or an `interfaces` table that
+answers `importLists` or `wildcardModules`, is refused naming the slot: a
+second reader of the same text is how two readings of it come to disagree,
+as Python's two hand-written readers of its imports did.
+
+Parsing costs: a WebAssembly parser reads about 11 MB of text a second, so
+Coherence keeps each file's parse in the project's `.coherence/parses`,
+under the text's digest and the parser's and queries' fingerprint. The
+warm-up a session start launches parses every source file once in the
+background; after that a reading of the whole project parses only the files
+that changed (PostHog's 20,000 Python files: 30 s for the first warm-up,
+2 s for the next, and mass in 3.4 s). A hook that reads a file or two parses
+it directly and never loads the store. Changing the parser or the queries
+changes the fingerprint, so nothing kept under the old ones is read.
+
+The parser runtime starts once per process, before any command. Code that
+imports Coherence's modules and asks a reading itself, outside its CLI,
+first awaits `startParsers()` (`@posthog/coherence/dist/plugins/syntax-trees.js`);
+a reading asked before then is refused saying so.
 
 ## Writing a language adapter
 

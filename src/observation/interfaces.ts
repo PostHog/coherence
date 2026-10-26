@@ -109,7 +109,7 @@ export async function readInterfaceMap(root: string, adapter: LanguageAdapter, m
         unanswered.set(file, error instanceof Error ? error.message : String(error));
         break;
       }
-      const kind = declares(lines[declaration.line - 1] ?? "", language);
+      const kind = declaration.declares ?? declares(lines[declaration.line - 1] ?? "", language);
       for (const site of projectSites(root, references)) {
         if (isTest(site.file, testFolders)) continue;
         const from = componentOf(model, site.file)?.folder;

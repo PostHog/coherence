@@ -5,7 +5,7 @@
     "shop/store/__init__.py": "",
     "shop/store/secrets.py": "SECRET_COLUMNS = {\"tokens\": [\"token\"]}\n\n\ndef seal(pattern, row):\n    out = dict(row)\n    for column in SECRET_COLUMNS.get(pattern, []):\n        out.pop(column, None)\n    return out\n",
     "shop/api/__init__.py": "",
-    "shop/api/render.py": "from shop.store.secrets import SECRET_COLUMNS, seal\n\n\ndef render(pattern, row):\n    sealed = seal(pattern, row)\n    leaked = SECRET_COLUMNS.get(pattern)\n    return {\"sealed\": sealed, \"leaked\": leaked}\n",
+    "shop/api/render.py": "from shop.store.secrets import (\n    SECRET_COLUMNS,\n    seal,\n)\n\n\ndef render(pattern, row):\n    sealed = seal(pattern, row)\n    leaked = SECRET_COLUMNS.get(pattern)\n    return {\"sealed\": sealed, \"leaked\": leaked}\n",
     "tests/test_secrets.py": "from shop.store.secrets import SECRET_COLUMNS\n\n\ndef test_columns():\n    assert SECRET_COLUMNS\n",
     "README.md": "# A project\n",
     "shop/api/app.py": "from shop.api.render import render\n\n\nclass App:\n    def get(self, path):\n        def wrap(fn):\n            return fn\n\n        return wrap\n\n\napp = App()\n\n\n@app.get(\"/rows\")\ndef rows(row):\n    return render(\"tokens\", row)\n"

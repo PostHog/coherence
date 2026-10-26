@@ -25,6 +25,10 @@
  * test that made it; and every test is timed between hooks on the file's
  * root, and fails past its ceiling.
  *
+ * It also starts the parser runtime, as the CLI does before any command, so
+ * a test that asks a reading of a language read through a parser finds it
+ * started (syntax-trees.ts).
+ *
  * Inert in the runner's parent process (no NODE_TEST_CONTEXT), and in any
  * process a test spawns that does not itself load this module.
  */
@@ -33,6 +37,7 @@ import { execFileSync, watchSpawns } from "../lifecycle/work-meter.ts";
 import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { startParsers } from "../plugins/syntax-trees.ts";
 import { declaredBudget, decisionHeld, describeSpawnBudget, describeTreeReads, launchesOwnCli, overCeiling, readsOwnTree, SPAWN_BUDGET, testCeiling, type Charged } from "./test-budgets.ts";
 
 /** A process the guard found alive: its pid and its command line. */
@@ -235,4 +240,7 @@ async function installBudgets(file: string): Promise<void> {
   });
 }
 
-if (process.env["NODE_TEST_CONTEXT"] !== undefined) await install();
+if (process.env["NODE_TEST_CONTEXT"] !== undefined) {
+  await startParsers();
+  await install();
+}

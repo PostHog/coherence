@@ -60,6 +60,9 @@ function installedProject(name: string): { project: string; installed: string } 
   run(unpacked, "tar", ["-xzf", tarball]);
   mkdirSync(join(project, "node_modules", "@posthog"), { recursive: true });
   renameSync(join(unpacked, "package"), join(project, "node_modules", "@posthog", "coherence"));
+  // The package's dependencies beside it, as npm installs them: copied from this checkout's, so the test needs no registry.
+  const { dependencies = {} } = JSON.parse(readFileSync(join(CHECKOUT, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
+  for (const dependency of Object.keys(dependencies)) cpSync(join(CHECKOUT, "node_modules", dependency), join(project, "node_modules", dependency), { recursive: true });
   return { project, installed: join(project, "node_modules", "@posthog", "coherence") };
 }
 
@@ -74,17 +77,19 @@ test("the bundled plugins load from an installed package: every adapter module a
   const bundled = join(installed, "dist", "bundled");
   const defaults = JSON.parse(readFileSync(join(bundled, "defaults.json"), "utf8")) as { plugins: string[] };
   for (const name of defaults.plugins) {
-    const manifest = JSON.parse(readFileSync(join(bundled, name, "plugin.json"), "utf8")) as { module?: string; syntax?: Record<string, string> };
-    for (const named of [manifest.module, ...Object.values(manifest.syntax ?? {}).map((at) => at.split("#")[0])]) {
+    const manifest = JSON.parse(readFileSync(join(bundled, name, "plugin.json"), "utf8")) as { module?: string; syntax?: Record<string, string>; treeSitter?: { parser: string; queries: string; resolve: string } };
+    for (const named of [manifest.module, ...[...Object.values(manifest.syntax ?? {}), manifest.treeSitter?.resolve].map((at) => at?.split("#")[0])]) {
       if (named === undefined) continue;
       assert.match(named, /\.js$/, `${name} names ${named} as JavaScript`);
       assert.ok(existsSync(join(bundled, name, named)), `${name}'s ${named} is in the package`);
     }
+    for (const named of manifest.treeSitter === undefined ? [] : [manifest.treeSitter.parser, manifest.treeSitter.queries]) assert.ok(existsSync(join(bundled, name, named)), `${name}'s ${named} is in the package`);
   }
 
   // Loaded from node_modules: each language's slots and adapter, and the declared plugin's adapter.
   const probe = `
     const languages = await import("@posthog/coherence/dist/plugins/languages.js");
+    await (await import("@posthog/coherence/dist/plugins/syntax-trees.js")).startParsers();
     const out = { languages: [...languages.LANGUAGES], files: {}, slots: {}, adapters: {} };
     for (const file of ["a.ts", "b.py", "c.rs"]) out.files[file] = languages.languageOfFile(file) ?? null;
     for (const language of languages.LANGUAGES) {

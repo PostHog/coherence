@@ -116,12 +116,15 @@
     "whenVacuous": "convention"
   },
   "module": "index.ts",
+  "treeSitter": {
+    "parser": "tree-sitter-python.wasm",
+    "queries": "python.scm",
+    "resolve": "python-source.ts#PYTHON_RESOLVE",
+    "privateName": "^_"
+  },
   "syntax": {
     "entrances": "python-entrances.ts#PYTHON_ENTRANCES",
     "interfaces": "python-scope.ts#PYTHON_INTERFACES",
-    "source": "python-source.ts#PYTHON_SOURCE",
-    "declares": "python-interfaces.ts#pythonDeclares",
-    "topLevel": "python-top-level.ts#pythonDeclaresAtTop",
     "boundaries": "tach-boundaries.ts#TACH_BOUNDARIES"
   }
 }
