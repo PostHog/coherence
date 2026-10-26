@@ -101,9 +101,68 @@ test("the parser reads Python's imports and declarations whole: across lines, in
   assert.deepEqual(syntaxOf("python", "interfaces")!.importLists(text), ["seal as sealed, json as j"]);
 });
 
+test("the parser reads TypeScript's imports, declarations and default exports whole: a default beside named imports, across lines, never inside a template or a comment", () => {
+  const text = [
+    "/** A module whose comment shows an import: import { fake } from './nothing' */",
+    'import React, { useState, type Ref as R } from "react";',
+    "import {",
+    "  SECRET_COLUMNS,",
+    "  seal as sealed,",
+    '} from "./store/secrets.ts";',
+    'import * as rows from "./store/rows.ts";',
+    'import "./polyfill.ts";',
+    'export { audit, render as show } from "./audit.ts";',
+    'export * from "./barrel.ts";',
+    "const FIXTURE = `",
+    'import { leaked } from "./never.ts";',
+    "export function Fake() {}",
+    "`;",
+    "export const enum Mode { On }",
+    "export const pick = <T,>(items: T[]): T => items[0]!, LIMIT = 10 * 60;",
+    "export const TABLE = { a: 1 } as unknown as Record<string, number>;",
+    "export const made = build();",
+    "export type Row =",
+    "  | { id: string }",
+    "  | null;",
+    "export const { handlers: { GET, POST }, auth } = NextAuth();",
+    "function local() {",
+    "  const inner = 1;",
+    "  return inner;",
+    "}",
+    "export { local as handle };",
+    "export default function Page() {",
+    "  return null;",
+    "}",
+    "export { local as default };",
+    "",
+  ].join("\n");
+  const imports: string[] = [];
+  syntaxOf("typescript", "source")!.importsOf(text, (name, specifier) => imports.push(`${name ?? "(module)"} <- ${specifier}`));
+  assert.deepEqual(imports.sort(), ["(module) <- ./barrel.ts", "(module) <- ./polyfill.ts", "(module) <- ./store/rows.ts", "Ref <- react", "SECRET_COLUMNS <- ./store/secrets.ts", "audit <- ./audit.ts", "default <- react", "render <- ./audit.ts", "seal <- ./store/secrets.ts", "useState <- react"]);
+  assert.deepEqual(
+    declarationsOf(text, "typescript").map((d) => `${d.name}@${d.line} ${d.exported ? "exported" : "private"} ${d.declares}${d.isDefault ? " default" : ""}`),
+    ["FIXTURE@11 private value", "Mode@15 exported value", "pick@16 exported body", "LIMIT@16 exported value", "TABLE@17 exported value", "made@18 exported unknown", "Row@19 exported type", "local@23 private body", "Page@28 exported body default"],
+    "a declaration inside a template string is none; a const enum is named by its name; each name of a statement is declared, by what its value is",
+  );
+  const topLevel = syntaxOf("typescript", "topLevel")!;
+  assert.ok(["GET", "POST", "auth", "handle", "show", "Page"].every((name) => topLevel(text, name)), "a destructured name and a name an export list exports are at the top level");
+  assert.ok(!topLevel(text, "inner") && !topLevel(text, "Fake"), "a name inside a function or a template is not");
+  const interfaces = syntaxOf("typescript", "interfaces")!;
+  assert.deepEqual(interfaces.importLists(text), ["Ref as R, seal as sealed, render as show"]);
+  assert.deepEqual(interfaces.defaultNames(text), ["local"], "a name exported as the default by name");
+  assert.ok(interfaces.isDefaultExport("export default function Page() {") && !interfaces.isDefaultExport("export function Page() {"));
+  assert.ok(interfaces.isTypeDeclaration("export interface Row {") && !interfaces.isTypeDeclaration("export const Row = 1;"));
+  assert.ok(interfaces.wildcardModules("src/index.ts", text).includes("src/barrel.ts"), "a wildcard re-export's module, in every spelling");
+});
+
 test("a parser is held to what Coherence reads: a capture it reads nothing by, queries that do not compile, and a reading before the runtime starts are each refused by name", () => {
   const stray = parserPlugin({}, { "zz.scm": "(import_statement name: (dotted_name) @import.thing)\n" });
   assert.throws(() => treeReaderOf(stray), /plugin zz's queries capture @import\.thing, which Coherence reads nothing by/);
+  // A capture the queries keep for a predicate (an underscore leads its name) compiles, tests, and is read by nothing.
+  const own = parserPlugin({}, { "zz.scm": '((import_statement name: (dotted_name) @import.module @_module) (#eq? @_module "os"))\n' });
+  let tested: string[] = [];
+  assert.doesNotThrow(() => (tested = treeReaderOf(own)!.imports("import os\nimport sys\n").map((i) => i.specifier)), "a capture the queries keep for a predicate is refused");
+  assert.deepEqual(tested, ["os"]);
   const broken = parserPlugin({}, { "zz.scm": "(import_statement name: (no_such_node) @import.module)\n" });
   assert.throws(() => treeReaderOf(broken), /plugin zz's queries \(zz\.scm\) do not compile against its parser/);
 

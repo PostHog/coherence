@@ -6,7 +6,8 @@
     "src/__tests__/secrets.test.ts": "import { SECRET_COLUMNS } from \"../store/secrets.ts\";\nexport const t = SECRET_COLUMNS;\n",
     "README.md": "# A project\n",
     "src/api/routes.ts": "import { render } from \"./render.ts\";\n\nexport const app = {\n  get(path: string, handler: (row: Record<string, unknown>) => string): readonly [string, (row: Record<string, unknown>) => string] {\n    return [path, handler] as const;\n  },\n};\n\nexport function rows(row: Record<string, unknown>): string {\n  return render(\"tokens\", row);\n}\n\napp.get(\"/rows\", rows);\n",
-    "src/store/rows.ts": "/** One stored row, by column. */\nexport type Row = Record<string, unknown>;\n"
+    "src/store/rows.ts": "/** One stored row, by column. */\nexport type Row = Record<string, unknown>;\n",
+    "src/store/index.ts": "/** The store's front: what the rest of the shop may import, re-exported whole and by a name of its own. */\nexport * from \"./rows.ts\";\nexport {\n  seal as sealRow,\n} from \"./secrets.ts\";\n"
   },
   "language": {
     "files": [
@@ -14,7 +15,8 @@
       "src/api/render.ts",
       "src/app.tsx",
       "src/legacy.mjs",
-      "src/store/rows.ts"
+      "src/store/rows.ts",
+      "src/store/index.ts"
     ],
     "not": [
       "README.md",
@@ -73,7 +75,8 @@
       ],
       "src/store/rows.ts": [
         "Row"
-      ]
+      ],
+      "src/store/index.ts": []
     },
     "imports": [
       {
@@ -96,6 +99,20 @@
         "module": "src/store/rows.ts",
         "names": [
           "Row"
+        ]
+      },
+      {
+        "file": "src/store/index.ts",
+        "module": "src/store/rows.ts",
+        "names": [
+          "*"
+        ]
+      },
+      {
+        "file": "src/store/index.ts",
+        "module": "src/store/secrets.ts",
+        "names": [
+          "seal"
         ]
       }
     ],

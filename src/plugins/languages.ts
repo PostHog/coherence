@@ -29,7 +29,7 @@ import type { BoundarySource } from "../scaffold/boundaries.ts";
 import { DERIVED_SLOTS, type CiStep, type EntranceRule, type LoadedPlugin, type MarkedFolder, type ModuleResolution, type PluginManifest, type PluginModule, type SyntaxSlot, type SyntaxTables } from "./plugin.ts";
 import type { SourceSyntax } from "../economy/source.ts";
 import type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
-import { treeReaderOf, type TreeReader } from "./syntax-trees.ts";
+import { treeReaderOf, type TreeDeclaration, type TreeReader } from "./syntax-trees.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest, throughThisCore } from "./registry.ts";
 import { setLanguageData } from "../readings/scope/language-data.ts";
 
@@ -510,7 +510,14 @@ function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
   // The project asking, at each call: the table is built once, and each project's parses are kept in its own folder.
   const reader = (): TreeReader => treeReaderOf(plugin, rootNow())!;
   // A question about one line (what it declares) parses the line alone: no project's store keeps it, since no file is that line.
-  const lineReader = (): TreeReader => treeReaderOf(plugin)!;
+  // A line that opens a bracket it does not close (export default function Page({) is read again with them closed, as its statement goes on.
+  const lineDeclaration = (line: string): TreeDeclaration | undefined => {
+    const reader = treeReaderOf(plugin)!;
+    const declared = reader.declarations(line)[0];
+    if (declared !== undefined) return declared;
+    const closers = unclosed(line);
+    return closers === "" ? undefined : reader.declarations(line + closers)[0];
+  };
   const resolution = (): ModuleResolution => {
     const value = exportAt(plugin, plugin.manifest.treeSitter!.resolve, "treeSitter.resolve") as ModuleResolution;
     if (typeof value?.resolveModule !== "function" || typeof value.modulePaths !== "function") throw new Error(`plugin ${plugin.name}'s treeSitter.resolve names ${plugin.manifest.treeSitter!.resolve}, which is no { resolveModule, modulePaths }`);
@@ -520,7 +527,7 @@ function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
   if (slot === "source") {
     table = {
       declarationOf: (line: string) => {
-        const declared = lineReader().declarations(line)[0];
+        const declared = lineDeclaration(line);
         return declared === undefined ? undefined : { name: declared.name, exported: declared.exported };
       },
       resolveModule: (root: string, from: string, specifier: string, vanished: ReadonlySet<string>) => resolution().resolveModule(root, from, specifier, vanished),
@@ -529,18 +536,19 @@ function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
         for (const imported of reader().imports(text)) if (imported.glob !== true) add(imported.name, imported.specifier);
       },
     } satisfies SourceSyntax;
-  } else if (slot === "declares") table = (line: string) => lineReader().declarations(line)[0]?.declares ?? "unknown";
+  } else if (slot === "declares") table = (line: string) => lineDeclaration(line)?.declares ?? "unknown";
   else if (slot === "topLevel") table = (text: string, name: string) => reader().topLevel(text).has(name);
   else if (slot === "interfaces") {
-    // The language's own facts the plugin's interfaces table states (whether its server narrows to bounds, its default exports); the import answers are the parser's alone.
+    // The language's own facts the plugin's interfaces table states (whether its server narrows to bounds); the import answers are the parser's alone.
     const facts = slotExport(plugin, "interfaces") as Partial<InterfaceSyntax> | undefined;
     const twice = (["importLists", "wildcardModules"] as const).filter((answer) => facts?.[answer] !== undefined);
     if (twice.length > 0) throw new Error(`plugin ${plugin.name} reads its text through treeSitter, so its interfaces table's ${twice.join(" and ")} would read its imports a second time; the core derives them from the parser: remove them`);
     table = {
-      isTypeDeclaration: (line: string) => lineReader().declarations(line)[0]?.declares === "type",
-      isDefaultExport: () => false,
+      isTypeDeclaration: (line: string) => lineDeclaration(line)?.declares === "type",
+      // A module's default export, where the queries capture it (@default): the declaration that is it, and the names exported as it.
+      isDefaultExport: (line: string) => lineDeclaration(line)?.isDefault === true,
       serverBounds: false,
-      defaultNames: () => [],
+      defaultNames: (text: string) => reader().defaults(text),
       ...facts,
       importLists: (text: string) => {
         const renamed = reader().imports(text).filter((i) => i.alias !== undefined);
@@ -551,6 +559,22 @@ function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
   }
   slots.set(key, table);
   return table;
+}
+
+/** The closers of every bracket a line opens and leaves open, innermost first; brackets inside a quoted string are none. */
+function unclosed(line: string): string {
+  const open: string[] = [];
+  let quote: string | undefined;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]!;
+    if (quote !== undefined) {
+      if (c === "\\") i++;
+      else if (c === quote) quote = undefined;
+    } else if (c === '"' || c === "'" || c === "`") quote = c;
+    else if (c === "(" || c === "[" || c === "{") open.push(c === "(" ? ")" : c === "[" ? "]" : "}");
+    else if ((c === ")" || c === "]" || c === "}") && open[open.length - 1] === c) open.pop();
+  }
+  return open.reverse().join("");
 }
 
 /**

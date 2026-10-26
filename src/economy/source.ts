@@ -75,6 +75,8 @@ export interface Declaration {
   exported: boolean;
   /** What it declares, when the language is read through a parser, which says it in the same parse. */
   declares?: Declares;
+  /** Whether it is its module's default export, when the language is read through a parser, which says it in the same parse. */
+  isDefault?: boolean;
 }
 
 /** The top-level names a file declares: through the language's parser when its plugin names one, else by a plain scan of line starts. */
