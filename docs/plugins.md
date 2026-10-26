@@ -114,7 +114,9 @@ project's other files resolve the package as they always did. The installed
 copy still gives an editor and a typecheck the interface's types.
 
 The bundled plugins are the fullest examples, shipped in the package under
-`plugins/`. For a language Coherence lacks, start from `python`: it reads its
+`plugins/`.
+<!-- claims: parser python; hand-written go, rust, typescript. Held by src/plugins/plugin-docs.test.ts against each plugin's manifest. -->
+For a language Coherence lacks, start from `python`: it reads its
 text through a tree-sitter parser and queries (below, reading through a
 parser), so the readings come from one parse and no hand-written reader of
 its text can disagree with another or miss a statement that spans lines.
@@ -150,7 +152,7 @@ copy names it the second way, and so should a plugin you write.
 |---|---|
 | `name`, `version` | Who the plugin is. Every run entry its adapter or verifier answers names both. |
 | `pluginApi` | The interface version it was written for. This release runs `3` and reads plugins written for `1` to `3`: a plugin written for an older one loads, and the session start names it with what changed since. Any other version is refused, naming both. Version 3 brought the parser path (`treeSitter`), imports that resolve to a module of several files, the adapter's `topLevelSymbols`, and `check.json`'s `reference` map; `plugin check` holds a plugin to the reference reading and server agrees duties from 3, and tells a plugin written for 2 they are not held. |
-| `provides.language` | The language its adapter answers for. A built-in name takes the built-in's place (see the swap rule). A new name needs `extensions` (or `files`), and the config's `language` must name it; the language is then read as a bundled one is, for that project: its files, test files and folders, its entrance rules, its CI steps and every syntax slot it fills. |
+| `provides` | `language`: the language its adapter answers for (or `declaredLanguages: true`, the bundled declared plugin's, for the languages a config declares). A built-in name takes the built-in's place (see the swap rule). A new name needs `extensions` (or `files`), and the config's `language` must name it; the language is then read as a bundled one is, for that project: its files, test files and folders, its entrance rules, its CI steps and every syntax slot it fills. |
 | `extends` | The language whose adapter it is handed to wrap, as `base` (Convex extends `typescript`). A plugin for a language of its own extends nothing. |
 | `extensions` | The files a new language is written in. An extension a built-in, a declared language, or another plugin owns is refused. |
 | `module` | The module, relative to the manifest. Required for an adapter, and for a verifier with no `command`. |
@@ -164,6 +166,8 @@ copy names it the second way, and so should a plugin you write.
 | `serverExtensions` | The extensions the language server can report a site in or resolve a name to. |
 | `testFiles` | Regular expressions a test file's base name matches by the language's own naming (pytest's `^test_.*\\.py$`), beside `.test.`/`.spec.` and the test folders. |
 | `testFolders` | Folder names whose files are all tests by the language's own layout, wherever they sit (SwiftPM's `Tests`), beside the config's test folders. A name matches a folder exactly, case and all. |
+| `basisFiles` | Regular expressions a base name matches for the files besides source the language's answers and entrances rest on: its configuration, manifests and lockfiles (`^Cargo\\.toml$`). A kept answer and the Structure reading's fingerprint are read against them. |
+| `moduleFolders` | Regular expressions a module file's path matches, the first group the folder it owns (`^(.*)/__init__\\.py$`), by which a chokepoint that is a module covers its folder's files. |
 | `members` | How an exported type's body reads for the lexicon's member scan: `opens`, `closes`, `field`, each a regular expression. |
 | `entrances` | The entrance detection rules (`rule`, `plural`, `detects`) and `notDetected`, what they miss: printed by the query, the page and orient. |
 | `notScanned` | Why the text scans do not read the language. Present, it turns off every reading that scans the language's text, whatever slots are filled: mass, entrance detection and the Structure reading each name the language as not read, with this reason. No bundled plugin carries it, and `plugin check` fails a plugin that does: every language plugin owes the readings of its text (the reading duties below), and none is waived. It stays so that a plugin still being written says what it does not read rather than measuring as a project of no code. |
@@ -311,6 +315,7 @@ The captures:
 
 | Capture | On | Means |
 |---|---|---|
+| `@import` | an import's whole statement, in the same match as its other captures | the statement: `coherence plugin shapes` reads from it whether the import spans lines or sits inside a block |
 | `@import.from` | the module node of an import that names what it brings in | the specifier, as written (`..pkg.mod`) |
 | `@import.name` | each name it brings in, one match per name | the name |
 | `@import.alias` | the name it is bound to, when renamed | the alias |

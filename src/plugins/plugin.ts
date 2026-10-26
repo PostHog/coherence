@@ -199,6 +199,25 @@ export interface ModuleResolution {
   modulePaths(from: string, specifier: string): string[];
 }
 
+/**
+ * Every key a manifest may carry, as docs/plugins.md's key table must list
+ * them; the type below fails to compile when PluginManifest gains a key this
+ * list lacks, so the list and the docs' table cannot drift from the type.
+ */
+export const MANIFEST_KEYS = ["name", "version", "pluginApi", "provides", "extends", "extensions", "files", "source", "serverExtensions", "testFiles", "testFolders", "basisFiles", "moduleFolders", "members", "entrances", "notScanned", "environmentFolders", "markedFolders", "ci", "wellKnown", "module", "syntax", "treeSitter", "ladder", "verifiers", "lexicon"] as const satisfies readonly (keyof PluginManifest)[];
+type ManifestKeyMissing = Exclude<keyof PluginManifest, (typeof MANIFEST_KEYS)[number]>;
+export const MANIFEST_KEYS_COMPLETE: [ManifestKeyMissing] extends [never] ? true : ManifestKeyMissing = true;
+
+/** Every key of a manifest's treeSitter, held to its type as MANIFEST_KEYS is. */
+export const TREE_SITTER_KEYS = ["parser", "queries", "resolve", "privateName"] as const satisfies readonly (keyof TreeSitterManifest)[];
+type TreeSitterKeyMissing = Exclude<keyof TreeSitterManifest, (typeof TREE_SITTER_KEYS)[number]>;
+export const TREE_SITTER_KEYS_COMPLETE: [TreeSitterKeyMissing] extends [never] ? true : TreeSitterKeyMissing = true;
+
+/** Every method of a language adapter, as the docs' adapter table must list them, held to the LanguageAdapter type (its two fields, language and ladder, are no methods). */
+export const ADAPTER_METHODS = ["ready", "resolve", "references", "visibility", "refute", "testFilter", "forget", "close", "serverPid", "topLevelSymbols"] as const satisfies readonly Exclude<keyof LanguageAdapter, "language" | "ladder">[];
+type AdapterMethodMissing = Exclude<keyof LanguageAdapter, "language" | "ladder" | (typeof ADAPTER_METHODS)[number]>;
+export const ADAPTER_METHODS_COMPLETE: [AdapterMethodMissing] extends [never] ? true : AdapterMethodMissing = true;
+
 /** The slots the core derives for a plugin on the parser path, which its manifest may not also fill. */
 export const DERIVED_SLOTS = ["source", "declares", "topLevel", "kept"] as const;
 

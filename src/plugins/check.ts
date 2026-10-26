@@ -306,6 +306,9 @@ export function checkProjectProblem(value: unknown): string | undefined {
 
 const DUTIES = ["file rule", "declarations", "answers agree", "reference reading", "references", "server agrees", "chokepoint"] as const;
 
+/** Every duty plugin check holds a language plugin to, in the order it reports them: what docs/plugins.md's duty table must list. */
+export const LANGUAGE_DUTIES = [...DUTIES, ...READING_DUTIES, "one answer each"] as const;
+
 /** The check projects a plugin is held over: the minimum (the bundled plugin's check.json for its language, as the installed package ships it, which no copy edits) and, when it adds to that, the plugin's own. */
 export function checkProjects(plugin: LoadedPlugin, language: string): { label: string; project: CheckProject }[] | { refusal: string } {
   const read = (file: string, label: string): CheckProject | string => {
