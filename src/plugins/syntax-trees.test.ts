@@ -16,7 +16,7 @@ import { declarationsOf, importsOf } from "../economy/source.ts";
 import { forProject, registerProjectPlugins, syntaxOf } from "./languages.ts";
 import type { LoadedPlugin, PluginManifest } from "./plugin.ts";
 import { BUNDLED_DIR, readManifest } from "./registry.ts";
-import { treeReaderOf, warmParses } from "./syntax-trees.ts";
+import { importShapes, treeReaderOf, warmParses } from "./syntax-trees.ts";
 import { warmProjectParses } from "../economy/warm-parses.ts";
 import { Parser, Tree } from "web-tree-sitter";
 
@@ -114,6 +114,24 @@ test("a parser is held to what Coherence reads: a capture it reads nothing by, q
     catch (error) { console.log(error.message); }`;
   const said = execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", probe], { encoding: "utf8" });
   assert.match(said, /plugin zz reads its language through a parser, and the parser runtime is not started: await startParsers\(\)/);
+});
+
+test("a path a group spells in pieces is read whole: every prefix over an import, outer first, joined to it by the separator, to any depth, the census placing it in the statement that holds it, and a prefix captured with no separator is refused", () => {
+  // Python's grammar standing in for a language whose imports nest in groups (Rust's use a::{b::{c}}): a class's name prefixes every import in its body.
+  const queries = "(class_definition name: (identifier) @import.prefix)\n(import_statement name: (dotted_name) @import.module) @import\n";
+  const plugin = parserPlugin({ treeSitter: { parser: "zz.wasm", queries: "zz.scm", resolve: "resolve.ts#RESOLVE", separator: "::" } }, { "zz.scm": queries });
+  const text = ["import os", "class A:", "    import json", "    class B:", "        import re", "    import sys", "import time", ""].join("\n");
+  assert.deepEqual(
+    treeReaderOf(plugin)!.imports(text).map((i) => i.specifier),
+    ["os", "A::json", "A::B::re", "A::sys", "time"],
+    "each import is read under the prefixes over it, the inner after the outer, and none past the group it stands in",
+  );
+  assert.deepEqual(importShapes(plugin, text).map((i) => i.specifier), ["os", "A::json", "A::B::re", "A::sys", "time"], "the census reads the same paths");
+  // A statement captured in a match of its own holds the imports of matches that capture none, as a use declaration holds the leaves of its groups.
+  const apart = parserPlugin({}, { "zz.scm": "(import_statement) @import\n(import_statement name: (dotted_name) @import.module)\n" });
+  assert.deepEqual(importShapes(apart, "import os\ndef f():\n    import json\n").map((i) => i.shapes), [["whole module"], ["whole module", "inside a block"]], "the census places an import in the statement that holds it");
+  const unjoined = parserPlugin({}, { "zz.scm": queries });
+  assert.throws(() => treeReaderOf(unjoined), /plugin zz's queries capture @import\.prefix, and its treeSitter names no separator/);
 });
 
 test("every tree a reading parses is freed before the reading returns, none left to the collector", () => {

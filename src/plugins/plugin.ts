@@ -189,6 +189,8 @@ export interface TreeSitterManifest {
   resolve: string;
   /** For a language that exports by name rather than by a keyword its queries capture as @exported: a regular expression a name it keeps private matches (Python's "^_", Go's "^\P{Lu}"), read with Unicode's character classes. */
   privateName?: string;
+  /** For queries that capture @import.prefix: the text the language joins a path's segments with (Rust's "::"), which joins each prefix to the path it prefixes. */
+  separator?: string;
 }
 
 /** Where an import leads: a plugin on the parser path supplies this as code, since a module's place is the language's rule, not its syntax. */
@@ -211,7 +213,7 @@ type ManifestKeyMissing = Exclude<keyof PluginManifest, (typeof MANIFEST_KEYS)[n
 export const MANIFEST_KEYS_COMPLETE: [ManifestKeyMissing] extends [never] ? true : ManifestKeyMissing = true;
 
 /** Every key of a manifest's treeSitter, held to its type as MANIFEST_KEYS is. */
-export const TREE_SITTER_KEYS = ["parser", "queries", "resolve", "privateName"] as const satisfies readonly (keyof TreeSitterManifest)[];
+export const TREE_SITTER_KEYS = ["parser", "queries", "resolve", "privateName", "separator"] as const satisfies readonly (keyof TreeSitterManifest)[];
 type TreeSitterKeyMissing = Exclude<keyof TreeSitterManifest, (typeof TREE_SITTER_KEYS)[number]>;
 export const TREE_SITTER_KEYS_COMPLETE: [TreeSitterKeyMissing] extends [never] ? true : TreeSitterKeyMissing = true;
 

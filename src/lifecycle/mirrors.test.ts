@@ -138,6 +138,28 @@ test("an edit no mirror watches costs the alarm one lookup and reads no source",
   assert.ok(unwatched < 25 && watched < 250, `unwatched ${unwatched.toFixed(2)} ms, watched ${watched.toFixed(2)} ms`);
 });
 
+test("a list in a Rust file is read by the Rust plugin's lists slot: an edit that makes it and its TypeScript partner disagree names what each holds alone", async () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-mirrors-rust-"));
+  made.push(root);
+  const files: Record<string, string> = {
+    "coherence.config.json": JSON.stringify({ name: "mirrors", language: ["typescript", "rust"] }),
+    "Cargo.toml": '[package]\nname = "kinds"\n',
+    "src/Kinds.spec.md": ["# Kinds", "", "The shape kinds.", "", "## mirrors", "- KINDS in kinds.rs: the shape kinds the kernel reads", "  mirrors: SHAPE_KINDS in client.ts", "", "## invariants", ""].join("\n"),
+    "src/kinds.rs": '/// The kinds, kept by hand beside the client\'s.\npub const KINDS: &[&str] = &["box", /* the ground */ "plane"];\n',
+    "src/client.ts": 'export const SHAPE_KINDS = ["box", "plane"] as const;\n',
+  };
+  for (const [file, text] of Object.entries(files)) {
+    mkdirSync(join(root, file, ".."), { recursive: true });
+    writeFileSync(join(root, file), text);
+  }
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  keepMirrorIndex(root);
+  const agree = await edit(root, "src/client.ts", 'export const SHAPE_KINDS = ["box", "plane"] as const;\n// touched\n');
+  assert.equal(agree.context, "", "the Rust list and its partner agree");
+  const broke = await edit(root, "src/kinds.rs", 'pub const KINDS: &[&str] = &["box", "plane", "sphere"];\n');
+  assert.match(broke.context, /KINDS \(src\/kinds\.rs:1\) and SHAPE_KINDS \(src\/client\.ts:1\) no longer agree: "sphere" only in KINDS/);
+});
+
 test("a literal is read without the compiler: an array's strings, a tuple by its first, an object's keys, through a wrapping call", () => {
   const text = [
     "export const A: readonly string[] = [\"a\", 'b', `c`, /* not */ \"d\" as const];",
