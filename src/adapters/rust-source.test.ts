@@ -15,7 +15,7 @@ import { computeMass, formatMass } from "../economy/mass.ts";
 import { declarationsOf, importsOf } from "../economy/source.ts";
 import { declares } from "../observation/interfaces.ts";
 import { isTypeDeclaration } from "../readings/scope/component-interfaces.ts";
-import { RUST_INTERFACES } from "../../plugins/rust/rust-scope.ts";
+import { syntaxOf } from "../plugins/languages.ts";
 import { rustListOf } from "../../plugins/rust/rust-lists.ts";
 import { uncommented, useLeaves } from "../../plugins/rust/rust-source.ts";
 
@@ -34,7 +34,7 @@ function project(files: Record<string, string>): string {
   return root;
 }
 
-test("a Rust line declares an item at column zero under any visibility and qualifier, exported when pub in any form; an impl, a use or an indented item declares nothing", () => {
+test("a Rust file declares each item at its top level under any visibility and qualifier, exported when pub in any form, named as written; an impl, a use, an item inside another or in a string declares nothing", () => {
   const text = [
     "pub const SECRET: &str = \"t\";",
     "pub(crate) async fn seal() {}",
@@ -51,17 +51,22 @@ test("a Rust line declares an item at column zero under any visibility and quali
     "use crate::store::Row;",
     "extern crate alloc;",
     "fn r#match() {}",
+    "#[derive(Debug)] pub struct Tagged;",
+    "const DOC: &str = \"",
+    "fn in_string() {}",
+    "\";",
   ].join("\n");
   assert.deepEqual(
     declarationsOf(text, "rust").map((d) => [d.name, d.exported]),
-    [["SECRET", true], ["seal", true], ["Row", true], ["raw", false], ["COUNT", false], ["Sealer", true], ["Rows", false], ["tests", false], ["row", false], ["match", false]],
+    [["SECRET", true], ["seal", true], ["Row", true], ["raw", false], ["COUNT", false], ["Sealer", true], ["Rows", false], ["tests", false], ["row", false], ["r#match", false], ["Tagged", true], ["DOC", false]],
+    "a raw identifier is named as rust-analyzer names it, r# kept; an item after an attribute on its line is read",
   );
   const lines = text.split("\n");
   assert.deepEqual(lines.slice(0, 9).map((l) => declares(l, "rust")), ["value", "body", "body", "body", "value", "type", "type", "unknown", "body"]);
-  assert.deepEqual(lines.slice(0, 9).map((l) => isTypeDeclaration(l, "rust")), [false, false, false, false, false, false, true, false, false], "a type alias alone declares a type only");
+  assert.deepEqual(lines.slice(0, 9).map((l) => isTypeDeclaration(l, "rust")), [false, false, false, false, false, true, true, false, false], "a trait and a type alias declare a type, as declares says");
 });
 
-test("a use tree is read leaf by leaf through nested braces, renames, self and globs, and nothing in a comment or a string is read", () => {
+test("a use tree is read leaf by leaf through nested braces, renames, self and globs, each path as an item of its module and as the module, and nothing in a comment or a string is read", () => {
   const text = [
     "use crate::{store::{self, seal as close, Row}, api::*};",
     "pub(crate) use super::super::util::helper;",
@@ -78,7 +83,16 @@ test("a use tree is read leaf by leaf through nested braces, renames, self and g
     ["crate::store::self", "crate::store::seal as close", "crate::store::Row", "crate::api::*", "super::super::util::helper", "::serde::Serialize", "crate::after::Seen"],
   );
   assert.equal(uncommented(text).length, text.length, "blanking keeps every offset");
-  assert.deepEqual(RUST_INTERFACES.importLists("use a::{b as c};"), ["a::{b as c}"], "the renames are read from the tree's text");
+  // Through the parser: each leaf spelled whole, its group's paths before it.
+  const read: string[] = [];
+  syntaxOf("rust", "source")!.importsOf(text, (name, specifier) => read.push(name === undefined ? specifier : `${name} from ${specifier}`));
+  assert.deepEqual(
+    [...new Set(read)].sort(),
+    ["::serde::Serialize", "Row from crate::store", "Seen from crate::after", "Serialize from ::serde", "crate::after::Seen", "crate::api", "crate::store::Row", "crate::store::seal", "crate::store::self", "helper from super::super::util", "seal from crate::store", "super::super::util::helper"],
+  );
+  const interfaces = syntaxOf("rust", "interfaces")!;
+  assert.deepEqual(interfaces.importLists("use a::{b as c};"), ["b as c, a::b as c"], "a rename is read as the name and as the path it renames");
+  assert.deepEqual(interfaces.wildcardModules("src/x.rs", text), ["src/api.rs", "src/api/mod.rs"], "a glob in a group is read under the group's path");
 });
 
 test("a Rust list is the array a top-level const or static is set to: its string literals, a tuple by its first, a path by its last segment, through & and vec!; what it cannot read is kept as written, and a comment or a string's brackets are no member", () => {
@@ -118,13 +132,45 @@ test("a Rust path resolves by its crate's folder layout: crate, self, super and 
     "tool/flags/mod.rs": "pub fn parse() {}\n",
   });
   const imports = (file: string, text: string): string[] => importsOf(root, file, text, "rust").map((i) => `${i.name ?? "*"} <- ${i.module}`);
-  assert.deepEqual(imports("crates/shop/src/store/rows.rs", "use super::seal;\nuse super::super::api::render;\nuse crate::api;\n"), ["seal <- crates/shop/src/store/mod.rs", "render <- crates/shop/src/api.rs", "api <- crates/shop/src/lib.rs", "* <- crates/shop/src/api.rs"]);
+  assert.deepEqual(imports("crates/shop/src/store/rows.rs", "use super::seal;\nuse super::super::api::render;\nuse crate::api;\n").sort(), ["* <- crates/shop/src/api.rs", "api <- crates/shop/src/lib.rs", "render <- crates/shop/src/api.rs", "seal <- crates/shop/src/store/mod.rs"]);
   const api = imports("crates/shop/src/api.rs", "use crate::store::{seal, rows::*};\nuse store::seal as again;\nuse serde::Serialize;\nuse crate::HiArgs;\n");
   assert.ok(api.includes("seal <- crates/shop/src/store/mod.rs") && api.includes("* <- crates/shop/src/store/rows.rs"), api.join("\n"));
   assert.ok(!api.some((line) => line.includes("serde")), "a path into a crate outside the workspace resolves to nothing");
   assert.ok(!api.some((line) => line.includes("hiargs")), "HiArgs is an item of the crate root, never the module file hiargs.rs, on any disk");
-  assert.deepEqual(imports("tool/main.rs", "mod flags;\nuse shop_core::store::seal;\nuse ::shop_core::api::render;\n"), ["seal <- crates/shop/src/store/mod.rs", "render <- crates/shop/src/api.rs", "* <- tool/flags/mod.rs"], "a workspace crate by its package name, - read as _; a [[bin]] root's module beside it");
-  assert.deepEqual(RUST_INTERFACES.wildcardModules("crates/shop/src/api.rs", "use crate::store::rows::*;\n"), ["crates/shop/src/store/rows.rs", "crates/shop/src/store/rows/mod.rs"], "a glob names its module in both layouts");
+  assert.deepEqual(imports("tool/main.rs", "mod flags;\nuse shop_core::store::seal;\nuse ::shop_core::api::render;\n").sort(), ["* <- tool/flags/mod.rs", "render <- crates/shop/src/api.rs", "seal <- crates/shop/src/store/mod.rs"], "a workspace crate by its package name, - read as _; a [[bin]] root's module beside it");
+  assert.deepEqual(syntaxOf("rust", "interfaces")!.wildcardModules("crates/shop/src/api.rs", "use crate::store::rows::*;\n"), ["crates/shop/src/store/rows.rs", "crates/shop/src/store/rows/mod.rs"], "a glob names its module in both layouts");
+});
+
+test("a use inside an inline module is read from that module: super leaves it before the file's own, a path still inside it leads to no other file, and a bare path there names a crate", () => {
+  const root = project({
+    "Cargo.toml": '[package]\nname = "shop"\n',
+    "src/lib.rs": "pub mod store;\npub mod api;\n",
+    "src/store/mod.rs": "pub fn seal() {}\npub mod rows;\n",
+    "src/store/rows.rs": "pub struct Row;\n",
+    "src/api.rs": "",
+  });
+  const text = [
+    "pub fn render() {}",
+    "#[cfg(test)]",
+    "mod tests {",
+    "    use super::*;",
+    "    use super::super::store::seal;",
+    "    use crate::store::rows::Row;",
+    "    use shop::store::rows;",
+    "    use self::helpers::Fixture;",
+    "    use store::Shadow;",
+    "    mod deeper {",
+    "        use super::super::render;",
+    "        use super::super::super::store::*;",
+    "    }",
+    "}",
+  ].join("\n");
+  assert.deepEqual(
+    importsOf(root, "src/api.rs", text, "rust").map((i) => `${i.name ?? "*"} <- ${i.module}`).sort(),
+    ["* <- src/store/mod.rs", "* <- src/store/rows.rs", "Row <- src/store/rows.rs", "rows <- src/store/mod.rs", "seal <- src/store/mod.rs"],
+    "use super::* in a test module is this file, never the crate root; super::super leaves the inline module, then the file's; a bare path inside it is a crate",
+  );
+  assert.deepEqual(syntaxOf("rust", "interfaces")!.wildcardModules("src/api.rs", text), ["src/store.rs", "src/store/mod.rs"], "a glob of the file's own module keys no file; one that leaves it keys the module it reaches");
 });
 
 test("mass reads a Rust project as it reads the other languages: its files counted, reach followed through its use trees and mod declarations, and no language named not read", () => {

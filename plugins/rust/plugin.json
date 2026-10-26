@@ -93,12 +93,15 @@
     ]
   },
   "module": "index.ts",
+  "treeSitter": {
+    "parser": "tree-sitter-rust.wasm",
+    "queries": "rust.scm",
+    "resolve": "rust-source.ts#RUST_RESOLVE",
+    "separator": "::"
+  },
   "syntax": {
     "entrances": "rust-entrances.ts#RUST_ENTRANCES",
     "interfaces": "rust-scope.ts#RUST_INTERFACES",
-    "source": "rust-source.ts#RUST_SOURCE",
-    "declares": "rust-interfaces.ts#rustDeclares",
-    "topLevel": "rust-top-level.ts#rustDeclaresAtTop",
     "lists": "rust-lists.ts#rustListOf"
   }
 }

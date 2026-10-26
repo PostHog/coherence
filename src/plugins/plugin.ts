@@ -189,6 +189,8 @@ export interface TreeSitterManifest {
   resolve: string;
   /** For a language that exports by name rather than by a keyword its queries capture as @exported: a regular expression a name it keeps private matches (Python's "^_"). */
   privateName?: string;
+  /** For queries that capture @import.prefix: the text the language joins a path's segments with (Rust's "::"), which joins each prefix to the path it prefixes. */
+  separator?: string;
 }
 
 /** Where an import leads: a plugin on the parser path supplies this as code, since a module's place is the language's rule, not its syntax. */

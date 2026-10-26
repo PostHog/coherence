@@ -117,7 +117,7 @@ function dataProblems(raw: Record<string, unknown>, who: string): string[] {
 function treeSitterProblems(raw: Record<string, unknown>, dir: string, language: string | undefined, who: string): string[] {
   const declared = raw["treeSitter"];
   if (declared === undefined) return [];
-  const shape = `${who}'s treeSitter is { "parser": "<.wasm beside the manifest>", "queries": "<.scm beside the manifest>", "resolve": "<module>#<export>", "privateName"?: "<regular expression>" }`;
+  const shape = `${who}'s treeSitter is { "parser": "<.wasm beside the manifest>", "queries": "<.scm beside the manifest>", "resolve": "<module>#<export>", "privateName"?: "<regular expression>", "separator"?: "<a path's separator>" }`;
   if (!isRecord(declared)) return [shape];
   const problems: string[] = [];
   for (const key of ["parser", "queries"] as const) {
@@ -128,6 +128,7 @@ function treeSitterProblems(raw: Record<string, unknown>, dir: string, language:
   }
   if (typeof declared["resolve"] !== "string" || !/^[^#/][^#]*#[A-Za-z_$][\w$]*$/.test(declared["resolve"])) problems.push(shape);
   if (declared["privateName"] !== undefined && !compiles(declared["privateName"])) problems.push(shape);
+  if (declared["separator"] !== undefined && (typeof declared["separator"] !== "string" || declared["separator"] === "")) problems.push(shape);
   if (language === undefined) problems.push(`${who} names a treeSitter parser but provides no language for it to read`);
   const syntax = isRecord(raw["syntax"]) ? raw["syntax"] : {};
   const twice = DERIVED_SLOTS.filter((slot) => syntax[slot] !== undefined);

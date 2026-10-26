@@ -1,24 +1,24 @@
 /**
- * Rust's facts for the plain source scan: which items a line declares at the
- * top level, which names a file brings in by `use` and `mod`, and where a
- * module path resolves (source.ts reads them through SOURCE_SYNTAX).
+ * Rust's model of its own code where no parse answers: where a module path
+ * resolves (RUST_RESOLVE, the manifest's treeSitter.resolve), what Cargo's
+ * layout and manifests make a crate root, a binary or an example, and the
+ * line readings the entrance and lists slots still read by (an item, a use
+ * tree, comments, literals and test-only items set apart). What a file
+ * declares at its top level and what it imports is read through Rust's
+ * parser and rust.scm, never here.
  *
  * A path resolves by Cargo's layout, not by rust-analyzer: a file's crate
  * root is found from its path (crateRootOf) or the manifests' target paths
  * (workspaceOf), and a module's file is <parent>/<name>.rs or
- * <parent>/<name>/mod.rs. A #[path] attribute and a module declared inline
- * (`mod a { … }`) are not followed; a path into a crate outside the
- * workspace resolves to nothing.
- *
- * This file is the plugin's one model of Rust: what an item is, what the
- * layout and the manifests make a crate root or a binary, and what code is
- * (comments, literals and test-only items set apart). The other files read
- * Rust through it.
+ * <parent>/<name>/mod.rs. A #[path] attribute is not followed; a path into a
+ * crate outside the workspace resolves to nothing; and a path written inside
+ * an inline module (mod tests { … }) is read from that module, so it leads
+ * to no other file unless it leaves the file's own module.
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { posix, resolve } from "node:path";
-import { parseToml, type SourceSyntax, type TomlTable, type TomlValue } from "../../src/plugins/api.ts";
+import { parseToml, type ModuleResolution, type TomlTable, type TomlValue } from "../../src/plugins/api.ts";
 
 /** An item: its indentation, under any visibility and qualifier, its keyword, then its name; or a macro_rules! macro. */
 const ITEM = /^(\s*)(?:(pub(?:\s*\([^)]*\))?\s+)?(?:(?:default|const|async|unsafe|extern(?:\s+"[^"]*")?)\s+)*(fn|struct|enum|union|trait|type|const|static(?:\s+mut)?|mod)\s+|(macro_rules!)\s*)(?:r#)?([A-Za-z_][A-Za-z0-9_]*)/;
@@ -128,11 +128,6 @@ export function useLeaves(text: string): UseLeaf[] {
   const out: UseLeaf[] = [];
   for (const m of codeOnly(text).matchAll(/(?:^|[;{}\s])(?:pub(?:\s*\([^)]*\))?\s+)?use\s+([^;]+);/g)) walk(m[1]!, [], out);
   return out;
-}
-
-/** The text of each use declaration's tree, where its `original as alias` renames are read from. */
-export function useTrees(text: string): string[] {
-  return [...codeOnly(text).matchAll(/(?:^|[;{}\s])(?:pub(?:\s*\([^)]*\))?\s+)?use\s+([^;]+);/g)].map((m) => m[1]!);
 }
 
 /** The modules a file declares out of line: `mod a;`, never an inline `mod a { … }`. */
@@ -354,34 +349,78 @@ function spelled(root: string, file: string): boolean {
   }
 }
 
-/** A pub item is seen outside its file (pub(crate) and pub(super) included); a private one only in its module. */
-export const RUST_SOURCE: SourceSyntax = {
-  declarationOf(line) {
-    const item = itemOf(line);
-    return item === undefined || !item.top ? undefined : { name: item.name, exported: item.exported };
-  },
+/**
+ * A specifier as the parse spells it (rust.scm), read as a path: its
+ * segments, white space and raw identifiers' r# dropped; a group's trailing
+ * self (use a::{self}) read as the group's module; and its leading mod
+ * segments, one per inline module the use sits in (mod is a keyword, so no
+ * path spells it), counted apart. Undefined for a path that names nothing on
+ * its own (use {self}).
+ */
+function pathOf(specifier: string): { inline: number; path: string[] } | undefined {
+  const all = specifier.replace(/\s+/g, "").split("::").map((p) => p.replace(/^r#/, ""));
+  let inline = 0;
+  while (all[inline] === "mod") inline += 1;
+  const path = all.slice(inline);
+  if (path[path.length - 1] === "self" && path.length > 1) path.pop();
+  if (path.length === 0 || (path.length === 1 && path[0] === "self")) return undefined;
+  return { inline, path };
+}
+
+/**
+ * A path written inside inline modules, as a path from the file's own module:
+ * crate:: and the extern prelude's :: read the same anywhere; each super
+ * leaves one inline module before it leaves the file's; a path still inside
+ * an inline module (self::, or super:: short of the file) names an item of
+ * this file, never another (undefined); and a bare path there names a crate
+ * (Rust 2018 reads a bare use path as a crate or an item of the module it is
+ * in), so it is read as a crate alone.
+ */
+function fromFile(inline: number, path: readonly string[]): { path: string[]; crateOnly: boolean } | undefined {
+  if (inline === 0 || path[0] === "crate" || path[0] === "") return { path: [...path], crateOnly: false };
+  let up = 0;
+  while (path[up] === "super") up += 1;
+  if (up === 0) return path[0] === "self" ? undefined : { path: [...path], crateOnly: true };
+  if (up < inline) return undefined;
+  return up === inline ? { path: ["self", ...path.slice(up)], crateOnly: false } : { path: [...path.slice(inline)], crateOnly: false };
+}
+
+/**
+ * Where a Rust import leads, read by Cargo's layout and the workspace's
+ * manifests (what no parse can say): a path from the file's crate root
+ * (crate::, self::, super::, or a module of the file's own), else a crate of
+ * the workspace by its package name. What a file declares and imports is
+ * read through Rust's parser and rust.scm (the manifest's treeSitter), each
+ * use path both as an item of a module and as the module itself; only the
+ * reading that resolves is kept.
+ */
+export const RUST_RESOLVE: ModuleResolution = {
   resolveModule(root, from, specifier, vanished) {
+    const read = pathOf(specifier);
+    const within = read === undefined ? undefined : fromFile(read.inline, read.path);
+    if (within === undefined) return undefined;
+    const { path } = within;
     const exists = (file: string): boolean => vanished.has(file) || spelled(root, file);
-    const path = specifier.split("::");
     const workspace = workspaceOf(root);
-    const own = resolvePath(exists, from, path, crateRootIn(workspace, from));
-    if (own !== undefined) return own;
+    if (!within.crateOnly) {
+      const own = resolvePath(exists, from, path, crateRootIn(workspace, from));
+      if (own !== undefined) return own;
+    }
     // A path into another crate of the workspace: its first segment names the crate, the rest a module from its root.
     const crateRoot = workspace.crates.get(path[0] === "" ? path[1] ?? "" : path[0]!);
     return crateRoot === undefined ? undefined : moduleFileOf(exists, crateRoot, path.slice(path[0] === "" ? 2 : 1));
   },
-  importsOf(text, add) {
-    for (const leaf of useLeaves(text)) {
-      const last = leaf.path[leaf.path.length - 1]!;
-      const prefix = leaf.path.slice(0, -1);
-      if (last === "*" || last === "self") {
-        if (prefix.length > 0) add(undefined, prefix.join("::"));
-        continue;
-      }
-      // `use a::b` names an item of a or the module a::b; each is handed on, and only the one that resolves is kept.
-      if (prefix.length > 0) add(last, prefix.join("::"));
-      add(undefined, leaf.path.join("::"));
-    }
-    for (const name of declaredModules(text)) add(undefined, `self::${name}`);
+  // A glob keys the word index by its module in both layouts a module may take: a.rs and a/mod.rs.
+  modulePaths(from, specifier) {
+    const crateRoot = crateRootOf(from);
+    const read = pathOf(specifier);
+    const within = read === undefined ? undefined : fromFile(read.inline, read.path);
+    if (crateRoot === undefined || within === undefined || within.crateOnly) return [];
+    const absolute = absolutePath(from, crateRoot, within.path);
+    // A glob of the file's own module (mod tests { use super::*; }) names no other file.
+    if (absolute === undefined || absolute.join("/") === modulePathOf(from, crateRoot).join("/")) return [];
+    if (absolute.length === 0) return [crateRoot];
+    const base = posix.join(posix.dirname(crateRoot), ...absolute);
+    return [`${base}.rs`, `${base}/mod.rs`];
   },
 };

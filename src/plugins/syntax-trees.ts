@@ -23,7 +23,7 @@ import { closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readd
 import { basename, dirname, join, resolve } from "node:path";
 import { userConfigDir } from "../lifecycle/user-dir.ts";
 import { createRequire } from "node:module";
-import { Language, Parser, Query } from "web-tree-sitter";
+import { Language, Parser, Query, type Node, type QueryMatch } from "web-tree-sitter";
 import type { LoadedPlugin, TreeSitterManifest } from "./plugin.ts";
 
 /** What a declaration declares, as the observation's interface reading names it. */
@@ -60,7 +60,8 @@ export type ImportShape = (typeof IMPORT_SHAPES)[number];
  * The shape of every import in a text, through the plugin's parser and
  * queries: one entry per import the queries match, at the line its statement
  * starts. Inside a block is known only where the queries capture the whole
- * statement as @import.
+ * statement as @import, in the import's own match or in a match of its own
+ * that holds it.
  */
 export function importShapes(plugin: LoadedPlugin, text: string): { line: number; shapes: ImportShape[]; specifier: string }[] {
   treeReaderOf(plugin);
@@ -82,9 +83,9 @@ export interface TreeReader {
 }
 
 /** The capture names a plugin's queries may use: any other is refused by name, never passed over. */
-export const CAPTURES = ["import", "import.from", "import.module", "import.name", "import.alias", "import.glob", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported"] as const;
+export const CAPTURES = ["import", "import.from", "import.module", "import.name", "import.alias", "import.glob", "import.prefix", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported"] as const;
 
-/** The captures whose text a reading reads; every other capture is read by its name and line. */
+/** The captures whose text a reading reads (an import's specifier spelled whole, with its prefixes); every other capture is read by its name and line. */
 const TEXT_READ = new Set(["import.from", "import.module", "import.name", "import.alias", "name"]);
 
 let started: Promise<void> | undefined;
@@ -190,6 +191,9 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
   if (unknown.length > 0) throw new Error(`plugin ${plugin.name}'s queries capture ${unknown.map((n) => `@${n}`).join(", ")}, which Coherence reads nothing by; the captures are ${CAPTURES.map((c) => `@${c}`).join(", ")}`);
   // A language whose queries mark what is exported says it by @exported; one with no such mark exports by name, unless its privateName says otherwise.
   const privateName = declared.privateName === undefined ? undefined : new RegExp(declared.privateName);
+  const prefixed = query.captureNames.includes("import.prefix");
+  if (prefixed && declared.separator === undefined) throw new Error(`plugin ${plugin.name}'s queries capture @import.prefix, and its treeSitter names no separator to join a prefix to the path it prefixes (Rust's "::")`);
+  const spell = speller(declared.separator ?? "");
   const parser = new Parser();
   parser.setLanguage(language);
   return {
@@ -201,10 +205,16 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
       const tree = parser.parse(text);
       if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
       try {
-        return query.matches(tree.rootNode).flatMap((match) => {
+        const matches = query.matches(tree.rootNode);
+        const spelled = prefixed ? spell(matches) : (node: Node) => node.text;
+        // A statement its queries capture on its own ((use_declaration) @import): the import of a match that captures none is in the innermost one holding it.
+        const statements = matches.flatMap((match) => match.captures.filter((c) => c.name === "import").map((c) => c.node));
+        const holding = (node: Node): Node | undefined =>
+          statements.filter((s) => s.startIndex <= node.startIndex && node.endIndex <= s.endIndex).sort((a, b) => a.endIndex - a.startIndex - (b.endIndex - b.startIndex))[0];
+        return matches.flatMap((match) => {
           const of = (name: string) => match.captures.find((c) => c.name === name)?.node;
           if (of("import.from") === undefined && of("import.module") === undefined) return [];
-          const statement = of("import");
+          const statement = of("import") ?? holding((of("import.from") ?? of("import.module"))!);
           const nodes = statement === undefined ? match.captures.map((c) => c.node) : [statement];
           const start = Math.min(...nodes.map((n) => n.startPosition.row));
           const end = Math.max(...nodes.map((n) => n.endPosition.row));
@@ -213,7 +223,7 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
           if (end > start) shapes.push("spans lines");
           // Inside a block only where the queries say which node is the statement: an indented line is no evidence (Go's import block indents).
           if (statement !== undefined && statement.parent !== null && statement.parent.type !== tree.rootNode.type) shapes.push("inside a block");
-          return [{ line: start + 1, shapes, specifier: (of("import.from") ?? of("import.module"))!.text }];
+          return [{ line: start + 1, shapes, specifier: spelled((of("import.from") ?? of("import.module"))!) }];
         });
       } finally {
         tree.delete();
@@ -224,12 +234,43 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
       const tree = parser.parse(text);
       if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
       try {
-        // A capture whose text no reading reads (a declaration's whole node, @bound, @exported) keeps its name and line alone, so a kept parse holds names, not bodies.
-        return query.matches(tree.rootNode).map((match) => match.captures.map((c) => [c.name, TEXT_READ.has(c.name) ? c.node.text : "", c.node.startPosition.row + 1] as [string, string, number]));
+        // A capture whose text no reading reads (a declaration's whole node, @bound, @exported) keeps its name and line alone, so a kept parse holds names, not bodies;
+        // an import's specifier is kept spelled whole, its prefixes joined to it, and a prefix, or a statement captured on its own, is kept nowhere else.
+        const matches = query.matches(tree.rootNode);
+        const spelled = prefixed ? spell(matches) : (node: Node) => node.text;
+        return matches
+          .map((match) => match.captures.filter((c) => c.name !== "import.prefix").map((c) => [c.name, c.name === "import.from" || c.name === "import.module" ? spelled(c.node) : TEXT_READ.has(c.name) ? c.node.text : "", c.node.startPosition.row + 1] as [string, string, number]))
+          .filter((captures) => captures.some(([name]) => name !== "import"));
       } finally {
         tree.delete();
       }
     },
+  };
+}
+
+/**
+ * An import's specifier spelled whole, for queries that capture @import.prefix:
+ * a prefix (a path a group of imports shares, Rust's a in use a::{b, c})
+ * prefixes every specifier its parent node holds after it, so prefixes nest
+ * as the tree does, to any depth, and each specifier is the prefixes over it,
+ * outer first, joined to its own text by the separator. A query reads one
+ * node's text; a path a group spells in pieces is only whole here.
+ */
+function speller(separator: string): (matches: QueryMatch[]) => (node: Node) => string {
+  return (matches) => {
+    const prefixes: { start: number; end: number; within: [number, number]; text: string }[] = [];
+    const seen = new Set<number>();
+    for (const match of matches)
+      for (const c of match.captures) {
+        if (c.name !== "import.prefix" || seen.has(c.node.id) || c.node.parent === null) continue;
+        seen.add(c.node.id);
+        prefixes.push({ start: c.node.startIndex, end: c.node.endIndex, within: [c.node.parent.startIndex, c.node.parent.endIndex], text: c.node.text });
+      }
+    prefixes.sort((a, b) => a.start - b.start);
+    return (node) => {
+      const over = prefixes.filter((p) => p.end <= node.startIndex && p.within[0] <= node.startIndex && node.endIndex <= p.within[1]);
+      return [...over.map((p) => p.text), node.text].join(separator);
+    };
   };
 }
 
