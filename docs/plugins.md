@@ -246,7 +246,7 @@ reading first asks for that slot:
 | `source` | the economy and mass | `SourceSyntax` |
 | `declares` | the observation's interface map | `(line) => "type" \| "value" \| "body" \| "unknown"` |
 | `notice` | the session start | `(root) => string` |
-| `lists` | declared mirrors | `(text, name) => Literal \| undefined` |
+| `lists` | declared mirrors, for a list in the language's files; a file of a language whose plugin fills none is read as TypeScript | `(text, name) => Literal \| undefined` |
 | `topLevel` | the spec model's check that a handler, guard or mirror is declared | `(text, name) => boolean` |
 | `boundaries` | `scaffold import` and adoption | `BoundarySource`: a tool's declaration file read into modules, as tach's |
 

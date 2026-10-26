@@ -411,7 +411,9 @@ test setup per runner, as [docs/config.md](docs/config.md#more-than-one-language
 Rust chokepoints are graded through rust-analyzer, found on the machine rather
 than installed by npm ([docs/enforcement.md](docs/enforcement.md#rust)); the
 economy and Scope readings read Rust's text by its crates' folder layout, and detect its
-binaries, build scripts, routes and foreign exports as entrances.
+binaries, examples, build scripts, routes and foreign exports (C, wasm-bindgen and
+UniFFI, an exported impl's methods among them) as entrances; a declared mirror
+reads a Rust list from the array a const or static is set to.
 Go is an opt-in bundled plugin, `"plugins": { "go": "bundled" }`, graded
 through gopls ([docs/plugins.md](docs/plugins.md#go)); a language Coherence
 lacks is a plugin you can write, held by `coherence plugin check` to what every

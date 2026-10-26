@@ -1308,6 +1308,13 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: said every disagreement at every watched edit, ignoring what the session was told -> "an edit that makes a list and its partner literal disagree names what each side holds alone, once per session" went red in mirrors.test.ts on its own assertion; restored byte for byte, green (2026-10-12)
   kinds: none
+- a mirror's list is read in its own language: A declared mirror's list or partner literal in a file of a language whose plugin fills the lists slot is read by that plugin's reader (Rust's: the array a top-level const or static is set to), and one in any other file by the TypeScript reader in mirrors.ts, so a Rust list and a TypeScript list kept equal by hand are compared at the edit that makes them disagree.
+  over: a Rust const list mirrored by a TypeScript literal, agreeing and then broken by an edit to the Rust file
+  via: a list in a Rust file is read by the Rust plugin's lists slot: an edit that makes it and its TypeScript partner disagree names what each holds alone
+  because: the lists slot was declared in the plugin interface and read by nothing, so a Rust list named under mirrors was said to be gone at every edit (no longer set to an array) and a project kept its Rust lists out of the alarm; the reader for a language is its plugin's, so the core reads the slot and names no language
+  crossing: project-source -> reading
+  refuted: read every mirror's list with the TypeScript reader, never the list's language's lists slot, in readLiteral -> "a list in a Rust file is read by the Rust plugin's lists slot: an edit that makes it and its TypeScript partner disagree names what each holds alone" went red in mirrors.test.ts on its own assertion (the Rust list read as gone); restored from a copy, byte for byte, green batched and alone (2026-10-24)
+  kinds: none
 - a gone mirror is said at the edit: A write to a file a declared mirror spans, after which its list or partner literal is no longer declared as a literal there, adds a line to the edit's context saying the mirror cannot be checked and why, and the spec model names the same mirror as a problem; a mirror is never skipped in silence.
   over: a mirror whose list is removed from its file by an edit
   via: a mirror whose list is gone is said at the edit and is a spec problem, never skipped

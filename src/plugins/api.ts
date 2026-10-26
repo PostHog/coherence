@@ -49,6 +49,7 @@ export { lineOf as tomlLineOf, parseToml, TomlError, type TomlTable, type TomlVa
 export { isSourceFile, toRelative, type ImportTarget, type SourceSyntax } from "../economy/source.ts";
 export { configRecord } from "../adapters/project-config.ts";
 export { killTree } from "../enforcement/totality.ts";
+export type { Literal } from "../lifecycle/mirrors.ts";
 export { spawn, spawnSync } from "../lifecycle/work-meter.ts";
 export { typescriptCompiler } from "./specifiers.ts";
 export type { InterfaceSymbol } from "../observation/interfaces.ts";

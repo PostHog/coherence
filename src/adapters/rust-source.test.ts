@@ -1,8 +1,9 @@
 /**
  * The Rust plugin's text scans (plugins/rust/rust-source.ts, rust-scope.ts,
- * rust-interfaces.ts): what a line declares, what a use tree brings in, where
- * a module path resolves by Cargo's layout and the workspace's manifests,
- * and that mass reads Rust as it reads the other languages.
+ * rust-interfaces.ts, rust-lists.ts): what a line declares, what a use tree
+ * brings in, where a module path resolves by Cargo's layout and the
+ * workspace's manifests, what a hand-kept list holds, and that mass reads
+ * Rust as it reads the other languages.
  */
 
 import assert from "node:assert/strict";
@@ -15,6 +16,7 @@ import { declarationsOf, importsOf } from "../economy/source.ts";
 import { declares } from "../observation/interfaces.ts";
 import { isTypeDeclaration } from "../readings/scope/component-interfaces.ts";
 import { RUST_INTERFACES } from "../../plugins/rust/rust-scope.ts";
+import { rustListOf } from "../../plugins/rust/rust-lists.ts";
 import { uncommented, useLeaves } from "../../plugins/rust/rust-source.ts";
 
 const madeFolders: string[] = [];
@@ -77,6 +79,29 @@ test("a use tree is read leaf by leaf through nested braces, renames, self and g
   );
   assert.equal(uncommented(text).length, text.length, "blanking keeps every offset");
   assert.deepEqual(RUST_INTERFACES.importLists("use a::{b as c};"), ["a::{b as c}"], "the renames are read from the tree's text");
+});
+
+test("a Rust list is the array a top-level const or static is set to: its string literals, a tuple by its first, a path by its last segment, through & and vec!; what it cannot read is kept as written, and a comment or a string's brackets are no member", () => {
+  const text = [
+    'pub const KINDS: &[&str] = &["box", /* ground */ "plane", r#"say "hi""#];',
+    "static TABLE: [(&str, u32); 2] = [",
+    '    ("a", 1), // the first',
+    '    ("b, ]", 2),',
+    "];",
+    "pub(crate) static SHAPES: &'static [Kind] = &[Kind::Box, shape::Kind::Sphere, 3, make(\"x\")];",
+    "const NAMES: Vec<&str> = vec![\"x\"];",
+    "const COUNT: usize = 3;",
+    "fn body() {",
+    '    const INNER: &[&str] = &["not top"];',
+    "}",
+  ].join("\n");
+  assert.deepEqual(rustListOf(text, "KINDS"), { line: 1, kind: "array", members: ["box", "plane", 'say "hi"'], unread: [] });
+  assert.deepEqual(rustListOf(text, "TABLE"), { line: 2, kind: "array", members: ["a", "b, ]"], unread: [] }, "past the type's [..; 2], a row by its first column, a comma and a bracket in a string kept in it");
+  assert.deepEqual(rustListOf(text, "SHAPES"), { line: 6, kind: "array", members: ["Box", "Sphere"], unread: ["3", 'make("x")'] });
+  assert.deepEqual(rustListOf(text, "NAMES")?.members, ["x"]);
+  assert.equal(rustListOf(text, "COUNT"), undefined, "a const set to no array is no list");
+  assert.equal(rustListOf(text, "INNER"), undefined, "a const inside a fn is not at the top");
+  assert.equal(rustListOf(text, "MISSING"), undefined);
 });
 
 test("a Rust path resolves by its crate's folder layout: crate, self, super and a module of the file's own, a.rs or a/mod.rs, a crate of the workspace by its package name, a [[bin]] root's modules beside it, and only under the file's exact spelling", () => {
