@@ -45,7 +45,7 @@ export { languageOfFile } from "../adapters/language-files.ts";
 export { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, nestedCheckouts, nestedFolder, neverWalkedName, projectListing, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "../adapters/project-files.ts";
 // TOML's line lookup is exported under its own name: entrance detection has a lineOf of its own.
 export { lineOf as tomlLineOf, parseToml, TomlError, type TomlTable, type TomlValue } from "../adapters/toml.ts";
-export { isSourceFile, toRelative, type SourceSyntax } from "../economy/source.ts";
+export { isSourceFile, toRelative, type ImportTarget, type SourceSyntax } from "../economy/source.ts";
 export { configRecord } from "../adapters/project-config.ts";
 export { killTree } from "../enforcement/totality.ts";
 export { spawn, spawnSync } from "../lifecycle/work-meter.ts";

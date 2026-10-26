@@ -334,9 +334,6 @@ export function selectorsIn(text: string): Map<string, Set<string>> {
   return out;
 }
 
-/** Separates an import path from the name a specifier asks for; `#` is never in a Go import path. */
-const NAMED = "#";
-
 /* -------------------------------------------------------------- packages */
 
 /** A file's text, or undefined when it cannot be read. */
@@ -458,33 +455,14 @@ export function packageFiles(root: string, folder: string): string[] {
   }
 }
 
-/** The names each file declares, read once per file and again when it changes. */
-const DECLARED = new Map<string, { at: number; names: Set<string> }>();
-
-function declaredIn(root: string, file: string): Set<string> {
-  const path = resolve(root, file);
-  let at: number;
-  try {
-    at = statSync(path).mtimeMs;
-  } catch {
-    return new Set();
-  }
-  const known = DECLARED.get(path);
-  if (known !== undefined && known.at === at) return known.names;
-  const names = new Set(declarationsIn(textOf(path) ?? "").flatMap((d) => d.names));
-  DECLARED.set(path, { at, names });
-  return names;
-}
-
 /**
  * A Go import is of a package, a folder of files: importsOf hands the path
- * once per exported name the file uses through it (`path#Name`), so each
- * resolves to the file of the package that declares that name, and the
- * closure's hop out is confirmed by a use of that file's names; a package
- * imported for its side effects, dot-imported, or whose names the file
- * never spells is handed whole and resolves to its first file in sorted
- * order. A file of the package the change deleted (vanished) stands in for
- * a name no file left declares, and for the package whole, so its
+ * once per exported name the file uses through it, and resolveModule names
+ * the package as a module, its folder and every file of it, so the core
+ * joins each name to the file that declares it (economy/source.ts importsOf).
+ * A package imported for its side effects, dot-imported, or whose names the
+ * file never spells is handed whole, and reaches every file of it. A file of
+ * the package the change deleted (vanished) stays among its files, so its
  * importers are found.
  */
 export const GO_SOURCE: SourceSyntax = {
@@ -498,18 +476,11 @@ export const GO_SOURCE: SourceSyntax = {
     return { name: declared.names[0]!, exported: declared.exported };
   },
   resolveModule(root, from, specifier, vanished) {
-    const at = specifier.indexOf(NAMED);
-    const path = at < 0 ? specifier : specifier.slice(0, at);
-    const name = at < 0 ? undefined : specifier.slice(at + 1);
-    const folder = packageFolderOf(root, from, path);
+    const folder = packageFolderOf(root, from, specifier);
     if (folder === undefined) return undefined;
     const present = packageFiles(root, folder);
-    const gone = [...vanished].filter((f) => isPackageFile(f) && (posix.dirname(f) === "." ? "" : posix.dirname(f)) === folder && !present.includes(f)).sort();
-    if (name !== undefined) {
-      const declaring = present.find((file) => declaredIn(root, file).has(name));
-      if (declaring !== undefined) return declaring;
-    }
-    return gone[0] ?? present[0];
+    const gone = [...vanished].filter((f) => isPackageFile(f) && (posix.dirname(f) === "." ? "" : posix.dirname(f)) === folder && !present.includes(f));
+    return { module: folder, files: [...present, ...gone].sort() };
   },
   importsOf(text, add) {
     const selectors = selectorsIn(text);
@@ -520,7 +491,7 @@ export const GO_SOURCE: SourceSyntax = {
       }
       const used = [...(selectors.get(spec.alias ?? packageNameOf(spec.path)) ?? [])].filter(exported).sort();
       if (used.length === 0) add(undefined, spec.path);
-      for (const name of used) add(undefined, `${spec.path}${NAMED}${name}`);
+      for (const name of used) add(name, spec.path);
     }
   },
 };

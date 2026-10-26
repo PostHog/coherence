@@ -12,7 +12,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, test } from "node:test";
-import { declarationsOf } from "../economy/source.ts";
+import { declarationsOf, importsOf } from "../economy/source.ts";
 import { forProject, registerProjectPlugins, syntaxOf } from "./languages.ts";
 import type { LoadedPlugin, PluginManifest } from "./plugin.ts";
 import { BUNDLED_DIR, readManifest } from "./registry.ts";
@@ -171,4 +171,28 @@ test("a project's parses are kept between processes: a later process parses only
   assert.deepEqual(readdirSync(join(root, ".coherence", "parses", "python")).filter((f) => f.endsWith(".json")).length, 1, "one store, the log folded into it");
   pass(bare, undefined);
   assert.deepEqual(readdirSync(bare), [], "a project with no .coherence folder gains none");
+});
+
+test("an import that resolves to a module joins, of its files, those that declare the name it imports, and every one when it imports the module whole or no file declares the name", () => {
+  const plugin = parserPlugin({ treeSitter: { parser: "zz.wasm", queries: "zz.scm", resolve: "module.ts#MODULE" } }, {
+    "module.ts": 'export const MODULE = { resolveModule: (root, from, specifier) => (specifier === "store" ? { module: "store", files: ["store/cache.zz", "store/rows.zz", "store/secrets.zz"] } : undefined), modulePaths: () => [] };\n',
+  });
+  const root = mkdtempSync(join(tmpdir(), "coherence-module-imports-"));
+  fixtures.push(root);
+  mkdirSync(join(root, "store"));
+  writeFileSync(join(root, "store", "cache.zz"), "CACHE = {}\n");
+  writeFileSync(join(root, "store", "rows.zz"), "class Row:\n    pass\n");
+  writeFileSync(join(root, "store", "secrets.zz"), "SECRET_COLUMNS = ['token']\n\ndef seal(row):\n    return row\n");
+  registerProjectPlugins(root, [plugin]);
+  try {
+    forProject(root, () => {
+      const joined = (text: string): string[] => importsOf(root, "api/render.zz", text, "zz").map((i) => `${i.name ?? "*"} <- ${i.module}`);
+      assert.deepEqual(joined("from store import seal, SECRET_COLUMNS\n"), ["seal <- store/secrets.zz", "SECRET_COLUMNS <- store/secrets.zz"], "a name joins the file that declares it, and no other");
+      assert.deepEqual(joined("from store import Row\n"), ["Row <- store/rows.zz"]);
+      assert.deepEqual(joined("import store\n"), ["* <- store/cache.zz", "* <- store/rows.zz", "* <- store/secrets.zz"], "a module imported whole joins every file of it");
+      assert.deepEqual(joined("from store import Missing\n"), ["Missing <- store/cache.zz", "Missing <- store/rows.zz", "Missing <- store/secrets.zz"], "a name no file declares joins every file, never a file picked for it");
+    });
+  } finally {
+    registerProjectPlugins(root, []);
+  }
 });

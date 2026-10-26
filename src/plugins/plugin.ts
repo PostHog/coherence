@@ -39,7 +39,7 @@
 import type { AdapterBounds, LanguageAdapter, Ladder } from "../adapters/adapter.ts";
 import type { DeclaredLanguage } from "../adapters/declared-config.ts";
 import type { EntranceSyntax } from "../adapters/entrance-candidates.ts";
-import type { SourceSyntax } from "../economy/source.ts";
+import type { ImportTarget, SourceSyntax } from "../economy/source.ts";
 import type { Literal } from "../lifecycle/mirrors.ts";
 import type { InterfaceSymbol } from "../observation/interfaces.ts";
 import type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
@@ -189,8 +189,8 @@ export interface TreeSitterManifest {
 
 /** Where an import leads: a plugin on the parser path supplies this as code, since a module's place is the language's rule, not its syntax. */
 export interface ModuleResolution {
-  /** The project-relative file a specifier names from a file, or undefined outside the project; `vanished` as for the source slot's. */
-  resolveModule(root: string, from: string, specifier: string, vanished: ReadonlySet<string>): string | undefined;
+  /** What a specifier names from a file: one project-relative file, or a module of several (its folder and files), or undefined outside the project; `vanished` as for the source slot's. */
+  resolveModule(root: string, from: string, specifier: string, vanished: ReadonlySet<string>): ImportTarget | undefined;
   /** Every spelling of the files a module specifier names from a file, resolved or not, for the word index's wildcard keys. */
   modulePaths(from: string, specifier: string): string[];
 }

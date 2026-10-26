@@ -291,7 +291,7 @@ plugin reads this way (`plugins/python`).
 |---|---|
 | `parser` | The language's parser compiled to WebAssembly, beside the manifest. Many grammars' npm packages ship one (`tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-java`, `tree-sitter-c`): copy the `.wasm` out of the package. For a grammar that ships none (`tree-sitter-swift`, `tree-sitter-kotlin`), run `tree-sitter build --wasm` in the grammar's repository; the tree-sitter CLI compiles it with Emscripten, or with Docker or Podman when Emscripten is not installed. Coherence runs web-tree-sitter 0.27, which loads parsers built for language ABI 13 to 15. |
 | `queries` | A file of tree-sitter queries, beside the manifest, whose captures are the names below. A query that does not compile against the parser, or a capture Coherence reads nothing by, is refused naming the plugin. |
-| `resolve` | `"<module>#<export>"`: a `ModuleResolution`, `{ resolveModule(root, from, specifier, vanished), modulePaths(from, specifier) }`. Where an import leads is the language's rule, not its syntax, so it stays code: `resolveModule` names the project file a specifier leads to (or `undefined` outside the project), `modulePaths` every spelling of the files a glob import names. |
+| `resolve` | `"<module>#<export>"`: a `ModuleResolution`, `{ resolveModule(root, from, specifier, vanished), modulePaths(from, specifier) }`. Where an import leads is the language's rule, not its syntax, so it stays code: `resolveModule` names the project file a specifier leads to, or, where the language's module is several files (a Go package, a SwiftPM target), the module as `{ module: "<folder>", files: ["<every file of it>"] }`, or `undefined` outside the project. `modulePaths` gives every spelling of the files a glob import names. |
 | `privateName` | For a language that exports by name rather than by a keyword: a regular expression a name it keeps private matches (Python's `^_`). A language that exports by keyword captures `@exported` instead. |
 
 The captures:
@@ -307,6 +307,15 @@ The captures:
 | `@name` | the declaration's name | the name |
 | `@bound` | a top-level name the file binds without declaring it (Python's lowercase module variables) | the spec model's check that a handler, guard or mirror exists reads it; mass does not |
 | `@exported` | anything in a declaration's match | the file exports it |
+
+An import that resolves to a module joins, of the module's files, those
+that declare the name it imports (read through the plugin's own parser), and
+every file of the module when it imports the module whole or no file declares
+the name. Return the module and let Coherence choose: a plugin that picks one
+file of a module (its first, the one named after it) misses the importer's
+other files, and two plugins that pick differently read one project two ways.
+A plugin with a hand-written `source` slot may return a module from its
+`resolveModule` the same way; the bundled Go plugin does.
 
 Python's queries (`plugins/python/python.scm`) are the worked example:
 one pattern per shape of import, then one per kind of declaration, each

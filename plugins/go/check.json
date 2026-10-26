@@ -84,21 +84,22 @@
         "file": "api/render.go",
         "module": "store/secrets.go",
         "names": [
-          "*"
+          "Seal",
+          "SecretColumns"
         ]
       },
       {
         "file": "cmd/shop/main.go",
         "module": "api/render.go",
         "names": [
-          "*"
+          "Render"
         ]
       },
       {
         "file": "cmd/shop/main.go",
         "module": "store/rows.go",
         "names": [
-          "*"
+          "Row"
         ]
       }
     ],

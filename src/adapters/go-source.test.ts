@@ -164,7 +164,7 @@ test("a Go import is read single and grouped, named, dot and blank, never from a
   assert.deepEqual(["shop/store", "gopkg.in/yaml.v3", "github.com/go-chi/chi/v5", "example.com/go-redis"].map(packageNameOf), ["store", "yaml", "chi", "redis"]);
 });
 
-test("a Go import path resolves under the module go.mod names, and the root's go.work, to the file of the package that declares each name the file uses through it; a package used for its side effects, dot-imported or never spelled is its first file; any other path resolves to nothing; a deleted file stands in for the names no file left declares", () => {
+test("a Go import path resolves under the module go.mod names, and the root's go.work, to the package, each name the file uses through it joining the file that declares it; a package used for its side effects, dot-imported or never spelled joins every file of it; any other path resolves to nothing; a deleted file stays among its files, so a name no file left declares still finds its importer", () => {
   const root = project({
     "go.mod": "module example.com/shop\n\ngo 1.22\n",
     "go.work": "go 1.22\n\nuse (\n\t.\n\t./tools\n)\n",
@@ -193,11 +193,11 @@ test("a Go import path resolves under the module go.mod names, and the root's go
     "}",
   ].join("\n");
   const imports = (file: string, text: string, vanished?: ReadonlySet<string>): string[] => importsOf(root, file, text, "go", vanished).map((i) => `${i.name ?? "*"} <- ${i.module}`);
-  assert.deepEqual(imports("api/render.go", api), ["* <- store/a_rows.go", "* <- store/secrets.go", "* <- side/side.go", "* <- tools/lint/lint.go"], "each name from the file that declares it; a blank import whole; a module go.work uses; the standard library and another module nothing");
-  assert.deepEqual(imports("api/render.go", "package api\n\nimport . \"example.com/shop/store\"\n\nvar x = Seal\n"), ["* <- store/a_rows.go"], "a dot import is of the package whole");
-  assert.deepEqual(imports("api/render.go", "package api\n\nimport \"example.com/shop/store\"\n"), ["* <- store/a_rows.go"], "an import whose names the file never spells is of the package whole");
+  assert.deepEqual(imports("api/render.go", api), ["Row <- store/a_rows.go", "Seal <- store/secrets.go", "SecretColumns <- store/secrets.go", "* <- side/side.go", "Run <- tools/lint/lint.go"], "each name from the file that declares it; a blank import whole; a module go.work uses; the standard library and another module nothing");
+  assert.deepEqual(imports("api/render.go", "package api\n\nimport . \"example.com/shop/store\"\n\nvar x = Seal\n"), ["* <- store/a_rows.go", "* <- store/secrets.go"], "a dot import is of the package whole");
+  assert.deepEqual(imports("api/render.go", "package api\n\nimport \"example.com/shop/store\"\n"), ["* <- store/a_rows.go", "* <- store/secrets.go"], "an import whose names the file never spells is of the package whole");
   const gone = new Set(["store/b_cache.go"]);
-  assert.deepEqual(imports("api/render.go", "package api\n\nimport \"example.com/shop/store\"\n\nvar c = store.Cache\nvar s = store.Seal\n", gone), ["* <- store/b_cache.go", "* <- store/secrets.go"], "a name no file left declares resolves to the deleted file, so its importer is found");
+  assert.deepEqual(imports("api/render.go", "package api\n\nimport \"example.com/shop/store\"\n\nvar c = store.Cache\nvar s = store.Seal\n", gone), ["Cache <- store/a_rows.go", "Cache <- store/b_cache.go", "Cache <- store/secrets.go", "Seal <- store/secrets.go"], "a name no file left declares joins every file of the package, the deleted one among them, so its importer is found");
 });
 
 test("the Go interfaces slot: Go renames packages, never names, so no import list holds an alias; it has no default export; gopls takes no bounds; a dot import's names are spelled at each use", () => {
