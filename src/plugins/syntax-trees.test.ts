@@ -8,15 +8,16 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { declarationsOf, importsOf } from "../economy/source.ts";
 import { forProject, registerProjectPlugins, syntaxOf } from "./languages.ts";
 import type { LoadedPlugin, PluginManifest } from "./plugin.ts";
 import { BUNDLED_DIR, readManifest } from "./registry.ts";
 import { treeReaderOf, warmParses } from "./syntax-trees.ts";
+import { warmProjectParses } from "../economy/warm-parses.ts";
 import { Parser, Tree } from "web-tree-sitter";
 
 const fixtures: string[] = [];
@@ -242,4 +243,35 @@ test("the parse store never reaches past the project's own folders: a link on it
   assert.deepEqual(JSON.parse(said), ["b <- a"], "a store the project brings, unsigned, is never read");
   assert.equal(readFileSync(elsewhere, "utf8"), "", "nothing is appended through a link");
   assert.ok(names().includes("notes.txt"), "a file that is not the store's own is never removed");
+});
+
+test("a registry's leaves share one parse store at the repository's top: a warm-up of one leaf keeps what another leaf's read, and pre-reads the top's files", () => {
+  const top = realpathSync(mkdtempSync(join(tmpdir(), "coherence-shared-parses-")));
+  fixtures.push(top);
+  const files: Record<string, string> = {
+    "coherence.config.json": JSON.stringify({ projects: ["a", "b"], language: "python" }),
+    "a/coherence.config.json": "{}\n",
+    "a/one.py": "from b.two import TWO\nONE = 1\n",
+    "b/coherence.config.json": "{}\n",
+    "b/two.py": "TWO = 2\n",
+    "tools/three.py": "THREE = 3\n",
+  };
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(top, path)), { recursive: true });
+    writeFileSync(join(top, path), text);
+  }
+  for (const dir of [".coherence", "a/.coherence", "b/.coherence"]) mkdirSync(join(top, dir), { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: top });
+  const kept = (): number => {
+    const store = join(top, ".coherence", "parses", "python");
+    const file = readdirSync(store).find((n) => n.endsWith(".json"));
+    return file === undefined ? 0 : Object.keys(JSON.parse(readFileSync(join(store, file), "utf8").split("\n").slice(1).join("\n")) as object).length;
+  };
+  const first = warmProjectParses(join(top, "a"));
+  assert.deepEqual(first.map((w) => [w.root, w.read]), [[join(top, "a"), 1], [top, 3]], "the leaf, then the repository's top");
+  assert.equal(kept(), 3, "every file of the repository, kept at its top");
+  assert.ok(!existsSync(join(top, "a", ".coherence", "parses")) && !existsSync(join(top, "b", ".coherence", "parses")), "no leaf keeps a store of its own");
+  writeFileSync(join(top, "b", "two.py"), "TWO = 22\n");
+  warmProjectParses(join(top, "b"));
+  assert.equal(kept(), 4, "b's warm-up adds its changed file and keeps a's and the top's, seen within the retention");
 });

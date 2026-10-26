@@ -122,7 +122,7 @@ const RECENT = 4;
 const DIRECT_PARSES = 16;
 
 /** Bumped when what a kept parse holds changes, so an older store is never read as this one's. */
-const STORE_FORMAT = 3;
+const STORE_FORMAT = 4;
 
 /**
  * The reader of a plugin's language through its parser and queries, built on
@@ -318,8 +318,8 @@ function readerOver(compiled: Compiled, store: ParseStore | undefined): TreeRead
  */
 class ParseStore {
   private static stores = new Map<string, ParseStore>();
-  private entries: Map<string, Found> | undefined;
-  private added: [string, Found][] = [];
+  private entries: Map<string, { found: Found; day: number }> | undefined;
+  private added: [string, Found, number][] = [];
   /** Texts this store's process parsed itself. */
   parsed = 0;
 
@@ -386,11 +386,11 @@ class ParseStore {
 
   get(key: string): Found | undefined {
     if (this.entries === undefined) {
-      const entries = new Map<string, Found>();
+      const entries = new Map<string, { found: Found; day: number }>();
       if (this.safe()) {
         try {
           const kept = JSON.parse(this.readSigned(this.base).join("\n") || "{}") as unknown;
-          if (typeof kept === "object" && kept !== null && !Array.isArray(kept)) for (const [k, found] of Object.entries(kept)) if (isFound(found)) entries.set(k, found);
+          if (typeof kept === "object" && kept !== null && !Array.isArray(kept)) for (const [k, value] of Object.entries(kept)) if (Array.isArray(value) && value.length === 2 && typeof value[0] === "number" && isFound(value[1])) entries.set(k, { day: value[0], found: value[1] });
         } catch {
           // What a warm-up kept is unreadable: every text is parsed, and the next warm-up writes it again.
         }
@@ -398,22 +398,23 @@ class ParseStore {
           if (line === "") continue;
           try {
             const entry = JSON.parse(line) as unknown;
-            if (Array.isArray(entry) && entry.length === 2 && typeof entry[0] === "string" && isFound(entry[1])) entries.set(entry[0], entry[1]);
+            if (Array.isArray(entry) && entry.length === 3 && typeof entry[0] === "string" && isFound(entry[1]) && typeof entry[2] === "number") entries.set(entry[0], { found: entry[1], day: entry[2] });
           } catch {
             // A line a process was killed while writing: that text is parsed again.
           }
         }
       }
-      for (const [k, found] of this.added) entries.set(k, found);
+      for (const [k, found, day] of this.added) entries.set(k, { found, day });
       this.entries = entries;
     }
-    return this.entries.get(key);
+    return this.entries.get(key)?.found;
   }
 
   put(key: string, found: Found): void {
     this.parsed++;
-    this.added.push([key, found]);
-    this.entries?.set(key, found);
+    const day = today();
+    this.added.push([key, found, day]);
+    this.entries?.set(key, { found, day });
     // A process that lives long (the warm server, hook-serve) appends as it goes, so what it holds unwritten stays small.
     if (this.added.length >= FLUSH_EVERY) this.flush();
   }
@@ -486,16 +487,20 @@ class ParseStore {
   }
 
   /**
-   * Keep exactly the texts named, from what is held and what this process
-   * parsed, in one signed file, and remove the store's own other files: the
+   * Keep the texts named, as seen today, and every other kept parse seen in
+   * the last RETAIN_DAYS, in one signed file, and remove the store's own other
+   * files: the
    * log, other fingerprints' stores, and temporary files a killed warm-up
    * left. Nothing else in the folder is touched.
    */
   rewrite(keep: ReadonlySet<string>): void {
     if (!existsSync(join(this.root, ".coherence")) || !this.safe()) return;
     this.get("");
-    const kept: Record<string, Found> = {};
-    for (const [k, found] of this.entries!) if (keep.has(k)) kept[k] = found;
+    const kept: Record<string, [number, Found]> = {};
+    // What this pass read is kept as seen today; anything else is kept while it was seen in the last RETAIN_DAYS, so one leaf's pass of a
+    // repository's shared store never drops another leaf's files, and a file gone or changed ages out.
+    const now = today();
+    for (const [k, { found, day }] of this.entries!) if (keep.has(k) || now - day <= RETAIN_DAYS) kept[k] = [keep.has(k) ? now : day, found];
     mkdirSync(this.dir, { recursive: true });
     if (!this.safe()) return;
     const temporary = `${this.base}.${process.pid}`;
@@ -548,6 +553,14 @@ function alive(pid: number): boolean {
 
 /** The first line of a store's file: its signature. */
 const STORE_SEAL = "coherence-parses ";
+
+/** How many days a kept parse no warm-up read lasts: a file deleted or changed ages out; one read only at the repository's top is parsed again after. */
+const RETAIN_DAYS = 14;
+
+/** The day, counted from 1970, for the stamps kept parses carry. */
+function today(): number {
+  return Math.floor(Date.now() / 86_400_000);
+}
 
 /** How many parses a process holds before it appends them. */
 const FLUSH_EVERY = 256;
