@@ -610,7 +610,6 @@
         "class ownership": "One party's thing treated as another's: Coherence's lexicon, practice or decision demanded of or read as an adopter's, or the reverse.",
         "class structure-drift": "What a spec, the lexicon or a document says has drifted from what the code or the files do, and no check sees it.",
         "class bypassed-door": "A reference reaches a protected thing outside its chokepoint.",
-        "class parse-gap": "A reader of source, shell or spec text misses a shape its language allows.",
         "class root-resolution": "The tool settled on the wrong project root, so it read, wrote or answered for the wrong tree.",
         "class overmatch": "A pattern or check matches more than it means, so an unrelated thing satisfies or triggers it.",
         "class self-clearing": "A check the very record or edit it guards can clear on its own.",
@@ -627,7 +626,8 @@
         "family hand-list": "A list kept by hand that must mirror something defined elsewhere (files, imports, events, tools, keys), so the two drift and nothing fails: a module, an event or a tool silently left out. A family: each list is removed by deriving it from what it mirrors, one guard per list.",
         "family silent-skip": "A reading, walk or command leaves part of what it was given out and says nothing about it. A family: every reader and command can skip in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure.",
         "mirror reading": "The reading that finds hand lists: literal collections of names matched by overlap against each other and against what code derives (a folder's files, the import closure of a list of files, a module's exports, the keys a file reads), from git objects at one revision, with history naming the commit that grew one side alone (query mirrors). Advisory and never taken in a hook: orient names the groups worth a look from the last reading kept, and the reading proposes pairs for the edit-time alarm to watch.",
-        "family version-skew": "The Coherence that runs is not the one the adopter installed or meant: another copy shadows it, a package manager resolved an older release than the project needs, or a plugin's import reaches another copy than the running one, and nothing says which version answers. A family: every place that picks a copy (which launches, which installs, which a plugin imports) picks it in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure."
+        "family version-skew": "The Coherence that runs is not the one the adopter installed or meant: another copy shadows it, a package manager resolved an older release than the project needs, or a plugin's import reaches another copy than the running one, and nothing says which version answers. A family: every place that picks a copy (which launches, which installs, which a plugin imports) picks it in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure.",
+        "family parse-gap": "A reader of source, shell or spec text misses a shape its language allows. A family: every hand-written reader (entrance rules, the shell reader, a plugin's import reader) misses shapes in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure; a reader moved onto a parser leaves it for that parser's guards."
       }
     },
     {
