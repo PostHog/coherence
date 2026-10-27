@@ -496,7 +496,7 @@ export function specBlock(root: string, now: number = Date.now()): string {
   const quiet = floorQuiet(model.runs, now);
   if (quiet !== undefined) lines.push(quiet);
   // A subsystem collecting defects across classes and rounds after its first guard: the design is wrong, not one guard (journal/dead-ends.ts). Never shortened.
-  lines.push(...deadEndBlock(readDeadEnds(root, model.components)));
+  lines.push(...deadEndBlock(readDeadEnds(root, model.components, new Date(now))));
   // A defect in a class already guarded: the protection was weaker than claimed (journal/defects.ts).
   const failures = model.defects?.guardFailures ?? [];
   if (failures.length > 0) {

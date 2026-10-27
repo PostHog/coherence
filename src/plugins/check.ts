@@ -56,7 +56,7 @@ import { declarationsOf, importsOf, isSourceFile } from "../economy/source.ts";
 import { DEFAULT_TEST_FOLDERS } from "../enforcement/config.ts";
 import { performRun } from "../enforcement/run.ts";
 import { detectedEntrances, readComponentInterfaces } from "../readings/scope/component-interfaces.ts";
-import { bundledAdapter, bundledPlugins, forProject, languageOfFile, parsedOf, registerProjectPlugins, repeatedAnswers, syntaxOf } from "./languages.ts";
+import { bundledAdapter, bundledPlugins, forProject, languageOfFile, parsedOf, registerProjectPlugins, repeatedAnswers } from "./languages.ts";
 import { DUTY_SINCE, PLUGIN_API_CHANGES, type LoadedPlugin } from "./plugin.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
 import { proveVia, viaForm } from "./verify.ts";
@@ -417,7 +417,7 @@ async function languageDutiesOf(plugin: LoadedPlugin, language: string): Promise
 /** Whether each of the plugin's answers is given by one slot alone (repeatedAnswers). */
 function oneAnswerEach(plugin: LoadedPlugin): Duty {
   const repeated = repeatedAnswers(plugin);
-  return repeated.length === 0 ? { name: "one answer each", verdict: "pass", reason: "no two slots give one answer" } : { name: "one answer each", verdict: "fail", reason: `${repeated.join("; ")}: keep the answer in one slot (the kept answers read interfaces.wildcardModules, so a kept slot that repeats it goes)` };
+  return repeated.length === 0 ? { name: "one answer each", verdict: "pass", reason: "no two slots give one answer" } : { name: "one answer each", verdict: "fail", reason: `${repeated.join("; ")}: keep the answer in one slot` };
 }
 
 /** A duty's outcome, or the duty failed with what it threw: one duty that throws never takes the others' outcomes with it. */
@@ -474,20 +474,21 @@ function declarations(project: CheckProject, language: string): Duty {
  * answers agree: where two of the language's readings answer one question of
  * the same text, their answers agree over every file of the check project. A
  * name the source scan finds declared is one the topLevel reading finds at
- * the top level, and a type declaration where the interfaces slot reads one
- * (a fact its plugin may state itself) exactly where the declares reading
- * reads a type; and every name an interfaces import list renames is one the
+ * the top level, and a type declaration where the interfaces reading reads
+ * one in the line alone exactly where the declares reading reads a type in
+ * the whole text; and every name an interfaces import list renames is one the
  * source scan reads imported. Two readers of one text that disagree are how a
  * reading misses what another finds (df-7ac38ee4: Python's source scan read
  * nothing of a from-import split across lines, which its interfaces slot read
- * whole); the parser derives each of them from one parse, and the duty holds
- * the derivations and the plugin's own facts to one another.
+ * whole); the parser derives each of them from one parse, so what the duty
+ * still finds is queries that read a declaration by what surrounds it, which
+ * the same queries over its line alone read otherwise.
  */
 function answersAgree(project: CheckProject, language: string): Duty {
   const source = parsedOf(language, "source");
   const topLevel = parsedOf(language, "topLevel");
   const declares = parsedOf(language, "declares");
-  const interfaces = syntaxOf(language, "interfaces");
+  const interfaces = parsedOf(language, "interfaces");
   const files = project.language.files.filter((f) => project.files[f] !== undefined);
   const wrong: string[] = [];
   let compared = 0;

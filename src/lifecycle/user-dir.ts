@@ -1,8 +1,10 @@
 /**
- * Coherence's folder in the user's configuration: $XDG_CONFIG_HOME/coherence,
- * else ~/.config/coherence. The update check, telemetry and the parse store's
- * machine key keep their files there, never in a project. Always an absolute
- * path: a relative one would land in whatever folder a process starts in.
+ * Coherence's folders in the user's configuration and cache:
+ * $XDG_CONFIG_HOME/coherence, else ~/.config/coherence, where the update check
+ * and telemetry keep their files; and $XDG_CACHE_HOME/coherence, else
+ * ~/.cache/coherence, where the parse store keeps kept parses; never in a
+ * project. Always an absolute path: a relative one would land in whatever
+ * folder a process starts in.
  */
 
 import { homedir, tmpdir, userInfo } from "node:os";
@@ -39,7 +41,7 @@ export function userConfigDir(env: Record<string, string | undefined> = process.
  * account's own, else Node's answer, else a folder named for the user in the
  * system's temporary folder. That last one another user could make first,
  * so what is kept there is trusted only as far as it is this user's alone
- * (the parse store's machine key: ownKey in src/plugins/syntax-trees.ts).
+ * (the parse store's folders: usersAlone in src/plugins/syntax-trees.ts).
  */
 function homeOf(env: Record<string, string | undefined>, sources: HomeSources): string {
   const asked = (source: () => string): string | undefined => {

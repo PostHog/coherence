@@ -86,14 +86,16 @@ jobs:
   # The TypeScript plugin's two parsers, rebuilt from tree-sitter-typescript
   # 0.23.2 and Coherence's patch (grammars/tree-sitter-typescript). The fetch
   # phase downloads every input and checks it by digest; the build phase runs
-  # in a container with no network (docker --network none; it refuses to run
-  # if it can reach the network), checks every input again, runs the
-  # grammar's corpus and Coherence's, builds the stock and patched parsers,
-  # fails on any difference between what they read that
-  # intended-differences.json does not allow (compare.mjs), and fails unless
-  # each patched parser comes out byte for byte as parsers.sha256 records.
-  # The image is node 22.18 on Debian trixie (glibc 2.41, which the CLI's
-  # binary needs, with gcc and git), pinned by digest.
+  # in a container with no network (docker --network none, which is what
+  # denies it; the phase's own connection attempt is a tripwire), checks every
+  # input again, builds from the pinned upstream tree, refuses a patch that
+  # changes anything but the grammar and its scanner, runs upstream's corpus
+  # from that clean tree and Coherence's from corpus/ (outside the patch),
+  # builds the stock and patched parsers, fails on any difference between
+  # what they read that intended-differences.json does not allow and on any
+  # expected tree the patched parsers do not read (compare.mjs), and fails
+  # unless each patched parser comes out byte for byte as parsers.sha256
+  # records. The image is inputs.sh's build_image, pinned by digest.
   typescript-parsers:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -106,11 +108,11 @@ jobs:
         run: grammars/tree-sitter-typescript/fetch.sh "$RUNNER_TEMP/grammar-inputs"
 
       - name: Build both parsers with no network and compare them with the stock ones
-        run: >-
-          docker run --rm --network none
-          --volume "$GITHUB_WORKSPACE:/repo:ro" --volume "$RUNNER_TEMP/grammar-inputs:/inputs:ro"
-          node:22.18.0-trixie@sha256:5329a2a013f6a49e8698609f9b20aa9aac670672ab6d88af73e3517cd79790e7
-          /repo/grammars/tree-sitter-typescript/build-phase.sh /inputs /tmp/parsers
+        run: |
+          . grammars/tree-sitter-typescript/inputs.sh
+          docker run --rm --network none \
+            --volume "$GITHUB_WORKSPACE:/repo:ro" --volume "$RUNNER_TEMP/grammar-inputs:/inputs:ro" \
+            "$build_image" /repo/grammars/tree-sitter-typescript/build-phase.sh /inputs /tmp/parsers
 
   # Everything in npm test but the unit tests, beside them, and the chokepoint run.
   checks:

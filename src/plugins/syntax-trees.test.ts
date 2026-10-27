@@ -7,20 +7,20 @@
  */
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { declarationsOf, importsOf } from "../economy/source.ts";
-import { forProject, parsedOf, registerProjectPlugins, sourceProvider, syntaxOf } from "./languages.ts";
+import { forProject, parsedOf, registerProjectPlugins, repeatedAnswers, sourceProvider, syntaxOf } from "./languages.ts";
 import { DERIVED_SLOTS, OLDEST_PLUGIN_API, PLUGIN_API, type LoadedPlugin, type PluginManifest } from "./plugin.ts";
 import { writeParserPlugin } from "./fixtures/parser-plugin.ts";
-import { BUNDLED_DIR, readManifest } from "./registry.ts";
+import { BUNDLED_DIR, readManifest, readPlugins } from "./registry.ts";
 import { fingerprintOf, importShapes, KEPT_FROM, keptParseOf, staleParsesNotice, treeReaderOf, warmParses } from "./syntax-trees.ts";
 import { warmProjectParses } from "../economy/warm-parses.ts";
-import { Language, Parser, Tree, type Node } from "web-tree-sitter";
+import { Parser, Tree } from "web-tree-sitter";
 
 const fixtures: string[] = [];
 after(() => {
@@ -38,9 +38,19 @@ function pythonStore(): string {
   return join(process.env["XDG_CACHE_HOME"]!, "coherence", "parses", fingerprintOf(PYTHON, PY_PLUGIN.manifest.treeSitter!));
 }
 
-/** The segments a store folder holds now. */
-function segmentsIn(store: string): string[] {
-  return existsSync(store) ? readdirSync(store).filter((name) => /^[0-9a-f]{24}\.json$/.test(name)).sort() : [];
+/** The kept parses a store folder holds now, each a file under the folder of its key's first two digits. */
+function keptIn(store: string): string[] {
+  if (!existsSync(store)) return [];
+  return readdirSync(store)
+    .filter((shard) => /^[0-9a-f]{2}$/.test(shard))
+    .flatMap((shard) => readdirSync(join(store, shard)).filter((name) => /^[0-9a-f]{30}$/.test(name)).map((name) => join(store, shard, name)))
+    .sort();
+}
+
+/** A text's kept parse's file in a store folder. */
+function keptFile(store: string, text: string): string {
+  const key = createHash("sha256").update(text).digest("hex").slice(0, 32);
+  return join(store, key.slice(0, 2), key.slice(2));
 }
 
 /** Run a script in a fresh process with the parser runtime started, the store's module and the Python plugin in scope; its stdout. */
@@ -60,33 +70,102 @@ function parserPlugin(manifest: Record<string, unknown>, files: Record<string, s
   return { name: "zz", version: "0.1.0", dir, source: dir, manifest: full };
 }
 
-test("a plugin that fills a hand-written reader slot (source, declares, topLevel or kept) is refused naming the slot and the parser to read through instead, whatever pluginApi it is written for and whether or not it names a parser", () => {
+/** Where the refusal of a hand-written reader puts each recovery: the ejected copy's first, then the parser path for a plugin written from scratch. */
+function recoveries(problem: string): { eject: number; parser: number } {
+  return { eject: problem.indexOf("coherence plugin eject"), parser: problem.indexOf("docs/plugins.md, Reading through a parser") };
+}
+
+test("a manifest that fills a hand-written reader slot (source, declares, topLevel or kept) never loads, whatever pluginApi it is written for and whether or not it names a parser, so no reading of the core can meet one: one refusal names every such slot, the eject to redo first and the parser to read through", () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-syntax-trees-project-"));
+  fixtures.push(root);
   for (const pluginApi of [OLDEST_PLUGIN_API, PLUGIN_API - 1, PLUGIN_API])
     for (const slot of DERIVED_SLOTS)
       for (const parser of [true, false]) {
         const plugin = parserPlugin({ pluginApi, syntax: { [slot]: "resolve.ts#RESOLVE" }, ...(parser ? {} : { treeSitter: undefined }) });
-        const read = readManifest("zz", plugin.dir, "coherence.config.json");
         const what = `syntax.${slot} at pluginApi ${pluginApi}${parser ? " beside a parser" : ""}`;
-        assert.equal(read.manifest, undefined, `${what} loads`);
-        assert.deepEqual(
-          read.problems,
-          [`coherence.config.json: plugin zz's syntax.${slot} is a hand-written reader of its language's text, which this Coherence does not read (pluginApi 4): read the language through treeSitter, a grammar's .wasm and queries, from which the core derives what ${slot} answered (docs/plugins.md, Reading through a parser)`],
-          what,
-        );
+        const read = readManifest("zz", plugin.dir, "coherence.config.json");
+        assert.equal(read.manifest, undefined, `${what} reads as a manifest`);
+        assert.equal(read.problems.length, 1, `${what}: ${read.problems.join("\n")}`);
+        const [problem] = read.problems as [string];
+        assert.ok(problem.startsWith(`coherence.config.json: plugin zz's syntax.${slot} is a hand-written reader of its language's text, which this Coherence does not read (pluginApi 4 removed them)`), problem);
+        const at = recoveries(problem);
+        assert.ok(at.eject >= 0 && at.parser > at.eject, `${what}: the eject to redo is named before the parser path: ${problem}`);
+        // Through the path every project's config takes: no plugin comes back for any reading to ask.
+        const loaded = readPlugins(root, { zz: plugin.dir }, "coherence.config.json", [], () => undefined);
+        assert.deepEqual(loaded.plugins, [], `${what} loads through the config`);
+        assert.deepEqual(loaded.problems, [problem], what);
       }
   assert.ok(DOCS.includes("\n### Reading through a parser\n"), "the section the refusal names is docs/plugins.md's");
+  // Every slot one fills is named in its one refusal.
+  const three = readManifest("zz", parserPlugin({ treeSitter: undefined, syntax: { source: "resolve.ts#RESOLVE", declares: "resolve.ts#RESOLVE", topLevel: "resolve.ts#RESOLVE" } }).dir, "coherence.config.json").problems;
+  assert.equal(three.length, 1, three.join("\n"));
+  assert.match(three[0]!, /plugin zz's syntax\.source, syntax\.declares and syntax\.topLevel are hand-written readers/);
   // An extending plugin wraps no reader either.
   const extending = parserPlugin({ provides: undefined, extends: "typescript", treeSitter: undefined, syntax: { source: "resolve.ts#RESOLVE" } });
   assert.match(readManifest("zz", extending.dir, "coherence.config.json").problems.join("\n"), /plugin zz's syntax\.source is a hand-written reader/);
   assert.deepEqual(readManifest("zz", parserPlugin({}).dir, "coherence.config.json").problems, [], "a parser alone loads");
   assert.deepEqual(readManifest("zz", parserPlugin({ pluginApi: OLDEST_PLUGIN_API, treeSitter: undefined, syntax: { notice: "notice.ts#NOTICE" } }, { "notice.ts": "export const NOTICE = () => \"\";\n" }).dir, "coherence.config.json").problems, [], "a plugin of an older interface that fills none of them loads");
+});
 
-  // An interfaces table that answers the imports the parser reads is refused when the slot is first asked.
-  const plugin = parserPlugin({ syntax: { interfaces: "facts.ts#FACTS" } }, { "facts.ts": "export const FACTS = { serverBounds: false, importLists: () => [] };\n" });
+/** The TypeScript plugin as Coherence 1.10.1's `plugin eject typescript` wrote it, byte for byte: its bundled manifest filled source, declares and topLevel by hand. */
+const EJECTED_1_10_1 = resolve("src/plugins/fixtures/ejected-1.10.1/typescript");
+
+test("a copy ejected from Coherence 1.10.1 is refused as ejected from an older Coherence, its recovery named first: eject it again from this version and reapply the changes; the parser path follows for a plugin written from scratch", () => {
+  const manifest = JSON.parse(readFileSync(join(EJECTED_1_10_1, "plugin.json"), "utf8")) as Record<string, unknown>;
+  assert.equal(manifest["pluginApi"], 2, "the copy is Coherence 1.10.1's, written for pluginApi 2");
+  assert.deepEqual(Object.keys(manifest["syntax"] as object).filter((slot) => (DERIVED_SLOTS as readonly string[]).includes(slot)), ["source", "declares", "topLevel"], "it fills the hand-written readers by hand");
+  assert.match(readFileSync(join(EJECTED_1_10_1, "index.ts"), "utf8"), /from "@posthog\/coherence\/plugin"/, "its import of the core is the one eject writes");
+  // A project that runs the copy by path, as eject left it.
+  const root = mkdtempSync(join(tmpdir(), "coherence-ejected-"));
+  fixtures.push(root);
+  cpSync(EJECTED_1_10_1, join(root, "cp", "typescript"), { recursive: true });
+  const loaded = readPlugins(root, { typescript: "./cp/typescript" }, "coherence.config.json", [], () => undefined);
+  assert.deepEqual(loaded.plugins, [], "the copy never loads");
+  assert.equal(loaded.problems.length, 1, loaded.problems.join("\n"));
+  const [problem] = loaded.problems as [string];
+  assert.ok(problem.startsWith("coherence.config.json: plugin typescript is ejected from an older Coherence (a copy of the bundled typescript plugin, version 1.10.1): its syntax.source, syntax.declares and syntax.topLevel are hand-written readers"), problem);
+  assert.ok(problem.includes('set plugins.typescript to "bundled" in the config, run `coherence plugin eject typescript --to <a new folder>`, then carry your changes into the new copy'), problem);
+  const at = recoveries(problem);
+  assert.ok(at.eject >= 0 && at.parser > at.eject, `the eject comes first, the parser path after: ${problem}`);
+  // A plugin no bundled one is named as is not said to be ejected, and is told both ways, the eject first.
+  const scratch = readPlugins(root, { zz: parserPlugin({ treeSitter: undefined, syntax: { kept: "resolve.ts#RESOLVE" } }).dir }, "coherence.config.json", [], () => undefined).problems;
+  assert.equal(scratch.length, 1);
+  assert.doesNotMatch(scratch[0]!, /is ejected from an older Coherence/);
+  assert.ok(recoveries(scratch[0]!).eject >= 0 && recoveries(scratch[0]!).parser > recoveries(scratch[0]!).eject, scratch[0]);
+});
+
+test("an interfaces table states its language's facts alone: one that answers importLists, wildcardModules or any reading of its text is refused naming it, whether or not its plugin names a parser, and the core reads those through the parser", () => {
   const root = mkdtempSync(join(tmpdir(), "coherence-syntax-trees-project-"));
   fixtures.push(root);
-  registerProjectPlugins(root, [plugin]);
-  forProject(root, () => assert.throws(() => syntaxOf("zz", "interfaces"), /interfaces table's importLists would read its imports a second time/));
+  const HAND = "export const FACTS = { serverBounds: false, importLists: (text) => [], wildcardModules: (file, text) => text.split('\\n').filter((l) => l.startsWith('use ')).map((l) => l.slice(4) + '.zz') };\n";
+  for (const parser of [true, false]) {
+    // The blind reviewer's probe: no parser, pluginApi 4, a wildcardModules read off the text by hand, which the removed kept slot answered.
+    const plugin = parserPlugin({ ...(parser ? {} : { treeSitter: undefined }), syntax: { interfaces: "facts.ts#FACTS" } }, { "facts.ts": HAND });
+    assert.deepEqual(readManifest("zz", plugin.dir, "coherence.config.json").problems, [], "the manifest names a slot that remains");
+    registerProjectPlugins(root, [plugin]);
+    forProject(root, () => {
+      assert.throws(() => syntaxOf("zz", "interfaces"), (error: Error) => error.message.startsWith("plugin zz's interfaces table answers importLists and wildcardModules, which this Coherence does not read (pluginApi 4)"), parser ? "beside a parser" : "without one");
+      assert.equal(parsedOf("zz", "interfaces") === undefined, !parser, "the readings are the parser's, and none without one");
+    });
+    // plugin check's one answer each duty loads every slot the plugin fills, and meets the same refusal.
+    assert.throws(() => repeatedAnswers(plugin), /plugin zz's interfaces table answers importLists and wildcardModules/);
+  }
+  // Each reading pluginApi 3's tables answered, alone, is refused by its name.
+  for (const reader of ["isTypeDeclaration", "isDefaultExport", "defaultNames", "importLists", "wildcardModules"]) {
+    const plugin = parserPlugin({ syntax: { interfaces: "facts.ts#FACTS" } }, { "facts.ts": `export const FACTS = { serverBounds: false, ${reader}: () => [] };\n` });
+    registerProjectPlugins(root, [plugin]);
+    forProject(root, () => assert.throws(() => syntaxOf("zz", "interfaces"), new RegExp(`interfaces table answers ${reader}, which`), reader));
+  }
+  // A plugin extending a language whose wrap adds a reader to the table beneath is refused too.
+  const extending = parserPlugin({ name: "zz-more", provides: undefined, extends: "zz", treeSitter: undefined, syntax: { interfaces: "more.ts#MORE" } }, { "more.ts": "export const MORE = (beneath) => ({ ...beneath, wildcardModules: () => [] });\n" });
+  registerProjectPlugins(root, [parserPlugin({ syntax: { interfaces: "resolve.ts#FACTS" } }), { ...extending, name: "zz-more" }]);
+  forProject(root, () => assert.throws(() => syntaxOf("zz", "interfaces"), /plugin zz-more's interfaces table answers wildcardModules/));
+  // Facts alone load, and the readings come from the parse.
+  registerProjectPlugins(root, [parserPlugin({ syntax: { interfaces: "resolve.ts#FACTS" } })]);
+  forProject(root, () => {
+    assert.deepEqual(syntaxOf("zz", "interfaces"), { serverBounds: false });
+    assert.deepEqual(parsedOf("zz", "interfaces")!.importLists("from a import b as c\n"), ["b as c"]);
+  });
   registerProjectPlugins(root, []);
 });
 
@@ -130,7 +209,7 @@ test("the parser reads Python's imports and declarations whole: across lines, in
   const topLevel = parsedOf("python", "topLevel")!;
   assert.ok(topLevel(text, "logger") && topLevel(text, "_hidden") && topLevel(text, "handler"), "a bound name is at the top level");
   assert.ok(!topLevel(text, "Fake") && !topLevel(text, "thing"), "a name inside a string or a function is not");
-  assert.deepEqual(syntaxOf("python", "interfaces")!.importLists(text), ["seal as sealed, json as j"]);
+  assert.deepEqual(parsedOf("python", "interfaces")!.importLists(text), ["seal as sealed, json as j"]);
 });
 
 test("the parser reads TypeScript's imports, declarations and default exports whole: a default beside named imports, across lines, never inside a template or a comment", () => {
@@ -179,7 +258,7 @@ test("the parser reads TypeScript's imports, declarations and default exports wh
   const topLevel = parsedOf("typescript", "topLevel")!;
   assert.ok(["GET", "POST", "auth", "handle", "show", "Page"].every((name) => topLevel(text, name)), "a destructured name and a name an export list exports are at the top level");
   assert.ok(!topLevel(text, "inner") && !topLevel(text, "Fake"), "a name inside a function or a template is not");
-  const interfaces = syntaxOf("typescript", "interfaces")!;
+  const interfaces = parsedOf("typescript", "interfaces")!;
   assert.deepEqual(interfaces.importLists(text), ["Ref as R, seal as sealed, render as show"]);
   assert.deepEqual(interfaces.defaultNames(text), ["local"], "a name exported as the default by name");
   assert.ok(interfaces.isDefaultExport("export default function Page() {") && !interfaces.isDefaultExport("export function Page() {"));
@@ -286,11 +365,10 @@ test("a project's parses are kept between processes, in the user's cache outside
       const imports = treeReaderOf(plugin, ${JSON.stringify(at)}).imports(texts[39]).map((i) => i.name + " <- " + i.specifier);
       console.log(JSON.stringify({ read, parsed, imports }));`)) as { read: number; parsed: number; imports: string[] };
   assert.deepEqual(pass(root, undefined), { read: 40, parsed: 40, imports: ["a <- m39", "b <- m39"] }, "a first process parses every text");
-  // The first texts a process meets are parsed directly, so a hook that reads a file or two never loads the kept parses (DIRECT_PARSES, 16).
-  assert.deepEqual(pass(root, 39), { read: 40, parsed: 17, imports: ["a <- m39", "b_changed <- m39"] }, "a later process parses only its first few texts and the one that changed");
-  assert.deepEqual(pass(root, 39), { read: 40, parsed: 16, imports: ["a <- m39", "b_changed <- m39"] }, "and the changed text is kept in turn");
-  assert.deepEqual(pass(other, 39), { read: 40, parsed: 16, imports: ["a <- m39", "b_changed <- m39"] }, "another project holding the same texts reads their parses");
-  assert.ok(segmentsIn(pythonStore()).length > 0, "kept in the user's cache");
+  assert.deepEqual(pass(root, 39), { read: 40, parsed: 1, imports: ["a <- m39", "b_changed <- m39"] }, "a later process parses only the text that changed");
+  assert.deepEqual(pass(root, 39), { read: 40, parsed: 0, imports: ["a <- m39", "b_changed <- m39"] }, "and the changed text is kept in turn");
+  assert.deepEqual(pass(other, 39), { read: 40, parsed: 0, imports: ["a <- m39", "b_changed <- m39"] }, "another project holding the same texts reads their parses");
+  assert.ok(keptIn(pythonStore()).length >= 41, "kept in the user's cache, a file each");
   assert.deepEqual([readdirSync(root), readdirSync(other)], [[], []], "and nothing written into either project");
 });
 
@@ -351,12 +429,12 @@ test("a warm-up holds a sample of its kept parses to a fresh parse of the same t
   const notice = (now: number): string => inProcess(`process.stdout.write(staleParsesNotice(${now}));`);
   assert.deepEqual([pass().audited, pass().stale], [0, 0], "a first warm-up has nothing kept to audit");
   assert.deepEqual(pick(pass(), ["audited", "stale"]), { audited: 8, stale: 0 }, "a later one audits a sample of what it kept, which agrees");
-  // Stale as a fingerprint that misses an input leaves it: the same segments, holding what other code read.
+  // Stale as a fingerprint that misses an input leaves it: the same files, holding what other code read.
   const store = pythonStore();
-  for (const segment of segmentsIn(store)) writeFileSync(join(store, segment), readFileSync(join(store, segment), "utf8").replaceAll('"a"', '"stale"'));
+  for (const file of keptIn(store)) writeFileSync(file, readFileSync(file, "utf8").replaceAll('"a"', '"stale"'));
   const audited = pass();
   assert.deepEqual(pick(audited, ["audited", "stale", "imports"]), { audited: 8, stale: 8, imports: ["a <- audited39", "b <- audited39"] }, "the audit finds the sample stale, and a reading after it reads a fresh parse");
-  assert.ok(segmentsIn(store).every((segment) => !readFileSync(join(store, segment), "utf8").includes('"stale"')), "the stale store is removed whole");
+  assert.ok(keptIn(store).every((file) => !readFileSync(file, "utf8").includes('"stale"')), "the stale store is removed whole");
   assert.match(notice(Date.now()), /plugin python's kept parses differed from a fresh parse of the same text on 8 of the 8/);
   assert.equal(notice(Date.now() + 8 * 86_400_000), "", "orient says it for a week");
   assert.deepEqual(pick(pass(), ["stale", "imports"]), { stale: 0, imports: ["a <- audited39", "b <- audited39"] }, "the next warm-up keeps fresh parses again");
@@ -426,7 +504,7 @@ test("a whole module the text uses names of through the name its import binds br
   }
 });
 
-test("the parse store lives outside every project and is used only where the user's cache is the user's alone: a project's own .coherence/parses, a forged store, a log, a lock and an audit among it, is never read or written, and a cache others may write keeps nothing", () => {
+test("the parse store lives outside every project and is used only where the user's cache is the user's alone: a project's own .coherence/parses, a forged store, a log, a lock and an audit among it, is never read or written, and a cache others may write, or a link to one, keeps nothing", () => {
   const texts = ["from a import (\n    b,\n)\n", "X = 1\n"];
   // A repository that commits what an older Coherence kept in the project, and things no Coherence wrote: none of it is the store's.
   const project = mkdtempSync(join(tmpdir(), "coherence-forged-"));
@@ -458,13 +536,14 @@ test("the parse store lives outside every project and is used only where the use
     console.log(JSON.stringify({ counts, imports: reader.imports(${JSON.stringify(texts[0])}).map((i) => i.name + " <- " + i.specifier), notice: staleParsesNotice() }));`, { ...process.env, XDG_CACHE_HOME: own })) as { counts: { read: number; skipped?: true }; imports: string[]; notice: string };
   assert.deepEqual(read, { counts: { read: 2, parsed: 2, audited: 0, stale: 0 }, imports: ["b <- a"], notice: "" }, "the warm-up reads every text, unheld by the planted lock, and no forged store, log or audit speaks");
   assert.deepEqual(snapshot(), before, "and nothing in the project is written");
-  // A cache folder others may write, or a link where it goes, keeps no parses: every text is parsed, and nothing is written there.
-  for (const how of ["others may write", "a link"] as const) {
+  // A cache folder others may write, or a link to one, keeps no parses: every text is parsed, and nothing is written there.
+  for (const how of ["others may write", "a link to a folder others may write"] as const) {
     const cache = mkdtempSync(join(tmpdir(), "coherence-shared-cache-"));
     fixtures.push(cache);
-    if (how === "a link") {
+    if (how === "a link to a folder others may write") {
       const elsewhere = mkdtempSync(join(tmpdir(), "coherence-elsewhere-"));
       fixtures.push(elsewhere);
+      chmodSync(elsewhere, 0o777);
       symlinkSync(elsewhere, join(cache, "coherence"));
     } else {
       mkdirSync(join(cache, "coherence"));
@@ -472,7 +551,7 @@ test("the parse store lives outside every project and is used only where the use
     }
     const shared = inProcess(`console.log(JSON.stringify(warmParses(plugin, ${JSON.stringify(project)}, ${JSON.stringify(texts)})));`, { ...process.env, XDG_CACHE_HOME: cache });
     assert.deepEqual(JSON.parse(shared), { read: 0, parsed: 0, audited: 0, stale: 0 }, `a cache folder that is ${how} keeps nothing`);
-    assert.ok(!existsSync(join(cache, "coherence", "parses")) || segmentsIn(join(cache, "coherence", "parses", fingerprint)).length === 0, `and nothing is written to a cache that is ${how}`);
+    assert.deepEqual(keptIn(join(cache, "coherence", "parses", fingerprint)), [], `and nothing is written to a cache that is ${how}`);
   }
 });
 
@@ -497,79 +576,126 @@ test("a repository's own files cannot stop a warm-up: a source file nested deep 
   execFileSync("git", ["init", "-q"], { cwd: linking });
   const warmed = execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", `import { startParsers } from ${JSON.stringify(resolve("src/plugins/syntax-trees.ts"))}; import { warmProjectParses } from ${JSON.stringify(resolve("src/economy/warm-parses.ts"))}; await startParsers(); console.log(JSON.stringify(warmProjectParses(${JSON.stringify(linking)}).map((w) => w.read)));`], { encoding: "utf8", timeout: 20_000 });
   assert.deepEqual(JSON.parse(warmed), [1], "the warm-up reads the project's own regular file alone, never one past 16 MB, and finishes");
-  assert.ok(!segmentsIn(pythonStore()).some((segment) => readFileSync(join(pythonStore(), segment), "utf8").includes("OUTSIDE_SECRET_TOKEN")), "nothing of a file outside the project is kept");
+  assert.ok(!keptIn(pythonStore()).some((file) => readFileSync(file, "utf8").includes("OUTSIDE_SECRET_TOKEN")), "nothing of a file outside the project is kept");
 });
 
-test("the parse store's path is made in this module alone, under the user's cache: neither parsesFolder nor StoreFolder is exported, parsesFolder builds on userCacheDir, and the module names no project folder of Coherence's", () => {
-  const source = readFileSync(resolve("src/plugins/syntax-trees.ts"), "utf8");
-  assert.ok(!/export\s+(function\s+parsesFolder|class\s+StoreFolder)\b/.test(source), "neither the gateway nor the function that makes its path leaves the module");
-  const body = /function parsesFolder\(\)[^{]*\{([\s\S]*?)\n\}/.exec(source)?.[1] ?? "";
-  assert.match(body, /userCacheDir\(\)/, "the store's folder is under the user's cache");
-  assert.doesNotMatch(source.replace(/^\s*(\/\/|\*|\/\*\*).*$/gm, ""), /["'`][^"'`]*\.coherence/, "the module's code spells no .coherence path, so it cannot name a project's folder");
+test("a kept parse is read only where it is the user's alone: a store folder, or a kept parse's folder, that others may write, a folder on the way to the cache others may write, a kept parse that is a link, and one that others may write, each answers nothing, and the text is parsed", () => {
+  const text = "from payments import charge\n";
+  const fingerprint = fingerprintOf(PYTHON, PY_PLUGIN.manifest.treeSitter!);
+  const forged = JSON.stringify([[["import.from", "forged", 1], ["import.name", "made_up", 1]]]);
+  // A fresh cache, a forged parse planted where the text's would be, and one thing on its path made what the case says; then a reading.
+  const reading = (arrange: (cache: string, store: string, file: string) => void, under?: string): string[] => {
+    const cache = join(under ?? mkdtempSync(join(tmpdir(), "coherence-own-")), "cache");
+    if (under === undefined) fixtures.push(dirname(cache));
+    const store = join(cache, "coherence", "parses", fingerprint);
+    const file = keptFile(store, text);
+    mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+    writeFileSync(file, forged, { mode: 0o600 });
+    arrange(cache, store, file);
+    return JSON.parse(inProcess(`console.log(JSON.stringify(treeReaderOf(plugin, "/p").imports(${JSON.stringify(text)}).map((i) => i.name + " <- " + i.specifier)));`, { ...process.env, XDG_CACHE_HOME: cache })) as string[];
+  };
+  assert.deepEqual(reading(() => {}), ["made_up <- forged"], "a kept parse in a store of the user's alone is read, so the cases below each test one thing");
+  assert.deepEqual(reading((_c, store) => chmodSync(store, 0o770)), ["charge <- payments"], "a store folder others may write");
+  assert.deepEqual(reading((_c, _s, file) => chmodSync(dirname(file), 0o770)), ["charge <- payments"], "a kept parse's folder others may write");
+  assert.deepEqual(reading((_c, _s, file) => chmodSync(file, 0o666)), ["charge <- payments"], "a kept parse others may write");
+  assert.deepEqual(reading((_c, _s, file) => {
+    const elsewhere = mkdtempSync(join(tmpdir(), "coherence-elsewhere-"));
+    fixtures.push(elsewhere);
+    writeFileSync(join(elsewhere, "parse"), forged);
+    rmSync(file);
+    symlinkSync(join(elsewhere, "parse"), file);
+  }), ["charge <- payments"], "a kept parse that is a link");
+  // A folder on the way to the cache that others may write, not sticky: another user could move the cache away under it.
+  const shared = mkdtempSync(join(tmpdir(), "coherence-shared-"));
+  fixtures.push(shared);
+  assert.deepEqual(reading((cache) => chmodSync(dirname(cache), 0o777), shared), ["charge <- payments"], "a folder on the way others may write");
 });
 
-test("a process that lives long reads the segments other processes wrote since, at most once a second, and reads the store again when a segment it read is gone; a process that parses and exits writes what it parsed without reading the store", async () => {
-  const project = mkdtempSync(join(tmpdir(), "coherence-reload-"));
+test("syntax-trees.ts gives out no way to the store: its exports are the readings, the warm-up, the fingerprint and the notice, never the store, its folder or a path", async () => {
+  const exported = Object.keys(await import("./syntax-trees.ts")).sort();
+  assert.deepEqual(exported, ["CAPTURES", "IMPORT_SHAPES", "KEPT_FROM", "capturesStatements", "fingerprintOf", "importShapes", "keptParseOf", "staleParsesNotice", "startParsers", "treeReaderOf", "warmParses"]);
+});
+
+test("a reading holds no kept parse past its last few texts and reads each from its own file: one another process keeps is read at once, one another removes answers no more, and each parse is kept as it is made", () => {
+  const project = mkdtempSync(join(tmpdir(), "coherence-loose-"));
   fixtures.push(project);
-  const texts = Array.from({ length: 40 }, (_, i) => `from lived${i} import a\n`);
-  // A store another process wrote first, so this one has segments to read, whatever ran before it.
-  inProcess(`console.log(JSON.stringify(warmParses(plugin, ${JSON.stringify(project)}, ${JSON.stringify(texts)})));`);
-  const reader = treeReaderOf(PY_PLUGIN, project)! as unknown as { imports(text: string): { name: string }[]; store: { loads: number } };
-  for (const text of texts) reader.imports(text);
-  const loaded = reader.store.loads;
-  assert.ok(loaded >= 1, "the store is read");
-  // Another process parses texts this one never met, and writes them as a segment of its own.
-  inProcess(`console.log(JSON.stringify(warmParses(plugin, ${JSON.stringify(project)}, Array.from({ length: 40 }, (_, i) => "from n" + i + " import c\\n"))));`);
-  await new Promise((done) => setTimeout(done, 1_200));
-  for (let i = 0; i < 5; i++) reader.imports(`import p${i}\n`);
-  assert.equal(reader.store.loads, loaded + 1, "the segment another process wrote is read once it is there");
-  const before = (reader.store as unknown as { parsed: number }).parsed;
-  assert.deepEqual(reader.imports("from n39 import c\n").map((i) => i.name), ["c"]);
-  assert.equal((reader.store as unknown as { parsed: number }).parsed, before, "and the other process's parse answers, unparsed here");
-  // Another process removes the store whole, as a warm-up that finds it stale does: this one reads again and answers from no segment gone.
+  const texts = Array.from({ length: 40 }, (_, i) => `from loose${i} import c\n`);
+  const reader = treeReaderOf(PY_PLUGIN, project)! as unknown as { imports(text: string): { name: string }[]; store: { parsed: number } };
+  // Another process keeps the texts; this one reads them at once, parsing none.
+  inProcess(`warmParses(plugin, ${JSON.stringify(project)}, ${JSON.stringify(texts)});`);
+  const before = reader.store.parsed;
+  for (const text of texts) assert.deepEqual(reader.imports(text).map((i) => i.name), ["c"]);
+  assert.equal(reader.store.parsed, before, "what another process kept is read at once, nothing parsed here");
+  // Another process finds the store stale and removes it: a text this one read before is parsed again, never answered from what was removed.
   const store = pythonStore();
-  for (const segment of segmentsIn(store)) writeFileSync(join(store, segment), readFileSync(join(store, segment), "utf8").replaceAll('"c"', '"stale"'));
-  inProcess(`console.log(JSON.stringify(warmParses(plugin, ${JSON.stringify(project)}, Array.from({ length: 40 }, (_, i) => "from n" + i + " import c\\n"))));`);
-  await new Promise((done) => setTimeout(done, 1_200));
-  for (let i = 0; i < 5; i++) reader.imports(`import q${i}\n`);
-  assert.deepEqual(reader.imports("from n38 import c\n").map((i) => i.name), ["c"], "a segment another process removed answers no more");
-  // A process that parses a few texts and exits writes them, and never reads the store to do so.
-  const brief = inProcess(`const reader = treeReaderOf(plugin, ${JSON.stringify(project)});
-    for (let i = 0; i < 3; i++) reader.imports("import r" + i + "\\n");
-    const written = reader.store.parsed;
-    reader.store.flush();
-    console.log(JSON.stringify({ loads: reader.store.loads, written }));`);
-  assert.deepEqual(JSON.parse(brief), { loads: 0, written: 3 }, "a short process writes without reading the store");
+  for (const file of keptIn(store)) writeFileSync(file, readFileSync(file, "utf8").replaceAll('"c"', '"stale"'));
+  const audit = JSON.parse(inProcess(`console.log(JSON.stringify(warmParses(plugin, ${JSON.stringify(project)}, ${JSON.stringify(texts)})));`)) as { stale: number };
+  assert.ok(audit.stale > 0, "the other process's audit finds the store stale");
+  assert.deepEqual(reader.imports(texts[0]!).map((i) => i.name), ["c"], "a parse another process removed answers no more");
+  assert.equal(reader.store.parsed, before + 1, "and the text is parsed again");
+  // A process that parses three texts and exits has kept each, with no step at its exit.
+  const brief = ["import brief_one\n", "import brief_two\n", "import brief_three\n"];
+  inProcess(`const reader = treeReaderOf(plugin, ${JSON.stringify(project)}); for (const text of ${JSON.stringify(brief)}) reader.imports(text); process.exit(0);`);
+  assert.ok(brief.every((text) => existsSync(keptFile(store, text))), "each parse is kept as it is made");
 });
 
-test("a warm-up merges a store of many segments into one, keeping what it read and what any pass wrote in the last fourteen days, and another warm-up of the same project skips while one runs", () => {
-  const project = mkdtempSync(join(tmpdir(), "coherence-merge-"));
-  fixtures.push(project);
-  const store = pythonStore();
-  // Ten processes, each parsing texts of its own: ten segments.
-  for (let n = 0; n < 10; n++) inProcess(`const reader = treeReaderOf(plugin, ${JSON.stringify(project)}); for (let i = 0; i < 20; i++) reader.imports("from s${n}x" + i + " import a\\n"); reader.store.flush();`);
-  const many = segmentsIn(store);
-  assert.ok(many.length >= 10, `segments: ${many.length}`);
-  // One written long ago, holding texts no pass reads again (none of s9's, which the warm-up below reads).
-  const old = join(store, many.find((segment) => readFileSync(join(store, segment), "utf8").includes('"s0x0"'))!);
-  const longAgo = new Date(Date.now() - 30 * 86_400_000);
-  utimesSync(old, longAgo, longAgo);
-  const oldKeys = Object.keys(JSON.parse(readFileSync(old, "utf8")) as object);
-  const counts = JSON.parse(inProcess(`console.log(JSON.stringify(warmParses(plugin, ${JSON.stringify(project)}, Array.from({ length: 20 }, (_, i) => "from s9x" + i + " import a\\n"))));`)) as { read: number };
-  assert.equal(counts.read, 20);
-  const after = segmentsIn(store);
-  assert.equal(after.length, 1, "merged into one");
-  const merged = JSON.parse(readFileSync(join(store, after[0]!), "utf8")) as Record<string, unknown>;
-  assert.ok(oldKeys.every((key) => !(key in merged)), "a segment no pass has read in fourteen days ages out");
-  assert.ok(Object.keys(merged).length >= 8 * 20, "and every recent one is kept");
-  // A warm-up of the same project, while one runs (its lock live), skips; one of another project does not.
-  const lock = join(store, `warming-${createHash("sha256").update(resolve(project)).digest("hex").slice(0, 16)}.lock`);
-  writeFileSync(lock, `${process.pid} ${Date.now()}`);
-  assert.deepEqual(warmParses(PY_PLUGIN, project, ["X = 1\n"]), { read: 0, parsed: 0, audited: 0, stale: 0, skipped: true }, "the same project's warm-up skips");
-  const another = mkdtempSync(join(tmpdir(), "coherence-merge-other-"));
-  fixtures.push(another);
-  assert.equal(warmParses(PY_PLUGIN, another, ["X = 1\n"]).read, 1, "another project's does not");
-  rmSync(lock);
+test("a kept parse no process has read in fourteen days is swept by a warm-up, at most once a day, with the temporary files of writes that died, a store a discard left and another fingerprint's folder; one read since is kept", () => {
+  const cache = mkdtempSync(join(tmpdir(), "coherence-sweep-"));
+  fixtures.push(cache);
+  const env = { ...process.env, XDG_CACHE_HOME: cache };
+  const parses = join(cache, "coherence", "parses");
+  const store = join(parses, fingerprintOf(PYTHON, PY_PLUGIN.manifest.treeSitter!));
+  const unread = Array.from({ length: 5 }, (_, i) => `from unread${i} import a\n`);
+  const reread = Array.from({ length: 5 }, (_, i) => `from reread${i} import a\n`);
+  inProcess(`warmParses(plugin, "/p", ${JSON.stringify([...unread, ...reread])});`, env);
+  const age = (path: string, ms: number): void => utimesSync(path, new Date(Date.now() - ms), new Date(Date.now() - ms));
+  for (const file of keptIn(store)) age(file, 30 * 86_400_000);
+  // A reading, not a warm-up, reads the second five again: each is stamped as read.
+  inProcess(`const reader = treeReaderOf(plugin, "/p"); for (const text of ${JSON.stringify(reread)}) reader.imports(text);`, env);
+  // What writes that died, a discard and an older Coherence leave.
+  const shard = dirname(keptFile(store, unread[0]!));
+  writeFileSync(join(shard, "0".repeat(30) + ".1.aaaaaaaaaaaa.tmp"), "");
+  age(join(shard, "0".repeat(30) + ".1.aaaaaaaaaaaa.tmp"), 2 * 3_600_000);
+  writeFileSync(join(shard, "1".repeat(30) + ".2.bbbbbbbbbbbb.tmp"), "");
+  const other = join(parses, "f".repeat(24), "ab");
+  mkdirSync(other, { recursive: true });
+  writeFileSync(join(other, "c".repeat(30)), "[]");
+  age(join(other, "c".repeat(30)), 20 * 86_400_000);
+  const discarded = join(parses, `${"e".repeat(24)}.stale-${"0".repeat(16)}`);
+  mkdirSync(discarded);
+  age(join(parses, "swept"), 2 * 86_400_000);
+  inProcess(`warmParses(plugin, "/p", ["from fresh import a\\n"]);`, env);
+  assert.ok(unread.every((text) => !existsSync(keptFile(store, text))), "a kept parse no process read in fourteen days is swept");
+  assert.ok([...reread, "from fresh import a\n"].every((text) => existsSync(keptFile(store, text))), "one read since is kept, and the warm-up's own");
+  assert.deepEqual(readdirSync(shard).filter((name) => name.endsWith(".tmp")), ["1".repeat(30) + ".2.bbbbbbbbbbbb.tmp"], "a write's temporary file is swept an hour on, never sooner");
+  assert.ok(!existsSync(join(parses, "f".repeat(24))) && !existsSync(discarded), "another fingerprint's folder empties and goes, and a discarded store goes");
+  // Swept within the day: nothing more is swept, however old.
+  for (const file of keptIn(store)) age(file, 30 * 86_400_000);
+  inProcess(`warmParses(plugin, "/p", []);`, env);
+  assert.ok(reread.every((text) => existsSync(keptFile(store, text))), "a warm-up within a day of a sweep sweeps nothing");
+});
+
+test("two warm-ups of one project at once both read every text, need no lock, and keep each text's parse once, whole and as a fresh parse reads it", async () => {
+  const cache = mkdtempSync(join(tmpdir(), "coherence-together-"));
+  fixtures.push(cache);
+  const env = { ...process.env, XDG_CACHE_HOME: cache };
+  const texts = Array.from({ length: 300 }, (_, i) => `from together${i} import (\n    a${i},\n    b,\n)\n`);
+  const probe = `import { startParsers, warmParses } from ${JSON.stringify(resolve("src/plugins/syntax-trees.ts"))};
+    await startParsers();
+    console.log(JSON.stringify(warmParses(${JSON.stringify(PY_PLUGIN)}, "/together", ${JSON.stringify(texts)})));`;
+  const warm = (): Promise<{ read: number }> =>
+    new Promise((done, fail) => {
+      const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", probe], { env, stdio: ["ignore", "pipe", "inherit"] });
+      let out = "";
+      child.stdout.on("data", (chunk: Buffer) => (out += chunk.toString()));
+      child.on("exit", (code) => (code === 0 ? done(JSON.parse(out) as { read: number }) : fail(new Error(`warm-up exited ${code}`))));
+    });
+  const both = await Promise.all([warm(), warm()]);
+  assert.deepEqual(both.map((w) => w.read), [300, 300], "each reads every text");
+  const store = join(cache, "coherence", "parses", fingerprintOf(PYTHON, PY_PLUGIN.manifest.treeSitter!));
+  assert.equal(keptIn(store).length, 300, "one kept parse a text");
+  for (const text of texts) assert.equal(readFileSync(keptFile(store, text), "utf8"), keptParseOf(PY_PLUGIN, text), "each whole, as a fresh parse reads it");
+  assert.deepEqual(readdirSync(store, { recursive: true }).filter((name) => String(name).endsWith(".tmp")), [], "and no temporary file is left");
 });
 
 test("a registry's leaves and its top share the user's one parse store: a warm-up of one leaf pre-reads the leaf and the top's files, and a warm-up of another reads what the first kept", () => {
@@ -590,143 +716,9 @@ test("a registry's leaves and its top share the user's one parse store: a warm-u
   execFileSync("git", ["init", "-q"], { cwd: top });
   const first = warmProjectParses(join(top, "a"));
   assert.deepEqual(first.map((w) => [w.root, w.read]), [[join(top, "a"), 1], [top, 3]], "the leaf, then the repository's top");
-  const kept = (): string => segmentsIn(pythonStore()).map((segment) => readFileSync(join(pythonStore(), segment), "utf8")).join("");
+  const kept = (): string => keptIn(pythonStore()).map((file) => readFileSync(file, "utf8")).join("");
   assert.ok(["ONE", "TWO", "THREE"].every((name) => kept().includes(`"${name}"`)), "a's warm-up keeps the leaf's file and every file of the top, b's among them");
   const second = warmProjectParses(join(top, "b"));
   assert.deepEqual(second.map((w) => [w.root, w.read]), [[join(top, "b"), 1], [top, 3]], "b's warm-up reads its leaf and the top from the same store");
   assert.ok(![top, join(top, "a"), join(top, "b")].some((dir) => existsSync(join(dir, ".coherence", "parses"))), "no project keeps a store of its own");
-});
-
-/** Every source file the core runs, under src: tests, end-to-end tests and fixtures aside. */
-function coreSources(dir: string, into: string[] = []): string[] {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name !== "fixtures" && entry.name !== "fonts") coreSources(path, into);
-    } else if (entry.name.endsWith(".ts") && !/\.(test|e2e)\.ts$/.test(entry.name) && !/fixture/.test(entry.name)) into.push(path);
-  }
-  return into;
-}
-
-/** The functions that load a plugin's syntax slot or ask for one by name: a hand-written reader's name handed to any of them reads one. */
-const SLOT_ASKERS = ["syntaxOf", "slotExport", "fills", "fillsSlot", "exportAt"];
-
-/**
- * Where a module's code reads a hand-written reader slot (DERIVED_SLOTS), as
- * the TypeScript plugin's own parser reads it: a slot's name read off a
- * manifest's syntax, by property or by a string index; a slot's name, or
- * "syntax.<slot>", handed to a function that loads or asks for a slot; and a
- * manifest's syntax indexed by a name that is not a parameter its function
- * types as a SyntaxSlot, whose members the test below holds to name none.
- */
-function handReaderReads(parsers: readonly Parser[], file: string, text: string): string[] {
-  // The TypeScript plugin's two grammars, as it reads a file: the first whose tree holds no error.
-  let tree = parsers[0]!.parse(text)!;
-  for (const parser of parsers.slice(1)) {
-    if (!tree.rootNode.hasError) break;
-    tree.delete();
-    tree = parser.parse(text)!;
-  }
-  try {
-    const found: string[] = [];
-    const at = (node: Node, what: string): void => void found.push(`${file}:${node.startPosition.row + 1}: ${what}`);
-    // An error the grammar recovers from may hide a read inside it: one within a line (the grammar's own slip over a \u0000 escape
-    // before a template's substitution, in two modules) hides nothing a line could not show, and one that spans lines is a finding.
-    const errors: Node[] = [];
-    const errs = (node: Node): void => {
-      if (node.isError || node.isMissing) errors.push(node);
-      else if (node.hasError) for (const child of node.children) errs(child!);
-    };
-    errs(tree.rootNode);
-    for (const error of errors) if (error.endPosition.row !== error.startPosition.row || /\b(source|declares|topLevel|kept)\b/.test(error.text)) at(error, `does not parse whole there (${JSON.stringify(error.text.slice(0, 60))}), so the scan cannot see a read in it`);
-    const slot = (name: string): boolean => (DERIVED_SLOTS as readonly string[]).includes(name);
-    const unquoted = (node: Node): string | undefined => (node.type === "string" ? node.text.slice(1, -1) : node.type === "template_string" && node.namedChildren.every((c) => c!.type === "string_fragment") ? node.text.slice(1, -1) : undefined);
-    // An object that is a manifest's syntax map, however it is reached: manifest.syntax, manifest.syntax?, raw["syntax"], a name syntax, a cast of any.
-    const syntaxMap = (node: Node): boolean => /\bsyntax\b/.test(node.text);
-    for (const member of tree.rootNode.descendantsOfType("member_expression")) {
-      const property = member!.childForFieldName("property")?.text ?? "";
-      if (slot(property) && syntaxMap(member!.childForFieldName("object")!)) at(member!, `reads syntax.${property}`);
-    }
-    for (const subscript of tree.rootNode.descendantsOfType("subscript_expression")) {
-      const object = subscript!.childForFieldName("object")!;
-      if (!syntaxMap(object)) continue;
-      const index = subscript!.childForFieldName("index")!;
-      const named = unquoted(index);
-      if (named !== undefined) {
-        if (slot(named)) at(subscript!, `reads syntax.${named}`);
-        continue;
-      }
-      // A name: a parameter of the function around it, typed as a slot only the slot types allow (SyntaxSlot, or a type parameter extending it).
-      let fn: Node | null = subscript!;
-      while (fn !== null && fn.type !== "function_declaration" && fn.type !== "method_definition") fn = fn.parent;
-      const parameter = fn?.childForFieldName("parameters")?.namedChildren.find((p) => p!.childForFieldName("pattern")?.text === index.text);
-      const type = parameter?.childForFieldName("type")?.text.replace(/^:\s*/, "");
-      const constraint = fn?.childForFieldName("type_parameters")?.namedChildren.find((p) => p!.childForFieldName("name")?.text === type)?.childForFieldName("constraint")?.text.replace(/^extends\s+/, "");
-      if (type !== "SyntaxSlot" && constraint !== "SyntaxSlot") at(subscript!, `indexes a manifest's syntax by ${index.text}, which is no parameter typed SyntaxSlot`);
-    }
-    for (const call of tree.rootNode.descendantsOfType("call_expression")) {
-      // Called by name, through a member, or through a cast of it: (syntaxOf as (l: string, s: string) => unknown)(language, "kept").
-      const callee = SLOT_ASKERS.find((name) => new RegExp(`\\b${name}\\b`).test(call!.childForFieldName("function")!.text));
-      if (callee === undefined) continue;
-      for (const argument of call!.childForFieldName("arguments")?.descendantsOfType(["string", "template_string"]) ?? []) {
-        const named = unquoted(argument!)?.replace(/^syntax\./, "");
-        if (named !== undefined && slot(named)) at(call!, `asks ${callee} for ${named}`);
-      }
-    }
-    return found;
-  } finally {
-    tree.delete();
-  }
-}
-
-test("no core code reads a hand-written source, declares, topLevel or kept slot: the slot types name none of them, and no module reads one off a manifest's syntax, asks for one by name, or indexes a manifest's syntax by any name but a SyntaxSlot", () => {
-  const [parser, tsx] = ["tree-sitter-typescript.wasm", "tree-sitter-tsx.wasm"].map((wasm) => {
-    const each = new Parser();
-    each.setLanguage(Language.loadSync(new WebAssembly.Module(readFileSync(join(BUNDLED_DIR, "typescript", wasm)))));
-    return each;
-  }) as [Parser, Parser];
-  try {
-    // The types a slot is named by: SYNTAX_SLOTS and SyntaxTables name none of the four, SyntaxSlot is SYNTAX_SLOTS's members, and a manifest's syntax is keyed by it, so the typecheck refuses a slot read by any of their names.
-    assert.deepEqual([...DERIVED_SLOTS].sort(), ["declares", "kept", "source", "topLevel"], "the slots a plugin no longer fills, which the registry refuses by");
-    const pluginTs = parser.parse(readFileSync(resolve("src/plugins/plugin.ts"), "utf8"))!;
-    try {
-      assert.equal(pluginTs.rootNode.hasError, false, "plugin.ts parses whole");
-      const declared = (type: string, name: string): Node | undefined => pluginTs.rootNode.descendantsOfType(type).find((n) => n!.childForFieldName("name")?.text === name) ?? undefined;
-      const listed = declared("variable_declarator", "SYNTAX_SLOTS")!.descendantsOfType("string").map((s) => s!.text.slice(1, -1));
-      assert.ok(listed.length > 0, "SYNTAX_SLOTS lists the slots a plugin fills");
-      assert.deepEqual(listed.filter((s) => (DERIVED_SLOTS as readonly string[]).includes(s)), [], "SYNTAX_SLOTS names no hand-written reader");
-      const tables = declared("interface_declaration", "SyntaxTables")!.descendantsOfType("property_signature").map((p) => p!.childForFieldName("name")!.text);
-      assert.deepEqual(tables.filter((s) => (DERIVED_SLOTS as readonly string[]).includes(s)), [], "SyntaxTables types no hand-written reader");
-      assert.equal(declared("type_alias_declaration", "SyntaxSlot")!.childForFieldName("value")!.text, "(typeof SYNTAX_SLOTS)[number]", "a slot is one SYNTAX_SLOTS lists");
-      const manifestSyntax = declared("interface_declaration", "PluginManifest")!.descendantsOfType("property_signature").find((p) => p!.childForFieldName("name")!.text === "syntax")!;
-      assert.equal(manifestSyntax.childForFieldName("type")!.text, ": Partial<Record<SyntaxSlot, string>>", "a manifest's syntax is keyed by SyntaxSlot");
-    } finally {
-      pluginTs.delete();
-    }
-
-    const sources = coreSources(resolve("src"));
-    assert.ok(sources.some((f) => f.endsWith(join("plugins", "languages.ts"))) && sources.some((f) => f.endsWith(join("plugins", "registry.ts"))), "the scan reads the modules that load slots");
-    const found = sources.flatMap((file) => handReaderReads([parser, tsx], file.slice(resolve("src").length + 1), readFileSync(file, "utf8")));
-    assert.deepEqual(found, [], "a language's text is read through its parser (languages.ts parsedOf), never a slot a plugin fills");
-
-    // The scan sees each shape it refuses, and passes the shapes the core reads a slot by.
-    const shapes = handReaderReads(
-      [parser],
-      "x.ts",
-      [
-        "const a = plugin.manifest.syntax?.source;",
-        "const b = (plugin.manifest.syntax as Record<string, string>)[\"kept\"];",
-        "const c = syntaxOf(language, \"topLevel\" as SyntaxSlot);",
-        "const d = exportAt(plugin, at, `syntax.declares`);",
-        "const h = (syntaxOf as (language: string, slot: string) => unknown)(language, \"kept\");",
-        "function e(plugin: LoadedPlugin, name: string): unknown { return plugin.manifest.syntax?.[name]; }",
-        "function f<S extends SyntaxSlot>(plugin: LoadedPlugin, slot: S): unknown { return plugin.manifest.syntax?.[slot]; }",
-        "function g(plugin: LoadedPlugin, slot: SyntaxSlot): unknown { return slotExport(plugin, slot) ?? plugin.manifest.syntax?.entrances; }",
-      ].join("\n"),
-    );
-    assert.deepEqual(shapes.sort(), ["x.ts:1: reads syntax.source", "x.ts:2: reads syntax.kept", "x.ts:3: asks syntaxOf for topLevel", "x.ts:4: asks exportAt for declares", "x.ts:5: asks syntaxOf for kept", "x.ts:6: indexes a manifest's syntax by name, which is no parameter typed SyntaxSlot"], shapes.join("\n"));
-  } finally {
-    parser.delete();
-    tsx.delete();
-  }
 });

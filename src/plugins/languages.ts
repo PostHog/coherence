@@ -26,10 +26,10 @@ import { join, resolve } from "node:path";
 import type { AdapterBounds, LanguageAdapter, Ladder } from "../adapters/adapter.ts";
 import type { DeclaredLanguage } from "../adapters/declared-config.ts";
 import type { BoundarySource } from "../scaffold/boundaries.ts";
-import type { CiStep, EntranceRule, LoadedPlugin, MarkedFolder, ModuleResolution, PluginManifest, PluginModule, SyntaxSlot, SyntaxTables } from "./plugin.ts";
+import { INTERFACE_FACTS, type CiStep, type EntranceRule, type LoadedPlugin, type MarkedFolder, type ModuleResolution, type PluginManifest, type PluginModule, type SyntaxSlot, type SyntaxTables } from "./plugin.ts";
 import type { InterfaceSymbol } from "../observation/interfaces.ts";
 import type { SourceSyntax } from "../economy/source.ts";
-import type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
+import type { InterfaceReadings } from "../readings/scope/component-interfaces.ts";
 import { treeReaderOf, type TreeDeclaration, type TreeReader } from "./syntax-trees.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest, throughThisCore } from "./registry.ts";
 import { setLanguageData } from "../readings/scope/language-data.ts";
@@ -378,10 +378,6 @@ export function moduleFolderOf(file: string): string | undefined {
 }
 
 /** Whether any plugin answering for the language fills the slot, read from the manifests alone: the swap, the provider, or a plugin that extends it. */
-export function fillsSlot(language: string, slot: SyntaxSlot): boolean {
-  const filled = (p: LoadedPlugin | undefined): boolean => fills(p, slot);
-  return filled(swapsNow().get(language)) || filled(baseProvider(language)) || extendersOf(language).some(filled);
-}
 
 /** How the language's exported type bodies read, for the lexicon's member scan; undefined when its plugin says nothing. */
 export function memberScanOf(language: string): { opens: RegExp; closes: RegExp; field: RegExp } | undefined {
@@ -435,13 +431,15 @@ const slots = new Map<string, unknown>();
  * One syntax slot of a language, loaded from the module its plugin's
  * manifest names, synchronously and once; undefined when the plugin leaves
  * the slot empty, which a reading reads as "not read for <language>". No
- * slot reads the language's text: that is parsedOf's, through its parser.
+ * slot answers a reading of the language's declarations, imports or exports:
+ * those are parsedOf's, through its parser, and an interfaces table that
+ * answers one is refused (statedFacts).
  */
 export function syntaxOf<S extends SyntaxSlot>(language: string, slot: S): SyntaxTables[S] | undefined {
   // The swap's slot when it fills it, else the bundled provider's: a plugin that replaces only the adapter keeps the readings.
   const swap = swapsNow().get(language);
   const plugin = fills(swap, slot) ? swap : baseProvider(language);
-  const provided = plugin === undefined ? undefined : ((slot === "interfaces" && plugin.manifest.treeSitter !== undefined ? treeSlot(plugin, "interfaces") : slotExport(plugin, slot)) as SyntaxTables[S] | undefined);
+  const provided = plugin === undefined ? undefined : (slotExport(plugin, slot) as SyntaxTables[S] | undefined);
   const extenders = extendersOf(language).filter((p) => p.manifest.syntax?.[slot] !== undefined);
   if (extenders.length === 0) return provided;
   // Each extending plugin's export for the slot wraps the one beneath it, in the config's order, as its adapter wraps the adapter.
@@ -449,17 +447,18 @@ export function syntaxOf<S extends SyntaxSlot>(language: string, slot: S): Synta
     extenders.reduce<SyntaxTables[S] | undefined>((beneath, extender) => {
       const wrap = slotExport(extender, slot);
       if (typeof wrap !== "function") throw new Error(`plugin ${extender.name} extends ${language}, so its syntax.${slot} names a function of the table beneath it, not a table`);
-      return (wrap as (beneath: SyntaxTables[S] | undefined) => SyntaxTables[S])(beneath);
+      const wrapped = (wrap as (beneath: SyntaxTables[S] | undefined) => SyntaxTables[S])(beneath);
+      return slot === "interfaces" ? (statedFacts(extender, wrapped) as SyntaxTables[S]) : wrapped;
     }, provided),
   );
 }
 
-/** Whether a plugin fills a slot: its manifest names an export for it, or, for the interfaces slot, names a parser the core reads its import answers from. */
+/** Whether a plugin fills a slot: its manifest names an export for it. */
 function fills(plugin: LoadedPlugin | undefined, slot: SyntaxSlot): boolean {
-  return plugin !== undefined && (plugin.manifest.syntax?.[slot] !== undefined || (slot === "interfaces" && plugin.manifest.treeSitter !== undefined));
+  return plugin?.manifest.syntax?.[slot] !== undefined;
 }
 
-/** What the core reads of a language's text, each derived from one parse through the parser its plugin names (parsedOf), never filled by a plugin. */
+/** What the core reads of a language's declarations, imports and exports, each derived from one parse through the parser its plugin names (parsedOf), never filled by a plugin. */
 export interface ParsedReadings {
   /** The economy's and mass's scan: the names a line declares, the imports a text holds, and where an import leads (the plugin's treeSitter.resolve). */
   source: SourceSyntax;
@@ -467,6 +466,8 @@ export interface ParsedReadings {
   declares: (line: string) => InterfaceSymbol["declares"];
   /** Whether a file's text declares a name at its top level, for the spec model's check that a handler, guard or mirror exists. */
   topLevel: (text: string, name: string) => boolean;
+  /** The component interface reading's and the kept answers' reading of a file: its type declarations, default exports, import lists and wildcard imports. */
+  interfaces: InterfaceReadings;
 }
 export type ParsedReading = keyof ParsedReadings;
 
@@ -474,18 +475,43 @@ export type ParsedReading = keyof ParsedReadings;
  * A reading of a language's text, derived from one parse through the parser
  * its source provider names (syntax-trees.ts); undefined for a language whose
  * plugin names none, which the readings say is not read. The one way the
- * core reads a language's text: no plugin slot answers it (DERIVED_SLOTS).
+ * core reads a language's declarations, imports and exports: no plugin slot
+ * answers one (DERIVED_SLOTS, INTERFACE_FACTS). The entrances and lists slots
+ * still read a file's text, for what no parse here derives.
  */
 export function parsedOf<R extends ParsedReading>(language: string, reading: R): ParsedReadings[R] | undefined {
   const plugin = sourceProvider(language);
   return plugin?.manifest.treeSitter === undefined ? undefined : (treeSlot(plugin, reading) as ParsedReadings[R]);
 }
 
-/** The export a plugin's manifest names for a slot, loaded synchronously and once; undefined when it leaves the slot empty. */
+/** The export a plugin's manifest names for a slot, loaded synchronously and once; undefined when it leaves the slot empty. An interfaces table is held to its facts (statedFacts); an extending plugin's, a function of the table beneath, is held where it is called. */
 function slotExport(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
   const at = plugin.manifest.syntax?.[slot];
   if (at === undefined) return undefined;
-  return exportAt(plugin, at, `syntax.${slot}`);
+  const value = exportAt(plugin, at, `syntax.${slot}`);
+  return slot === "interfaces" && typeof value !== "function" ? statedFacts(plugin, value) : value;
+}
+
+/**
+ * An interfaces table, refused by name when it answers anything but its
+ * language's facts (INTERFACE_FACTS): a member that reads the language's
+ * text (importLists, wildcardModules, isTypeDeclaration, isDefaultExport,
+ * defaultNames, as pluginApi 3's tables did) would be a second reader of what
+ * the parse reads, whether or not the plugin names a parser. The core reads
+ * those through parsedOf alone, so such a member could never be read; it is
+ * refused rather than ignored, so a plugin's author learns it went unread.
+ */
+function statedFacts(plugin: LoadedPlugin, table: unknown): unknown {
+  if (table === undefined || table === null || typeof table !== "object") return table;
+  const readers = Object.keys(table).filter((member) => !(INTERFACE_FACTS as readonly string[]).includes(member));
+  if (readers.length > 0) throw new Error(interfaceReadersRefused(plugin.name, readers));
+  return table;
+}
+
+/** The refusal of an interfaces table's readers, naming each and what to do. */
+export function interfaceReadersRefused(plugin: string, readers: readonly string[]): string {
+  const named = readers.length === 1 ? readers[0]! : `${readers.slice(0, -1).join(", ")} and ${readers[readers.length - 1]!}`;
+  return `plugin ${plugin}'s interfaces table answers ${named}, which this Coherence does not read (pluginApi 4): the table states only ${INTERFACE_FACTS.join(", ")}, and a language's type declarations, default exports, import lists and wildcard imports are read through its treeSitter parser alone (docs/plugins.md, Reading through a parser); remove ${readers.length === 1 ? "it" : "them"}, or, for a copy ejected from an older Coherence, eject it again from this one (coherence plugin eject <name>) and reapply your changes`;
 }
 
 /** The export "<module>#<name>" of a plugin's, loaded synchronously and once. */
@@ -515,12 +541,11 @@ export function treeReaderFor(language: string): TreeReader | undefined {
 }
 
 /**
- * A reading the core derives for a plugin on the parser path, or its
- * interfaces table, built once: every one reads the text through the same
- * parse (syntax-trees.ts), and where an import leads through the plugin's
- * resolve.
+ * A reading the core derives for a plugin on the parser path, built once:
+ * every one reads the text through the same parse (syntax-trees.ts), and
+ * where an import leads through the plugin's resolve.
  */
-function treeSlot(plugin: LoadedPlugin, slot: ParsedReading | "interfaces"): unknown {
+function treeSlot(plugin: LoadedPlugin, slot: ParsedReading): unknown {
   const key = `${plugin.dir}\u0000tree\u0000${slot}`;
   if (slots.has(key)) return slots.get(key);
   // The project asking, at each call: the table is built once, and a project's files are kept parses, a line alone is not.
@@ -559,23 +584,17 @@ function treeSlot(plugin: LoadedPlugin, slot: ParsedReading | "interfaces"): unk
   } else if (slot === "declares") table = (line: string) => lineDeclaration(line)?.declares ?? "unknown";
   else if (slot === "topLevel") table = (text: string, name: string) => reader().topLevel(text).has(name);
   else if (slot === "interfaces") {
-    // The language's own facts the plugin's interfaces table states (whether its server narrows to bounds); the import answers are the parser's alone.
-    const facts = slotExport(plugin, "interfaces") as Partial<InterfaceSyntax> | undefined;
-    const twice = (["importLists", "wildcardModules"] as const).filter((answer) => facts?.[answer] !== undefined);
-    if (twice.length > 0) throw new Error(`plugin ${plugin.name} reads its text through treeSitter, so its interfaces table's ${twice.join(" and ")} would read its imports a second time; the core derives them from the parser: remove them`);
     table = {
       isTypeDeclaration: (line: string) => lineDeclaration(line)?.declares === "type",
       // A module's default export, where the queries capture it (@default): the declaration that is it, and the names exported as it.
       isDefaultExport: (line: string) => lineDeclaration(line)?.isDefault === true,
-      serverBounds: false,
       defaultNames: (text: string) => reader().defaults(text),
-      ...facts,
       importLists: (text: string) => {
         const renamed = reader().imports(text).filter((i) => i.alias !== undefined);
         return renamed.length === 0 ? [] : [renamed.map((i) => `${i.name ?? i.specifier} as ${i.alias}`).join(", ")];
       },
       wildcardModules: (file: string, text: string) => reader().imports(text).filter((i) => i.glob === true).flatMap((i) => resolution().modulePaths(file, i.specifier)),
-    } satisfies InterfaceSyntax;
+    } satisfies InterfaceReadings;
   }
   slots.set(key, table);
   return table;

@@ -236,7 +236,7 @@ export function appendInvariant(specPath: string, bullet: string): string {
 export function renderPractice(name: string, sentence: string, when: string | undefined): string {
   return [
     `- ${name}: ${sentence.trim()}`,
-    `  when: ${when ?? "<command <words> | edit <glob> [adding <text>] | explicit>"}`,
+    `  when: ${when ?? "<command <words> | edit <glob> [adding <text>] | defect <class or family> | explicit>"}`,
     "  step: <what to do first>",
     "    leaves: <the evidence this step leaves; delete the line when it leaves none>",
     "  step: <what to do next>",

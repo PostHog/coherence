@@ -27,10 +27,11 @@ import { parseSpec } from "../spec/grammar.ts";
 import { guardStanding, loadSpecModel } from "../spec/model.ts";
 import { HOOK_TIMES_DIR, parseHookTimes } from "../lifecycle/hook-latency.ts";
 import { defectStates, type DefectFloor, type DefectState } from "./defects.ts";
-import { deadEndLine, readDeadEnds, readingScope, type DeadEndReading } from "./dead-ends.ts";
+import { DEAD_END, deadEndLine, readDeadEnds, readingScope, windowOf, type DeadEndReading } from "./dead-ends.ts";
 import { loadJournal } from "./store.ts";
 
-export const DEFAULT_WINDOW_DAYS = 14;
+/** The window's default length: the dead-end reading's, since both read one window (windowOf). */
+export const DEFAULT_WINDOW_DAYS: number = DEAD_END.days;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const UNKNOWN = "unknown";
 
@@ -93,7 +94,7 @@ export interface Convergence {
   closing: { recordedInWindow: number; closed: number; guarded: number; decided: number; neither: number; guardedShare: number | null; allTime: Pick<DefectFloor, "recorded" | "closed" | "guarded" | "decided"> };
   /** Guard failures by class, all time and in the window. */
   repeats: { class: string; allTime: number; inWindow: number }[];
-  /** Subsystems at a dead end as of now, read as spec --check reads them (their own window, every worktree's journal, dead-ends.ts). */
+  /** Subsystems at a dead end as of now, read as spec --check reads them (this reading's window, every worktree's journal, dead-ends.ts). */
   deadEnds: DeadEndReading;
   /** Defects whose introduced names a commit or pull request git could not place in any release range. */
   unplaced: string[];
@@ -196,9 +197,10 @@ export interface ConvergenceOptions {
 export function convergence(root: string, options: ConvergenceOptions = {}): Convergence {
   const days = options.days ?? DEFAULT_WINDOW_DAYS;
   const now = (options.now ?? (() => new Date()))();
-  const toDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const fromDay = new Date(toDay.getTime() - (days - 1) * DAY_MS);
-  const from = fromDay.toISOString();
+  // One window for this reading and the dead ends it reports: whole days ending today (dead-ends.ts).
+  const window = windowOf(now, days);
+  const from = window.from;
+  const fromDay = new Date(from);
   const states = defectStates(loadJournal(root).records);
   const inWindow = states.filter((d) => d.at >= from);
 
@@ -303,7 +305,7 @@ export function convergence(root: string, options: ConvergenceOptions = {}): Con
     .sort((a, b) => a.event.localeCompare(b.event) || a.version.localeCompare(b.version, undefined, { numeric: true }));
 
   return {
-    window: { days, from: from.slice(0, 10), to: toDay.toISOString().slice(0, 10) },
+    window: { days, from: from.slice(0, 10), to: window.to },
     arrivals,
     days: dayList,
     releases,
@@ -317,7 +319,7 @@ export function convergence(root: string, options: ConvergenceOptions = {}): Con
       allTime: { recorded: floor?.recorded ?? states.length, closed: floor?.closed ?? 0, guarded: floor?.guarded ?? 0, decided: floor?.decided ?? 0 },
     },
     repeats: [...repeatMap.entries()].map(([cls, n]) => ({ class: cls, ...n })).sort((a, b) => b.allTime - a.allTime),
-    deadEnds: readDeadEnds(root, model.components, now),
+    deadEnds: readDeadEnds(root, model.components, now, { days }),
     unplaced,
     churn,
     hookLatency,
@@ -351,7 +353,7 @@ export function convergenceText(c: Convergence): string {
   const share = k.guardedShare === null ? "no close yet" : `${Math.round(k.guardedShare * 100)}% guarded`;
   lines.push(`closing: ${k.closed} of ${k.recordedInWindow} closed in the window (${k.guarded} guarded, ${k.decided} decided, ${k.neither} with neither; ${share}); all time ${k.allTime.closed} of ${k.allTime.recorded} closed, ${k.allTime.guarded} guarded`);
   lines.push(`repeats (guard failures, should fall to zero): ${c.repeats.length === 0 ? "none" : c.repeats.map((r) => `${r.class} ${r.allTime} (${r.inWindow} in the window)`).join(", ")}`);
-  lines.push(`dead ends (a subsystem collecting defects across classes and rounds after its first guard, back through its own guards): ${c.deadEnds.deadEnds.length === 0 ? "none" : c.deadEnds.deadEnds.length}; ${readingScope(c.deadEnds)}`);
+  lines.push(`dead ends (a subsystem collecting defects across classes and rounds after its first guard, its arrivals rising round over round): ${c.deadEnds.deadEnds.length === 0 ? "none" : c.deadEnds.deadEnds.length}; ${readingScope(c.deadEnds)}`);
   for (const d of c.deadEnds.deadEnds) lines.push(`  ${deadEndLine(d)}`);
   const first = c.days.find((d) => d.bullets !== undefined)?.bullets;
   const last = [...c.days].reverse().find((d) => d.bullets !== undefined)?.bullets;

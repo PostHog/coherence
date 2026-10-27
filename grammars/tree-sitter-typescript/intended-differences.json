@@ -1,5 +1,5 @@
 {
-  "about": "Every difference coherence.patch may make to what tree-sitter-typescript 0.23.2 reads, by construct. compare.mjs parses its corpus with the stock and the patched parsers and fails on any region of difference no entry here allows. An entry allows a region when the region is of its kind (improvement: the stock parser errs there and the patched one does not; regression: the other way about; both err: each errs, differently; reshape: neither errs), in one of its dialects, and overlaps a node its query captures as @construct in the tree of its side. Each entry must show in every case it names, in each of its dialects, so none outlives the patch. Keyed by construct and case name, never by byte offset, so the corpus may grow. No entry allows a token renamed: a leaf of the patched trees that is no type of its own spelling, or is named and spelled as one of the stock grammar's tokens, must be read as the stock trees read that spelling somewhere in the corpus, inside an improvement's region as anywhere else. An entry's tokens lists such a reading it brings ({text, type, named}), allowed only inside its own regions, and each must show there.",
+  "about": "Every difference coherence.patch may make to what tree-sitter-typescript 0.23.2 reads, by construct. compare.mjs parses its corpus with the stock and the patched parsers and fails on any region of difference no entry here allows. An entry allows a region when the region is of its kind (improvement: the stock parser errs there and the patched one does not; regression: the other way about; both err: each errs, differently; reshape: neither errs), in one of its dialects, and overlaps a node its query captures as @construct in the tree of its side. Each entry names its cases, one form to a case, and must show in each of them, in each of its dialects, as that case's one region of difference, so none outlives the patch and a form that breaks fails in its own case. A case an improvement names is one of Coherence's (corpus/coherence*.txt, outside the patch) and declares the whole tree the patched parsers must read it as. Keyed by construct and case name, never by byte offset, so the corpus may grow. No entry allows a token renamed: a leaf of the patched trees that is no type of its own spelling, or is named and spelled as one of the stock grammar's tokens, must be read as the stock trees read that spelling somewhere in the corpus, inside an improvement's region as anywhere else. An entry's tokens lists such a reading it brings ({text, type, named}), allowed only inside its own regions, and each must show there.",
   "differences": [
     {
       "id": "import-type-arguments",
@@ -8,7 +8,10 @@
       "dialects": ["typescript", "tsx"],
       "side": "patched",
       "query": "(member_expression object: [(call_expression function: (import)) (member_expression)] type_arguments: (type_arguments)) @construct",
-      "cases": ["coherence: Coherence: import types with type arguments"]
+      "cases": [
+        "coherence: Coherence: an import type with type arguments in a union",
+        "coherence: Coherence: an import type with type arguments as an alias's type"
+      ]
     },
     {
       "id": "import-type-primary",
@@ -17,19 +20,49 @@
       "dialects": ["typescript", "tsx"],
       "side": "patched",
       "query": "[(array_type (member_expression object: [(call_expression function: (import)) (member_expression)]) @construct) (lookup_type (member_expression object: [(call_expression function: (import)) (member_expression)]) @construct) (index_type_query (member_expression object: [(call_expression function: (import)) (member_expression)]) @construct) (type_arguments (member_expression object: [(call_expression function: (import)) (member_expression)]) @construct)]",
-      "cases": ["coherence: Coherence: import types as primary types"]
+      "cases": [
+        "coherence: Coherence: an import type as an array's element",
+        "coherence: Coherence: an import type as keyof's operand",
+        "coherence: Coherence: an import type with type arguments as an indexed type's object",
+        "coherence: Coherence: an import type as an array's element in a type argument"
+      ]
     },
     {
       "id": "member-named-in",
-      "construct": "a member named in or instanceof, or whose name begins with in, on the line after another member (in?: T, in = 2, in_progress, in$, in2, inü)",
+      "construct": "a member named in or instanceof before :, ? or =, or one whose name is in or instanceof and then a digit, _, $ or \\ (in_progress, in$, in2, in\\u0061, instanceof_x), on the line after another member: a property, a class field, a method or a method signature (in?: T, in = 2, in_x(): void, in2<T>(): T, in?(): void, in_progress() {})",
       "kind": "improvement",
       "dialects": ["typescript", "tsx"],
       "side": "patched",
-      "query": "([(property_signature name: (property_identifier) @construct) (public_field_definition name: (property_identifier) @construct)] (#match? @construct \"^in\"))",
+      "query": "([(property_signature name: (property_identifier) @construct) (public_field_definition name: (property_identifier) @construct) (method_signature name: (property_identifier) @construct) (method_definition name: (property_identifier) @construct) (abstract_method_signature name: (property_identifier) @construct)] (#match? @construct \"^in(stanceof)?([0-9_$\\\\\\\\]|$)\"))",
       "tokens": [{ "text": "instanceof", "type": "property_identifier", "named": true }],
       "cases": [
-        "coherence: Coherence: members named in and instanceof after another member",
-        "coherence: Coherence: members whose names begin with in after another member"
+        "coherence: Coherence: a property named in after another member",
+        "coherence: Coherence: a property named instanceof after another member",
+        "coherence: Coherence: a property named in_progress after another member",
+        "coherence: Coherence: a property named instanceof_x after another member",
+        "coherence: Coherence: a property named in$ after another member",
+        "coherence: Coherence: a property named in2 after another member",
+        "coherence: Coherence: a property named in\\u0061 after another member",
+        "coherence: Coherence: a property named instanceof$ after another member",
+        "coherence: Coherence: a property named in_x in a type literal after another member",
+        "coherence: Coherence: a class field named in after another field",
+        "coherence: Coherence: a method signature named in_x after another member",
+        "coherence: Coherence: a generic method signature named in2 after another member",
+        "coherence: Coherence: an optional method signature named in after another member",
+        "coherence: Coherence: a method named in_progress after a field",
+        "coherence: Coherence: a method signature named in_x in a declared class after a field"
+      ]
+    },
+    {
+      "id": "statement-beginning-with-in",
+      "construct": "a statement on the line after another that begins with a name that is in or instanceof and then a digit, _, $ or \\ (in_x(), in$.bar(), in2 = 3)",
+      "kind": "improvement",
+      "dialects": ["typescript", "tsx"],
+      "side": "patched",
+      "query": "((identifier) @construct (#match? @construct \"^in(stanceof)?([0-9_$\\\\\\\\]|$)\"))",
+      "cases": [
+        "coherence: Coherence: a statement beginning with in_x after another",
+        "coherence: Coherence: a statement beginning with in$ after another"
       ]
     },
     {
@@ -40,7 +73,8 @@
       "side": "patched",
       "query": "((jsx_text) @construct (#match? @construct \"&\"))",
       "cases": [
-        "coherence-tsx: Coherence: a bare ampersand in JSX text and strings",
+        "coherence-tsx: Coherence: a bare ampersand in JSX text",
+        "coherence-tsx: Coherence: a bare ampersand among character references in JSX text",
         "coherence-tsx: Coherence: character references at their limits"
       ]
     },
@@ -51,7 +85,11 @@
       "dialects": ["tsx"],
       "side": "patched",
       "query": "(jsx_attribute (string (string_fragment) @construct) (#eq? @construct \"&\"))",
-      "cases": ["coherence-tsx: Coherence: a bare ampersand in JSX text and strings"]
+      "cases": [
+        "coherence-tsx: Coherence: a bare ampersand before a letter in a JSX string",
+        "coherence-tsx: Coherence: a bare ampersand before a single-quoted JSX string's closing quote",
+        "coherence-tsx: Coherence: a bare ampersand before a double-quoted JSX string's closing quote"
+      ]
     },
     {
       "id": "comparison-after-import-type",

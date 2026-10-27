@@ -58,9 +58,9 @@ test("orient names each guard failure under the spec block", () => {
   const j = journal(root);
   const who = ["--session", "s1", "--agent", "alpha"];
   const first = j("defect", "the knob stuck", "--evidence", "turned it", "--class", "path-identity", ...who);
-  assert.equal(specBlock(root, ORIENT_AT), "", "a defect with no guard yet is no guard failure");
+  assert.doesNotMatch(specBlock(root, ORIENT_AT), /Guard failures/, "a defect with no guard yet is no guard failure");
   const close = j("resolved", first, "--because", "oiled, every knob checked", "--guard", "widget/knob turns", ...who);
-  assert.equal(specBlock(root, ORIENT_AT), "", "the guarded defect itself is none");
+  assert.doesNotMatch(specBlock(root, ORIENT_AT), /Guard failures/, "the guarded defect itself is none");
   const repeat = j("defect", "another knob stuck", "--evidence", "turned it", "--class", "path-identity", ...who);
   const block = specBlock(root, ORIENT_AT);
   assert.match(block, /^Guard failures \(1\): a defect arrived in a class a guard already covered, so the guard was weaker than claimed/m);

@@ -4,8 +4,10 @@
  * practice per bullet, in the spec's bullet grammar:
  *
  *   - <name>: <sentence>
- *     when: command <words> | edit <glob> [adding <text>] | explicit
- *       (a command word with * or ? is a glob over one word: command resolved df-*)
+ *     when: command <words> | edit <glob> [adding <text>] | defect <class or family> | explicit
+ *       (a command word with * or ? is a glob over one word: command resolved df-*;
+ *       defect <name> fires on a command that records, classifies or closes a
+ *       defect with --class <name>)
  *     step: <what to do>
  *       leaves: <the evidence the step leaves>       optional; belongs to the step above it, at any indentation
  *     pitfall: <a way this practice has failed> (<record id or commit>)
@@ -43,6 +45,8 @@ export type Reach = (typeof REACHES)[number];
 export type Trigger =
   | { kind: "command"; words: string }
   | { kind: "edit"; glob: string; adding: string | undefined }
+  /** A defect of one class or family: fired by a command that records, classifies or closes a defect with --class naming it. */
+  | { kind: "defect"; class: string }
   | { kind: "explicit" };
 
 export interface PracticeStep {
@@ -119,12 +123,18 @@ function parseTriggers(value: string): { triggers: Trigger[]; problem: string | 
       triggers.push({ kind: "command", words: command[1]!.trim() });
       continue;
     }
+    const defect = /^defect\s+(.+)$/.exec(raw);
+    if (defect !== null) {
+      if (!CLASS_NAME.test(defect[1]!)) return { triggers, problem: `"${raw}" names no class: defect takes one kebab-case class or family name (duplicated-fact)` };
+      triggers.push({ kind: "defect", class: defect[1]! });
+      continue;
+    }
     const edit = /^edit\s+(\S+)(?:\s+adding\s+(.+))?$/.exec(raw);
     if (edit !== null) {
       triggers.push({ kind: "edit", glob: edit[1]!, adding: edit[2]?.trim() });
       continue;
     }
-    return { triggers, problem: `"${raw}" is not a trigger; when: takes command <words>, edit <glob> [adding <text>], or explicit, separated by |` };
+    return { triggers, problem: `"${raw}" is not a trigger; when: takes command <words>, edit <glob> [adding <text>], defect <class or family>, or explicit, separated by |` };
   }
   if (triggers.length === 0) return { triggers, problem: "when: names no trigger; write explicit for a practice no tool use fires" };
   return { triggers, problem: undefined };
@@ -137,7 +147,7 @@ function normalize(text: string): string {
 /** The version: the triggers, steps (with what each leaves) and pitfalls, normalized and hashed. */
 export function practiceVersion(practice: Pick<Practice, "triggers" | "steps" | "pitfalls">): string {
   const parts = [
-    ...practice.triggers.map((t) => `when ${t.kind === "command" ? `command ${t.words}` : t.kind === "edit" ? `edit ${t.glob}${t.adding ? ` adding ${t.adding}` : ""}` : "explicit"}`),
+    ...practice.triggers.map((t) => `when ${t.kind === "command" ? `command ${t.words}` : t.kind === "edit" ? `edit ${t.glob}${t.adding ? ` adding ${t.adding}` : ""}` : t.kind === "defect" ? `defect ${t.class}` : "explicit"}`),
     ...practice.steps.map((s) => `step ${normalize(s.text)}${s.leaves ? ` leaves ${normalize(s.leaves)}` : ""}`),
     ...practice.pitfalls.map((p) => `pitfall ${normalize(p.text)}`),
   ];
@@ -347,9 +357,30 @@ export function commandWordsMatch(words: string, command: readonly string[]): bo
   return false;
 }
 
+/** A class name, as the defect verb takes one: lowercase words joined by hyphens. */
+const CLASS_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+
+/** The journal verbs that give a defect its class: recording it, classifying it, closing it; each named after the program, as a defect trigger reads them. */
+const CLASS_VERBS = ["defect", "classify", "resolved"].flatMap((verb) => [`coherence ${verb}`, `cli.* ${verb}`]);
+
+/** The class a simple command gives a defect: --class <name> or --class=<name> in a command running one of the class verbs; undefined otherwise. */
+function classGiven(words: readonly string[]): string | undefined {
+  if (!CLASS_VERBS.some((verb) => commandWordsMatch(verb, words))) return undefined;
+  for (let i = 0; i < words.length; i += 1) {
+    if (words[i] === "--class") return words[i + 1];
+    if (words[i]!.startsWith("--class=")) return words[i]!.slice("--class=".length);
+  }
+  return undefined;
+}
+
 /** The first trigger of a practice this tool use fires, described, or undefined. */
 export function firedBy(practice: Practice, use: ToolUse): string | undefined {
   for (const trigger of practice.triggers) {
+    if (trigger.kind === "defect" && use.command !== undefined) {
+      // Read as the shell reads the command when the caller did, else as its words split on blanks.
+      const commands = use.commands ?? [{ words: use.command.split(/\s+/).filter((w) => w !== "") }];
+      if (commands.some((c) => classGiven(c.words) === trigger.class)) return `defect of class ${trigger.class}`;
+    }
     if (trigger.kind === "command" && use.command !== undefined) {
       const matched = use.commands === undefined ? commandMatches(trigger.words, use.command) : use.commands.some((c) => commandWordsMatch(trigger.words, c.words));
       if (matched) return `command ${trigger.words}`;
@@ -368,6 +399,7 @@ export function firedBy(practice: Practice, use: ToolUse): string | undefined {
 export function triggerText(trigger: Trigger): string {
   if (trigger.kind === "command") return trigger.words;
   if (trigger.kind === "edit") return `edit ${trigger.glob}${trigger.adding ? ` adding ${trigger.adding}` : ""}`;
+  if (trigger.kind === "defect") return `defect ${trigger.class}`;
   return "explicit";
 }
 

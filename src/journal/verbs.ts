@@ -348,31 +348,42 @@ export function dismiss(argv: string[], ctx: Context): Written {
 }
 
 /**
- * The component a defect belongs to, settled at the write: --component when
- * given, refused unless it names a component folder; otherwise the one
- * component whose folder holds every file the defect names. None when the
- * files name no component or several, with a line saying how to name one,
- * so a reader never has to guess it later.
+ * The component a defect belongs to, settled at the write. A file's owner is
+ * the deepest component folder above it; a file outside the project or
+ * outside every component has none. Without --component the record carries
+ * the one component that owns every file the defect names, and none when the
+ * files have several owners, when one has none, or when it names no file,
+ * with a line saying why. --component is refused unless it names a component
+ * folder that owns every file the defect names: a defect's own files decide
+ * where it counts, so naming another component cannot move it out of the
+ * dead-end reading of the one that holds the fault. A defect whose files lie
+ * in several components takes no --component and counts toward each.
  */
 function defectComponent(given: string | undefined, files: readonly string[], cwd: string): { component?: string; note?: string } {
   const folders = componentFolders(cwd);
+  const owners = files.map((named) => {
+    const file = (isAbsolute(named) ? relative(cwd, named) : named).split(sep).join("/").replace(/^\.\//, "");
+    const outside = file === "" || file === ".." || file.startsWith("../") || isAbsolute(file);
+    return { named, owner: outside ? undefined : componentHolding(folders.map((f) => ({ folder: f })), file)?.folder };
+  });
+  const loose = owners.filter((o) => o.owner === undefined).map((o) => o.named);
+  const held = new Set(owners.flatMap((o) => (o.owner === undefined ? [] : [o.owner])));
   if (given !== undefined) {
     const folder = given.trim().replace(/^\.\/(?=.)/, "").replace(/\/+$/, "") || ".";
     if (!folders.includes(folder)) throw new JournalError(`--component ${given} names no component (a folder holding a spec); components: ${folders.join(", ") || "none"}`);
+    const elsewhere = owners.filter((o) => o.owner !== folder).map((o) => `${o.named} (${o.owner === undefined ? "in no component" : `in ${o.owner}`})`);
+    if (elsewhere.length > 0) {
+      throw new JournalError(
+        `--component ${folder} does not own every file the defect names: ${elsewhere.join(", ")}; a defect counts where its files lie, so leave --component off (a defect whose files lie in several components counts toward each), or name only the files of the fault`,
+      );
+    }
     return { component: folder };
   }
-  const held = new Set<string>();
-  for (const named of files) {
-    const file = (isAbsolute(named) ? relative(cwd, named) : named).split(sep).join("/").replace(/^\.\//, "");
-    if (file === "" || file === ".." || file.startsWith("../") || isAbsolute(file)) continue;
-    const folder = componentHolding(folders.map((f) => ({ folder: f })), file)?.folder;
-    if (folder !== undefined) held.add(folder);
-  }
-  if (held.size > 1) held.delete(".");
-  if (held.size === 1) return { component: [...held][0]! };
-  const how = "give --component <folder> so the dead-end reading reads it rather than deriving it";
-  if (held.size > 1) return { note: `  no component: its files lie in ${[...held].sort().join(" and ")}; ${how}` };
-  return { note: `  no component: ${files.length === 0 ? "it names no file" : "no component holds its files"}; ${how}` };
+  if (loose.length === 0 && held.size === 1) return { component: [...held][0]! };
+  const how = "the dead-end reading derives where it counts from its files and says so";
+  if (files.length === 0) return { note: `  no component: it names no file; give --file <path> for each file of the fault, or --component <folder>, so the dead-end reading reads where it counts` };
+  if (loose.length > 0) return { note: `  no component: ${loose.join(", ")} lie${loose.length === 1 ? "s" : ""} in no component; ${how}` };
+  return { note: `  no component: its files lie in ${[...held].sort().join(" and ")}, so it counts toward each; ${how}` };
 }
 
 export function defect(argv: string[], ctx: Context): Written {

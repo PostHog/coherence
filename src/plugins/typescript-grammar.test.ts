@@ -16,7 +16,7 @@ import { declarationsOf } from "../economy/source.ts";
 import { parsedOf } from "./languages.ts";
 import { BUNDLED_DIR } from "./registry.ts";
 
-test("the bundled TypeScript parsers read what tree-sitter-typescript 0.23.2 cannot: an import type with type arguments or as an array's element, an indexed type's object or keyof's operand, a member named in or beginning with in after another, and a bare & in JSX text or a JSX string, each with every declaration after it, while in and instanceof still continue an expression and a character reference still reads as one", () => {
+test("the bundled TypeScript parsers read what tree-sitter-typescript 0.23.2 cannot: an import type with type arguments or as an array's element, an indexed type's object or keyof's operand, a member named in or beginning with in after another, a method among them, or a statement beginning with in after another, and a bare & in JSX text or a JSX string, each with every declaration after it, while in and instanceof still continue an expression and a character reference still reads as one", () => {
   // Each shape is one PostHog's frontend writes; the stock grammar's error over it hid the declarations after it (grammars/tree-sitter-typescript/build.sh).
   const shapes: Record<string, string> = {
     "import type with type arguments": "export type Page = null | import('../lib/api').PaginatedResponse<Source>",
@@ -29,6 +29,9 @@ test("the bundled TypeScript parsers read what tree-sitter-typescript 0.23.2 can
     "member named in_": "export interface Summary {\n  ongoing: Incident[]\n  in_progress: Maintenance[]\n  instance_id: string\n  in: number\n}",
     "member named in or instanceof": "export interface Flags {\n  a: number\n  in?: number\n  b: number\n  instanceof: string\n  c: number\n  instanceof_x: number\n}",
     "class field named in": "export class Range {\n  a = 1\n  in = 2\n}",
+    "method signature named in_": "export interface Job {\n  id(): string\n  in_progress(): boolean\n  in2<T>(): T\n  in?(): void\n}",
+    "method named in_ after a field": "export class Queue {\n  a = 1\n  in_flight() {}\n}",
+    "statement beginning with in_": "export const a = 1\nin_flight()",
     "bare & in JSX text": "export const Menu = () => <p>Billing & Usage &amp; more</p>",
     "bare & in a JSX string": "export const Link = () => <a href=\"https://posthog.com?utm_medium=in-product&utm_campaign=x\">docs</a>",
     "bare & before a JSX string's quote": "export const Mark = () => <a title='Q&' data-x=\"R&\" />",

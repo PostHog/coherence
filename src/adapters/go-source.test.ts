@@ -193,7 +193,7 @@ test("a Go import is read single and grouped, named, dot and blank, never from a
   const imports: string[] = [];
   parsedOf("go", "source")!.importsOf(text, (name, specifier) => imports.push(`${name ?? "*"} <- ${specifier}`));
   assert.deepEqual(imports, ["Println <- fmt", "Row <- shop/store", "Seal <- shop/store", "ResponseWriter <- net/http", "* <- shop/side", "* <- shop/dot", "X <- shop/raw", "Marshal <- gopkg.in/yaml.v3"], "a variadic ...st.Row is a use; an unexported st.lower is none; a local named as a dot-imported package is no qualifier of it");
-  assert.deepEqual(syntaxOf("go", "interfaces")!.importLists(text), ["shop/store as st, shop/side as _, shop/dot as ."]);
+  assert.deepEqual(parsedOf("go", "interfaces")!.importLists(text), ["shop/store as st, shop/side as _, shop/dot as ."]);
   assert.equal(uncommented(text).length, text.length);
   assert.equal(codeOnly(text).length, text.length);
   assert.deepEqual(["shop/store", "gopkg.in/yaml.v3", "github.com/go-chi/chi/v5", "example.com/go-redis"].map(packageNameOf), ["store", "yaml", "chi", "redis"]);
@@ -235,15 +235,15 @@ test("a Go import path resolves under the module go.mod names, and the root's go
   assert.deepEqual(imports("api/render.go", "package api\n\nimport \"example.com/shop/store\"\n\nvar c = store.Cache\nvar s = store.Seal\n", gone), ["Cache <- store/a_rows.go", "Cache <- store/b_cache.go", "Cache <- store/secrets.go", "Seal <- store/secrets.go"], "a name no file left declares joins every file of the package, the deleted one among them, so its importer is found");
 });
 
-test("the Go interfaces slot: an interface or alias line is a type declaration, it has no default export, gopls takes no bounds, and a dot import keys no wildcard path, since its names are spelled at each use", () => {
-  const interfaces = syntaxOf("go", "interfaces")!;
+test("the Go interfaces reading: an interface or alias line is a type declaration, it has no default export, gopls takes no bounds, and a dot import keys no wildcard path, since its names are spelled at each use", () => {
+  const interfaces = parsedOf("go", "interfaces")!;
   assert.equal(interfaces.isTypeDeclaration("type Reader interface{ Read() }"), true);
   assert.equal(interfaces.isTypeDeclaration("type Rows = []Row"), true);
   assert.equal(interfaces.isTypeDeclaration("type Row struct{}"), false);
   assert.deepEqual(interfaces.defaultNames("package x\n"), []);
   assert.deepEqual(interfaces.wildcardModules("api/render.go", "package api\n\nimport . \"shop/store\"\n"), []);
   assert.equal(interfaces.isDefaultExport("func Render() {}"), false);
-  assert.equal(interfaces.serverBounds, false);
+  assert.equal(syntaxOf("go", "interfaces")?.serverBounds ?? false, false, "Go fills no interfaces table, so its server takes no bounds");
 });
 
 test("mass reads a Go project as it reads the other languages: its files counted, its declarations found, and no language named not read", () => {

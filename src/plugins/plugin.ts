@@ -41,7 +41,7 @@ import type { DeclaredLanguage } from "../adapters/declared-config.ts";
 import type { EntranceSyntax } from "../adapters/entrance-candidates.ts";
 import type { ImportTarget } from "../economy/source.ts";
 import type { Literal } from "../lifecycle/mirrors.ts";
-import type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
+import type { InterfaceFacts } from "../readings/scope/component-interfaces.ts";
 import type { BoundarySource } from "../scaffold/boundaries.ts";
 import type { Verdict } from "../enforcement/record.ts";
 
@@ -55,7 +55,7 @@ export const OLDEST_PLUGIN_API = 1;
 export const PLUGIN_API_CHANGES: Readonly<Record<number, string>> = {
   2: 'syntax slots moved from the module\'s syntax export to plugin.json ("syntax": { slot: "module#export" }), the member scan became plugin.json data (members), and kept, declares, notice, topLevel and boundaries joined the slots',
   3: 'a language plugin may read its text through a tree-sitter parser and queries (treeSitter) in place of the source, declares and topLevel slots; resolveModule may answer a module of several files ({ module, files }) and Coherence joins each imported name to the file that declares it; the adapter answers topLevelSymbols, and check.json maps the reference project (reference), which plugin check now holds a language plugin to',
-  4: 'the hand-written reader slots (syntax.source, syntax.declares, syntax.topLevel and syntax.kept) are gone: a language is read through treeSitter, a grammar\'s .wasm and queries, from which the core derives what they answered, and a manifest that fills one is refused, whatever pluginApi it is written for',
+  4: 'the hand-written reader slots (syntax.source, syntax.declares, syntax.topLevel and syntax.kept) are gone: a language is read through treeSitter, a grammar\'s .wasm and queries, from which the core derives what they answered, and a manifest that fills one is refused, whatever pluginApi it is written for; the interfaces table states serverBounds alone, its type declarations, default exports, import lists and wildcard imports read through the parser; a copy ejected from an older Coherence is ejected again (coherence plugin eject <name>) and its changes reapplied',
 };
 
 /** The interface version from which a duty holds: a plugin written for an older one is told so, never failed by a duty that did not exist when it was written. */
@@ -168,8 +168,8 @@ export interface PluginManifest {
   /**
    * The parser the language's text is read through, and the queries over it
    * (syntax-trees.ts): the one reader of the language's text. The core
-   * derives from them every reading of it (languages.ts ParsedReadings) and the interfaces
-   * slot's importLists and wildcardModules; no slot reads the text by hand.
+   * derives from them every reading of its declarations, imports and exports
+   * (languages.ts ParsedReadings); no slot answers one of those by hand.
    */
   treeSitter?: TreeSitterManifest;
   /** The rungs the plugin's adapter grades on; absent, the wrapped adapter's, else reference-choked alone. */
@@ -227,12 +227,23 @@ export const ADAPTER_METHODS_COMPLETE: [AdapterMethodMissing] extends [never] ? 
 /**
  * The slots a plugin once filled with a hand-written reader of its
  * language's text, which the core now derives from the language's parser
- * alone (languages.ts ParsedReadings; kept through the interfaces slot's wildcardModules):
- * a manifest whose syntax names one is refused, whatever pluginApi it is
- * written for, and no slot type below can name one.
+ * alone (languages.ts ParsedReadings; what kept answered is the parsed
+ * interfaces reading's wildcardModules): a manifest whose syntax names one is
+ * refused, whatever pluginApi it is written for, so no manifest the core
+ * loads holds one; and no slot type below can name one.
  */
 export const DERIVED_SLOTS = ["source", "declares", "topLevel", "kept"] as const;
 
+/**
+ * What a plugin's interfaces table may state: its language's facts, none a
+ * reading of its text. The type declarations, default exports, import lists
+ * and wildcard imports pluginApi 3 read off the table are the parse's alone
+ * (languages.ts ParsedReadings interfaces), and a table that answers any
+ * other member is refused by name when it loads (languages.ts).
+ */
+export const INTERFACE_FACTS = ["serverBounds"] as const satisfies readonly (keyof InterfaceFacts)[];
+type InterfaceFactMissing = Exclude<keyof InterfaceFacts, (typeof INTERFACE_FACTS)[number]>;
+export const INTERFACE_FACTS_COMPLETE: [InterfaceFactMissing] extends [never] ? true : InterfaceFactMissing = true;
 
 /** What a verifier is asked. */
 export interface VerifyRequest {
@@ -253,7 +264,8 @@ export interface VerifyResult {
 /** The syntax tables a plugin may supply for the readings, each optional, each loaded from the module its manifest names: what no parse answers, never a reader of the language's text (DERIVED_SLOTS). */
 export interface SyntaxTables {
   entrances?: EntranceSyntax;
-  interfaces?: InterfaceSyntax;
+  /** The language's facts the component interface reading needs and no parse answers. */
+  interfaces?: InterfaceFacts;
   /** One line a session start says about the language's instrument at this root, or "" (TypeScript 7 ships no tsserver). */
   notice?: (root: string) => string;
   /** The mirror reader: the literal a list named `name` is set to in a file's text. */

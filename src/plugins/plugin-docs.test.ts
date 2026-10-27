@@ -14,7 +14,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { LANGUAGE_DUTIES } from "./check.ts";
-import { ADAPTER_METHODS, MANIFEST_KEYS, PLUGIN_API, SYNTAX_SLOTS, TREE_SITTER_KEYS, type PluginManifest } from "./plugin.ts";
+import { parsedOf, syntaxOf } from "./languages.ts";
+import { ADAPTER_METHODS, INTERFACE_FACTS, MANIFEST_KEYS, PLUGIN_API, SYNTAX_SLOTS, TREE_SITTER_KEYS, type PluginManifest } from "./plugin.ts";
 import { BUNDLED_DIR, readManifest } from "./registry.ts";
 import { CAPTURES } from "./syntax-trees.ts";
 
@@ -98,4 +99,26 @@ test("docs/plugins.md's claims about the bundled plugins are true of them: each 
   const start = /start from `(\w+)`/.exec(DOC);
   assert.ok(start !== null, "the guide names a plugin to start from");
   assert.ok(manifest(start[1]!).treeSitter !== undefined, `the guide says to start from ${start[1]}, which names no parser`);
+});
+
+test("docs/plugins.md's claims about what the slots read are true: the interfaces table states exactly the facts the code lets it, the readings it may not answer are exactly the parse's, and the entrance members it says read text by hand are the entrance syntax's", () => {
+  const prose = DOC.replace(/\s+/g, " ");
+  const row = DOC.split("\n").find((l) => l.trim().startsWith("| `interfaces` |"));
+  assert.ok(row !== undefined, "the slot table has an interfaces row");
+  const stated = /`\{ ([^}]*) \}` alone/.exec(row);
+  assert.ok(stated !== null, `the interfaces row says what the table states: ${row}`);
+  assert.deepEqual(sorted(stated[1]!.split(",").map((f) => f.trim())), sorted(INTERFACE_FACTS), "the facts an interfaces table states");
+  const refused = /an `interfaces` table that answers ((?:`\w+`,? )+)or anything but `(\w+)` is refused/.exec(prose);
+  assert.ok(refused !== null, "the guide names the readings an interfaces table may not answer");
+  assert.deepEqual([refused[2]], [...INTERFACE_FACTS], "the one member it may answer");
+  // The readings it names are the parse's, every one of them: what pluginApi 3's tables answered by hand.
+  assert.deepEqual(sorted([...refused[1]!.matchAll(/`(\w+)`/g)].map((m) => m[1]!)), sorted(Object.keys(parsedOf("typescript", "interfaces")!)), "the parse's interfaces readings");
+  assert.deepEqual(syntaxOf("typescript", "interfaces"), { serverBounds: false }, "the bundled table states its facts alone");
+  // The entrance members the guide says read a file's text by hand are the entrance syntax's own.
+  const entrances = /`entrances` reads a code file for ([^;]*);/.exec(prose);
+  assert.ok(entrances !== null, "the guide says what the entrances slot reads by hand");
+  const members = [...entrances[1]!.matchAll(/`(\w+)`/g)].map((m) => m[1]!);
+  assert.ok(members.length > 0);
+  const syntax = syntaxOf("typescript", "entrances")!;
+  for (const member of members) assert.equal(typeof (syntax as unknown as Record<string, unknown>)[member], "function", `${member} is a function of the entrance syntax`);
 });

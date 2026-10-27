@@ -11,17 +11,18 @@
  *
  * The runtime starts once per process (startParsers, which the CLI awaits
  * before any command); a parser loads on first use and stays. Parses are
- * kept in the user's cache, outside every project, by the parser's
- * fingerprint and each text's digest: the warm-up a session start launches
- * reads every file once (warmParses), and a later reading of the whole
- * project, or of any project holding the same text, parses only what changed. Every tree is
+ * kept in the user's cache, outside every project, a file each, by the
+ * parser's fingerprint and the text's digest: the warm-up a session start
+ * launches reads every file once (warmParses), and a later reading of the
+ * whole project, or of any project holding the same text, parses only what
+ * changed. Every tree is
  * freed before the reader returns: web-tree-sitter trees hold WebAssembly
  * memory only delete() returns, and the old harness crashed an adopter at
  * parse #638 of one file by never freeing them.
  */
 
 import { createHash, randomBytes } from "node:crypto";
-import { lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, futimesSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { userCacheDir } from "../lifecycle/user-dir.ts";
@@ -79,6 +80,9 @@ export function capturesStatements(plugin: LoadedPlugin): boolean {
   return compiled.get(plugin.dir)!.capturesStatements;
 }
 
+/** A reader of a project's files: its store, a text's key there, and a text's matches with whether a kept parse answered them. */
+type KeptReader = TreeReader & { store: ParseStore | undefined; keyOf(text: string): string; read(text: string): { found: Found; kept?: true } };
+
 /** What the core reads of a language's text through its parser. */
 export interface TreeReader {
   imports(text: string): TreeImport[];
@@ -131,16 +135,13 @@ interface Compiled {
 }
 
 const compiled = new Map<string, Compiled>();
-const readers = new Map<string, TreeReader & { store: ParseStore | undefined; keyOf(text: string): string }>();
+const readers = new Map<string, KeptReader>();
 
 /** How many texts' matches a reader keeps in memory: enough for the readings one pass asks of a file in turn, few enough to hold no project. */
 const RECENT = 4;
 
-/** Parses a process makes itself before it reads the project's kept parses: a hook that reads a file or two parses them, cheaper than loading every file's. */
-const DIRECT_PARSES = 16;
-
 /** Bumped when what a kept parse holds changes, so an older store is never read as this one's. */
-const STORE_FORMAT = 7;
+const STORE_FORMAT = 8;
 
 /**
  * Each treeSitter key, by whether what a kept parse holds depends on it: a
@@ -169,7 +170,7 @@ export function fingerprintOf(dir: string, declared: TreeSitterManifest, read: (
     hash.update(`\u0000${key}\u0000`);
     hash.update(value === undefined ? "\u0001" : how === "file" ? read(value) : `\u0002${value}`);
   }
-  return hash.update(`\u0000${STORE_FORMAT}\u0000${runtimeVersion()}\u0000${extractionDigest()}`).digest("base64url").slice(0, 16);
+  return hash.update(`\u0000${STORE_FORMAT}\u0000${runtimeVersion()}\u0000${extractionDigest()}`).digest("hex").slice(0, 24);
 }
 
 let extraction: string | undefined;
@@ -208,62 +209,52 @@ export function treeReaderOf(plugin: LoadedPlugin, root?: string): TreeReader | 
 
 /**
  * Pre-read a project's files of one plugin's language, as the warm-up a
- * session start launches does: every text is read through the parser (a kept
- * parse answering where the text is unchanged), what was parsed is written as
- * a segment of the store, and the store's segments are merged when they are
- * many, keeping what this pass read and what any pass wrote in the last
- * RETAIN_DAYS. One warm-up of a project at a time; another of the same
- * project skips.
+ * session start launches does: every text is read through the parser, a kept
+ * parse answering where the text is unchanged and each new parse kept as it
+ * is made, and then the store is swept of what no process has read in
+ * RETAIN_DAYS. Two warm-ups at once need no lock: each parse is one file
+ * written whole, so neither can spoil what the other writes, and each reads
+ * what the other has kept by then.
  */
-export function warmParses(plugin: LoadedPlugin, root: string, texts: Iterable<string>): { read: number; parsed: number; audited: number; stale: number; skipped?: true } {
-  const reader = treeReaderOf(plugin, root) as (TreeReader & { store: ParseStore | undefined; keyOf(text: string): string }) | undefined;
+export function warmParses(plugin: LoadedPlugin, root: string, texts: Iterable<string>): { read: number; parsed: number; audited: number; stale: number } {
+  const reader = treeReaderOf(plugin, root) as KeptReader | undefined;
   if (reader === undefined || reader.store === undefined) return { read: 0, parsed: 0, audited: 0, stale: 0 };
   const store = reader.store;
-  if (!store.lock(root)) return { read: 0, parsed: 0, audited: 0, stale: 0, skipped: true };
-  try {
-    const keep = new Set<string>();
-    let read = 0;
-    const before = store.parsed;
-    // A sample of the texts a kept parse answers, chosen evenly over the pass (a reservoir), each held after the pass to a fresh parse of it.
-    const sample: { text: string; kept: Found }[] = [];
-    let hits = 0;
-    for (const text of texts) {
-      const key = reader.keyOf(text);
-      const kept = store.get(key);
-      // Each text read on its own: one the reader cannot read is kept nowhere, and the pass goes on to the next.
-      try {
-        reader.imports(text);
-      } catch {
-        continue;
-      }
-      if (kept !== undefined) {
-        hits++;
-        if (sample.length < AUDIT_SAMPLE) sample.push({ text, kept });
-        else {
-          const at = Math.floor(Math.random() * hits);
-          if (at < AUDIT_SAMPLE) sample[at] = { text, kept };
-        }
-      }
-      keep.add(key);
-      read++;
+  let read = 0;
+  const before = store.parsed;
+  // A sample of the texts a kept parse answers, chosen evenly over the pass (a reservoir), each held after the pass to a fresh parse of it.
+  const sample: { text: string; kept: Found }[] = [];
+  let hits = 0;
+  for (const text of texts) {
+    // Each text read on its own: one the reader cannot read is kept nowhere, and the pass goes on to the next.
+    let answer: { found: Found; kept?: true };
+    try {
+      answer = reader.read(text);
+    } catch {
+      continue;
     }
-    const parsed = store.parsed - before;
-    // A kept parse that differs from a fresh parse of the same text was kept under a fingerprint that leaves out something the parse depends on:
-    // the store is removed whole, since no entry of it can be trusted, and the next session start says so (staleParsesNotice).
-    const fresh = compiled.get(plugin.dir)!;
-    const stale = sample.filter(({ text, kept }) => JSON.stringify(fresh.parse(text)) !== JSON.stringify(kept)).length;
-    if (stale > 0) {
-      store.discard({ sampled: sample.length, stale });
-      for (const key of [...readers.keys()]) if (key.startsWith(`${plugin.dir}\u0000`)) readers.delete(key);
-    } else {
-      store.flush();
-      store.merge(keep);
+    if (answer.kept === true) {
+      const kept = answer.found;
+      hits++;
+      if (sample.length < AUDIT_SAMPLE) sample.push({ text, kept });
+      else {
+        const at = Math.floor(Math.random() * hits);
+        if (at < AUDIT_SAMPLE) sample[at] = { text, kept };
+      }
     }
-    StoreFolder.prune(compiled.get(plugin.dir)!.fingerprint);
-    return { read, parsed, audited: sample.length, stale };
-  } finally {
-    store.unlock(root);
+    read++;
   }
+  const parsed = store.parsed - before;
+  // A kept parse that differs from a fresh parse of the same text was kept under a fingerprint that leaves out something the parse depends on:
+  // the store is removed whole, since no entry of it can be trusted, and the next session start says so (staleParsesNotice).
+  const fresh = compiled.get(plugin.dir)!;
+  const stale = sample.filter(({ text, kept }) => JSON.stringify(fresh.parse(text)) !== JSON.stringify(kept)).length;
+  if (stale > 0) {
+    store.discard({ sampled: sample.length, stale });
+    for (const key of [...readers.keys()]) if (key.startsWith(`${plugin.dir}\u0000`)) readers.delete(key);
+  }
+  ParseStore.sweep();
+  return { read, parsed, audited: sample.length, stale };
 }
 
 /** What a project's store would keep of a text read through a plugin's parser, as JSON: what the audit and the fingerprint's test hold kept parses to. */
@@ -282,7 +273,7 @@ export function keptParseOf(plugin: LoadedPlugin, text: string): string {
  * user's warm-ups write. Empty when none was.
  */
 export function staleParsesNotice(now: number = Date.now()): string {
-  return StoreFolder.audits()
+  return ParseStore.audits()
     .filter(({ at, sampled, stale }) => stale >= 1 && stale <= sampled && sampled <= AUDIT_SAMPLE && at <= now && now - at <= AUDIT_NOTICE_DAYS * 86_400_000)
     .map(({ plugin, at, sampled, stale }) => `Kept parses: plugin ${plugin}'s kept parses differed from a fresh parse of the same text on ${stale} of the ${sampled} its warm-up sampled (${new Date(at).toISOString().slice(0, 10)}), so its store was removed and every text is parsed again. The fingerprint they were kept under leaves out something a parse depends on (KEPT_FROM, fingerprintOf in src/plugins/syntax-trees.ts, or a change to the plugin's parsing that names no new parser or queries): a defect to record.\n\n`)
     .join("");
@@ -445,27 +436,24 @@ function speller(separator: string): (matches: QueryMatch[]) => (node: Node) => 
   };
 }
 
-function readerOver(compiled: Compiled, store: ParseStore | undefined): TreeReader & { store: ParseStore | undefined; keyOf(text: string): string } {
+function readerOver(compiled: Compiled, store: ParseStore | undefined): KeptReader {
   const { marksExports, exportedName } = compiled;
-  const keyOf = (text: string): string => createHash("sha256").update(text).digest("base64url").slice(0, 22);
+  const keyOf = (text: string): string => createHash("sha256").update(text).digest("hex").slice(0, 32);
   // The last few texts' matches in memory, so the readings a pass asks of one file (its declarations, then its imports) share one parse;
-  // past the first few parses, the project's kept parses, so a file unchanged since an earlier process is not parsed again.
+  // then the text's kept parse, so a file unchanged since an earlier process is not parsed again.
   const recent: { text: string; found: Found }[] = [];
-  let direct = 0;
-  const raw = (text: string): Found => {
-    const kept = recent.find((r) => r.text === text);
-    if (kept !== undefined) return kept.found;
+  const read = (text: string): { found: Found; kept?: true } => {
+    const known = recent.find((r) => r.text === text);
+    if (known !== undefined) return { found: known.found };
     const key = store === undefined ? undefined : keyOf(text);
-    let found = key !== undefined && direct >= DIRECT_PARSES ? store!.get(key) : undefined;
-    if (found === undefined) {
-      found = compiled.parse(text);
-      direct++;
-      if (key !== undefined) store!.put(key, found);
-    }
+    const kept = key !== undefined ? store!.get(key) : undefined;
+    const found = kept ?? compiled.parse(text);
+    if (kept === undefined && key !== undefined) store!.put(key, found);
     recent.unshift({ text, found });
     recent.length = Math.min(recent.length, RECENT);
-    return found;
+    return kept === undefined ? { found } : { found, kept: true };
   };
+  const raw = (text: string): Found => read(text).found;
   const matches = (text: string): { name: string; text: string; line: number }[][] => raw(text).map((captures) => captures.map(([name, value, line]) => ({ name, text: value, line })));
 
   return {
@@ -534,305 +522,132 @@ function readerOver(compiled: Compiled, store: ParseStore | undefined): TreeRead
     },
     store,
     keyOf,
+    read,
   };
 }
+
 
 /**
  * The kept parses of one parser fingerprint, in the user's cache outside
  * every project (parsesFolder), shared by every project, worktree and process
  * of the user's. A kept parse is a function of its text and the fingerprint
- * alone, so it is filed by the text's digest and never changes once written:
- * a process writes what it parsed as a segment, one file written whole under
- * a temporary name and renamed into place, and never opens a segment to
- * write again. A reader reads each segment once, and a long-lived one reads
- * the segments other processes wrote since, at most once a second; nothing
- * it has read is ever changed under it. No file of a project's is read or
- * written, so a repository can neither feed a reading through the store nor
- * stop one. A warm-up merges the segments when there are many, and a stale
- * store, which only a fingerprint that leaves something out can make, is
- * removed whole.
+ * alone, so each is a file of its own named by the text's digest, written
+ * whole under a temporary name, renamed into place and never written again,
+ * as git keeps a loose object. A reading opens the one file it asks for and
+ * holds nothing of the store in memory, so what another process writes is
+ * read at once, what another removes answers no more, and no process merges,
+ * reloads or locks. A file read is stamped as read at most once a day, and a
+ * warm-up's sweep removes what no process has read in RETAIN_DAYS. No file of
+ * a project's is read or written, so a repository can neither feed a reading
+ * through the store nor stop one; and a stale store, which only a fingerprint
+ * that leaves something out can make, is removed whole.
  */
 class ParseStore {
-  private static stores = new Map<string, ParseStore>();
-  private readonly entries = new Map<string, Found>();
-  /** The segment each kept parse was read from, for a merge's retention. */
-  private readonly from = new Map<string, string>();
-  /** The segments this process has read, or written itself. */
-  private readonly read = new Set<string>();
-  private added = new Map<string, Found>();
-  private checked = 0;
+  private static stores = new Map<string, ParseStore | undefined>();
+  readonly #dir: string;
+  readonly #plugin: string;
   /** Texts this store's process parsed itself. */
   parsed = 0;
-  /** How many times this process read segments it had not read: once, and again only once another process wrote one. */
-  loads = 0;
 
-  static of(plugin: string, fingerprint: string): ParseStore | undefined {
-    let store = ParseStore.stores.get(fingerprint);
-    if (store === undefined) {
-      const folder = StoreFolder.of(fingerprint);
-      if (folder === undefined) return undefined;
-      store = new ParseStore(plugin, folder);
-      ParseStore.stores.set(fingerprint, store);
-      if (ParseStore.stores.size === 1) process.once("exit", () => ParseStore.stores.forEach((s) => s.flush()));
-    }
-    return store;
-  }
-
-  private readonly plugin: string;
-  private readonly folder: StoreFolder;
-
-  private constructor(plugin: string, folder: StoreFolder) {
-    this.plugin = plugin;
-    this.folder = folder;
-  }
-
-  get(key: string): Found | undefined {
-    if (Date.now() - this.checked > RELOAD_MS) this.readNew();
-    return this.entries.get(key);
-  }
-
-  /**
-   * Read the segments not read yet: every one at first, and after that only
-   * those another process wrote since. Where a segment read before is gone
-   * (another process merged the store, or removed it as stale), what was
-   * read is dropped and the store read again from the segments there are,
-   * so a reader never answers from a segment the store no longer holds.
-   */
-  private readNew(): void {
-    this.checked = Date.now();
-    const present = this.folder.segments();
-    const here = new Set(present);
-    if ([...this.read].some((name) => !here.has(name))) {
-      this.entries.clear();
-      this.from.clear();
-      this.read.clear();
-      for (const [key, found] of this.added) this.entries.set(key, found);
-    }
-    const unread = present.filter((name) => !this.read.has(name));
-    if (unread.length === 0) return;
-    this.loads++;
-    for (const name of unread) {
-      this.read.add(name);
-      for (const [key, found] of this.folder.readSegment(name)) {
-        if (this.entries.has(key)) continue;
-        this.entries.set(key, found);
-        this.from.set(key, name);
-      }
-    }
-  }
-
-  put(key: string, found: Found): void {
-    this.parsed++;
-    this.entries.set(key, found);
-    this.added.set(key, found);
-    // A process that lives long (the warm server, hook-serve) writes as it goes, so what it holds unwritten stays small.
-    if (this.added.size >= FLUSH_EVERY) this.flush();
-  }
-
-  /** Write what this process parsed and has not written as a segment of its own. Never a read: a process that exits writes and goes. */
-  flush(): void {
-    if (this.added.size === 0) return;
-    const name = this.folder.writeSegment(this.added);
-    if (name !== undefined) {
-      this.read.add(name);
-      for (const key of this.added.keys()) this.from.set(key, name);
-    }
-    this.added = new Map();
-  }
-
-  /**
-   * Merge the store's segments into one when there are more than
-   * SEGMENTS_MAX: every kept parse this pass read, and every one a segment
-   * written in the last RETAIN_DAYS holds, so a text no pass has read since
-   * ages out. The merged segments are removed after the merge is written;
-   * one another process writes meanwhile is left as it is.
-   */
-  merge(keep: ReadonlySet<string>): void {
-    this.checked = 0;
-    this.readNew();
-    const present = this.folder.segments().filter((name) => this.read.has(name));
-    if (present.length <= SEGMENTS_MAX) return;
-    const recent = new Set(present.filter((name) => this.folder.ageDays(name) <= RETAIN_DAYS));
-    const merged = new Map<string, Found>();
-    for (const [key, found] of this.entries) if (keep.has(key) || recent.has(this.from.get(key) ?? "")) merged.set(key, found);
-    const name = this.folder.writeSegment(merged);
-    if (name === undefined) return;
-    this.read.add(name);
-    for (const key of merged.keys()) this.from.set(key, name);
-    for (const old of present) this.folder.remove(old);
-  }
-
-  /** Remove every kept parse of this fingerprint, in memory and in the cache, and leave the audit that found them stale for orient to say. */
-  discard(audit: { sampled: number; stale: number }): void {
-    this.entries.clear();
-    this.from.clear();
-    this.added = new Map();
-    for (const name of this.folder.segments()) this.folder.remove(name);
-    StoreFolder.writeAudit(this.plugin, { at: Date.now(), ...audit });
-  }
-
-  /**
-   * Take a project's warm-up lock: true when this process holds it, false
-   * when a live warm-up of the same project in another process does, so two
-   * warm-ups (a session start and the prompt after it) never parse a project
-   * twice. A lock whose process is gone, older than WARM_LOCK_MS, or stamped
-   * in the future is taken over.
-   */
-  lock(root: string): boolean {
-    const name = this.lockName(root);
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (this.folder.create(name, `${process.pid} ${Date.now()}`)) return true;
-      const [pid, at] = (this.folder.read(name) ?? "").split(" ").map(Number);
-      const age = Date.now() - (at ?? 0);
-      if (alive(pid ?? 0) && age >= 0 && age < WARM_LOCK_MS) return false;
-      this.folder.remove(name);
-    }
-    return false;
-  }
-
-  /** Give a project's warm-up lock back. */
-  unlock(root: string): void {
-    const name = this.lockName(root);
-    if (this.folder.read(name)?.startsWith(`${process.pid} `)) this.folder.remove(name);
-  }
-
-  private lockName(root: string): string {
-    return `warming-${createHash("sha256").update(resolve(root)).digest("hex").slice(0, 16)}.lock`;
-  }
-}
-
-/**
- * The folder of the user's kept parses, or undefined where it cannot be the
- * user's alone. The one place the store's path is made, under the user's
- * cache (userCacheDir), never under a project.
- */
-function parsesFolder(): string | undefined {
-  const cache = userCacheDir();
-  const parses = join(cache, "parses");
-  try {
-    mkdirSync(parses, { recursive: true, mode: 0o700 });
-  } catch {
-    return undefined;
-  }
-  return ownFolder(cache) && ownFolder(parses) ? parses : undefined;
-}
-
-/** Whether a folder is this user's alone: a real folder, not a link, owned by this user, that no one else may write. */
-function ownFolder(path: string): boolean {
-  try {
-    const entry = lstatSync(path);
-    const owner = process.getuid?.();
-    return entry.isDirectory() && (owner === undefined || entry.uid === owner) && (entry.mode & 0o022) === 0;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * One fingerprint's folder of kept parses in the user's cache, and the audits
- * beside them. Its segments are named by random hex, written whole under a
- * temporary name and renamed into place, and only ever read or removed after.
- */
-class StoreFolder {
-  readonly #dir: string;
-
-  private constructor(dir: string) {
+  private constructor(plugin: string, dir: string) {
+    this.#plugin = plugin;
     this.#dir = dir;
   }
 
-  /** A fingerprint's folder; undefined where the user's cache is not the user's alone or will not take it. */
-  static of(fingerprint: string): StoreFolder | undefined {
-    const parses = parsesFolder();
-    if (parses === undefined || !FINGERPRINT.test(fingerprint)) return undefined;
-    const dir = join(parses, fingerprint);
-    try {
-      mkdirSync(dir, { recursive: true, mode: 0o700 });
-    } catch {
-      return undefined;
+  /** A fingerprint's store; undefined where its folder, or any on the path to it, is not the user's alone (usersAlone). */
+  static of(plugin: string, fingerprint: string): ParseStore | undefined {
+    if (!ParseStore.stores.has(fingerprint)) {
+      const parses = parsesFolder();
+      const dir = parses === undefined || !FINGERPRINT.test(fingerprint) ? undefined : join(parses, fingerprint);
+      try {
+        if (dir !== undefined) mkdirSync(dir, { recursive: true, mode: 0o700 });
+      } catch {
+        // A folder that cannot be made is no folder of the user's alone, which usersAlone answers.
+      }
+      ParseStore.stores.set(fingerprint, dir !== undefined && usersAlone(dir) ? new ParseStore(plugin, dir) : undefined);
     }
-    return ownFolder(dir) ? new StoreFolder(dir) : undefined;
+    return ParseStore.stores.get(fingerprint);
   }
 
-  /** The segments the folder holds now. */
-  segments(): string[] {
+  /** A text's kept parse, read from its own file; undefined where none is kept, or the file is not this user's own regular file of a parse's shape. */
+  get(key: string): Found | undefined {
+    const path = this.#path(key);
+    if (!ownFolder(dirname(path))) return undefined;
+    const kept = ownFile(path, PARSE_MAX_BYTES, true);
+    if (kept === undefined) return undefined;
     try {
-      return readdirSync(this.#dir).filter((name) => SEGMENT.test(name)).sort();
-    } catch {
-      return [];
-    }
-  }
-
-  /** A segment's kept parses, each checked for shape; none where it is gone or will not read. */
-  readSegment(name: string): [string, Found][] {
-    try {
-      const kept = JSON.parse(readFileSync(join(this.#dir, name), "utf8")) as unknown;
-      if (typeof kept !== "object" || kept === null || Array.isArray(kept)) return [];
-      return Object.entries(kept).filter((entry): entry is [string, Found] => isFound(entry[1]));
-    } catch {
-      return [];
-    }
-  }
-
-  /** Write kept parses as a new segment, whole: under a temporary name, then renamed into place. Its name, or undefined where it could not be written. */
-  writeSegment(entries: ReadonlyMap<string, Found>): string | undefined {
-    const name = `${randomBytes(12).toString("hex")}.json`;
-    const temporary = join(this.#dir, `${name}.${process.pid}.tmp`);
-    try {
-      writeFileSync(temporary, JSON.stringify(Object.fromEntries(entries)), { flag: "wx", mode: 0o600 });
-      renameSync(temporary, join(this.#dir, name));
-      return name;
-    } catch {
-      rmSync(temporary, { force: true });
-      return undefined;
-    }
-  }
-
-  /** How many days ago a segment was written; never where it is gone. */
-  ageDays(name: string): number {
-    try {
-      return (Date.now() - statSync(join(this.#dir, name)).mtimeMs) / 86_400_000;
-    } catch {
-      return Number.POSITIVE_INFINITY;
-    }
-  }
-
-  /** Create a small file where none is: false where one already is. */
-  create(name: string, text: string): boolean {
-    try {
-      writeFileSync(join(this.#dir, name), text, { flag: "wx", mode: 0o600 });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /** A small file's text, or undefined where it is gone. */
-  read(name: string): string | undefined {
-    try {
-      return readFileSync(join(this.#dir, name), "utf8");
+      const found = JSON.parse(kept) as unknown;
+      return isFound(found) ? found : undefined;
     } catch {
       return undefined;
     }
   }
 
-  remove(name: string): void {
-    rmSync(join(this.#dir, name), { force: true });
-  }
-
-  /** Remove the folders of other fingerprints no warm-up has written to in RETAIN_DAYS: a plugin or Coherence changed, and their parses will never be read again. */
-  static prune(current: string): void {
-    const parses = parsesFolder();
-    if (parses === undefined) return;
-    let names: string[];
+  /** Keep a text's parse: written whole under a temporary name and renamed into place, so a reader meets the whole file or none. */
+  put(key: string, found: Found): void {
+    this.parsed++;
+    const path = this.#path(key);
     try {
-      names = readdirSync(parses).filter((name) => FINGERPRINT.test(name) && name !== current);
+      mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     } catch {
       return;
     }
-    for (const name of names) {
-      const folder = new StoreFolder(join(parses, name));
-      const newest = Math.min(...folder.segments().map((segment) => folder.ageDays(segment)), folder.ageDays("."));
-      if (newest > RETAIN_DAYS) rmSync(join(parses, name), { recursive: true, force: true });
+    if (ownFolder(dirname(path))) writeWhole(path, JSON.stringify(found));
+  }
+
+  /** Remove every kept parse of this fingerprint, renamed out of the way first so no reader meets half a store, and leave the audit that found them stale for orient to say. */
+  discard(audit: { sampled: number; stale: number }): void {
+    const away = `${this.#dir}.stale-${randomBytes(8).toString("hex")}`;
+    try {
+      renameSync(this.#dir, away);
+      rmSync(away, { recursive: true, force: true });
+    } catch {
+      // A store another warm-up removed first.
+    }
+    ParseStore.writeAudit(this.#plugin, { at: Date.now(), ...audit });
+  }
+
+  /** A kept parse's file: a folder of the key's first two digits, holding a file of the rest, as git files a loose object. */
+  #path(key: string): string {
+    if (!KEY.test(key)) throw new Error(`a kept parse's key is 32 lowercase hex digits, never ${JSON.stringify(key)}`);
+    return join(this.#dir, key.slice(0, 2), key.slice(2));
+  }
+
+  /**
+   * Remove, across every fingerprint, each kept parse no process has read in
+   * RETAIN_DAYS, each temporary file a write that died left an hour on, each
+   * store a discard left behind, and each folder that empties; at most once a
+   * day, which the swept file's time says.
+   */
+  static sweep(now: number = Date.now()): void {
+    const parses = parsesFolder();
+    if (parses === undefined) return;
+    const swept = join(parses, SWEPT);
+    try {
+      if (now - lstatSync(swept).mtimeMs < DAY_MS) return;
+    } catch {
+      // Never swept.
+    }
+    writeWhole(swept, "");
+    const older = (path: string, ms: number): boolean => {
+      try {
+        return now - lstatSync(path).mtimeMs > ms;
+      } catch {
+        return false;
+      }
+    };
+    for (const name of listed(parses)) {
+      const path = join(parses, name);
+      if (STALE_STORE.test(name)) rmSync(path, { recursive: true, force: true });
+      if (!FINGERPRINT.test(name)) continue;
+      for (const shard of listed(path).filter((s) => SHARD.test(s))) {
+        const folder = join(path, shard);
+        for (const file of listed(folder)) {
+          if ((KEY_REST.test(file) && older(join(folder, file), RETAIN_DAYS * DAY_MS)) || (TEMPORARY.test(file) && older(join(folder, file), HOUR_MS))) rmSync(join(folder, file), { force: true });
+        }
+        removeIfEmpty(folder);
+      }
+      removeIfEmpty(path);
     }
   }
 
@@ -842,40 +657,155 @@ class StoreFolder {
     if (parses === undefined || !PLUGIN_NAME.test(plugin)) return;
     try {
       mkdirSync(join(parses, AUDITS), { recursive: true, mode: 0o700 });
-      writeFileSync(join(parses, AUDITS, `${plugin}.json`), JSON.stringify(audit), { mode: 0o600 });
     } catch {
       // An audit that cannot be kept is one orient does not say.
+      return;
     }
+    writeWhole(join(parses, AUDITS, `${plugin}.json`), JSON.stringify(audit));
   }
 
   /** The audits warm-ups left, by plugin, each checked for shape. */
   static audits(): { plugin: string; at: number; sampled: number; stale: number }[] {
     const parses = parsesFolder();
     if (parses === undefined) return [];
-    const folder = new StoreFolder(join(parses, AUDITS));
-    let names: string[];
-    try {
-      names = readdirSync(join(parses, AUDITS)).filter((name) => name.endsWith(".json") && PLUGIN_NAME.test(name.slice(0, -5)));
-    } catch {
-      return [];
-    }
-    return names.flatMap((name) => {
-      try {
-        const { at, sampled, stale } = JSON.parse(folder.read(name) ?? "") as Record<string, unknown>;
-        if (typeof at !== "number" || !Number.isInteger(sampled) || !Number.isInteger(stale)) return [];
-        return [{ plugin: name.slice(0, -5), at, sampled: sampled as number, stale: stale as number }];
-      } catch {
-        return [];
-      }
-    });
+    return listed(join(parses, AUDITS))
+      .filter((name) => name.endsWith(".json") && PLUGIN_NAME.test(name.slice(0, -5)))
+      .flatMap((name) => {
+        try {
+          const { at, sampled, stale } = JSON.parse(ownFile(join(parses, AUDITS, name), AUDIT_MAX_BYTES, false) ?? "") as Record<string, unknown>;
+          if (typeof at !== "number" || !Number.isInteger(sampled) || !Number.isInteger(stale)) return [];
+          return [{ plugin: name.slice(0, -5), at, sampled: sampled as number, stale: stale as number }];
+        } catch {
+          return [];
+        }
+      });
   }
 }
 
-/** A fingerprint's folder name, a segment's name, a plugin's name in an audit's, and the audits' folder. */
-const FINGERPRINT = /^[A-Za-z0-9_-]{16}$/;
-const SEGMENT = /^[0-9a-f]{24}\.json$/;
+/**
+ * The folder of the user's kept parses, or undefined where it cannot be the
+ * user's alone. The one place the store's path is made, under the user's
+ * cache (userCacheDir), never under a project.
+ */
+function parsesFolder(): string | undefined {
+  const parses = join(userCacheDir(), "parses");
+  try {
+    mkdirSync(parses, { recursive: true, mode: 0o700 });
+  } catch {
+    return undefined;
+  }
+  return usersAlone(parses) ? parses : undefined;
+}
+
+/**
+ * Whether no one but this user (and the system) can change what a path
+ * leads to, as written and once every link on it is followed: each folder on
+ * it, and each link, owned by this user or by the system, and no folder others
+ * may write unless it is sticky (the system's temporary folder), where others
+ * may add a name but never move this user's; and the folder itself, and the
+ * one it is in (Coherence's in the cache), this user's own that no one else
+ * may write. Nothing on the path can then be changed after the check by anyone
+ * this user does not trust, so a store judged the user's alone stays so.
+ */
+function usersAlone(path: string): boolean {
+  const me = process.getuid?.();
+  const trusted = (entry: { uid: number }): boolean => me === undefined || entry.uid === me || entry.uid === 0;
+  const own = (entry: { uid: number; mode: number }): boolean => (me === undefined || entry.uid === me) && (entry.mode & 0o022) === 0;
+  const walk = (at: string): boolean => {
+    for (let here = at; ; here = dirname(here)) {
+      const entry = lstatSync(here);
+      if (!trusted(entry)) return false;
+      if (entry.isDirectory() && (entry.mode & 0o022) !== 0 && (entry.mode & 0o1000) === 0) return false;
+      if (dirname(here) === here) return true;
+    }
+  };
+  try {
+    const real = realpathSync(path);
+    // The folder and the one it is in this user's own; every folder and link on the way trusted.
+    return walk(path) && walk(real) && own(lstatSync(real)) && own(lstatSync(dirname(real))) && lstatSync(real).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** Whether a folder of the store's is this user's own, a real folder, not a link, that no one else may write: a kept parse's folder, checked at each read. */
+function ownFolder(path: string): boolean {
+  try {
+    const entry = lstatSync(path);
+    const me = process.getuid?.();
+    return entry.isDirectory() && (me === undefined || entry.uid === me) && (entry.mode & 0o022) === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A file of the store's, as text: opened without following a link and
+ * without waiting on a pipe, and read only where it is a regular file this
+ * user owns, that no one else may write, of at most `max` bytes; a kept parse read is stamped as read when
+ * its last stamp is a day old, so the sweep keeps what is still read.
+ * Undefined for anything else, or a file that is gone.
+ */
+function ownFile(path: string, max: number, stamp: boolean): string | undefined {
+  let fd: number;
+  try {
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  } catch {
+    return undefined;
+  }
+  try {
+    const entry = fstatSync(fd);
+    const me = process.getuid?.();
+    if (!entry.isFile() || (me !== undefined && entry.uid !== me) || (entry.mode & 0o022) !== 0 || entry.size > max) return undefined;
+    const now = Date.now();
+    if (stamp && now - entry.mtimeMs > DAY_MS) futimesSync(fd, now / 1000, now / 1000);
+    return readFileSync(fd, "utf8");
+  } catch {
+    return undefined;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** Write a file whole: under a temporary name no other write shares, then renamed into place; nothing where it cannot be written. */
+function writeWhole(path: string, text: string): void {
+  const temporary = `${path}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
+  try {
+    writeFileSync(temporary, text, { flag: "wx", mode: 0o600 });
+    renameSync(temporary, path);
+  } catch {
+    rmSync(temporary, { force: true });
+  }
+}
+
+/** A folder's names; none where it is gone. */
+function listed(folder: string): string[] {
+  try {
+    return readdirSync(folder);
+  } catch {
+    return [];
+  }
+}
+
+/** Remove a folder that holds nothing; one that holds something stays. */
+function removeIfEmpty(folder: string): void {
+  try {
+    rmdirSync(folder);
+  } catch {
+    // Not empty, or gone.
+  }
+}
+
+/** A text's key, a fingerprint, a key's shard folder and the rest of its name, a write's temporary file, a store a discard renamed away, and a plugin's name in an audit's. Hex alone, so no two names differ by case on a file system that folds it. */
+const KEY = /^[0-9a-f]{32}$/;
+const FINGERPRINT = /^[0-9a-f]{24}$/;
+const SHARD = /^[0-9a-f]{2}$/;
+const KEY_REST = /^[0-9a-f]{30}$/;
+const TEMPORARY = /\.tmp$/;
+const STALE_STORE = /^[0-9a-f]{24}\.stale-[0-9a-f]{16}$/;
 const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const AUDITS = "audits";
+const SWEPT = "swept";
 
 /** The web-tree-sitter release that parses, read from its package once: a parse kept under another release is never read as this one's. */
 let runtime: string | undefined;
@@ -890,34 +820,20 @@ function runtimeVersion(): string {
   return runtime;
 }
 
-/** How often, at most, a long-lived process looks for segments other processes wrote. */
-const RELOAD_MS = 1000;
-
 /** How long orient says a stale store was found. */
 const AUDIT_NOTICE_DAYS = 7;
 
-/** How long a warm-up lock holds before another warm-up of the same project may take it over. */
-const WARM_LOCK_MS = 10 * 60 * 1000;
-
-/** Whether a process is alive (signal 0 asks without sending). */
-function alive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
-}
-
-/** How many days a kept parse no warm-up read lasts: a text gone from every project ages out at the next merge after. */
+/** How many days a kept parse no process reads lasts: a text gone from every project is removed by the first sweep after. */
 const RETAIN_DAYS = 14;
 
-/** How many segments a fingerprint's folder holds before a warm-up merges them. */
-const SEGMENTS_MAX = 8;
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 
-/** How many parses a process holds before it writes them. */
-const FLUSH_EVERY = 256;
+/** The largest kept parse read: one of the largest text a warm-up reads (16 MB) keeps less. */
+const PARSE_MAX_BYTES = 32 * 1024 * 1024;
+
+/** The largest audit read: one is a few numbers. */
+const AUDIT_MAX_BYTES = 4096;
 
 /** Whether a value is a kept parse: matches of captures, each [name, text, line]. */
 function isFound(value: unknown): value is Found {

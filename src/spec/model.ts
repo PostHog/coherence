@@ -584,6 +584,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       invariantsByFolder: new Map(components.map((c) => [c.folder, new Set(c.invariants.map((i) => i.name))])),
       coherenceTree: practiceFiles.size === 0 ? true : isCoherenceTree(root),
       records,
+      classes: () => declaredClasses(root, false),
     }),
   );
   const byName = new Map(components.map((c) => [c.folder, c]));

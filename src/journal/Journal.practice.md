@@ -4,7 +4,7 @@
     leaves: the defect's or the classification's id
   step: name what let the bug be written (the state a value can hold that it never should, or a second way to do what one function should do alone), then sweep the codebase for every sibling of that shape and record the sweep: what was searched and each sibling found, or that it found none
     leaves: the representable shape, and the sweep
-  step: fix it so the code cannot express it again, in preference to a check at the site; when the dead-end reading names the defect's component (DEAD END in spec --check, Dead ends in orient), weigh a different design for that component first, not a narrower door in the same one, and record the choice, redesign or keep, as a decision: one door every caller must pass (a function or class its module keeps private, so the compiler, or a totality oracle where the language has no such check, refuses any other caller), a type that cannot hold the bad value, a walk with a stack of its own rather than recursion over what input controls, a fact derived where it is needed rather than kept twice; route every sibling the sweep found through it
+  step: fix it so the code cannot express it again, in preference to a check at the site: one door every caller must pass (a function or class its module keeps private, so the compiler, or a totality oracle where the language has no such check, refuses any other caller), a type that cannot hold the bad value, a walk with a stack of its own rather than recursion over what input controls, a fact derived where it is needed rather than kept twice; route every sibling the sweep found through it. When the dead-end reading names the defect's component (DEAD END in spec --check, Dead ends in orient), weigh a different design for that component before adding any such door to the one it has, and record the choice, redesign or keep, as a decision
     leaves: the door, type or derivation, and the siblings now routed through it; at a dead end, the decision choosing the design
   step: guard or decide: name an invariant that fails on any second way to write the bug, a chokepoint the compiler grades or a totality oracle that reads the code and refuses each other door (another call, a name held under an alias, a module asked for by string), adding the bullet when none exists; or record a decision saying why fixing the instance suffices, or that only time or a scheduler can show the bug (a cost, a race), bounding it structurally all the same (a size every read passes, a lock only one process can take)
     leaves: the guard's <component folder>/<invariant> or the decision's id
@@ -36,7 +36,7 @@
   reach: internal
   because: a report is a transcript, read once by one reader; a journal record carries its rejected alternative and reaches Scope, the pull request's records summary and every later session
 - keep state where it is true: Each piece of state a program keeps has one home, chosen for who may write it and how long it must live, and everything else that depends on it is computed from it, not stored beside it.
-  when: explicit | command coherence defect | command cli.* defect
+  when: defect duplicated-fact | explicit
   step: name the state the change touches: each truth (what is observed, entered or decided) and each value derived from one (a count, a cache, an index, a copy, a version repeated across files, a number written in a document)
     leaves: the truths and the derivations, each derivation naming the truth it comes from
   step: store each truth once: where a second copy exists, compute it from the first (when built, read or shown) or remove it; a copy that must be kept (a cache, a snapshot) is filed by the truth it came from, by its digest or fingerprint, so it cannot disagree without being read as another
@@ -52,6 +52,6 @@
   pitfall: a journal kept per worktree showed one copy of a session's records, and the pane that read it showed nearly none (w-4c76c5ea)
   pitfall: numbers typed into documents and decisions from a measurement went stale or wrong, and had to be corrected by later decisions (d-2dfb13fc, d-e8f43329)
   pitfall: a reading stopped by a time budget gave different answers on the same checkout under different machine load (w-77d2fe8f)
-  invariants: a defect carries its class and origin
+  invariants: src/spec/a practice fires on a defect's class
   reach: kernel
   because: data is the job a program does: state kept in two places disagrees, state kept where another party writes is theirs, and an output that is not a function of its state cannot be checked; store truth once, then compute what follows from it (after "Data is destiny", accord.exchange, CC BY-SA 4.0)

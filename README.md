@@ -647,11 +647,14 @@ gh workflow run prerelease.yml -f ref=<branch> -f notes="$(cat notes.md)"
 ```
 
 `.github/workflows/prerelease.yml` checks the branch out clean at its tip,
-refuses (naming each reason) unless the version is a prerelease that every
-bundled plugin and mod following the package names, the commit is on a branch
-of PostHog/coherence and holds its main, and no tag of the version exists;
-then it packs the tarball there and creates the prerelease at that commit's
-sha. Nothing is cut from a local checkout.
+with read access alone, and refuses (naming each reason) unless the version is
+a prerelease that every bundled plugin and mod following the package names,
+the commit is on a branch of PostHog/coherence and holds its main, and no tag
+of the version exists; then it packs the tarball there, installs it in an
+empty folder and runs `coherence plugin check typescript` and `plugin check
+python` from it. A second job, the only one that can write, tags that
+commit's sha and creates the prerelease on the tag, carrying the tarball.
+Nothing is cut from a local checkout.
 
 ## Further reading
 

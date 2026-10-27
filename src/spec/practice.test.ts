@@ -156,6 +156,43 @@ test("a command trigger's words match whole words of one simple command in place
   assert.notEqual(pattern.version, practice("command turn-knob").version, "the pattern is part of the version");
 });
 
+test("a defect trigger fires on a command that records, classifies or closes a defect in its class or family, and on no other class, verb or quoted text", () => {
+  const practice = (when: string) => parsePractices(practiceText("d-0000abcd").replace("command turn-knob | edit src/widget/**/*.ts adding knob", when), "W.practice.md");
+  const p = practice("defect duplicated-fact | explicit").practices[0]!;
+  assert.deepEqual(p.triggers, [{ kind: "defect", class: "duplicated-fact" }, { kind: "explicit" }]);
+  const fires = (practice: typeof p, command: string) => firedBy(practice, toolUseOf({ tool_input: { command } }, []));
+  for (const command of [
+    `node src/cli.ts defect "the count drifted" --evidence "seen" --class duplicated-fact`,
+    `npx coherence defect "the count drifted" --evidence "seen" --class duplicated-fact`,
+    `node node_modules/@posthog/coherence/dist/cli.js defect "x" --class=duplicated-fact --evidence "y"`,
+    `node src/cli.ts classify df-1a2b3c4d --class duplicated-fact --because "two copies"`,
+    `node src/cli.ts resolved df-1a2b3c4d --because "derived" --guard src/journal/a --class duplicated-fact`,
+    `ls && node src/cli.ts defect "x" --evidence "y" --class "duplicated-fact"`,
+  ]) assert.equal(fires(p, command), "defect of class duplicated-fact", command);
+  for (const command of [
+    `node src/cli.ts defect "the count drifted" --evidence "seen" --class cost`,
+    `node src/cli.ts defect "the count drifted" --evidence "seen"`,
+    `node src/cli.ts defect "the --class duplicated-fact flag" --evidence "seen"`,
+    `node src/cli.ts decide "x" --because "y" --class duplicated-fact`,
+    `node src/cli.ts journal --kind defect --class duplicated-fact`,
+    "cat > notes.md <<'EOF'\nnode src/cli.ts defect x --class duplicated-fact\nEOF",
+  ]) assert.equal(fires(p, command), undefined, command);
+  assert.equal(firedBy(p, { command: "npx coherence defect x --class duplicated-fact", writes: [], added: "" }), "defect of class duplicated-fact", "the text fallback reads it too");
+  assert.notEqual(p.version, practice("defect cost | explicit").practices[0]!.version, "the class is part of the version");
+  assert.match(practice("defect Not A Class").problems.map((x) => x.message).join("\n"), /"defect Not A Class" names no class/);
+  // The kernel practice keep state where it is true fires on the duplicated-fact family, and no longer on every defect.
+  const kernel = parsePractices(readFileSync(join(import.meta.dirname, "..", "journal", "Journal.practice.md"), "utf8"), "src/journal/Journal.practice.md").practices.find((x) => x.name === "keep state where it is true")!;
+  assert.equal(fires(kernel, `node src/cli.ts defect "x" --evidence "y" --class duplicated-fact --file a.ts`), "defect of class duplicated-fact");
+  assert.equal(fires(kernel, `node src/cli.ts defect "x" --evidence "y" --class over-claim`), undefined);
+  assert.equal(fires(kernel, `node src/cli.ts defect "x" --evidence "y"`), undefined);
+  // A defect trigger naming a class no lexicon declares can never fire, and is a spec problem.
+  const { root } = widget();
+  writeFileSync(join(root, "src/widget/Widget.practice.md"), practiceText((loadJournal(root).records[0]!).id).replace("command turn-knob | edit src/widget/**/*.ts adding knob", "defect knob-seized | defect duplicated-fact"));
+  const messages = loadSpecModel(root, { runs: false }).problems.map((x) => x.message);
+  assert.ok(messages.some((m) => /its trigger defect knob-seized names a class no lexicon declares/.test(m)), messages.join("\n"));
+  assert.ok(!messages.some((m) => /defect duplicated-fact names a class/.test(m)), "a family Coherence's lexicon declares is no problem");
+});
+
 test("a practice file stands only beside its folder's spec, with the spec's stem", () => {
   const root = project({ "src/widget/Widget.spec.md": SPEC, "src/widget/Gadget.practice.md": practiceText("d-0000abcd"), "src/loose/Loose.practice.md": practiceText("d-0000abcd") });
   const messages = loadSpecModel(root, { runs: false }).problems.map((p) => `${p.file}: ${p.message}`);

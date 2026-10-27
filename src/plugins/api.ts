@@ -53,6 +53,6 @@ export type { Literal } from "../lifecycle/mirrors.ts";
 export { spawn, spawnSync } from "../lifecycle/work-meter.ts";
 export { typescriptCompiler } from "./specifiers.ts";
 export type { InterfaceSymbol } from "../observation/interfaces.ts";
-export type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
+export type { InterfaceFacts } from "../readings/scope/component-interfaces.ts";
 export { readOwners, type BoundaryModule, type BoundarySource, type Exposure } from "../scaffold/boundaries.ts";
 export { ScaffoldError } from "../scaffold/scaffold.ts";

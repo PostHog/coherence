@@ -23,20 +23,22 @@ import { sourceFiles } from "./source.ts";
  * files, and the user's one store keeps them all. What each root and
  * language read, and how many of those it parsed rather than found kept.
  */
-export function warmProjectParses(rootGiven: string): { root: string; language: string; read: number; parsed: number; skipped?: true }[] {
+export function warmProjectParses(rootGiven: string): { root: string; language: string; read: number; parsed: number }[] {
   const root = resolve(rootGiven);
   const top = registryForLeaf(root)?.top;
   return [root, ...(top === undefined || resolve(top) === root ? [] : [resolve(top)])].flatMap((at) => warmRoot(at).map((w) => ({ root: at, ...w })));
 }
 
-function warmRoot(root: string): { language: string; read: number; parsed: number; skipped?: true }[] {
+function warmRoot(root: string): { language: string; read: number; parsed: number }[] {
   const config = readEnforcementConfig(root);
   const ignore = configIgnore(root);
   return forProject(root, () =>
     config.languages.flatMap((language) => {
       const plugin = sourceProvider(language);
       if (plugin?.manifest.treeSitter === undefined) return [];
-      const files = sourceFiles(root, language, ignore);
+      // In an order of this warm-up's own, so two warm-ups of one project at once (a session start and the prompt after it) mostly parse
+      // different files, each reading what the other has kept by then, where in one order they would parse every file twice.
+      const files = shuffled(sourceFiles(root, language, ignore));
       const texts = (function* () {
         for (const file of files) {
           const text = warmText(resolve(root, file));
@@ -73,4 +75,14 @@ function warmText(path: string): string | undefined {
   } finally {
     closeSync(fd);
   }
+}
+
+/** The same items in a random order (Fisher and Yates). */
+function shuffled<T>(items: readonly T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
 }

@@ -153,7 +153,7 @@ copy names it the second way, and so should a plugin you write.
 | Key | Meaning |
 |---|---|
 | `name`, `version` | Who the plugin is. Every run entry its adapter or verifier answers names both. |
-| `pluginApi` | The interface version it was written for. This release runs `4` and reads plugins written for `1` to `4`: a plugin written for an older one loads, and the session start names it with what changed since. Any other version is refused, naming both. Version 4 removed the hand-written reader slots (`source`, `declares`, `topLevel` and `kept` under `syntax`): a language's text is read through `treeSitter` alone, and a manifest that fills one is refused naming the slot, whatever version it is written for. Version 3 brought the parser path (`treeSitter`), imports that resolve to a module of several files, the adapter's `topLevelSymbols`, and `check.json`'s `reference` map; `plugin check` holds a plugin to the reference reading and server agrees duties from 3, and tells a plugin written for 2 they are not held. |
+| `pluginApi` | The interface version it was written for. This release runs `4` and reads plugins written for `1` to `4`: a plugin written for an older one loads, and the session start names it with what changed since. Any other version is refused, naming both. Version 4 removed the hand-written reader slots (`source`, `declares`, `topLevel` and `kept` under `syntax`): a language's declarations, imports and exports are read through `treeSitter` alone, a manifest that fills one is refused naming each, whatever version it is written for, and the `interfaces` table states `serverBounds` alone (below, the syntax slots). Version 3 brought the parser path (`treeSitter`), imports that resolve to a module of several files, the adapter's `topLevelSymbols`, and `check.json`'s `reference` map; `plugin check` holds a plugin to the reference reading and server agrees duties from 3, and tells a plugin written for 2 they are not held. |
 | `provides` | `language`: the language its adapter answers for (or `declaredLanguages: true`, the bundled declared plugin's, for the languages a config declares). A built-in name takes the built-in's place (see the swap rule). A new name needs `extensions` (or `files`), and the config's `language` must name it; the language is then read as a bundled one is, for that project: its files, test files and folders, its entrance rules, its CI steps, its parser and every syntax slot it fills. |
 | `extends` | The language whose adapter it is handed to wrap, as `base` (Convex extends `typescript`). A plugin for a language of its own extends nothing. |
 | `extensions` | The files a new language is written in. An extension a built-in, a declared language, or another plugin owns is refused. |
@@ -161,8 +161,8 @@ copy names it the second way, and so should a plugin you write.
 | `ladder` | The rungs the adapter grades on: `top`, `because`, `rungs`, and optionally `whenVacuous`, the rung a chokepoint stands on when the refutation could not see its staged uses (absent, the earned rung stands with the verdict not run). Absent, the wrapped adapter's; with none, reference-choked alone, enforced by Coherence's check. |
 | `verifiers` | The via forms it proves (below). A `command` must name `{name}`; a command that is never told what to prove is refused. An optional `match` is a regular expression its output must match for an exit 0 to pass. |
 | `lexicon` | Its lexicon layer, relative to the manifest. |
-| `syntax` | The syntax slots it fills, each `"<module beside the manifest>#<export>"` (below). No slot reads the language's text: one that names `source`, `declares`, `topLevel` or `kept` is refused. |
-| `treeSitter` | The tree-sitter parser its language's text is read through, and the queries over it (below, reading through a parser): the one way a plugin reads its language's text. The core derives every reading of the text (the names a file declares, what each declares, its imports) and the `interfaces` slot's import answers from the parse; a language whose plugin names none is not read. |
+| `syntax` | The syntax slots it fills, each `"<module beside the manifest>#<export>"` (below). No slot answers a reading of the language's declarations, imports or exports, which are the parser's: a manifest that names `source`, `declares`, `topLevel` or `kept` is refused, and so is an `interfaces` table that answers anything but `serverBounds`. |
+| `treeSitter` | The tree-sitter parser its language's text is read through, and the queries over it (below, reading through a parser): the one way a plugin reads its language's text. The core derives from the parse every reading of the language's declarations, imports and exports: the names a file declares, what each declares, its imports, its type declarations, default exports, renamed imports and wildcard imports; a language whose plugin names none is not read. |
 | `files` | The files a language is written in, as a regular expression `pattern` with an optional `except` (TypeScript, as JSON writes them: `\\.(?:[cm]?[tj]sx?)$` except `\\.d\\.ts$`); `extensions` is the short form for a plain list. |
 | `source` | `except`: of the language's files, those the plain source scan leaves out (TypeScript's JavaScript, Python's stubs). |
 | `serverExtensions` | The extensions the language server can report a site in or resolve a name to. |
@@ -234,25 +234,36 @@ there is not, so the copy never makes the name ambiguous.
 ### The syntax slots
 
 A language plugin reads its text through a parser (below, reading through
-a parser), from which the core derives every reading of the text: the names
-a file declares and whether it exports each (the economy and mass), what
-each declares (the observation's interface map), what a file's top level
-declares (the spec model's check that a handler, guard or mirror exists),
-its imports, and the `interfaces` slot's import answers. The plugin fills
-the slots no parse answers (`entrances`, `notice`, `lists`, `boundaries`,
-the `interfaces` table's language facts). No slot reads the language's text:
+a parser), from which the core derives every reading of the language's
+declarations, imports and exports: the names a file declares and whether it
+exports each (the economy and mass), what each declares (the observation's
+interface map), what a file's top level declares (the spec model's check
+that a handler, guard or mirror exists), its imports, and the Structure
+reading's type declarations, default exports, renamed imports and wildcard
+imports (the kept answers read the last). No slot answers one of those:
 the hand-written reader slots of pluginApi 3 and before (`source`,
 `declares`, `topLevel`, `kept`) are gone, and a manifest that names one is
-refused naming the slot, whatever `pluginApi` it is written for.
+refused, whatever `pluginApi` it is written for; and an `interfaces` table
+that answers `importLists`, `wildcardModules`, `isTypeDeclaration`,
+`isDefaultExport`, `defaultNames` or anything but `serverBounds` is refused
+naming each, whether or not its plugin names a parser.
 
-The readings take what no parse answers from the tables its plugin's
-manifest names under `syntax`, each as `"<module>#<export>"`, loaded
-synchronously, once, when a reading first asks for that slot:
+The plugin fills the slots no parse answers. Two of them still read a
+file's text by hand, for what the parse does not derive: `entrances` reads a
+code file for a framework's entrance rules (`candidates`), the lines a
+statement spans (`definitionAt`, `continues`), whether the file binds a name
+a call spells (`binds`) and, for TypeScript, which code files another imports
+by a relative path (`importedAmong`); `lists` reads the literal a list is set
+to. The others read no text of the language: `notice` a line for the session
+start, `boundaries` a tool's declaration file (tach's), and `interfaces` the
+language's facts. The tables are named under `syntax`, each as
+`"<module>#<export>"`, loaded synchronously, once, when a reading first asks
+for that slot:
 
 | Slot | Read by | Type |
 |---|---|---|
 | `entrances` | entrance detection | `EntranceSyntax` |
-| `interfaces` | the Structure reading; its `wildcardModules` also the Structure reading's kept answers | `InterfaceSyntax` |
+| `interfaces` | the Structure reading: whether the language's server narrows to bounds | `InterfaceFacts`: `{ serverBounds }` alone |
 | `notice` | the session start | `(root) => string` |
 | `lists` | declared mirrors, for a list in the language's files; a file of a language whose plugin fills none is read as TypeScript | `(text, name) => Literal \| undefined` |
 | `boundaries` | `scaffold import` and adoption | `BoundarySource`: a tool's declaration file read into modules, as tach's |
@@ -267,8 +278,9 @@ name its Cargo.toml gives it), so no language's layout is known in the core.
 Every type is exported from `@posthog/coherence/plugin`. A language read
 without a parser, or a slot a plugin leaves empty, reads as "not read for
 <language>", never as another language: a plugin that names no parser is
-named not read by mass and every reading that scans text, and one that
-fills no `interfaces` slot by the Structure reading. `plugin check` fails a
+named not read by mass, the Structure reading and every reading that scans
+text, and one that fills no `interfaces` table reads as a server that takes
+no bounds. `plugin check` fails a
 plugin whose two slots answer with one function or two spelled alike (its
 "one answer each" duty).
 
@@ -367,33 +379,45 @@ carry its own build of it. The TypeScript plugin's two grammars are
 tree-sitter-typescript 0.23.2 with a patch, since upstream has merged no
 grammar change since that release: they read an import type with type
 arguments or as an array's element (`import('x').T<U>`, `import('x').T[]`),
-a member named `in` or `instanceof` (`in?: T`, `in = 2`) or beginning with
-`in` (`in_progress`, `in$`) on the line after another, and a bare `&` in JSX
-text or a JSX string, each of which hid the declarations after it in
-PostHog's frontend. The patch and the scripts that rebuild both parsers byte
-for byte are in `grammars/tree-sitter-typescript` in Coherence's repository.
-The build runs in two phases. The fetch phase downloads every input and
-checks it by the digest `inputs.sha256` records (the CLI, clang and wasm-opt
-the parsers are compiled with, tree-sitter-javascript, and the TypeScript
-and web-tree-sitter packages the comparison reads with), and clones the
-upstream grammar at its pinned commit. The build phase runs with the network
-denied, so it can download nothing, and refuses to run where it reaches the
-network; it checks every input again, runs the grammar's own test corpus and
-Coherence's (each fix, and each form it must leave alone, with its whole
-expected tree) in both dialects, builds the stock parsers beside the patched
-ones, and compares what the two read, node by node, over that corpus,
-TypeScript's own lib declaration files and Coherence's source. Any difference
-`intended-differences.json` does not name by its construct fails the build,
-as does any token the patched parsers read as another type than the stock
-ones do; the list names five fixes and one regression, below. The build
-phase writes the bundled parsers only once each is the digest
-`parsers.sha256` records. CI runs it on every pull request in a container
-with no network, and fails its checks unless every difference is listed and
-both parsers come out as the ones bundled. Still
+a member named `in` or `instanceof` (`in?: T`, `in = 2`, `in?(): void`) or
+beginning with `in` and a digit, `_`, `$` or `\` (`in_progress`, `in$`,
+`in2<T>(): T`), and a statement beginning so (`in_flight()`), on the line
+after another, and a bare `&` in JSX text or a JSX string, each of which hid
+the declarations after it in PostHog's frontend. The patch and the scripts
+that rebuild both parsers byte for byte are in `grammars/tree-sitter-typescript`
+in Coherence's repository. The build runs in two phases. The fetch phase
+downloads every input and checks it by the digest `inputs.sha256` records (the
+CLI, clang and wasm-opt the parsers are compiled with, tree-sitter-javascript,
+and the TypeScript and web-tree-sitter packages the comparison reads with),
+and clones the upstream grammar at its pinned commit. The build phase runs
+with the network denied by what runs it: `sandbox-exec` on macOS, docker with
+`--network none` on Linux and in CI (`unshare -rn` where there is no docker,
+which leaves the machine's unix sockets reachable). Its own attempt to
+connect is a tripwire for a phase started with the network on, not the
+denial. It checks every input again and builds from the upstream commit's
+tree, hashed again and held to the tree `inputs.sh` pins, so no ref or replace
+object in the clone has a say. The patch may change the grammar and its
+scanner (`common/define-grammar.js`, `common/scanner.h`) and nothing else; one
+that touches another file is refused, and the patched grammar is the clean
+tree with those two files alone taken from it. The phase then runs
+upstream's test corpus, read from the clean tree, and Coherence's, kept in
+`corpus/` outside the patch so the patch cannot rewrite what it is held to,
+each case with its whole expected tree, in both dialects; builds the stock
+parsers beside the patched ones; and compares what the two read, node by
+node, over that corpus, TypeScript's own lib declaration files and
+Coherence's source. Any difference `intended-differences.json` does not name
+by its construct fails the build, as does any token the patched parsers read
+as another type than the stock ones do, any expected tree the bundled
+parsers do not read, and any intended difference that does not show as the
+one region of each case it names, one form to a case; the list names six
+fixes and one regression, below. The build phase writes the bundled parsers
+only once each is the digest `parsers.sha256` records. CI runs it on every
+pull request in a container with no network, and fails its checks unless
+every difference is listed and both parsers come out as the ones bundled. Still
 errors, as with the stock grammar: an optional destructured parameter in a
 function type (`({ a }?: T) => U`), a parenthesized import type, `typeof
 import('x')` as a call's type argument (`importOriginal<typeof
-import('x')>()`), a method named `in` after another member, and variance
+import('x')>()`), a method named `in` (`in() {}`) after another member, and variance
 annotations (`<in out T>`). A comparison after an import type
 (`x as import('x').T < y`) now errs too, as it does after any other type
 (`x as T < y`) and as TypeScript's own compiler refuses it. Around a
@@ -420,15 +444,20 @@ a constant whose value is JSX declares `unknown`.
 
 The plugin still fills the slots no parse answers: `entrances` (a
 framework's rules), `notice`, `lists`, `boundaries`, and an `interfaces`
-table for the language's own facts (whether its server narrows to bounds,
-its default exports). A manifest that fills `source`, `declares`, `topLevel`
-or `kept`, the hand-written readers pluginApi 4 removed, is refused naming
-the slot, whatever version it is written for and whether or not it names a
+table for the language's one fact (whether its server narrows to bounds).
+A manifest that fills `source`, `declares`, `topLevel` or `kept`, the
+hand-written readers pluginApi 4 removed, is refused in one problem naming
+each, whatever version it is written for and whether or not it names a
 parser; to move one, write the queries that capture what it read, and the
 core derives the reading from them. An `interfaces` table that answers
-`importLists` or `wildcardModules` is refused naming the answer. A second
-reader of the same text is how two readings of it come to disagree, as
-Python's two hand-written readers of its imports did.
+anything but `serverBounds` (`importLists`, `wildcardModules`,
+`isTypeDeclaration`, `isDefaultExport`, `defaultNames`, which pluginApi 3's
+tables answered) is refused naming each when it is first loaded, whether or
+not its plugin names a parser, and `plugin check`'s "one answer each" duty
+fails on it: the core reads those through the parse alone, so a table's own
+could never be read. A second reader of the same text is how two readings
+of it come to disagree, as Python's two hand-written readers of its imports
+did.
 
 Parsing costs: a WebAssembly parser reads about 11 MB of text a second, so
 Coherence keeps each text's parse in the user's own cache
@@ -437,11 +466,15 @@ filed by the parser's fingerprint and the text's digest, never in a
 project. The warm-up a session start launches parses every source file once
 in the background; after that a reading of the whole project, or of any
 project or worktree holding the same text, parses only the texts that
-changed (PostHog's 20,000 Python files: 30 s for the first warm-up, 2 s for
-the next, and mass in 3.4 s). A hook that reads a file or two parses it
-directly and never reads the store. A parse is written once, in a segment
-file written whole and never changed; a warm-up merges the segments when
-there are more than eight, keeping what was read in the last fourteen days.
+changed (PostHog's 19,902 Python files: 32 s for the first warm-up, 2 s for
+the next, and mass in 3.4 s, measured 2026-10-27). Each parse is a file of
+its own, named by the text's digest, written whole under a temporary name
+and renamed into place, as git keeps a loose object, and never written
+again; a reading opens only the files of the texts it reads and holds no
+store in memory. Two warm-ups at once need no lock, since neither can spoil
+what the other writes. A kept parse is stamped as read at most once a day,
+and a warm-up removes, once a day, every kept parse no process has read in
+fourteen days.
 The fingerprint digests everything a kept parse depends on: the parser and
 its `alternate`, the queries, the `separator`, the web-tree-sitter release
 and the Coherence code that reads a tree. Changing any of them changes the
@@ -449,8 +482,12 @@ fingerprint, so nothing kept under the old ones is read; `privateName` and
 `resolve` are read after the store and change no kept parse. Each warm-up
 also parses a sample of the texts it found kept and compares; a store that
 differs from a fresh parse is removed, and the next session start says so.
-The store is used only where the user's cache folder is the user's own, not
-a link and not writable by anyone else; elsewhere every text is parsed. The
+The store is used only where no one but the user and the system can change
+what its path leads to: every folder and link on the way owned by the user
+or the system, none others may write unless it is sticky (the system's
+temporary folder), and the store's own folders the user's alone; each kept
+parse is read only where it is the user's own regular file, no link, that no
+one else may write. Elsewhere every text is parsed. The
 warm-up reads only a project's regular source files, never one through a
 link or larger than 16 MB, and a file nested thousands deep around an error
 is read like any other.
@@ -621,7 +658,7 @@ one wanting changes a copy of it:
    | imports | the parser's scan reads every import `readings.imports` names, resolved to its project file, and none else: what the economy's closure walks |
    | interfaces | with each folder `readings.interfaces` names a component, the component interface reading finds the symbols one uses of another, and none else |
    | entrances | entrance detection finds every entrance `readings.entrances` names, by file, handler and rule, and none else |
-   | answers agree | where two readings answer one question of the same text, they agree over every file: a name the scan declares is one the top-level reading finds; a type declaration where `interfaces` (its plugin's own facts among them) and the declares reading both say so; a name an `interfaces` import list renames is one the scan reads imported |
+   | answers agree | where two readings answer one question of the same text, they agree over every file: a name the scan declares is one the top-level reading finds; a type declaration where the interfaces reading of its line alone and the declares reading of the whole text both say so (queries that read a declaration by what surrounds it fail here); a name an import list renames is one the scan reads imported |
    | one answer each | no two of its slots answer with one function, or two spelled alike |
 
    Each duty passes, fails with why, or is not run with why (the
@@ -668,10 +705,20 @@ the module's `syntax` export into `plugin.json`
 `topLevel` and `boundaries` slots. A module that still exports `syntax` is
 refused at load, by name, rather than read as having none. `pluginApi` 4
 removed the hand-written reader slots (`source`, `declares`, `topLevel`,
-`kept`): a manifest that fills one is refused naming the slot, whatever
-version it is written for, and says to read the language through
-`treeSitter`, a grammar's `.wasm` and queries (above, reading through a
-parser). A plugin of 1 to 3 that fills none of them still loads.
+`kept`): a manifest that fills one is refused, whatever version it is
+written for, in one problem naming each. Every bundled language plugin of
+Coherence 1.10 and before filled `source`, `declares` and `topLevel` by
+hand, so a copy `plugin eject` made then is refused, and so is a plugin
+written from that release's guide. The refusal names the simplest recovery
+first: a plugin named as a bundled one is said to be ejected from an older
+Coherence, and is ejected again from this version (set its entry in the
+config back to `"bundled"`, run `coherence plugin eject <name> --to <a new
+folder>`) with its changes reapplied to the new copy; a plugin written from
+scratch reads its language through `treeSitter`, a grammar's `.wasm` and
+queries (above, reading through a parser). Version 4 also left the
+`interfaces` table its one fact, `serverBounds`. A plugin of 1 to 3 that
+fills none of the removed slots, and whose `interfaces` table states
+nothing else, still loads.
 
 ## Roles
 

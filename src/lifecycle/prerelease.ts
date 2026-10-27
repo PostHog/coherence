@@ -8,10 +8,11 @@
  *
  *   gh workflow run prerelease.yml -f ref=<branch> -f notes="<markdown>"
  *
- * It checks the branch out clean, with full history, runs this module there
- * (node src/lifecycle/prerelease.ts, which takes no arguments and cuts
- * nothing), and only when it names no reason installs, packs and makes the
- * prerelease, targeting the commit it checked out by its sha. Run anywhere
+ * Its build job checks the branch out clean, with full history, runs this
+ * module there (node src/lifecycle/prerelease.ts, which takes no arguments
+ * and cuts nothing), and only when it names no reason installs, packs and
+ * checks the tarball; its release job then tags the commit checked out, by
+ * its sha, and makes the prerelease on that tag. Run anywhere
  * else, it reads that clone's HEAD and remotes, which is no reading of what
  * the workflow would cut: a local working tree, remote or ref is not what
  * ships, and review after review found the local script's view of them
@@ -26,7 +27,8 @@
  * read from HEAD; HEAD is on a branch of that remote, every branch fetched now
  * by an explicit refspec, deleted ones pruned; that remote's main, so fetched,
  * is an ancestor of HEAD, so the prerelease carries everything main has
- * shipped; and no tag of the version exists there. 1.11.0-beta.1 was cut from
+ * shipped; and that remote's tags list, with no tag of the version among
+ * them, a listing that fails being a reason too. 1.11.0-beta.1 was cut from
  * a branch that never took main's #153, and put back what #153 fixed; npm
  * version left the bundled plugins' versions behind the package's.
  */
@@ -105,7 +107,10 @@ export function prereleaseProblems(repo: string): string[] {
     if (!git(repo, "merge-base", "--is-ancestor", main, head).ok) problems.push(`${remote}/main (${git(repo, "rev-parse", "--short", main).out}) is not an ancestor of HEAD (${head.slice(0, 7)}): merge it first, or the prerelease takes back what main shipped since this branch left it`);
     if (git(repo, "for-each-ref", "--contains", head, "--format=%(refname)", `refs/remotes/${remote}/`).out === "") problems.push(`HEAD (${head.slice(0, 7)}) is on no branch of ${remote}: push it, since the release's target must be there`);
   }
-  if (git(repo, "ls-remote", "--tags", remote, `refs/tags/v${version}`).out !== "") problems.push(`the tag v${version} exists already: bump the version`);
+  // A listing that failed says nothing of the tag, so it is a reason too, never read as "no such tag".
+  const tags = git(repo, "ls-remote", "--tags", remote, `refs/tags/v${version}`);
+  if (!tags.ok) problems.push(`${remote}'s tags could not be listed, so whether v${version} exists is unknown`);
+  else if (tags.out !== "") problems.push(`the tag v${version} exists already: bump the version`);
   return problems;
 }
 

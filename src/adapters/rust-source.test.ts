@@ -15,7 +15,7 @@ import { computeMass, formatMass } from "../economy/mass.ts";
 import { declarationsOf, importsOf } from "../economy/source.ts";
 import { declares } from "../observation/interfaces.ts";
 import { isTypeDeclaration } from "../readings/scope/component-interfaces.ts";
-import { parsedOf, syntaxOf } from "../plugins/languages.ts";
+import { parsedOf } from "../plugins/languages.ts";
 import { rustListOf } from "../../plugins/rust/rust-lists.ts";
 import { uncommented, useLeaves } from "../../plugins/rust/rust-source.ts";
 
@@ -90,7 +90,7 @@ test("a use tree is read leaf by leaf through nested braces, renames, self and g
     [...new Set(read)].sort(),
     ["::serde::Serialize", "Row from crate::store", "Seen from crate::after", "Serialize from ::serde", "crate::after::Seen", "crate::api", "crate::store::Row", "crate::store::seal", "crate::store::self", "helper from super::super::util", "seal from crate::store", "super::super::util::helper"],
   );
-  const interfaces = syntaxOf("rust", "interfaces")!;
+  const interfaces = parsedOf("rust", "interfaces")!;
   assert.deepEqual(interfaces.importLists("use a::{b as c};"), ["b as c, a::b as c"], "a rename is read as the name and as the path it renames");
   assert.deepEqual(interfaces.wildcardModules("src/x.rs", text), ["src/api.rs", "src/api/mod.rs"], "a glob in a group is read under the group's path");
 });
@@ -138,7 +138,7 @@ test("a Rust path resolves by its crate's folder layout: crate, self, super and 
   assert.ok(!api.some((line) => line.includes("serde")), "a path into a crate outside the workspace resolves to nothing");
   assert.ok(!api.some((line) => line.includes("hiargs")), "HiArgs is an item of the crate root, never the module file hiargs.rs, on any disk");
   assert.deepEqual(imports("tool/main.rs", "mod flags;\nuse shop_core::store::seal;\nuse ::shop_core::api::render;\n").sort(), ["* <- tool/flags/mod.rs", "render <- crates/shop/src/api.rs", "seal <- crates/shop/src/store/mod.rs"], "a workspace crate by its package name, - read as _; a [[bin]] root's module beside it");
-  assert.deepEqual(syntaxOf("rust", "interfaces")!.wildcardModules("crates/shop/src/api.rs", "use crate::store::rows::*;\n"), ["crates/shop/src/store/rows.rs", "crates/shop/src/store/rows/mod.rs"], "a glob names its module in both layouts");
+  assert.deepEqual(parsedOf("rust", "interfaces")!.wildcardModules("crates/shop/src/api.rs", "use crate::store::rows::*;\n"), ["crates/shop/src/store/rows.rs", "crates/shop/src/store/rows/mod.rs"], "a glob names its module in both layouts");
 });
 
 test("a use inside an inline module is read from that module: super leaves it before the file's own, a path still inside it leads to no other file, and a bare path there names a crate", () => {
@@ -170,7 +170,7 @@ test("a use inside an inline module is read from that module: super leaves it be
     ["* <- src/store/mod.rs", "* <- src/store/rows.rs", "Row <- src/store/rows.rs", "rows <- src/store/mod.rs", "seal <- src/store/mod.rs"],
     "use super::* in a test module is this file, never the crate root; super::super leaves the inline module, then the file's; a bare path inside it is a crate",
   );
-  assert.deepEqual(syntaxOf("rust", "interfaces")!.wildcardModules("src/api.rs", text), ["src/store.rs", "src/store/mod.rs"], "a glob of the file's own module keys no file; one that leaves it keys the module it reaches");
+  assert.deepEqual(parsedOf("rust", "interfaces")!.wildcardModules("src/api.rs", text), ["src/store.rs", "src/store/mod.rs"], "a glob of the file's own module keys no file; one that leaves it keys the module it reaches");
 });
 
 test("mass reads a Rust project as it reads the other languages: its files counted, reach followed through its use trees and mod declarations, and no language named not read", () => {

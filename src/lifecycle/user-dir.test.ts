@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { isAbsolute, join } from "node:path";
 import { test } from "node:test";
-import { userConfigDir } from "./user-dir.ts";
+import { userCacheDir, userConfigDir } from "./user-dir.ts";
 
-test("Coherence's folder in the user's configuration is always an absolute path: XDG_CONFIG_HOME where it is absolute, else ~/.config under a home that is absolute, HOME's, the account's or Node's, else one in the temporary folder, so the machine key never lands in whatever folder a process starts in", () => {
+test("Coherence's folders in the user's configuration and cache are always absolute paths: XDG_CONFIG_HOME and XDG_CACHE_HOME where absolute, else ~/.config and ~/.cache under a home that is absolute, HOME's, the account's or Node's, else one in the temporary folder, so nothing Coherence keeps lands in whatever folder a process starts in", () => {
   assert.equal(userConfigDir({ XDG_CONFIG_HOME: "/xdg", HOME: "/home/u" }), join("/xdg", "coherence"));
   for (const relative of ["", "config", "./config", "../elsewhere"]) assert.equal(userConfigDir({ XDG_CONFIG_HOME: relative, HOME: "/home/u" }), join("/home/u", ".config", "coherence"), `XDG_CONFIG_HOME=${JSON.stringify(relative)} is ignored`);
   assert.equal(userConfigDir({ HOME: "/home/u" }), join("/home/u", ".config", "coherence"));
@@ -17,4 +17,11 @@ test("Coherence's folder in the user's configuration is always an absolute path:
   const bare = userConfigDir({ HOME: "rel" }, none);
   assert.ok(isAbsolute(bare), `with no home anywhere: ${bare} is absolute`);
   assert.equal(userConfigDir({ HOME: "rel" }, { account: () => "/acct", home: () => "/node" }), join("/acct", ".config", "coherence"), "the account's home before Node's");
+  // The cache's folder, where kept parses go, by the same rule.
+  assert.equal(userCacheDir({ XDG_CACHE_HOME: "/xdg-cache", HOME: "/home/u" }), join("/xdg-cache", "coherence"));
+  for (const relative of ["", "cache", "./cache", "../elsewhere"]) assert.equal(userCacheDir({ XDG_CACHE_HOME: relative, HOME: "/home/u" }), join("/home/u", ".cache", "coherence"), `XDG_CACHE_HOME=${JSON.stringify(relative)} is ignored`);
+  for (const home of ["", "rel", undefined]) {
+    const dir = userCacheDir({ HOME: home, XDG_CACHE_HOME: "cache" });
+    assert.ok(isAbsolute(dir) && dir.endsWith(join(".cache", "coherence")), `HOME=${JSON.stringify(home)}: ${dir} is absolute`);
+  }
 });

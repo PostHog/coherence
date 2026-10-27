@@ -117,11 +117,13 @@ export interface PracticeChecks {
   /** Whether the root is Coherence's own tree, where every practice declares its reach and nowhere else may. */
   coherenceTree: boolean;
   records: readonly JournalRecord[];
+  /** The defect classes and families the project's lexicon stack declares, asked only when a practice has a defect trigger. */
+  classes?: () => ReadonlySet<string>;
 }
 
 /**
  * The model-level problems of a project's practices: a citation found nowhere,
- * an invariant no spec declares, a reach missing in Coherence's tree or written outside it,
+ * an invariant no spec declares, a defect trigger naming a class no lexicon declares, a reach missing in Coherence's tree or written outside it,
  * and a step or pitfall gone from an enacted practice with no decision amending it (floorGaps).
  */
 export function practiceProblems(checks: PracticeChecks): Problem[] {
@@ -159,6 +161,15 @@ export function practiceProblems(checks: PracticeChecks): Problem[] {
       const invariant = slash === -1 ? name : name.slice(slash + 1);
       if (invariantsByFolder.get(folder)?.has(invariant)) continue;
       problems.push({ file: p.file, line: p.lines.invariants ?? p.line, message: `practice ${p.name} names invariant ${name}, which ${slash === -1 ? "its sister spec" : `the spec at ${folder}`} does not declare` });
+    }
+  }
+
+  // A defect trigger naming a class no lexicon declares can never fire: the defect verb refuses that class.
+  const defectTriggers = practices.flatMap((p) => p.triggers.flatMap((t) => (t.kind === "defect" ? [{ p, name: t.class }] : [])));
+  if (defectTriggers.length > 0 && checks.classes !== undefined) {
+    const declared = checks.classes();
+    for (const { p, name } of defectTriggers) {
+      if (!declared.has(name)) problems.push({ file: p.file, line: p.lines.when ?? p.line, message: `practice ${p.name}: its trigger defect ${name} names a class no lexicon declares, so no defect can carry it and the practice never fires on it; name a declared class or family, or declare it (lexicon propose define defect)` });
     }
   }
 

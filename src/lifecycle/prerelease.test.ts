@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, test } from "node:test";
@@ -48,99 +48,34 @@ function moveMain(work: string, name: string): void {
   git(other, "push", "--quiet", "origin", "HEAD:main");
 }
 
-/** A value of the block YAML the workflows are written in. */
-type Yaml = string | null | Yaml[] | { [key: string]: Yaml };
-
 /**
- * A strict reader of the block YAML the workflows are written in: mappings, sequences, plain and quoted scalars, flow
- * sequences of plain scalars, and literal block scalars, every scalar a string. Anything else (a tab, a node named with & or recalled with *, a tag, a
- * flow mapping, a folded scalar, a duplicate key, a plain scalar holding ": ", indentation no parent expects) throws,
- * so it never reads a file as YAML would not.
+ * The workflow's lines as a lint reads them: comments and blank lines dropped, each with its indentation. A lint of
+ * the file's shape, not a reading of what the workflow does: it refuses the YAML forms it does not read (a tab, a node
+ * named with & or recalled with *, a merge key, a flow mapping, a quoted or complex key, a second document) rather than
+ * read past them.
  */
-function readYaml(text: string): Yaml {
-  if (text.includes("\t")) throw new Error("a tab, which YAML refuses for indentation");
-  const lines = text.split("\n");
-  let i = 0;
-  const fail = (why: string): never => {
-    throw new Error(`line ${i + 1}: ${why}: ${lines[i]}`);
-  };
-  const indentOf = (line: string): number => line.length - line.trimStart().length;
-  const isItem = (line: string): boolean => /^\s*-( |$)/.test(line);
-  const KEY = /^([A-Za-z0-9_][A-Za-z0-9_.-]*|"[^"]*"|'[^']*'):(?: +(.*))?$/;
-  // The next line that is neither blank nor a comment, outside a block scalar.
-  const next = (): number => {
-    while (i < lines.length && /^\s*(#.*)?$/.test(lines[i]!)) i++;
-    return i;
-  };
-  const scalar = (raw: string): Yaml => {
-    const s = raw.trim();
-    if (s === "" || s.startsWith("#")) return null;
-    if (s.startsWith('"')) return (/^"((?:[^"\\]|\\.)*)" *(#.*)?$/.exec(s) ?? fail("a double-quoted scalar that does not close"))[1]!.replace(/\\(.)/g, (_, c: string) => (c === "n" ? "\n" : c));
-    if (s.startsWith("'")) return (/^'((?:[^']|'')*)' *(#.*)?$/.exec(s) ?? fail("a single-quoted scalar that does not close"))[1]!.replace(/''/g, "'");
-    if (s.startsWith("[")) return (/^\[([^[\]{}"']*)\] *(#.*)?$/.exec(s) ?? fail("a flow sequence of more than plain scalars"))[1]!.split(",").map((item) => item.trim()).filter((item) => item !== "").map(scalar);
-    if (/^[{&*!|>%@`]/.test(s)) fail("a form this reader does not take");
-    const plain = s.replace(/ +#.*$/, "");
-    if (/: |:$/.test(plain)) fail("a plain scalar holding ': '");
-    return plain;
-  };
-  // A literal block scalar under a key at `indent`: every line deeper than it, or blank, taken as written.
-  const literal = (indent: number): string => {
-    const body: string[] = [];
-    while (i < lines.length && (lines[i]!.trim() === "" || indentOf(lines[i]!) > indent)) body.push(lines[i++]!);
-    while (body.length > 0 && body.at(-1)!.trim() === "") body.pop();
-    const at = Math.min(...body.filter((line) => line.trim() !== "").map(indentOf));
-    return `${body.map((line) => line.slice(at)).join("\n")}\n`;
-  };
-  const mapping = (indent: number): { [key: string]: Yaml } => {
-    const out: { [key: string]: Yaml } = {};
-    while (next() < lines.length) {
-      const line = lines[i]!;
-      if (indentOf(line) < indent || (indentOf(line) === indent && isItem(line))) break;
-      if (indentOf(line) > indent) fail("indentation this mapping does not expect");
-      const m = KEY.exec(line.slice(indent)) ?? fail("no key");
-      const key = m[1]!.replace(/^(["'])(.*)\1$/, "$2");
-      if (Object.hasOwn(out, key)) fail(`the key ${key} twice`);
-      const rest = (m[2] ?? "").trim();
-      i++;
-      if (/^\|-?( +#.*)?$/.test(rest)) out[key] = literal(indent);
-      else if (rest !== "" && !rest.startsWith("#")) out[key] = scalar(rest);
-      else if (next() < lines.length && (indentOf(lines[i]!) > indent || (indentOf(lines[i]!) === indent && isItem(lines[i]!)))) out[key] = block();
-      else out[key] = null;
-    }
-    return out;
-  };
-  const sequence = (indent: number): Yaml[] => {
-    const out: Yaml[] = [];
-    while (next() < lines.length) {
-      const line = lines[i]!;
-      if (indentOf(line) < indent || (indentOf(line) === indent && !isItem(line))) break;
-      if (indentOf(line) > indent) fail("indentation this sequence does not expect");
-      const content = line.slice(indent + 1).trimStart();
-      if (content === "" || content.startsWith("#")) {
-        i++;
-        out.push(next() < lines.length && indentOf(lines[i]!) > indent ? block() : null);
-      } else if (KEY.test(content)) {
-        // A mapping begun on the item's own line: read as though its first key stood alone, at the column it starts at.
-        const column = line.length - content.length;
-        lines[i] = `${" ".repeat(column)}${content}`;
-        out.push(mapping(column));
-      } else {
-        i++;
-        out.push(scalar(content));
-      }
-    }
-    return out;
-  };
-  const block = (): Yaml => (isItem(lines[next()]!) ? sequence(indentOf(lines[i]!)) : mapping(indentOf(lines[i]!)));
-  const document = block();
-  if (next() < lines.length) fail("a line no mapping or sequence holds");
-  return document;
+function workflowLines(text: string): { indent: number; text: string }[] {
+  const lines: { indent: number; text: string }[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.replace(/(^|\s+)#.*$/, "");
+    if (line.trim() === "") continue;
+    assert.doesNotMatch(line, /\t|^\s*(- )?["'?]|<<\s*:|:\s+[&*!{]|^---|^\.\.\./, `a YAML form this lint does not read: ${raw}`);
+    lines.push({ indent: line.length - line.trimStart().length, text: line.trim() });
+  }
+  return lines;
 }
 
-/** The mapping a value is, refused when it is none. */
-function mappingOf(value: Yaml | undefined, what: string): { [key: string]: Yaml } {
-  assert.ok(value !== undefined && value !== null && typeof value === "object" && !Array.isArray(value), `${what} is a mapping`);
-  return value;
+/** The lines under the one at index, those indented deeper than it, up to the next that is not. */
+function blockUnder(lines: { indent: number; text: string }[], index: number): { indent: number; text: string }[] {
+  const under: { indent: number; text: string }[] = [];
+  for (let i = index + 1; i < lines.length && lines[i]!.indent > lines[index]!.indent; i++) under.push(lines[i]!);
+  return under;
+}
+
+/** The keys a block holds at its own level: the lines at its least indentation. */
+function keysOf(block: { indent: number; text: string }[]): string[] {
+  const level = Math.min(...block.map((line) => line.indent));
+  return block.filter((line) => line.indent === level).map((line) => line.text);
 }
 
 describe("a prerelease is cut only from a clean HEAD on a branch of the remote package.json names, holding that remote's main as fetched now, at a prerelease version every bundled plugin and mod that follows the package names, under a tag no release has", () => {
@@ -206,12 +141,18 @@ describe("a prerelease is cut only from a clean HEAD on a branch of the remote p
     assert.match(prereleaseProblems(forked).join("\n"), /no remote's URL is the repository package\.json names/);
   });
 
-  test("a version that is no prerelease and a tag that exists are refused, GitHub is matched by its own host alone, and the script spells no remote", () => {
+  test("a version that is no prerelease, a tag that exists and tags that cannot be listed are refused, GitHub is matched by its own host alone, and the script spells no remote", () => {
     assert.match(prereleaseProblems(repository("1.11.0").work).join("\n"), /package\.json names 1\.11\.0, which is no prerelease/);
     const tagged = repository("1.11.0-beta.3").work;
     git(tagged, "tag", "v1.11.0-beta.3");
     git(tagged, "push", "--quiet", "origin", "v1.11.0-beta.3");
     assert.match(prereleaseProblems(tagged).join("\n"), /the tag v1\.11\.0-beta\.3 exists already/);
+    // A remote that cannot be read says nothing of its tags: that is a reason, never "no such tag".
+    const unread = repository("1.11.0-beta.3").work;
+    renameSync(join(unread, "..", "origin.git.git"), join(unread, "..", "moved.git"));
+    const unreadable = prereleaseProblems(unread).join("\n");
+    assert.match(unreadable, /origin's tags could not be listed, so whether v1\.11\.0-beta\.3 exists is unknown/);
+    assert.doesNotMatch(unreadable, /exists already/);
     // GitHub by its own host alone, in every form git spells it; a host that merely ends in its name is another repository.
     for (const url of ["git+https://github.com/PostHog/coherence.git", "git@github.com:PostHog/coherence.git", "ssh://git@ssh.github.com:443/PostHog/coherence.git", "https://github.com/PostHog/coherence"]) assert.equal(repositoryOf(url), "github:posthog/coherence", url);
     for (const url of ["git@evilgithub.com:PostHog/coherence.git", "https://notgithub.com/PostHog/coherence"]) assert.notEqual(repositoryOf(url), "github:posthog/coherence", url);
@@ -220,60 +161,43 @@ describe("a prerelease is cut only from a clean HEAD on a branch of the remote p
     assert.doesNotMatch(source, /["'`](origin|upstream|PostHog\/coherence)\b/, "no remote or repository is spelled in the script's code");
   });
 
-  test("the workflow alone cuts, by hand: it checks a branch out clean with full history, checks it before it installs or packs, makes a prerelease targeting by sha the commit it checked out, with contents: write and nothing more, every action pinned by commit, and never publishes to npm", () => {
-    // Read as YAML, not as text: what GitHub reads is the parse, so a key, a step or a permission is held where it stands.
-    const flow = mappingOf(readYaml(readFileSync(join(import.meta.dirname, "..", "..", ".github", "workflows", "prerelease.yml"), "utf8")), "the workflow");
-    // Run by hand alone, with a branch and the notes, both required.
-    const on = mappingOf(flow.on, "on");
-    assert.deepEqual(Object.keys(on), ["workflow_dispatch"], "dispatched by hand, and by nothing else");
-    const inputs = mappingOf(mappingOf(on.workflow_dispatch, "workflow_dispatch").inputs, "its inputs");
-    assert.deepEqual(Object.keys(inputs).sort(), ["notes", "ref"]);
-    for (const name of ["notes", "ref"]) assert.equal(mappingOf(inputs[name], name).required, "true", `${name} is required`);
-    // The least it needs: read for the workflow, write for the one job that creates the release, and no id-token, so no npm trusted publishing.
-    assert.deepEqual(flow.permissions, { contents: "read" });
-    const jobs = mappingOf(flow.jobs, "jobs");
-    assert.deepEqual(Object.keys(jobs), ["prerelease"]);
-    const job = mappingOf(jobs.prerelease, "the job");
-    assert.deepEqual(job.permissions, { contents: "write" }, "contents: write and nothing more");
-    assert.equal(job.environment, undefined, "not the Release environment, which publishes to npm from main");
-    const concurrency = mappingOf(flow.concurrency, "concurrency");
-    assert.ok(typeof concurrency.group === "string" && concurrency.group !== "", "one concurrency group");
-    assert.equal(concurrency["cancel-in-progress"], "false", "a second cut waits rather than cancelling the first");
-    assert.ok(Array.isArray(job.steps));
-    const steps = job.steps.map((step, n) => mappingOf(step, `step ${n + 1}`));
-    // Every action pinned by commit.
-    for (const step of steps.filter((step) => step.uses !== undefined)) assert.match(String(step.uses), /^[\w.-]+\/[\w.-]+(\/[\w./-]+)?@[0-9a-f]{40}$/, `pinned by commit: ${String(step.uses)}`);
-    // The branch checked out first, clean, by its full ref, with full history (main's ancestry), and no credentials left on disk.
-    assert.match(String(steps[0]!.uses), /^actions\/checkout@/);
-    assert.deepEqual(steps[0]!.with, { ref: "refs/heads/${{ inputs.ref }}", "fetch-depth": "0", "persist-credentials": "false" });
-    const runs = steps.map((step) => (typeof step.run === "string" ? step.run : ""));
-    // No expression reaches a shell but through a step's environment, so neither input can be spliced into a script.
-    for (const run of runs) assert.doesNotMatch(run, /\$\{\{/, `an expression spliced into a script: ${run}`);
-    // Never npm: no publish, and no registry set up to publish to.
-    for (const run of runs) assert.doesNotMatch(run, /\bnpm\b[^\n]*\bpublish\b/, `an npm publish: ${run}`);
-    assert.doesNotMatch(JSON.stringify(flow), /registry-url|NODE_AUTH_TOKEN|NPM_TOKEN|id-token/, "nothing set up to publish to npm");
-    // The checks, then the install and the pack, then the release, in that order.
-    const index = (pattern: RegExp, what: string): number => {
-      const found = runs.flatMap((run, n) => (pattern.test(run) ? [n] : []));
-      assert.equal(found.length, 1, `one step ${what}`);
+  test("the workflow's shape is linted, not its behaviour: dispatched by hand alone, read access but for the one job that releases, which alone may write contents and checks nothing out, no id-token or environment, every action pinned by commit; the module cuts nothing", () => {
+    // A lint of the file's text: what the workflow does is held by how it is built and by its runs, never by this test.
+    const lines = workflowLines(readFileSync(join(import.meta.dirname, "..", "..", ".github", "workflows", "prerelease.yml"), "utf8"));
+    const top = (key: string): number => {
+      const found = lines.flatMap((line, n) => (line.indent === 0 && line.text.startsWith(`${key}:`) ? [n] : []));
+      assert.equal(found.length, 1, `one top-level ${key}`);
       return found[0]!;
     };
-    const check = index(/^node( --[\w=-]+)* src\/lifecycle\/prerelease\.ts\n?$/, "runs the checks");
-    const install = index(/^npm ci\b/, "installs");
-    const pack = index(/^npm pack\n?$/, "packs");
-    const release = index(/\bgh release create\b/, "creates the release");
-    assert.ok(0 < check && check < install && install < pack && pack < release, `checks ${check}, installs ${install}, packs ${pack}, releases ${release}, in that order`);
-    // A prerelease, its target the commit checked out by sha: the environment variable --target names is a step's output, written from git rev-parse HEAD.
-    const create = runs[release]!.split("\n").find((line) => /\bgh release create\b/.test(line))!;
-    assert.match(create, / --prerelease\b/, "marked a prerelease");
-    const target = / --target "\$(\w+)"/.exec(create)?.[1];
-    assert.ok(target !== undefined, `--target names a variable: ${create}`);
-    const output = /^\$\{\{ steps\.([\w-]+)\.outputs\.([\w-]+) \}\}$/.exec(String(mappingOf(steps[release]!.env, "the release's env")[target]));
-    assert.ok(output !== null, `--target is a step's output, never a branch's name: ${target}`);
-    const resolved = steps.findIndex((step) => step.id === output[1]);
-    assert.ok(0 < resolved && resolved < check, "the commit is resolved after the checkout and before the checks");
-    assert.match(runs[resolved]!, new RegExp(`^echo "${output[2]}=\\$\\(git rev-parse HEAD\\)" >> "\\$GITHUB_OUTPUT"$`, "m"), "from the commit checked out");
-    assert.match(create, /"posthog-coherence-\$VERSION\.tgz"$/, "carrying the tarball packed");
+    assert.deepEqual(lines.filter((line) => line.indent === 0).map((line) => line.text.replace(/:.*$/, "")), ["name", "run-name", "on", "permissions", "concurrency", "jobs"], "the top-level keys, and no other");
+    // Dispatched by hand, and by nothing else.
+    assert.equal(lines[top("on")]!.text, "on:");
+    assert.deepEqual(keysOf(blockUnder(lines, top("on"))), ["workflow_dispatch:"], "dispatched by hand, and by nothing else");
+    // Read access for the workflow; each job names its own, and one job alone may write contents, the one that releases.
+    assert.deepEqual(blockUnder(lines, top("permissions")).map((line) => line.text), ["contents: read"]);
+    const jobs = blockUnder(lines, top("jobs"));
+    const jobLevel = Math.min(...jobs.map((line) => line.indent));
+    const jobStarts = jobs.flatMap((line, n) => (line.indent === jobLevel ? [n] : []));
+    const writers: string[] = [];
+    for (const start of jobStarts) {
+      const name = jobs[start]!.text;
+      const job = blockUnder(jobs, start);
+      const permissions = job.findIndex((line) => line.indent === job[0]!.indent && line.text.startsWith("permissions:"));
+      assert.ok(permissions >= 0 && job[permissions]!.text === "permissions:", `${name} names its permissions, as a mapping`);
+      const granted = blockUnder(job, permissions).map((line) => line.text);
+      assert.ok(granted.every((grant) => /^contents: (read|write)$/.test(grant)) && granted.length === 1, `${name} holds contents alone: ${granted.join(", ")}`);
+      if (granted[0] === "contents: write") {
+        writers.push(name);
+        assert.ok(job.some((line) => /\bgh release create\b/.test(line.text)), `${name}, which may write, is the job that releases`);
+        assert.ok(!job.some((line) => /actions\/checkout@/.test(line.text)), `${name}, which may write, checks nothing out`);
+      }
+    }
+    assert.equal(writers.length, 1, `one job may write contents: ${writers.join(", ")}`);
+    assert.ok(!lines.some((line) => /\bwrite-all\b|\bid-token\b|^environment\s*:/.test(line.text)), "no write-all, no id-token (so no npm trusted publishing), and not the Release environment");
+    // Every action pinned by commit.
+    const uses = lines.filter((line) => /\buses\s*:/.test(line.text));
+    assert.ok(uses.length > 0, "the workflow uses actions");
+    for (const line of uses) assert.match(line.text, /^(- )?uses: [\w.-]+\/[\w.-]+(\/[\w./-]+)?@[0-9a-f]{40}$/, `pinned by commit: ${line.text}`);
     // The module cuts nothing: no gh, npm or clone in its code, so the workflow is the one way a prerelease is made;
     const source = readFileSync(join(import.meta.dirname, "prerelease.ts"), "utf8").replace(/^\s*(\/\/|\*|\/\*\*).*$/gm, "");
     assert.doesNotMatch(source, /["'`](gh|npm|npx)["'`]|["'`]clone["'`]|release create/, "the module runs no gh, npm or clone");

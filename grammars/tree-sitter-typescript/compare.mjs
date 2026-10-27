@@ -7,14 +7,20 @@
 // tree-sitter query whose capture the region overlaps. Every token the patched parsers read is also held to the stock
 // parsers' own reading of its spelling: a keyword or a mark read as a type the stock parsers never read it as (a token
 // renamed or aliased) fails wherever it stands, an improvement's region among it: no intended difference renames one.
-// Each intended difference names the corpus cases it must show in, and one that shows nowhere fails, so the list
-// holds no more than the patch does.
+// Each intended difference names the corpus cases it must show in, one form to a case, and fails unless each of those
+// cases, in each of its dialects, holds exactly one region of difference and that region is one it allows: a form that
+// breaks back to the stock reading, or into another difference, fails in its own case, whatever the others show. The
+// patched parsers are also held to every expected tree the corpus declares, the whole tree, as tree-sitter test holds
+// the native build: an improvement's case must declare one, so a form is held to its fixed reading, not merely to
+// reading with no error. The corpus is read from where the patch cannot write: the clean upstream tree and this folder.
 //
 // node compare.mjs --runtime <web-tree-sitter folder> --stock <folder> --patched <folder> --intended <json>
 //   --cases <test/corpus folder>... --files <folder>...
 // Each parser folder holds tree-sitter-typescript.wasm and tree-sitter-tsx.wasm. --cases reads every *.txt in the
-// folder as tree-sitter's corpus format, each case an input; --files reads every .ts, .tsx, .mts and .cts below the
-// folder, node_modules left out. Every input is read by both dialects. Exits 1 on any difference no entry allows.
+// folder as tree-sitter's corpus format, each case an input with the tree it expects, if any; --files reads every .ts,
+// .tsx, .mts and .cts below the folder, node_modules left out. Every input is read by both dialects for the comparison;
+// an expected tree holds the dialects its case is for (those its :language attributes name, the TSX grammar alone for a
+// file named *-tsx.txt, else both). Exits 1 on any difference no entry allows, or any expected tree not read.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
@@ -64,10 +70,17 @@ function casesOf(text) {
     let next = k + 1;
     while (next < lines.length && !header.test(lines[next])) next++;
     const name = names.filter((line) => !line.startsWith(":")).join(" ").trim();
-    cases.push({ name, text: body.join("\n").replace(/^\n+/, "").replace(/\n+$/, "\n") });
+    const languages = names.flatMap((line) => /^:language\((\w+)\)\s*$/.exec(line)?.[1] ?? []);
+    const expected = normalized(lines.slice(k + 1, next).join("\n"));
+    cases.push({ name, languages, expected: expected === "" ? null : expected, text: body.join("\n").replace(/^\n+/, "").replace(/\n+$/, "\n") });
     i = next;
   }
   return cases;
+}
+
+/** An S-expression as tree-sitter test compares one: white space collapsed, none inside a parenthesis's edge. */
+function normalized(sexp) {
+  return sexp.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
 }
 
 function inputs() {
@@ -84,7 +97,9 @@ function inputs() {
         const label = `${basename(file, ".txt")}: ${c.name}`;
         const n = (seen.get(label) ?? 0) + 1;
         seen.set(label, n);
-        all.push({ key: n === 1 ? label : `${label} (${n})`, text: c.text });
+        const dialects = c.languages.length > 0 ? c.languages : basename(file, ".txt").endsWith("-tsx") ? ["tsx"] : DIALECTS;
+        if (dialects.some((d) => !DIALECTS.includes(d))) fail(`${label}: no dialect ${dialects.join(", ")}`);
+        all.push({ key: n === 1 ? label : `${label} (${n})`, text: c.text, expected: c.expected, dialects });
       }
     }
     from(folder);
@@ -94,7 +109,7 @@ function inputs() {
       for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
         const path = join(dir, entry.name);
         if (entry.isDirectory()) { if (entry.name !== "node_modules") walk(path); }
-        else if (/\.[mc]?tsx?$/.test(entry.name)) all.push({ key: `${basename(folder)}/${relative(folder, path)}`, text: readFileSync(path, "utf8") });
+        else if (/\.[mc]?tsx?$/.test(entry.name)) all.push({ key: `${basename(folder)}/${relative(folder, path)}`, text: readFileSync(path, "utf8"), expected: null, dialects: [] });
       }
     };
     walk(folder);
@@ -197,6 +212,18 @@ function regionsOf(s, p) {
   return regions;
 }
 
+/** A flattened tree as tree-sitter test prints it: named nodes and missing ones, with their fields when asked. */
+function sexpOf(t, index, fields) {
+  const node = t.nodes[index];
+  const head = node.missing ? `MISSING ${node.named ? node.type : JSON.stringify(node.type)}` : node.type;
+  const parts = [head];
+  for (const c of node.children) {
+    const child = t.nodes[c];
+    if (child.named || child.missing) parts.push(`${fields && child.field !== "" ? `${child.field}: ` : ""}${sexpOf(t, c, fields)}`);
+  }
+  return `(${parts.join(" ")})`;
+}
+
 const kindOf = (r) => (r.stockErrs ? (r.patchedErrs ? "both err" : "improvement") : r.patchedErrs ? "regression" : "reshape");
 
 // --- The comparison ----------------------------------------------------------------------------------------------
@@ -239,6 +266,10 @@ const entries = intended.differences.map((entry) => {
 
 const failures = [];
 const renames = [];
+// The cases the entries name, and in each parse of one, the regions and the entries that allow each.
+const named = new Set(entries.flatMap((e) => e.cases));
+const parsesOfNamed = new Map(); // case and dialect -> [{ kind, allowing: Set of ids }]
+const inputKeys = new Map(); // case -> its input
 // A token is known by its spelling: a leaf the stock parsers read as an anonymous token, a keyword or a mark, read by the
 // patched parsers as another type is a rename. The symbol's own name cannot say so, since a token used only under an
 // alias takes the alias's name in its parser's table. So a patched leaf's spelling and type must be a pair the stock
@@ -253,12 +284,13 @@ const tokenSpelled = (language, text) => {
   return id !== null && id !== 0 && language.nodeTypeIsVisible(id);
 };
 const heldToStock = (leaf, dialect) => (leaf.named ? tokenSpelled(parsers[dialect].stock.language, leaf.text) : leaf.type !== leaf.text);
-const tally = { inputs: 0, identical: 0, regions: 0 };
+const tally = { inputs: 0, identical: 0, regions: 0, expected: 0 };
 const kindKey = (leaf) => `${leaf.text}\u0000${leaf.type}\u0000${leaf.named}`;
 const excerpt = (text, start, end) => JSON.stringify(text.slice(start, Math.min(end, start + 80)) + (end - start > 80 ? "…" : ""));
 
 for (const input of inputs()) {
   tally.inputs++;
+  inputKeys.set(input.key, input);
   for (const dialect of DIALECTS) {
     const { stock, patched } = parsers[dialect];
     const sTree = stock.parser.parse(input.text);
@@ -277,10 +309,25 @@ for (const input of inputs()) {
       }
       return captures.get(entry.id);
     };
+    // The patched parser reads the case as the tree it expects, whole.
+    if (input.expected !== null && input.dialects.includes(dialect)) {
+      tally.expected++;
+      const read = normalized(sexpOf(p, 0, /\w: \(/.test(input.expected)));
+      if (read !== input.expected) {
+        // Where the two first part, a little before it, so the message shows the node that differs.
+        let at = 0;
+        while (at < read.length && read[at] === input.expected[at]) at++;
+        const from = Math.max(0, at - 40);
+        failures.push(`${input.key} (${dialect}): the patched parser does not read the tree the case expects; from character ${from}, it reads ${excerpt(read, from, from + 80)} where the case expects ${excerpt(input.expected, from, from + 80)}`);
+      }
+    }
+    const parseRegions = named.has(input.key) ? [] : null;
+    if (parseRegions !== null) parsesOfNamed.set(`${input.key}\u0000${dialect}`, parseRegions);
     const allowed = [];
     for (const region of regions) {
       const kind = kindOf(region);
       const allowing = entries.filter((e) => e.kind === kind && e.dialects.includes(dialect) && capturesOf(e).some((c) => c.start < region.end && region.start < c.end));
+      parseRegions?.push({ kind, allowing: new Set(allowing.map((e) => e.id)) });
       for (const entry of allowing) {
         entry.seen.add(`${input.key}\u0000${dialect}`);
         allowed.push({ region, entry });
@@ -304,24 +351,28 @@ for (const [key, { leaf, where, text }] of patchedKinds) {
   if (stockKinds.has(key)) continue;
   renames.push(`${where}: the patched parser reads ${JSON.stringify(leaf.text)} as ${leaf.named ? "named " : ""}${leaf.type}, which the stock parsers never do (a token renamed or aliased), first at ${leaf.start}..${leaf.end}`);
 }
-// Every intended difference shows in each case it names, in each of its dialects, and somewhere, and each token
-// reading it lists shows in its regions.
+// Every intended difference shows in each case it names, in each of its dialects, as that case's one region, and each
+// token reading it lists shows in its regions. A case an improvement names declares the tree it fixes the form to.
 for (const entry of entries) {
   for (const key of entry.tokens) if (!entry.tokensSeen.has(key)) failures.push(`intended difference ${entry.id} lists the token ${key.split("\u0000").slice(0, 2).join(" read as ")}, which none of its regions shows`);
   if (entry.seen.size === 0) failures.push(`intended difference ${entry.id} (${entry.construct}) shows in no input`);
   for (const name of entry.cases) {
+    const input = inputKeys.get(name);
+    if (input === undefined) { failures.push(`intended difference ${entry.id} names ${name}, which no corpus holds`); continue; }
+    if (entry.kind === "improvement" && (input.expected === null || entry.dialects.some((d) => !input.dialects.includes(d)))) failures.push(`intended difference ${entry.id} names ${name}, which declares no expected tree in each of its dialects (${entry.dialects.join(", ")}): an improvement's form is held to the tree it reads as`);
     for (const dialect of entry.dialects) {
-      if (!entry.seen.has(`${name}\u0000${dialect}`)) failures.push(`intended difference ${entry.id} does not show in ${name} (${dialect}), a case it names`);
+      const found = parsesOfNamed.get(`${name}\u0000${dialect}`) ?? [];
+      if (found.length !== 1 || !found[0].allowing.has(entry.id)) failures.push(`intended difference ${entry.id} does not show in ${name} (${dialect}), a case it names, as its one region: it holds ${found.length === 0 ? "none" : found.map((r) => `${r.kind} allowed by ${[...r.allowing].join(", ") || "none"}`).join("; ")}`);
     }
   }
 }
 
-console.log(`compare.mjs: ${tally.inputs} inputs in ${DIALECTS.length} dialects, ${tally.identical} parses identical, ${tally.regions} regions of difference`);
+console.log(`compare.mjs: ${tally.inputs} inputs in ${DIALECTS.length} dialects, ${tally.identical} parses identical, ${tally.regions} regions of difference, ${tally.expected} expected trees`);
 for (const entry of entries) console.log(`  ${entry.id} (${entry.kind}): ${entry.seen.size} parses`);
 if (renames.length + failures.length > 0) {
   for (const r of renames) console.error(`  ✕ ${r}`);
   for (const f of failures.slice(0, 100)) console.error(`  ✕ ${f}`);
   if (failures.length > 100) console.error(`  … and ${failures.length - 100} more`);
-  fail(`${renames.length} token${renames.length === 1 ? "" : "s"} renamed and ${failures.length} other difference${failures.length === 1 ? "" : "s"} between the stock and patched parsers that intended-differences.json does not allow`);
+  fail(`${renames.length} token${renames.length === 1 ? "" : "s"} renamed and ${failures.length} other failure${failures.length === 1 ? "" : "s"}: differences between the stock and patched parsers that intended-differences.json does not allow, intended ones not shown as their cases' one region, or expected trees not read`);
 }
-console.log("compare.mjs: every difference between the stock and patched parsers is one intended-differences.json allows");
+console.log("compare.mjs: every difference between the stock and patched parsers is one intended-differences.json allows, each in its own cases, and the patched parsers read every expected tree");

@@ -177,56 +177,75 @@ export function otherWorktrees(cwd: string): string[] {
   return out;
 }
 
+/** The bytes of each store file in a journal folder, by name; one that cannot be read is said, never taken as a file with no records. */
+function storeFiles(dir: string, damaged: Damaged[], shown: string): Map<string, Buffer> {
+  const out = new Map<string, Buffer>();
+  let names: string[];
+  try {
+    names = readdirSync(dir).filter(isStoreFile).sort();
+  } catch (error) {
+    // No journal folder is a worktree with no records; any other refusal is said.
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") damaged.push({ file: shown, line: 0, reason: `not read: ${error instanceof Error ? error.message : String(error)}` });
+    return out;
+  }
+  for (const name of names) {
+    try {
+      out.set(name, readFileSync(join(dir, name)));
+    } catch (error) {
+      damaged.push({ file: join(shown, name), line: 0, reason: `not read: ${error instanceof Error ? error.message : String(error)}` });
+    }
+  }
+  return out;
+}
+
 /**
  * The journal of every worktree of the repository in one timeline, each
  * record once: an agent records its defects in the checkout it works in, so
  * a reading of one checkout alone misses the worktree where the work went
- * wrong. The self is read as loadJournal reads it; each other worktree's
- * store files are read only when a file of that name and size was not read
- * already (a committed shard is sealed, so the same name and size is the same
- * records), and a record whose text or id was already read is the same
- * record. Read only, never written. A line that will not parse in another
- * worktree is reported with that worktree's path.
+ * wrong. The self is read as loadJournal reads it; every store file of each
+ * other worktree is read, and one whose bytes equal a file already read is
+ * the same records and is not parsed again, whatever its name; a record
+ * whose text or id was already read is the same record. Nothing is
+ * skipped by a file's name or size, so two worktrees' files of one name and
+ * size with different records are both read, and a file that cannot be read
+ * is reported as damaged, never taken to stand for another. Read only, never
+ * written. A line that will not parse in another worktree is reported with
+ * that worktree's path.
  */
 export function loadJournalAcrossWorktrees(cwd: string): LoadedAcross {
   const own = loadJournal(cwd);
   const ids = new Set(own.records.map((r) => r.id));
   const loaded: LoadedAcross = { records: [...own.records], damaged: [...own.damaged], worktrees: [{ path: cwd, self: true, records: own.records.length, only: own.records.length }] };
-  const keys = new Set([...journalFileKeys(cwd).entries()].map(([name, key]) => `${name}:${key.split(":")[2]}`));
+  // The files already read, by length: a file is compared byte for byte only with those of its length.
+  const read = new Map<number, Buffer[]>();
+  const known = (bytes: Buffer): boolean => {
+    const same = read.get(bytes.length) ?? [];
+    if (same.some((b) => b.equals(bytes))) return true;
+    read.set(bytes.length, [...same, bytes]);
+    return false;
+  };
+  for (const bytes of storeFiles(journalDir(cwd), [], JOURNAL_DIR).values()) known(bytes);
   const seen = new Set<string>();
   for (const folder of otherWorktrees(cwd)) {
     const dir = journalDir(folder);
-    const read: WorktreeRead = { path: folder, self: false, records: 0, only: 0 };
-    let names: string[] = [];
-    try {
-      names = readdirSync(dir).filter(isStoreFile).sort();
-    } catch {
-      names = [];
-    }
-    for (const name of names) {
-      let text: string;
-      try {
-        const key = `${name}:${statSync(join(dir, name)).size}`;
-        if (keys.has(key)) continue;
-        keys.add(key);
-        text = readFileSync(join(dir, name), "utf8");
-      } catch {
-        continue;
-      }
+    const worktree: WorktreeRead = { path: folder, self: false, records: 0, only: 0 };
+    for (const [name, bytes] of storeFiles(dir, loaded.damaged, dir)) {
+      if (known(bytes)) continue;
+      const text = bytes.toString("utf8");
       for (const { line, number } of storeLines(text, seen)) {
         const verdict = parseLine(line);
         if (typeof verdict === "string") {
           loaded.damaged.push({ file: join(dir, name), line: number, reason: verdict });
           continue;
         }
-        read.records += 1;
+        worktree.records += 1;
         if (ids.has(verdict.id)) continue;
         ids.add(verdict.id);
-        read.only += 1;
+        worktree.only += 1;
         loaded.records.push(verdict);
       }
     }
-    loaded.worktrees.push(read);
+    loaded.worktrees.push(worktree);
   }
   loaded.records.sort(compareRecords);
   return loaded;
