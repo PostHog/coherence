@@ -125,7 +125,7 @@ The language adapter seam: how to ask a language's server for definitions, refer
   refuted: joined pytest names as a regex -> "pytest's JUnit report reads as the jest shape, and -k names join with or" went red in python.test.ts; restored, green (2026-09-17)
   kinds: none
 - server located or a reason: The language server binary is resolved by the package resolver from the adopter's project first, then from Coherence's own module, then found on PATH, and its absence is a reason naming each place looked, never a crash.
-  protects: SERVER_BIN in typescript.ts
+  protects: SERVER_BIN in plugins/typescript/typescript.ts
   chokepoint: plugins/typescript/typescript.ts
   over: the adopter's project, Coherence's own module, and every folder on PATH
   via: the language server binary is found (the adapter's precondition)
