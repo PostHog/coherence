@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -19,7 +19,7 @@ import type { LoadedPlugin, PluginManifest } from "./plugin.ts";
 import { BUNDLED_DIR, readManifest } from "./registry.ts";
 import { fingerprintOf, importShapes, KEPT_FROM, keptParseOf, staleParsesNotice, treeReaderOf, warmParses } from "./syntax-trees.ts";
 import { warmProjectParses } from "../economy/warm-parses.ts";
-import { Language, Parser, Tree } from "web-tree-sitter";
+import { Language, Parser, Tree, type Node } from "web-tree-sitter";
 
 const fixtures: string[] = [];
 after(() => {
@@ -27,6 +27,14 @@ after(() => {
 });
 
 const PYTHON = join(BUNDLED_DIR, "python");
+
+/** A store's file with its body changed and sealed again, under its generation, with the key given: a store this machine's key signs, holding what it did not read. */
+function resealed(text: string, key: Buffer, fingerprint: string, change: (body: string) => string): string {
+  const newline = text.indexOf("\n");
+  const generation = text.slice(0, newline).split(" ")[1]!;
+  const body = change(text.slice(newline + 1));
+  return `coherence-parses ${generation} ${createHmac("sha256", key).update(fingerprint).update("\u0000").update(`${generation}\n${body}`).digest("base64url")}\n${body}`;
+}
 
 /** A plugin folder by path that reads a language "zz" through Python's parser, with the manifest and queries given. */
 function parserPlugin(manifest: Partial<PluginManifest>, files: Record<string, string> = {}): LoadedPlugin {
@@ -225,6 +233,15 @@ test("the bundled TypeScript parsers read what tree-sitter-typescript 0.23.2 can
   }
 });
 
+test("the bundled TypeScript parsers are the ones grammars/tree-sitter-typescript/build.sh builds: each is byte for byte the digest the script records and checks its build against", () => {
+  const build = readFileSync(resolve("grammars/tree-sitter-typescript/build.sh"), "utf8");
+  for (const dialect of ["typescript", "tsx"]) {
+    const expected = new RegExp(`^expected_${dialect}=([0-9a-f]{64})$`, "m").exec(build)?.[1];
+    assert.ok(expected !== undefined, `build.sh records the ${dialect} parser's digest`);
+    assert.equal(createHash("sha256").update(readFileSync(join(BUNDLED_DIR, "typescript", `tree-sitter-${dialect}.wasm`))).digest("hex"), expected, `the bundled ${dialect} parser is the one build.sh builds: rebuild it, or record the new digest with the patch that made it`);
+  }
+});
+
 test("a parser is held to what Coherence reads: a capture it reads nothing by, queries that do not compile against its parser or its alternate, and a reading before the runtime starts are each refused by name", () => {
   const stray = parserPlugin({}, { "zz.scm": "(import_statement name: (dotted_name) @import.thing)\n" });
   assert.throws(() => treeReaderOf(stray), /plugin zz's queries capture @import\.thing, which Coherence reads nothing by/);
@@ -399,11 +416,9 @@ test("a warm-up holds a sample of its kept parses to a fresh parse of the same t
   assert.deepEqual(pick(pass(), ["audited", "stale"]), { audited: 8, stale: 0 }, "a later one audits a sample of what it kept, which agrees");
   // Stale as a fingerprint that misses an input leaves it: the same file, signed by this machine, holding what other code read.
   const [file] = kept();
-  const [, body] = readFileSync(join(store, file!), "utf8").split(/\n(.*)/s);
-  const stale = body!.replaceAll('"a"', '"stale"');
   const key = readFileSync(join(config, "coherence", "parses.key"));
   const fingerprint = file!.slice(0, -".json".length);
-  writeFileSync(join(store, file!), `coherence-parses ${createHmac("sha256", key).update(fingerprint).update("\u0000").update(stale).digest("base64url")}\n${stale}`);
+  writeFileSync(join(store, file!), resealed(readFileSync(join(store, file!), "utf8"), key, fingerprint, (body) => body.replaceAll('"a"', '"stale"')));
   const audited = pass();
   assert.deepEqual(pick(audited, ["audited", "stale", "imports"]), { audited: 8, stale: 8, imports: ["a <- m39", "b <- m39"] }, "the audit finds the sample stale, and a reading after it reads a fresh parse");
   assert.deepEqual(kept(), [], "the stale store is discarded whole");
@@ -560,6 +575,64 @@ test("a repository's own files in the parse store cannot stop a warm-up or speak
   }
 });
 
+test("the parse store touches its files only through StoreFolder: every use of node:fs in syntax-trees.ts outside StoreFolder reads Coherence's own files or the machine key, and only StoreFolder spells the store's folder", () => {
+  // Read with the TypeScript plugin's own parser: each use of a name imported from node:fs, placed by the top-level declaration that holds it.
+  const source = readFileSync(resolve("src/plugins/syntax-trees.ts"), "utf8");
+  const parser = new Parser();
+  parser.setLanguage(Language.loadSync(new WebAssembly.Module(readFileSync(join(BUNDLED_DIR, "typescript", "tree-sitter-typescript.wasm")))));
+  const tree = parser.parse(source)!;
+  try {
+    assert.equal(tree.rootNode.hasError, false, "syntax-trees.ts parses whole");
+    const imports = tree.rootNode.children.filter((n) => n!.type === "import_statement").map((n) => n!);
+    const fsModules = imports.filter((n) => /^["'](node:)?fs(\/promises)?["']$/.test(n.childForFieldName("source")!.text));
+    assert.deepEqual(fsModules.map((n) => n.childForFieldName("source")!.text), ['"node:fs"'], "the file reaches the file system through one import of node:fs, by name");
+    assert.ok(!/\brequire\(|\bimport\(/.test(source.replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, "")), "and through no require or dynamic import");
+    const fsNames = new Set(fsModules[0]!.descendantsOfType("import_specifier").map((s) => (s!.childForFieldName("alias") ?? s!.childForFieldName("name"))!.text));
+    // What reads Coherence's own files (the parser, the queries, web-tree-sitter's package, this module's source) or the machine key, never a project's.
+    const own = new Set(["compile", "fingerprintOf", "runtimeVersion", "extractionDigest", "machineKey"]);
+    const holder = (node: Node): string => {
+      let at: Node = node;
+      while (at.parent !== null && at.parent.type !== "program") at = at.parent;
+      const declaration = at.type === "export_statement" ? at.namedChildren.find((c) => c!.type !== "comment")! : at;
+      return (declaration.childForFieldName("name") ?? declaration.descendantsOfType("variable_declarator")[0]?.childForFieldName("name"))?.text ?? declaration.type;
+    };
+    const uses = tree.rootNode.descendantsOfType("identifier").filter((id) => fsNames.has(id!.text) && id!.parent?.type !== "import_specifier").map((id) => holder(id!));
+    assert.ok(uses.includes("StoreFolder"), "the gateway itself uses the file system");
+    assert.deepEqual([...new Set(uses.filter((name) => name !== "StoreFolder" && !own.has(name)))], [], "store code touches a file only through StoreFolder");
+    // The store's folder is spelled where StoreFolder makes it, and parsesFolder, which makes it, is this module's own: no other module can call it.
+    const spelled = tree.rootNode.descendantsOfType("string_fragment").filter((s) => s!.text === "parses").map((s) => holder(s!));
+    assert.deepEqual([...new Set(spelled)].sort(), ["StoreFolder", "parsesFolder"]);
+    assert.ok(!/export\s+(function\s+parsesFolder|class\s+StoreFolder)\b/.test(source), "neither the gateway nor the function that makes its path leaves the module");
+  } finally {
+    tree.delete();
+    parser.delete();
+  }
+});
+
+test("a store's generation is made only by ParseStore's rewrite, an append writes only the log, and a discard leaves no store file: no write but a rewrite or a discard changes the generation a process loaded", () => {
+  const source = readFileSync(resolve("src/plugins/syntax-trees.ts"), "utf8");
+  const parser = new Parser();
+  parser.setLanguage(Language.loadSync(new WebAssembly.Module(readFileSync(join(BUNDLED_DIR, "typescript", "tree-sitter-typescript.wasm")))));
+  const tree = parser.parse(source)!;
+  try {
+    const store = tree.rootNode.descendantsOfType("class_declaration").find((c) => c!.childForFieldName("name")?.text === "ParseStore")!;
+    const method = (node: Node): string | undefined => {
+      for (let at: Node | null = node; at !== null; at = at.parent) if (at.type === "method_definition") return at.childForFieldName("name")?.text;
+      return undefined;
+    };
+    const calls = tree.rootNode.descendantsOfType("call_expression").filter((c) => c!.childForFieldName("function")?.text === "newGeneration");
+    assert.ok(calls.length > 0, "a rewrite makes a generation");
+    assert.deepEqual(calls.map((c) => `${store.startIndex <= c!.startIndex && c!.endIndex <= store.endIndex ? "ParseStore" : "elsewhere"}.${method(c!)}`), ["ParseStore.rewrite"], "only ParseStore's rewrite makes a generation");
+    // Each of the store's writes, by the file it names: the store's file only replaced in rewrite, the log only appended.
+    const writes = store.descendantsOfType("call_expression").filter((c) => /^this\.folder\.(append|replace|create)$/.test(c!.childForFieldName("function")?.text ?? "")).map((c) => `${method(c!)} ${c!.childForFieldName("function")!.text.split(".").pop()} ${c!.childForFieldName("arguments")!.namedChildren[0]!.text}`);
+    assert.deepEqual(writes.filter((w) => w.endsWith(" this.base")), ["rewrite replace this.base"], "the store's file is written only by a rewrite");
+    assert.deepEqual(writes.filter((w) => w.endsWith(" this.log")), ["flush append this.log"], "the log only appended to");
+  } finally {
+    tree.delete();
+    parser.delete();
+  }
+});
+
 test("a log line is read only where it signs itself with this machine's key, a torn line is passed over, and a log that fails more than a torn line's worth is read no further, so a repository's log costs a few signatures whatever its size", () => {
   const plugin: LoadedPlugin = { name: "python", version: "0", dir: PYTHON, source: "bundled", manifest: { name: "python", version: "0", pluginApi: 2, treeSitter: { parser: "tree-sitter-python.wasm", queries: "python.scm", resolve: "python-source.ts#PYTHON_RESOLVE" } } };
   const text = "from a import b\n";
@@ -574,7 +647,9 @@ test("a log line is read only where it signs itself with this machine's key, a t
   const kept = JSON.parse(readFileSync(join(store, base), "utf8").split("\n").slice(1).join("\n")) as Record<string, [number, unknown]>;
   const [digest, [day, found]] = Object.entries(kept)[0]!;
   rmSync(join(store, base));
-  const forged = JSON.stringify([digest, JSON.parse(JSON.stringify(found).replaceAll('"b"', '"made_up"')), day]);
+  // With the store's file gone the store has no generation, and a log line read is one appended under none.
+  const forged = JSON.stringify([digest, JSON.parse(JSON.stringify(found).replaceAll('"b"', '"made_up"')), day, ""]);
+  const otherGeneration = JSON.stringify([digest, JSON.parse(JSON.stringify(found).replaceAll('"b"', '"made_up"')), day, "AAAAAAAAAAAA"]);
   // The key the leak guard's own Coherence folder holds, as every process of this test file's reads it.
   const key = readFileSync(join(process.env["XDG_CONFIG_HOME"]!, "coherence", "parses.key"));
   const signed = (line: string): string => `${createHmac("sha256", key).update(fp).update("\u0000").update(line).digest("base64url")} ${line}`;
@@ -589,6 +664,7 @@ test("a log line is read only where it signs itself with this machine's key, a t
   };
   assert.deepEqual(read(`${signed(forged)}\n`), ["made_up <- a"], "a line this machine signed is read, so the log is read at all");
   assert.deepEqual(read(`${"x".repeat(43)} ${forged}\n`), ["b <- a"], "a line signed with no key of this machine's is never read");
+  assert.deepEqual(read(`${signed(otherGeneration)}\n`), ["b <- a"], "a line appended under another generation of the store is never read");
   assert.deepEqual(read(`{"torn\n${signed(forged)}\n`), ["made_up <- a"], "a line a killed process tore is passed over");
   assert.deepEqual(read(`${"a b\n".repeat(9)}${signed(forged)}\n`), ["b <- a"], "past a torn line's worth the log is read no further");
 });
@@ -609,9 +685,8 @@ test("a process that lives long reads again what another process discarded, even
   // A store this machine signed whose parses differ from a fresh parse's, as a fingerprint that missed an input would leave.
   const store = join(project, ".coherence", "parses", "python");
   const base = readdirSync(store).find((n) => /^[\w-]{16}\.json$/.test(n))!;
-  const stale = readFileSync(join(store, base), "utf8").split("\n").slice(1).join("\n").replaceAll('"a"', '"stale"');
   const key = readFileSync(join(process.env["XDG_CONFIG_HOME"]!, "coherence", "parses.key"));
-  writeFileSync(join(store, base), `coherence-parses ${createHmac("sha256", key).update(base.slice(0, 16)).update("\u0000").update(stale).digest("base64url")}\n${stale}`);
+  writeFileSync(join(store, base), resealed(readFileSync(join(store, base), "utf8"), key, base.slice(0, 16), (body) => body.replaceAll('"a"', '"stale"')));
   // This process loads it, another's warm-up finds it stale and discards it, and this one appends a batch of its own after.
   const reader = treeReaderOf(plugin, project)!;
   for (const text of texts) reader.imports(text);

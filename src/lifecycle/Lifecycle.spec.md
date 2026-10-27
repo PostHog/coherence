@@ -27,6 +27,13 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   mirrors: TOOL_HOOKS in hook-events.ts
 
 ## invariants
+- a prerelease carries main: A prerelease of Coherence is cut from a branch only by src/lifecycle/prerelease.ts, which refuses, naming each reason, unless the version is a prerelease, every bundled plugin and mod that follows the package's major version names it, no tracked file holds a change, HEAD is on the remote, origin/main is an ancestor of HEAD, and no tag of the version exists.
+  over: a branch that holds main, then one main moved on from, merged after; a bundled plugin left at the version before; a change no commit names; a commit not pushed; a version that is no prerelease; and a tag that exists
+  via: a prerelease is cut only from a pushed, committed HEAD that holds origin's main, at a prerelease version every bundled plugin and mod that follows the package names, under a tag no release has
+  because: 1.11.0-beta.1 was cut from a branch that never took main's #153, so an adopter's session start went back to saying "use these names" over a vocabulary past its cap; and npm version left the bundled plugins and the mod at the version before, found only by a reviewer
+  refuted: dropped the check that origin/main is an ancestor of HEAD (prereleaseProblems in src/lifecycle/prerelease.ts) -> "a prerelease is cut only from a pushed, committed HEAD that holds origin's main, at a prerelease version every bundled plugin and mod that follows the package names, under a tag no release has" went red in prerelease.test.ts on its own assertion (origin/main is not an ancestor of HEAD, unsaid); restored from a copy, byte for byte, green batched and alone (2026-10-27)
+  refuted: held only the package's own version, not the bundled manifests' (prereleaseProblems in src/lifecycle/prerelease.ts) -> "a prerelease is cut only from a pushed, committed HEAD that holds origin's main, at a prerelease version every bundled plugin and mod that follows the package names, under a tag no release has" went red in prerelease.test.ts on its own assertion (plugins/python/plugin.json names 1.11.0-beta.2, unsaid); restored from a copy, byte for byte, green batched and alone (2026-10-27)
+  kinds: none
 - a subagent is told its own session: A subagent's start names its own session for every journal write and names its coordinator's session as one it never writes under; the main thread's start names no coordinator.
   over: a subagent start carrying the host's agent id beside its coordinator's session, and a main-thread start
   via: a subagent's start names its own session and its coordinator's, and says never to write under the coordinator's

@@ -84,6 +84,25 @@ jobs:
         run: npm run test:unit
 
   # Everything in npm test but the unit tests, beside them, and the chokepoint run.
+  # The TypeScript plugin's two parsers, rebuilt from tree-sitter-typescript
+  # 0.23.2 and Coherence's patch (grammars/tree-sitter-typescript/build.sh):
+  # the grammar's own corpus and Coherence's run first, in both dialects, and
+  # the build fails unless each parser comes out byte for byte as the one
+  # bundled. The unit tests hold the bundled parsers to the digests build.sh
+  # records; this holds those digests to a build whose corpus passed, so a
+  # parser no patch makes, or a patch that breaks code that parsed, never merges.
+  typescript-parsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: emscripten/emsdk:6.0.13@sha256:fb7864e398acfda863dfcea78b8bc8adad359fa60c6a0bbeb845931de64aa68a
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rebuild both parsers and compare
+        run: grammars/tree-sitter-typescript/build.sh
+
   checks:
     runs-on: ubuntu-latest
     timeout-minutes: 30

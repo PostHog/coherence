@@ -7,6 +7,10 @@
 # for a version npm does not have yet, so any other change to package.json
 # releases nothing. It can also be run by hand from the Actions tab.
 #
+# A prerelease cut from a branch, before it merges, is a GitHub prerelease with
+# the tarball and never npm: node src/lifecycle/prerelease.ts cuts it, and only
+# from a pushed HEAD that holds origin/main.
+#
 # A prerelease version (1.11.0-beta.0) publishes under its own dist-tag (beta),
 # never latest, and its GitHub release is marked a prerelease: npm install
 # @posthog/coherence and Coherence's update notice, which read latest, never

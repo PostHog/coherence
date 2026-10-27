@@ -20,8 +20,8 @@
  */
 
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import { closeSync, constants, existsSync, fstatSync, linkSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, writeFileSync, writeSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { closeSync, constants, fstatSync, linkSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, writeFileSync, writeSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { userConfigDir } from "../lifecycle/user-dir.ts";
 import { createRequire } from "node:module";
@@ -139,7 +139,7 @@ const RECENT = 4;
 const DIRECT_PARSES = 16;
 
 /** Bumped when what a kept parse holds changes, so an older store is never read as this one's. */
-const STORE_FORMAT = 5;
+const STORE_FORMAT = 6;
 
 /**
  * Each treeSitter key, by whether what a kept parse holds depends on it: a
@@ -268,25 +268,18 @@ export function keptParseOf(plugin: LoadedPlugin, text: string): string {
  * is said rather than healed in silence. Empty when none was.
  */
 export function staleParsesNotice(root: string, now: number = Date.now()): string {
-  const folder = join(resolve(root), ".coherence", "parses");
-  let plugins: string[];
-  try {
-    if (!lstatSync(folder).isDirectory()) return "";
-    plugins = readdirSync(folder).filter((name) => PLUGIN_FOLDER.test(name)).sort();
-  } catch {
-    return "";
-  }
   const lines: string[] = [];
-  for (const plugin of plugins) {
-    const path = join(folder, plugin, AUDIT_FILE);
+  for (const folder of StoreFolder.all(root)) {
+    const plugin = folder.name;
+    const text = folder.read(AUDIT_FILE);
+    if (text === undefined) continue;
     try {
-      if (!lstatSync(join(folder, plugin)).isDirectory() || !lstatSync(path).isFile()) continue;
-      const audit = JSON.parse(readFileSync(path, "utf8")) as unknown;
+      const audit = JSON.parse(text) as unknown;
       if (typeof audit !== "object" || audit === null) continue;
       const { at, sampled, stale } = audit as Record<string, unknown>;
       if (typeof at !== "number" || typeof sampled !== "number" || typeof stale !== "number" || !Number.isInteger(sampled) || !Number.isInteger(stale)) continue;
       // Said only when this machine wrote it, for this folder, in bounds a warm-up's audit can reach: a repository's own audit.json says nothing.
-      if (stale < 1 || stale > sampled || sampled > AUDIT_SAMPLE || readFileSync(path, "utf8") !== auditText(plugin, { at, sampled, stale })) continue;
+      if (stale < 1 || stale > sampled || sampled > AUDIT_SAMPLE || text !== auditText(plugin, { at, sampled, stale })) continue;
       if (now - at > AUDIT_NOTICE_DAYS * 86_400_000 || at > now) continue;
       lines.push(`Kept parses: plugin ${plugin}'s kept parses differed from a fresh parse of the same text on ${stale} of the ${sampled} its warm-up sampled (${new Date(at).toISOString().slice(0, 10)}), so its store was discarded and every file is parsed again. The fingerprint they were kept under leaves out something a parse depends on (KEPT_FROM, fingerprintOf in src/plugins/syntax-trees.ts, or a change to the plugin's parsing that names no new parser or queries): a defect to record.`);
     } catch {
@@ -536,13 +529,18 @@ function readerOver(compiled: Compiled, store: ParseStore | undefined): TreeRead
  * project Coherence never ran in gains none.
  *
  * A project is not trusted to hold the store honestly (df-7c50adfe): every
- * folder on its path must be a real folder, never a link (a repository that
- * commits .coherence/parses/python as a link to ~/.ssh would otherwise have
- * the warm-up empty ~/.ssh); nothing is read or appended through a link; a
- * temporary file is created exclusively; only the store's own files are ever
- * removed; every entry read is checked for shape; and a store, or a log,
- * whose first line is not signed with this machine's key is never read, so a
- * store committed to a repository feeds no reading anywhere it is cloned.
+ * file it touches it touches through its StoreFolder, which refuses a link,
+ * a pipe or a folder where a file goes and reads with a bounded cost; every
+ * entry read is checked for shape; and the store, and each line of its log,
+ * is read only where this machine's key signs it, so a store committed to a
+ * repository feeds no reading anywhere it is cloned.
+ *
+ * The store's first line carries its generation, which only a rewrite or a
+ * discard changes, and each log line the generation it was appended under:
+ * a log line of another generation is never read, and a process that loaded
+ * one generation reads the store again when the file holds another. An
+ * append changes no generation, so no process's append can hide another's
+ * rewrite or discard.
  */
 class ParseStore {
   private static stores = new Map<string, ParseStore>();
@@ -552,29 +550,26 @@ class ParseStore {
   parsed = 0;
 
   static of(root: string, plugin: string, fingerprint: string): ParseStore | undefined {
-    // A plugin's name names a folder of the store: one that could step out of it keeps no parses.
-    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(plugin) || plugin.includes("..")) return undefined;
-    const dir = join(resolve(root), ".coherence", "parses", plugin);
-    const key = `${dir}\u0000${fingerprint}`;
+    const folder = StoreFolder.of(root, plugin);
+    if (folder === undefined) return undefined;
+    const key = `${folder.key}\u0000${fingerprint}`;
     let store = ParseStore.stores.get(key);
     if (store === undefined) {
-      store = new ParseStore(resolve(root), dir, fingerprint);
+      store = new ParseStore(folder, fingerprint);
       ParseStore.stores.set(key, store);
       if (ParseStore.stores.size === 1) process.once("exit", () => ParseStore.stores.forEach((s) => s.flush()));
     }
     return store;
   }
 
-  private readonly root: string;
-  private readonly dir: string;
+  private readonly folder: StoreFolder;
   private readonly fingerprint: string;
-  /** The store's files as last loaded or written by this process (their size, time and inode): a change is another process's, and reloads. */
-  private seen = "";
+  /** The generation of the store this process loaded or last wrote: "" where there was none. */
+  private generation = "";
   private checked = 0;
 
-  private constructor(root: string, dir: string, fingerprint: string) {
-    this.root = root;
-    this.dir = dir;
+  private constructor(folder: StoreFolder, fingerprint: string) {
+    this.folder = folder;
     this.fingerprint = fingerprint;
   }
 
@@ -583,30 +578,226 @@ class ParseStore {
     return createHmac("sha256", machineKey()).update(this.fingerprint).update("\u0000").update(text).digest("base64url");
   }
 
-  /** The store's files, as a stat says them, to tell when another process changed them. */
-  private stamp(): string {
-    return [this.base, this.log].map((path) => {
-      try {
-        const stat = lstatSync(path);
-        return `${stat.ino}:${stat.size}:${stat.mtimeMs}`;
-      } catch {
-        return "-";
-      }
-    }).join("|");
-  }
-
   private get base(): string {
-    return join(this.dir, `${this.fingerprint}.json`);
+    return `${this.fingerprint}.json`;
   }
 
   private get log(): string {
-    return join(this.dir, `${this.fingerprint}.added.jsonl`);
+    return `${this.fingerprint}.added.jsonl`;
   }
 
-  /** Whether every folder from the project's .coherence down to the store's is a real folder or not there yet: never a link, never a file. */
-  private safe(): boolean {
-    let at = join(this.root, ".coherence");
-    for (const part of ["", "parses", basename(this.dir)]) {
+  /** The generation and signature a store's first line names, or undefined where it names none. */
+  private static sealOf(line: string | undefined): { generation: string; signature: string } | undefined {
+    const match = line === undefined ? null : /^coherence-parses ([A-Za-z0-9_-]{12}) ([A-Za-z0-9_-]{43})$/.exec(line);
+    return match === null ? undefined : { generation: match[1]!, signature: match[2]! };
+  }
+
+  /** The generation the store's file holds now, read from its first line alone: "" where there is none. */
+  private generationOnDisk(): string {
+    return ParseStore.sealOf(this.folder.firstLine(this.base))?.generation ?? "";
+  }
+
+  get(key: string): Found | undefined {
+    // A process that lives long (the warm server) reads the store again once another process rewrote or discarded it, looking at most once a second.
+    if (this.entries !== undefined && Date.now() - this.checked > RELOAD_MS) {
+      this.checked = Date.now();
+      if (this.generationOnDisk() !== this.generation) this.entries = undefined;
+    }
+    if (this.entries === undefined) {
+      const entries = new Map<string, { found: Found; day: number }>();
+      this.checked = Date.now();
+      this.generation = "";
+      const text = this.folder.read(this.base);
+      if (text !== undefined) {
+        try {
+          // The store's first line signs its generation and the rest: a store whose contents this machine did not write is never read, whatever its seal.
+          const newline = text.indexOf("\n");
+          const seal = ParseStore.sealOf(newline < 0 ? text : text.slice(0, newline));
+          const body = newline < 0 ? "" : text.slice(newline + 1);
+          if (seal !== undefined && seal.signature === this.sign(`${seal.generation}\n${body}`)) {
+            const kept = JSON.parse(body) as unknown;
+            if (typeof kept === "object" && kept !== null && !Array.isArray(kept)) for (const [k, value] of Object.entries(kept)) if (Array.isArray(value) && value.length === 2 && typeof value[0] === "number" && isFound(value[1])) entries.set(k, { day: value[0], found: value[1] });
+            this.generation = seal.generation;
+          }
+        } catch {
+          // What a warm-up kept is unreadable: every text is parsed, and the next warm-up writes it again.
+        }
+      }
+      // Each line of the log signs itself: "<signature> <entry>", the entry naming the generation it was appended under. A log this machine
+      // wrote fails only where a killed process tore a line, so one that fails more than LOG_TORN_MAX times is no log of ours and is read no
+      // further: a repository's log of a million short lines costs a few signatures, not a million.
+      let torn = 0;
+      for (const signed of this.folder.lines(this.log)) {
+        if (signed === "") continue;
+        const space = signed.indexOf(" ");
+        const line = signed.slice(space + 1);
+        if (space !== SIGNATURE_LENGTH || signed.slice(0, space) !== this.sign(line)) {
+          if (++torn > LOG_TORN_MAX) break;
+          continue;
+        }
+        try {
+          const entry = JSON.parse(line) as unknown;
+          if (Array.isArray(entry) && entry.length === 4 && typeof entry[0] === "string" && isFound(entry[1]) && typeof entry[2] === "number" && entry[3] === this.generation) entries.set(entry[0], { found: entry[1], day: entry[2] });
+        } catch {
+          // A line a process was killed while writing: that text is parsed again.
+        }
+      }
+      for (const [k, found, day] of this.added) entries.set(k, { found, day });
+      this.entries = entries;
+    }
+    return this.entries.get(key)?.found;
+  }
+
+  put(key: string, found: Found): void {
+    this.parsed++;
+    const day = today();
+    this.added.push([key, found, day]);
+    this.entries?.set(key, { found, day });
+    // A process that lives long (the warm server, hook-serve) appends as it goes, so what it holds unwritten stays small.
+    if (this.added.length >= FLUSH_EVERY) this.flush();
+  }
+
+  /** Append what this process parsed, under the generation it parsed against: a process that never loaded the store reads the generation first. */
+  flush(): void {
+    if (this.added.length === 0) return;
+    const generation = this.entries === undefined ? this.generationOnDisk() : this.generation;
+    const lines = this.added.map(([k, found, day]) => JSON.stringify([k, found, day, generation])).map((line) => `${this.sign(line)} ${line}\n`).join("");
+    this.added = [];
+    if (this.folder.ensure()) this.folder.append(this.log, lines);
+  }
+
+  /**
+   * Take the store's warm-up lock: true when this process holds it, false
+   * when a live warm-up of another process does, so two warm-ups (a session
+   * start and the prompt after it) never parse the project twice or remove
+   * each other's files. A lock whose process is gone, older than
+   * WARM_LOCK_MS, or stamped in the future is taken over; a folder or a link
+   * where the lock goes is no warm-up's, and the warm-up goes on without it.
+   */
+  lock(): boolean {
+    if (!this.folder.ensure()) return false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (this.folder.create(WARM_LOCK, `${process.pid} ${Date.now()}`)) return true;
+      const held = this.folder.read(WARM_LOCK);
+      if (held === undefined) {
+        if (this.folder.holdsOther(WARM_LOCK)) return true;
+        continue;
+      }
+      const [pid, at] = held.split(" ").map(Number);
+      const age = Date.now() - (at ?? 0);
+      if (alive(pid ?? 0) && age >= 0 && age < WARM_LOCK_MS) return false;
+      this.folder.remove(WARM_LOCK);
+    }
+    return false;
+  }
+
+  /** Give the warm-up lock back. */
+  unlock(): void {
+    if (this.folder.read(WARM_LOCK)?.startsWith(`${process.pid} `)) this.folder.remove(WARM_LOCK);
+  }
+
+  /**
+   * Drop every kept parse, in memory and on disk, and leave the audit that
+   * found them stale beside the store for orient to say (staleParsesNotice).
+   * Only the store's own files are removed. The store's file goes with them,
+   * so its generation is none, and every process that loaded it reads again.
+   */
+  discard(audit: { sampled: number; stale: number }): void {
+    this.entries = new Map();
+    this.added = [];
+    this.generation = "";
+    this.checked = Date.now();
+    if (!this.folder.ensure()) return;
+    for (const name of this.folder.names()) if (STORE_FILE.test(name)) this.folder.remove(name);
+    this.folder.remove(AUDIT_FILE);
+    this.folder.create(AUDIT_FILE, auditText(this.folder.name, { at: Date.now(), ...audit }));
+  }
+
+  /**
+   * Keep the texts named, as seen today, and every other kept parse seen in
+   * the last RETAIN_DAYS, in one signed file of a new generation, and remove
+   * the store's own other files: the log, other fingerprints' stores, and
+   * temporary files a killed warm-up left. Nothing else in the folder is
+   * touched.
+   */
+  rewrite(keep: ReadonlySet<string>): void {
+    if (!this.folder.ensure()) return;
+    this.get("");
+    const kept: Record<string, [number, Found]> = {};
+    // What this pass read is kept as seen today; anything else is kept while it was seen in the last RETAIN_DAYS, so one leaf's pass of a
+    // repository's shared store never drops another leaf's files, and a file gone or changed ages out.
+    const now = today();
+    for (const [k, { found, day }] of this.entries!) if (keep.has(k) || now - day <= RETAIN_DAYS) kept[k] = [keep.has(k) ? now : day, found];
+    const body = JSON.stringify(kept);
+    const generation = newGeneration();
+    // A store path the project holds as something else (a folder named as the store's file): nothing is kept, and the warm-up goes on.
+    if (!this.folder.replace(this.base, `${STORE_SEAL}${generation} ${this.sign(`${generation}\n${body}`)}\n${body}`)) return;
+    for (const name of this.folder.names()) if (name !== this.base && STORE_FILE.test(name)) this.folder.remove(name);
+    this.added = [];
+    this.generation = generation;
+    this.checked = Date.now();
+  }
+}
+
+/** A store's new generation: made only by a rewrite, so no append can change the generation a process loaded. */
+function newGeneration(): string {
+  return randomBytes(9).toString("base64url");
+}
+
+/** The folder of a project's kept parses for one plugin, or of all of them: .coherence/parses[/<plugin>]. The one place its path is made. */
+function parsesFolder(root: string, plugin?: string): string {
+  const parses = join(resolve(root), ".coherence", "parses");
+  return plugin === undefined ? parses : join(parses, plugin);
+}
+
+/**
+ * The one way Coherence touches a file of a project's parse store. A
+ * repository controls everything under its .coherence, so each operation here
+ * acts only where every folder from .coherence down is a real folder (never a
+ * link), opens without following a link or blocking on a pipe, acts on a
+ * regular file only, reads no file larger than STORE_MAX_BYTES, reads a
+ * log a chunk at a time so its reader can stop early, writes a whole file
+ * under a temporary name and renames it into place, creates a file only where
+ * none is, and removes only a regular file. The store's path is made here
+ * alone (parsesFolder), so no other code holds a path to touch the store by.
+ */
+class StoreFolder {
+  readonly #root: string;
+  readonly #dir: string;
+  /** The plugin's folder name. */
+  readonly name: string;
+
+  private constructor(root: string, name: string) {
+    this.#root = resolve(root);
+    this.#dir = parsesFolder(root, name);
+    this.name = name;
+  }
+
+  /** A plugin's folder of the store; undefined for a name that could step out of it. */
+  static of(root: string, plugin: string): StoreFolder | undefined {
+    if (!PLUGIN_FOLDER.test(plugin) || plugin.includes("..")) return undefined;
+    return new StoreFolder(root, plugin);
+  }
+
+  /** Every plugin's folder the project's store holds, where the store's own folder is a real one. */
+  static all(root: string): StoreFolder[] {
+    try {
+      if (!lstatSync(join(resolve(root), ".coherence")).isDirectory() || !lstatSync(parsesFolder(root)).isDirectory()) return [];
+      return readdirSync(parsesFolder(root)).filter((name) => PLUGIN_FOLDER.test(name)).sort().map((name) => new StoreFolder(root, name));
+    } catch {
+      return [];
+    }
+  }
+
+  /** What tells this folder apart from another project's or plugin's. */
+  get key(): string {
+    return this.#dir;
+  }
+
+  /** Whether every folder from the project's .coherence down to this one is a real folder or not there yet: never a link, never a file. */
+  #safe(): boolean {
+    let at = join(this.#root, ".coherence");
+    for (const part of ["", "parses", this.name]) {
       if (part !== "") at = join(at, part);
       let stat;
       try {
@@ -619,32 +810,72 @@ class ParseStore {
     return true;
   }
 
-  /** A file of the store's own, its lines, read only when it is a regular file no larger than STORE_MAX_BYTES. */
-  private lines(path: string): string[] {
+  /** Make the folder where the project has its .coherence and the path holds no link: whether it may be written. */
+  ensure(): boolean {
+    if (!this.#safe()) return false;
     try {
-      const stat = lstatSync(path);
-      return stat.isFile() && stat.size <= STORE_MAX_BYTES ? readFileSync(path, "utf8").split("\n") : [];
+      if (!lstatSync(join(this.#root, ".coherence")).isDirectory()) return false;
+      mkdirSync(this.#dir, { recursive: true });
     } catch {
-      return [];
+      return false;
     }
+    return this.#safe();
   }
 
-  /**
-   * The log's lines, read a chunk at a time from a regular file no larger than
-   * STORE_MAX_BYTES, so a reader that stops early (a log no machine of ours
-   * wrote) reads no further than it got. Never through a link, never blocking
-   * on a pipe.
-   */
-  private *logLines(): Generator<string> {
+  /** A file of the folder opened to read: a regular file no larger than STORE_MAX_BYTES, never through a link or a pipe. */
+  #open(name: string): number | undefined {
+    if (!this.#safe()) return undefined;
     let fd: number;
     try {
-      fd = openSync(this.log, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+      fd = openSync(join(this.#dir, name), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     } catch {
-      return;
+      return undefined;
     }
     try {
       const stat = fstatSync(fd);
-      if (!stat.isFile() || stat.size > STORE_MAX_BYTES) return;
+      if (stat.isFile() && stat.size <= STORE_MAX_BYTES) return fd;
+    } catch {
+      // Unreadable: as if absent.
+    }
+    closeSync(fd);
+    return undefined;
+  }
+
+  /** A file's whole text, or undefined where it is absent or no file of the store's may be. */
+  read(name: string): string | undefined {
+    const fd = this.#open(name);
+    if (fd === undefined) return undefined;
+    try {
+      return readFileSync(fd, "utf8");
+    } catch {
+      return undefined;
+    } finally {
+      closeSync(fd);
+    }
+  }
+
+  /** A file's first line, reading no more of it than MAX_FIRST_LINE bytes. */
+  firstLine(name: string): string | undefined {
+    const fd = this.#open(name);
+    if (fd === undefined) return undefined;
+    try {
+      const head = Buffer.alloc(MAX_FIRST_LINE);
+      const got = readSync(fd, head, 0, head.length, 0);
+      const text = head.subarray(0, got);
+      const end = text.indexOf(10);
+      return text.subarray(0, end < 0 ? got : end).toString("utf8");
+    } catch {
+      return undefined;
+    } finally {
+      closeSync(fd);
+    }
+  }
+
+  /** A file's lines, read a chunk at a time, so a reader that stops early reads no further than it got. */
+  *lines(name: string): Generator<string> {
+    const fd = this.#open(name);
+    if (fd === undefined) return;
+    try {
       const chunk = Buffer.alloc(1 << 20);
       let pending = Buffer.alloc(0);
       for (;;) {
@@ -664,215 +895,79 @@ class ParseStore {
     }
   }
 
-  get(key: string): Found | undefined {
-    // A process that lives long (the warm server) reloads what another process rewrote or discarded since, looking at most once a second.
-    if (this.entries !== undefined && Date.now() - this.checked > RELOAD_MS) {
-      this.checked = Date.now();
-      if (this.stamp() !== this.seen) this.entries = undefined;
-    }
-    if (this.entries === undefined) {
-      const entries = new Map<string, { found: Found; day: number }>();
-      this.seen = this.stamp();
-      this.checked = Date.now();
-      if (this.safe()) {
-        try {
-          // The store's first line signs the rest: a store whose contents this machine did not write is never read, whatever its seal.
-          const [seal, ...rest] = this.lines(this.base);
-          const body = rest.join("\n");
-          const kept = seal === `${STORE_SEAL}${this.sign(body)}` ? (JSON.parse(body) as unknown) : {};
-          if (typeof kept === "object" && kept !== null && !Array.isArray(kept)) for (const [k, value] of Object.entries(kept)) if (Array.isArray(value) && value.length === 2 && typeof value[0] === "number" && isFound(value[1])) entries.set(k, { day: value[0], found: value[1] });
-        } catch {
-          // What a warm-up kept is unreadable: every text is parsed, and the next warm-up writes it again.
-        }
-        // Each line of the log signs itself: "<signature> <entry>". A log this machine wrote fails only where a killed process tore a
-        // line, so one that fails more than LOG_TORN_MAX times is no log of ours and is read no further: a repository's log of a
-        // million short lines costs a few signatures, not a million.
-        let torn = 0;
-        for (const signed of this.logLines()) {
-          if (signed === "") continue;
-          const space = signed.indexOf(" ");
-          const line = signed.slice(space + 1);
-          if (space !== SIGNATURE_LENGTH || signed.slice(0, space) !== this.sign(line)) {
-            if (++torn > LOG_TORN_MAX) break;
-            continue;
-          }
-          try {
-            const entry = JSON.parse(line) as unknown;
-            if (Array.isArray(entry) && entry.length === 3 && typeof entry[0] === "string" && isFound(entry[1]) && typeof entry[2] === "number") entries.set(entry[0], { found: entry[1], day: entry[2] });
-          } catch {
-            // A line a process was killed while writing: that text is parsed again.
-          }
-        }
-      }
-      for (const [k, found, day] of this.added) entries.set(k, { found, day });
-      this.entries = entries;
-    }
-    return this.entries.get(key)?.found;
-  }
-
-  put(key: string, found: Found): void {
-    this.parsed++;
-    const day = today();
-    this.added.push([key, found, day]);
-    this.entries?.set(key, { found, day });
-    // A process that lives long (the warm server, hook-serve) appends as it goes, so what it holds unwritten stays small.
-    if (this.added.length >= FLUSH_EVERY) this.flush();
-  }
-
-  /** Append what this process parsed, where the project has its .coherence folder and the store's path holds no link; never through a link. */
-  flush(): void {
-    if (this.added.length === 0) return;
-    const lines = this.added.map((entry) => JSON.stringify(entry)).map((line) => `${this.sign(line)} ${line}\n`).join("");
-    this.added = [];
-    if (!existsSync(join(this.root, ".coherence")) || !this.safe()) return;
+  /** Append to a regular file, made where absent, never through a link or into a pipe. */
+  append(name: string, text: string): void {
+    if (!this.#safe()) return;
     try {
-      mkdirSync(this.dir, { recursive: true });
-      if (!this.safe()) return;
-      // Whether another process rewrote or discarded the store since this one loaded it, asked before this append changes the stamp.
-      const changed = this.entries !== undefined && this.stamp() !== this.seen;
-      // Never blocking on a pipe the project put at the log's path, and appending only to a regular file.
-      const fd = openSync(this.log, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
+      const fd = openSync(join(this.#dir, name), constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
       try {
-        if (fstatSync(fd).isFile()) writeSync(fd, lines);
+        if (fstatSync(fd).isFile()) writeSync(fd, text);
       } finally {
         closeSync(fd);
       }
-      // What this process wrote is no other's change; what another did is read again on the next get.
-      if (changed) this.entries = undefined;
-      else if (this.entries !== undefined) this.seen = this.stamp();
     } catch {
-      // A store that cannot be written only means the next process parses again.
+      // A file that cannot be written only means the next process parses again.
     }
   }
 
-  /**
-   * Take the store's warm-up lock: true when this process holds it, false
-   * when a live warm-up of another process does, so two warm-ups (a session
-   * start and the prompt after it) never parse the project twice or remove
-   * each other's files. A lock whose process is gone, or older than
-   * WARM_LOCK_MS, is taken over.
-   */
-  lock(): boolean {
-    if (!existsSync(join(this.root, ".coherence")) || !this.safe()) return false;
+  /** Create a file where none is: false where one, or anything else, already is. */
+  create(name: string, text: string): boolean {
+    if (!this.#safe()) return false;
     try {
-      mkdirSync(this.dir, { recursive: true });
+      const fd = openSync(join(this.#dir, name), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+      try {
+        writeSync(fd, text);
+      } finally {
+        closeSync(fd);
+      }
+      return true;
     } catch {
       return false;
     }
-    if (!this.safe()) return false;
-    const path = join(this.dir, WARM_LOCK);
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
-        writeSync(fd, `${process.pid} ${Date.now()}`);
-        closeSync(fd);
-        return true;
-      } catch {
-        let held: { pid: number; at: number } | undefined;
-        try {
-          if (lstatSync(path).isFile()) {
-            const [pid, at] = readFileSync(path, "utf8").split(" ").map(Number);
-            held = { pid: pid ?? 0, at: at ?? 0 };
-          }
-        } catch {
-          continue;
-        }
-        // A folder or a link the project put at the lock's path is no warm-up's: the warm-up goes on without the lock, as one with
-        // no .coherence folder would never go on at all; two warm-ups at once parse twice and each rewrite is whole.
-        if (held === undefined) return true;
-        // A lock stamped in the future is no warm-up's: a committed one would otherwise hold every warm-up off for good.
-        const age = Date.now() - held.at;
-        if (alive(held.pid) && age >= 0 && age < WARM_LOCK_MS) return false;
-        rmSync(path, { force: true });
-      }
-    }
-    return false;
   }
 
-  /** Give the warm-up lock back. */
-  unlock(): void {
-    const path = join(this.dir, WARM_LOCK);
+  /** Whether something other than a regular file (a folder, a link, a pipe) is at a name. */
+  holdsOther(name: string): boolean {
     try {
-      if (lstatSync(path).isFile() && readFileSync(path, "utf8").startsWith(`${process.pid} `)) rmSync(path, { force: true });
+      return !lstatSync(join(this.#dir, name)).isFile();
     } catch {
-      // Not held.
+      return false;
     }
   }
 
-  /**
-   * Drop every kept parse, in memory and on disk, and leave the audit that
-   * found them stale beside the store for orient to say (staleParsesNotice).
-   * Only the store's own files are removed; the audit is written afresh,
-   * never through a link.
-   */
-  discard(audit: { sampled: number; stale: number }): void {
-    this.entries = new Map();
-    this.added = [];
-    this.checked = Date.now();
-    if (!existsSync(join(this.root, ".coherence")) || !this.safe()) return;
-    for (const name of existsSync(this.dir) ? readdirSync(this.dir) : []) {
-      if (!STORE_FILE.test(name)) continue;
-      try {
-        if (lstatSync(join(this.dir, name)).isFile()) rmSync(join(this.dir, name), { force: true });
-      } catch {
-        // Gone already.
-      }
-    }
+  /** Write a file whole: under a temporary name of this process's, created exclusively, then renamed over the name, which a rename replaces and never follows. */
+  replace(name: string, text: string): boolean {
+    if (!this.#safe()) return false;
+    const temporary = `${name}.${process.pid}`;
+    this.remove(temporary);
+    if (!this.create(temporary, text)) return false;
     try {
-      mkdirSync(this.dir, { recursive: true });
-      if (!this.safe()) return;
-      const path = join(this.dir, AUDIT_FILE);
-      rmSync(path, { force: true });
-      writeFileSync(path, auditText(basename(this.dir), { at: Date.now(), ...audit }), { flag: "wx", mode: 0o600 });
+      renameSync(join(this.#dir, temporary), join(this.#dir, name));
+      return true;
     } catch {
-      // An audit that cannot be kept: the store is discarded all the same.
+      this.remove(temporary);
+      return false;
     }
-    this.seen = this.stamp();
   }
 
-  /**
-   * Keep the texts named, as seen today, and every other kept parse seen in
-   * the last RETAIN_DAYS, in one signed file, and remove the store's own other
-   * files: the
-   * log, other fingerprints' stores, and temporary files a killed warm-up
-   * left. Nothing else in the folder is touched.
-   */
-  rewrite(keep: ReadonlySet<string>): void {
-    if (!existsSync(join(this.root, ".coherence")) || !this.safe()) return;
-    this.get("");
-    const kept: Record<string, [number, Found]> = {};
-    // What this pass read is kept as seen today; anything else is kept while it was seen in the last RETAIN_DAYS, so one leaf's pass of a
-    // repository's shared store never drops another leaf's files, and a file gone or changed ages out.
-    const now = today();
-    for (const [k, { found, day }] of this.entries!) if (keep.has(k) || now - day <= RETAIN_DAYS) kept[k] = [keep.has(k) ? now : day, found];
-    const temporary = `${this.base}.${process.pid}`;
+  /** Remove a regular file; a link, a folder or a pipe at the name stays as it is. */
+  remove(name: string): void {
+    if (!this.#safe()) return;
     try {
-      mkdirSync(this.dir, { recursive: true });
-      if (!this.safe()) return;
-      rmSync(temporary, { force: true });
-      const body = JSON.stringify(kept);
-      writeFileSync(temporary, `${STORE_SEAL}${this.sign(body)}\n${body}`, { flag: "wx", mode: 0o600 });
-      renameSync(temporary, this.base);
+      if (lstatSync(join(this.#dir, name)).isFile()) rmSync(join(this.#dir, name), { force: true });
     } catch {
-      // A store path the project holds as something else (a folder named as the store's file): nothing is kept, and the warm-up goes on.
-      try {
-        if (lstatSync(temporary).isFile()) rmSync(temporary, { force: true });
-      } catch {
-        // Never made.
-      }
-      return;
+      // Gone already.
     }
-    for (const name of readdirSync(this.dir)) {
-      if (name === `${this.fingerprint}.json` || !STORE_FILE.test(name)) continue;
-      const path = join(this.dir, name);
-      try {
-        if (lstatSync(path).isFile()) rmSync(path, { force: true });
-      } catch {
-        // Gone already.
-      }
+  }
+
+  /** The names in the folder. */
+  names(): string[] {
+    if (!this.#safe()) return [];
+    try {
+      return readdirSync(this.#dir);
+    } catch {
+      return [];
     }
-    this.added = [];
-    this.seen = this.stamp();
   }
 }
 
@@ -930,8 +1025,11 @@ function alive(pid: number): boolean {
   }
 }
 
-/** The first line of a store's file: its signature. */
+/** The first line of a store's file: its generation and its signature. */
 const STORE_SEAL = "coherence-parses ";
+
+/** The most of a store's file read for its first line: the seal is 74 bytes. */
+const MAX_FIRST_LINE = 256;
 
 /** How many days a kept parse no warm-up read lasts: a file deleted or changed ages out; one read only at the repository's top is parsed again after. */
 const RETAIN_DAYS = 14;

@@ -371,7 +371,11 @@ a member named `in` or `instanceof` (`in?: T`, `in = 2`) or beginning with
 `in` (`in_progress`) on the line after another, and a bare `&` in JSX text
 or a JSX string, each of which hid the declarations after it in PostHog's
 frontend. The patch and the script that rebuilds both parsers byte for byte
-are in `grammars/tree-sitter-typescript` in Coherence's repository. Still
+are in `grammars/tree-sitter-typescript` in Coherence's repository; the
+script builds nothing until the grammar's own test corpus and Coherence's
+(each fix, and each form it must leave alone, with its whole expected tree)
+pass in both dialects, and CI rebuilds both parsers on every pull request
+and fails unless they come out as the ones bundled. Still
 errors: an optional destructured parameter in a function type
 (`({ a }?: T) => U`), a parenthesized import type, `typeof import('x')` as
 a call's type argument (`importOriginal<typeof import('x')>()`), a method
@@ -415,7 +419,8 @@ kept parse. Each warm-up also parses a sample of the files it found kept
 and compares; a store that differs from a fresh parse is discarded, and the
 next session start says so. A store is read only where this machine's key
 signs its contents, and a line of its log only where the line signs
-itself, so a store or log a repository commits feeds no reading; a log
+itself and names the store's generation, which only a warm-up's rewrite
+changes, so a store or log a repository commits feeds no reading; a log
 whose lines fail more than a killed process's torn line would is read no
 further, so however many lines a repository commits it costs a few
 signatures.
