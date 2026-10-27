@@ -637,6 +637,22 @@ environment, with provenance and no stored token, and tags it as a GitHub
 release with generated notes. Any other change to package.json releases
 nothing. The workflow can also be run by hand from the Actions tab.
 
+A prerelease of a branch, before it merges, is a GitHub prerelease carrying
+the tarball, never npm. Bump the versions as above to a prerelease
+(`1.11.0-beta.4`), merge main into the branch, push it, and run the
+Prerelease workflow:
+
+```sh
+gh workflow run prerelease.yml -f ref=<branch> -f notes="$(cat notes.md)"
+```
+
+`.github/workflows/prerelease.yml` checks the branch out clean at its tip,
+refuses (naming each reason) unless the version is a prerelease that every
+bundled plugin and mod following the package names, the commit is on a branch
+of PostHog/coherence and holds its main, and no tag of the version exists;
+then it packs the tarball there and creates the prerelease at that commit's
+sha. Nothing is cut from a local checkout.
+
 ## Further reading
 
 - `Coherence.spec.md` and the `*.spec.md` file in each folder under `src/`: Coherence's own trust levels and invariants, in its own grammar.

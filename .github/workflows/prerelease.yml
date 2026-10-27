@@ -1,0 +1,92 @@
+# Cuts a prerelease of @posthog/coherence from a branch, before it merges: a
+# GitHub prerelease carrying the package's tarball, and never npm, which
+# release.yml publishes to from main alone, through the Release environment.
+# Run it by hand, from the Actions tab or with
+#
+#   gh workflow run prerelease.yml -f ref=<branch> -f notes="$(cat notes.md)"
+#
+# It checks the branch out clean at its tip, with full history, so the
+# tarball is packed from that commit and nothing else: no contributor's
+# working tree, remote or local ref has a say in what ships, which is why
+# cutting moved here from a local script whose view of them kept diverging
+# from what would ship. Before it installs or packs, src/lifecycle/prerelease.ts
+# refuses, naming each reason, unless the version is a prerelease that every
+# bundled plugin and mod following the package names, the commit is on a
+# branch of the repository package.json names and holds its main, and no tag
+# of the version exists. The release targets the commit checked out, by its
+# sha, never the branch's name, which may move while this runs.
+name: Prerelease
+
+run-name: Prerelease of ${{ inputs.ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The branch to cut, at its tip when the run starts (a branch name, not a tag or a commit)
+        required: true
+        type: string
+      notes:
+        description: The release notes, in Markdown
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# One prerelease at a time: the tag the check finds free is the one the release creates.
+concurrency:
+  group: prerelease
+  cancel-in-progress: false
+
+jobs:
+  prerelease:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # contents: write creates the release and its tag; nothing is published to npm, so no id-token.
+      contents: write
+    steps:
+      # The branch by its full ref, so a tag or a commit is refused here; full history, so the check can read main's ancestry.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/${{ inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.18"
+
+      # The commit released, resolved once: every later step names it by this sha.
+      - name: The commit and version cut
+        id: commit
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: May this commit be cut?
+        run: node --disable-warning=ExperimentalWarning src/lifecycle/prerelease.ts
+
+      # No dependency's install script runs here.
+      - run: npm ci --ignore-scripts
+
+      # prepare builds dist; the tarball is checked before it is released.
+      - run: npm pack
+      - name: Check the tarball runs
+        run: |
+          mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
+          npm init -y >/dev/null
+          npm install --ignore-scripts "$GITHUB_WORKSPACE"/posthog-coherence-*.tgz
+          npx --no coherence spec --check
+
+      # The notes reach the shell through the environment, never spliced into the script.
+      - name: Create the GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.commit.outputs.sha }}
+          VERSION: ${{ steps.commit.outputs.version }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --prerelease --target "$SHA" --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md" "posthog-coherence-$VERSION.tgz"

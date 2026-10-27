@@ -17,7 +17,7 @@ absent. A single-value flag given twice is refused.
 - `resolved <id> --because "<what the test showed>" [--as "<candidate>"]`: resolves a conjecture.
 - `resolved <defect-id> --because "<what fixed it>" [--guard <component folder>/<invariant>] [--decision <id>]`: closes a defect (see Defects below).
 - `dismiss <id> --because "<why nobody will chase it>"`
-- `defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <review|ci|probe|adopter|self|test>] [--cite <id>]...`
+- `defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--component <folder>] [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <review|ci|probe|adopter|self|test>] [--cite <id>]...`
 - `classify <defect-id> [--class <name>] [--introduced <...>] [--caught <...>] --because "<the evidence>"`: a decision citing the defect that gives the fields it lacked.
 - `experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"... [--cite <id>]...`: prints step ids.
 - `experiment close <id> --result <stepId>=<pass|fail|unknown>...`: every step needs a result; the outcome is derived.
@@ -57,6 +57,11 @@ fields, which the practice close a defect asks for:
   pull request makes the defect fix-induced.
 - `caught`: review, ci, probe, adopter, self or test.
 
+A defect also names its `component`, the folder of the spec it belongs to:
+`--component <folder>`, or, without it, the one component whose folder holds
+every file `--file` names. Files in several components, or none, write no
+component, and the verb says how to name one.
+
 A defect recorded without them stays valid. The journal is append-only, so
 `classify` gives them later as a decision citing the defect; every reader
 folds the defect's own fields, then each classification not retracted, then
@@ -70,11 +75,30 @@ is a guard failure: the guard was weaker than claimed. Both are advisory,
 and orient lists each guard failure. A retracted close no longer closes, so a
 defect can be closed again with its guard.
 
+A dead end is a component whose defects keep coming back after it was
+guarded: within the last 14 days and since the first close of one of its
+defects with a witnessed guard, 8 or more defects across 3 or more classes or
+families, recorded at 3 or more commits (a round's findings share the commit
+its fixes land on), 3 or more of them closed by a guard that had already closed
+an earlier defect there. Its guards are narrowing doors in a design that is
+wrong. `spec --check`, orient and the convergence reading name each dead end
+with its defects, classes, rounds, first guard and window, and say what to
+do: stop adding guards there, review its representation, record the choice as
+a decision, and `escalate` the question to a human, citing one of its defects.
+The escalation then heads every read; a human's `acknowledge` restarts the
+count, so a component that keeps failing after the answer is named again.
+Coherence never writes the escalation itself: a record carries the session
+that wrote it, and a reading writes none. The reading reads the journal of
+every worktree of the repository, each record once, and says how many it read
+and how it placed each defect: by the component its record names, or, for a
+record older than the field, by its files, else its guard's component. It is
+advisory and never a problem.
+
 `query convergence [--days <n>] [--json]` reads whether discoveries repay over
 a window (14 days by default): defects arriving by origin and catch, escapes
-per release, the share closed with a guard, repeats per class, bullets at each
-day and release tag, the files most often changed, and hook latency p50 and
-p95 per event and Coherence version.
+per release, the share closed with a guard, repeats per class, dead ends,
+bullets at each day and release tag, the files most often changed, and hook
+latency p50 and p95 per event and Coherence version.
 
 `query mirrors [--all] [--rev <rev>] [--json | --proposals]` is the mirror
 reading: the lists kept by hand that must mirror another list, a folder or the

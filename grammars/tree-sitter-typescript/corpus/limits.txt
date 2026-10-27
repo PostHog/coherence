@@ -1,0 +1,56 @@
+Forms compare.mjs reads beside the grammar's corpus and Coherence's: the one the patch reads worse than the stock
+grammar (a comparison after an import type, which intended-differences.json lists as a regression), and those both
+grammars still err on, which must stay as the stock grammar reads them. No expected trees: the comparison's only
+reference is the stock parser.
+
+==================
+a comparison after an import type
+==================
+
+const a = x as import('x').T < y;
+const b = 1;
+
+---
+
+==================
+an optional destructured parameter in a function type
+==================
+
+type F = ({ a }?: T) => U;
+
+---
+
+==================
+a parenthesized import type
+==================
+
+type P = (import('x').T)[];
+
+---
+
+==================
+typeof an import type as a call's type argument
+==================
+
+const m = importOriginal<typeof import('x')>();
+
+---
+
+==================
+a method named in after another member
+==================
+
+class C {
+  a = 1
+  in() {}
+}
+
+---
+
+==================
+variance annotations
+==================
+
+type V<in out T> = T;
+
+---

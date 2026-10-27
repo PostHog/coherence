@@ -136,6 +136,12 @@ export interface DefectState {
   class?: string;
   introduced?: string;
   caught?: Caught;
+  /** The files the defect names, as it was recorded; empty when it named none. */
+  files?: string[];
+  /** The component the defect record names, when it was written with one; a record older than the field names none. */
+  component?: string;
+  /** The short commit HEAD named when the defect was written, null where no git answered. */
+  commit?: string | null;
   /** The resolution that closed it, unretracted; absent while it is open. */
   resolution?: Resolution;
 }
@@ -159,7 +165,8 @@ export function defectStates(records: readonly JournalRecord[]): DefectState[] {
   for (const record of ordered) {
     if (record.kind === "defect") {
       const d = record as Defect;
-      const state: DefectState = { id: d.id, at: d.at, what: d.what };
+      const state: DefectState = { id: d.id, at: d.at, what: d.what, files: Array.isArray(d.files) ? d.files : [], commit: d.commit ?? null };
+      if (typeof d.component === "string") state.component = d.component;
       fold(state, d);
       states.set(d.id, state);
     } else if (gone.has(record.id)) {

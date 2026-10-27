@@ -8,8 +8,9 @@
 # releases nothing. It can also be run by hand from the Actions tab.
 #
 # A prerelease cut from a branch, before it merges, is a GitHub prerelease with
-# the tarball and never npm: node src/lifecycle/prerelease.ts cuts it, and only
-# from a pushed HEAD that holds origin/main.
+# the tarball and never npm: prerelease.yml cuts it, run by hand
+# (gh workflow run prerelease.yml -f ref=<branch> -f notes=...), from the
+# branch checked out clean, and only when it holds main.
 #
 # A prerelease version (1.11.0-beta.0) publishes under its own dist-tag (beta),
 # never latest, and its GitHub release is marked a prerelease: npm install

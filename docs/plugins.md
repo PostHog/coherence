@@ -370,15 +370,26 @@ arguments or as an array's element (`import('x').T<U>`, `import('x').T[]`),
 a member named `in` or `instanceof` (`in?: T`, `in = 2`) or beginning with
 `in` (`in_progress`, `in$`) on the line after another, and a bare `&` in JSX
 text or a JSX string, each of which hid the declarations after it in
-PostHog's frontend. The patch and the script that rebuilds both parsers byte
+PostHog's frontend. The patch and the scripts that rebuild both parsers byte
 for byte are in `grammars/tree-sitter-typescript` in Coherence's repository.
-The script fetches every input and checks it by its digest (the upstream
-commit, tree-sitter-javascript, and the CLI, clang and wasm-opt the parsers
-are compiled with), builds nothing until the grammar's own test corpus and
+The build runs in two phases. The fetch phase downloads every input and
+checks it by the digest `inputs.sha256` records (the CLI, clang and wasm-opt
+the parsers are compiled with, tree-sitter-javascript, and the TypeScript
+and web-tree-sitter packages the comparison reads with), and clones the
+upstream grammar at its pinned commit. The build phase runs with the network
+denied, so it can download nothing, and refuses to run where it reaches the
+network; it checks every input again, runs the grammar's own test corpus and
 Coherence's (each fix, and each form it must leave alone, with its whole
-expected tree) pass in both dialects, and writes the bundled parsers only
-once each is the digest it records. CI rebuilds both on every pull request
-and fails its checks unless they come out as the ones bundled. Still
+expected tree) in both dialects, builds the stock parsers beside the patched
+ones, and compares what the two read, node by node, over that corpus,
+TypeScript's own lib declaration files and Coherence's source. Any difference
+`intended-differences.json` does not name by its construct fails the build,
+as does any token the patched parsers read as another type than the stock
+ones do; the list names five fixes and one regression, below. The build
+phase writes the bundled parsers only once each is the digest
+`parsers.sha256` records. CI runs it on every pull request in a container
+with no network, and fails its checks unless every difference is listed and
+both parsers come out as the ones bundled. Still
 errors, as with the stock grammar: an optional destructured parameter in a
 function type (`({ a }?: T) => U`), a parenthesized import type, `typeof
 import('x')` as a call's type argument (`importOriginal<typeof
@@ -386,9 +397,14 @@ import('x')>()`), a method named `in` after another member, and variance
 annotations (`<in out T>`). A comparison after an import type
 (`x as import('x').T < y`) now errs too, as it does after any other type
 (`x as T < y`) and as TypeScript's own compiler refuses it. Around a
-parenthesized import type the patched grammar can recover less of what
-follows: over about 80,000 files of real TypeScript, mostly type
-declarations, it read 4 declarations fewer there, and 2,601 more elsewhere.
+parenthesized import type, which errs with the stock grammar too, the
+patched grammar can recover less: where it reads such a file as one error
+at its root, none of the file's declarations are read, those before the
+import type included. Over about 106,000 files of TypeScript from
+node_modules, mostly type declarations, 4 files read 11 declarations fewer
+than with the stock grammar (8 more read none of the declaration named
+import the stock grammar's error made up); over PostHog's 21,159 TypeScript
+files, none.
 
 A language with two grammars names the second as its `alternate`: a text
 whose tree from `parser` holds an error is parsed again with it, and the
@@ -412,28 +428,29 @@ second reader of the same text is how two readings of it come to disagree,
 as Python's two hand-written readers of its imports did.
 
 Parsing costs: a WebAssembly parser reads about 11 MB of text a second, so
-Coherence keeps each file's parse in the project's `.coherence/parses`,
-under the text's digest and the parser's and queries' fingerprint. The
-warm-up a session start launches parses every source file once in the
-background; after that a reading of the whole project parses only the files
-that changed (PostHog's 20,000 Python files: 30 s for the first warm-up,
-2 s for the next, and mass in 3.4 s). A hook that reads a file or two parses
-it directly and never loads the store. The fingerprint digests everything
-a kept parse depends on: the parser and its `alternate`, the queries, the `separator`, the
-web-tree-sitter release and the Coherence code that reads a tree. Changing
-any of them changes the fingerprint, so nothing kept under the old ones is
-read; `privateName` and `resolve` are read after the store and change no
-kept parse. Each warm-up also parses a sample of the files it found kept
-and compares; a store that differs from a fresh parse is discarded, and the
-next session start says so. A store is read only where this machine's key
-signs its contents, and a line of its log only where the line signs
-itself and names the store's generation, which only a warm-up's rewrite or
-discard changes, so a store or log a repository commits feeds no reading; a
-log whose lines fail more than a killed process's torn line would is read no
-further, so however many lines a repository commits it costs a few
-signatures. The warm-up reads only a project's regular source files, never
-one through a link or larger than 16 MB, and a file nested thousands deep
-around an error is read like any other.
+Coherence keeps each text's parse in the user's own cache
+(`$XDG_CACHE_HOME/coherence/parses`, else `~/.cache/coherence/parses`),
+filed by the parser's fingerprint and the text's digest, never in a
+project. The warm-up a session start launches parses every source file once
+in the background; after that a reading of the whole project, or of any
+project or worktree holding the same text, parses only the texts that
+changed (PostHog's 20,000 Python files: 30 s for the first warm-up, 2 s for
+the next, and mass in 3.4 s). A hook that reads a file or two parses it
+directly and never reads the store. A parse is written once, in a segment
+file written whole and never changed; a warm-up merges the segments when
+there are more than eight, keeping what was read in the last fourteen days.
+The fingerprint digests everything a kept parse depends on: the parser and
+its `alternate`, the queries, the `separator`, the web-tree-sitter release
+and the Coherence code that reads a tree. Changing any of them changes the
+fingerprint, so nothing kept under the old ones is read; `privateName` and
+`resolve` are read after the store and change no kept parse. Each warm-up
+also parses a sample of the texts it found kept and compares; a store that
+differs from a fresh parse is removed, and the next session start says so.
+The store is used only where the user's cache folder is the user's own, not
+a link and not writable by anyone else; elsewhere every text is parsed. The
+warm-up reads only a project's regular source files, never one through a
+link or larger than 16 MB, and a file nested thousands deep around an error
+is read like any other.
 `plugin eject` copies a plugin's parser byte for byte with its queries, so
 an ejected copy reads as the bundled plugin read.
 

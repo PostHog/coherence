@@ -16,6 +16,7 @@
  * attributes to a human, stored apart from its own because.
  */
 
+import { isAbsolute, relative, sep } from "node:path";
 import { JournalError, onePositional, parseFlags, required, type FlagShape, type Parsed } from "./args.ts";
 import {
   INSTRUMENT_IS_WRONG,
@@ -48,7 +49,7 @@ import {
   alternation,
   spoken,
 } from "./record.ts";
-import { loadSpecModel, projectPractices } from "../spec/model.ts";
+import { componentFolders, componentHolding, loadSpecModel, projectPractices } from "../spec/model.ts";
 import { originFields } from "./defects.ts";
 import { amendCommand, floorGaps, type ModelPractice } from "../spec/practices.ts";
 import { appendRecordTo, gitState, loadJournal, type Loaded } from "./store.ts";
@@ -346,14 +347,43 @@ export function dismiss(argv: string[], ctx: Context): Written {
   return write(ctx, record);
 }
 
+/**
+ * The component a defect belongs to, settled at the write: --component when
+ * given, refused unless it names a component folder; otherwise the one
+ * component whose folder holds every file the defect names. None when the
+ * files name no component or several, with a line saying how to name one,
+ * so a reader never has to guess it later.
+ */
+function defectComponent(given: string | undefined, files: readonly string[], cwd: string): { component?: string; note?: string } {
+  const folders = componentFolders(cwd);
+  if (given !== undefined) {
+    const folder = given.trim().replace(/^\.\/(?=.)/, "").replace(/\/+$/, "") || ".";
+    if (!folders.includes(folder)) throw new JournalError(`--component ${given} names no component (a folder holding a spec); components: ${folders.join(", ") || "none"}`);
+    return { component: folder };
+  }
+  const held = new Set<string>();
+  for (const named of files) {
+    const file = (isAbsolute(named) ? relative(cwd, named) : named).split(sep).join("/").replace(/^\.\//, "");
+    if (file === "" || file === ".." || file.startsWith("../") || isAbsolute(file)) continue;
+    const folder = componentHolding(folders.map((f) => ({ folder: f })), file)?.folder;
+    if (folder !== undefined) held.add(folder);
+  }
+  if (held.size > 1) held.delete(".");
+  if (held.size === 1) return { component: [...held][0]! };
+  const how = "give --component <folder> so the dead-end reading reads it rather than deriving it";
+  if (held.size > 1) return { note: `  no component: its files lie in ${[...held].sort().join(" and ")}; ${how}` };
+  return { note: `  no component: ${files.length === 0 ? "it names no file" : "no component holds its files"}; ${how}` };
+}
+
 export function defect(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ evidence: "one", file: "many", ...ORIGIN, ...CITE }));
+  const parsed = parseFlags(argv, withCommon({ evidence: "one", file: "many", component: "one", ...ORIGIN, ...CITE }));
   const who = attribution(parsed);
   const what = onePositional(parsed, "what failed");
   const evidence = required(parsed, "evidence", "a defect carries the reproducer or report that made it one");
   const files = parsed.many.get("file") ?? [];
-  const record: Defect = { ...head("defect", who, ctx, what), what, evidence, files, ...originFields(originGiven(parsed), ctx.cwd), ...citations(parsed, ctx.cwd) };
-  const written = write(ctx, record);
+  const placed = defectComponent(parsed.one.get("component"), files, ctx.cwd);
+  const record: Defect = { ...head("defect", who, ctx, what), what, evidence, files, ...(placed.component === undefined ? {} : { component: placed.component }), ...originFields(originGiven(parsed), ctx.cwd), ...citations(parsed, ctx.cwd) };
+  const written = write(ctx, record, placed.note === undefined ? [] : [placed.note]);
   recordDefectTelemetry(ctx.cwd, record);
   return written;
 }

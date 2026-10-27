@@ -94,14 +94,29 @@ function isFileOnDisk(root: string, rel: string): boolean {
   }
 }
 
-/** Whether something is at a listed path that no reading may open: a folder, a pipe, a socket, a device, or a link to one or to nothing. A path with nothing at it (a tracked file an edit deleted) is not. */
+/**
+ * Whether what is at a path a change names is no file of the change: a
+ * folder, or a pipe, a socket or a device, which a read waits on forever or
+ * reads without end, or a link to one of those. A link git tracks is a file
+ * of the change whatever it leads to, a folder or nothing: relinked or left
+ * dangling, it changed. A path with nothing at it (a tracked file an edit
+ * deleted) is not.
+ */
 function isOtherOnDisk(root: string, rel: string): boolean {
+  let entry;
   try {
-    lstatSync(join(root, rel));
+    entry = lstatSync(join(root, rel));
   } catch {
     return false;
   }
-  return !isFileOnDisk(root, rel);
+  if (entry.isDirectory()) return true;
+  if (!entry.isSymbolicLink()) return !entry.isFile();
+  try {
+    const target = statSync(join(root, rel));
+    return !target.isFile() && !target.isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function gitList(root: string, pathspecs: readonly string[]): string[] {

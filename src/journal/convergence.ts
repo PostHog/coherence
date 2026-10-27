@@ -8,6 +8,8 @@
  *     range and that were recorded after the release's tag;
  *   the share of closed defects closed with a guard;
  *   repeats per class: guard failures, which should fall to zero;
+ *   dead ends: subsystems that keep collecting defects after their first
+ *     guard, across classes and rounds (dead-ends.ts), read off the same floor;
  *   bullets over time, from the specs at each day and tag;
  *   hotspot churn: the files most often changed;
  *   hook latency p50 and p95 per event per Coherence version.
@@ -25,6 +27,7 @@ import { parseSpec } from "../spec/grammar.ts";
 import { guardStanding, loadSpecModel } from "../spec/model.ts";
 import { HOOK_TIMES_DIR, parseHookTimes } from "../lifecycle/hook-latency.ts";
 import { defectStates, type DefectFloor, type DefectState } from "./defects.ts";
+import { deadEndLine, readDeadEnds, readingScope, type DeadEndReading } from "./dead-ends.ts";
 import { loadJournal } from "./store.ts";
 
 export const DEFAULT_WINDOW_DAYS = 14;
@@ -90,6 +93,8 @@ export interface Convergence {
   closing: { recordedInWindow: number; closed: number; guarded: number; decided: number; neither: number; guardedShare: number | null; allTime: Pick<DefectFloor, "recorded" | "closed" | "guarded" | "decided"> };
   /** Guard failures by class, all time and in the window. */
   repeats: { class: string; allTime: number; inWindow: number }[];
+  /** Subsystems at a dead end as of now, read as spec --check reads them (their own window, every worktree's journal, dead-ends.ts). */
+  deadEnds: DeadEndReading;
   /** Defects whose introduced names a commit or pull request git could not place in any release range. */
   unplaced: string[];
   churn: { file: string; commits: number }[];
@@ -312,6 +317,7 @@ export function convergence(root: string, options: ConvergenceOptions = {}): Con
       allTime: { recorded: floor?.recorded ?? states.length, closed: floor?.closed ?? 0, guarded: floor?.guarded ?? 0, decided: floor?.decided ?? 0 },
     },
     repeats: [...repeatMap.entries()].map(([cls, n]) => ({ class: cls, ...n })).sort((a, b) => b.allTime - a.allTime),
+    deadEnds: readDeadEnds(root, model.components, now),
     unplaced,
     churn,
     hookLatency,
@@ -345,6 +351,8 @@ export function convergenceText(c: Convergence): string {
   const share = k.guardedShare === null ? "no close yet" : `${Math.round(k.guardedShare * 100)}% guarded`;
   lines.push(`closing: ${k.closed} of ${k.recordedInWindow} closed in the window (${k.guarded} guarded, ${k.decided} decided, ${k.neither} with neither; ${share}); all time ${k.allTime.closed} of ${k.allTime.recorded} closed, ${k.allTime.guarded} guarded`);
   lines.push(`repeats (guard failures, should fall to zero): ${c.repeats.length === 0 ? "none" : c.repeats.map((r) => `${r.class} ${r.allTime} (${r.inWindow} in the window)`).join(", ")}`);
+  lines.push(`dead ends (a subsystem collecting defects across classes and rounds after its first guard, back through its own guards): ${c.deadEnds.deadEnds.length === 0 ? "none" : c.deadEnds.deadEnds.length}; ${readingScope(c.deadEnds)}`);
+  for (const d of c.deadEnds.deadEnds) lines.push(`  ${deadEndLine(d)}`);
   const first = c.days.find((d) => d.bullets !== undefined)?.bullets;
   const last = [...c.days].reverse().find((d) => d.bullets !== undefined)?.bullets;
   if (first !== undefined && last !== undefined) lines.push(`bullets: ${first.bullets} at ${first.commit} -> ${last.bullets} at ${last.commit}; enforced (enforcement and kinds; refutation is in the run store, not read at a past commit) ${first.enforced} -> ${last.enforced}, requirements ${first.requirements} -> ${last.requirements}`);
@@ -355,7 +363,7 @@ export function convergenceText(c: Convergence): string {
   return lines.join("\n");
 }
 
-export const CONVERGENCE_USAGE = "  query convergence [--days <n>] [--json]   defects arriving by origin and catch, escapes per release, closes with a guard, repeats per class, bullets over time, churn and hook latency per version";
+export const CONVERGENCE_USAGE = "  query convergence [--days <n>] [--json]   defects arriving by origin and catch, escapes per release, closes with a guard, repeats per class, dead ends, bullets over time, churn and hook latency per version";
 
 /** query convergence [--days <n>] [--json] */
 export function convergenceCommand(root: string, argv: readonly string[], io: { out: (line: string) => void; err: (line: string) => void }): number {

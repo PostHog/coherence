@@ -10,7 +10,7 @@
  */
 
 import { execFileSync } from "../lifecycle/work-meter.ts";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { appendWhole, storeLines } from "./append.ts";
 import { JournalError } from "./args.ts";
@@ -127,6 +127,106 @@ export function loadJournalFiles(cwd: string, names?: readonly string[]): Loaded
         loaded.records.push(verdict);
       }
     }
+  }
+  loaded.records.sort(compareRecords);
+  return loaded;
+}
+
+/** One worktree the journal was read from: its folder, the records read there, and how many no worktree read before it held. */
+export interface WorktreeRead {
+  path: string;
+  /** The checkout the reading runs in. */
+  self: boolean;
+  records: number;
+  /** Records held here and in no worktree read before it: the self first, then the others in git's order. */
+  only: number;
+}
+
+export interface LoadedAcross extends Loaded {
+  /** Every worktree read, the self first; just the self where git names no other. */
+  worktrees: WorktreeRead[];
+}
+
+/**
+ * The project's folder in each other worktree of its repository: git's
+ * worktree list, the project's own prefix inside its checkout joined to each,
+ * a bare entry, a worktree git calls prunable and one whose folder is gone
+ * left out. Empty without git or with no other worktree.
+ */
+export function otherWorktrees(cwd: string): string[] {
+  const top = git(cwd, ["rev-parse", "--show-toplevel"]);
+  const listed = git(cwd, ["worktree", "list", "--porcelain"]);
+  if (top === null || listed === null) return [];
+  const prefix = git(cwd, ["rev-parse", "--show-prefix"]) ?? "";
+  const real = (path: string): string => {
+    try {
+      return realpathSync(path);
+    } catch {
+      return path;
+    }
+  };
+  const self = real(top);
+  const out: string[] = [];
+  for (const block of listed.split(/\n\s*\n/)) {
+    const lines = block.split("\n");
+    const path = lines.find((l) => l.startsWith("worktree "))?.slice("worktree ".length);
+    if (path === undefined || lines.some((l) => l === "bare" || l.startsWith("prunable"))) continue;
+    if (real(path) === self || !existsSync(path)) continue;
+    out.push(join(path, prefix));
+  }
+  return out;
+}
+
+/**
+ * The journal of every worktree of the repository in one timeline, each
+ * record once: an agent records its defects in the checkout it works in, so
+ * a reading of one checkout alone misses the worktree where the work went
+ * wrong. The self is read as loadJournal reads it; each other worktree's
+ * store files are read only when a file of that name and size was not read
+ * already (a committed shard is sealed, so the same name and size is the same
+ * records), and a record whose text or id was already read is the same
+ * record. Read only, never written. A line that will not parse in another
+ * worktree is reported with that worktree's path.
+ */
+export function loadJournalAcrossWorktrees(cwd: string): LoadedAcross {
+  const own = loadJournal(cwd);
+  const ids = new Set(own.records.map((r) => r.id));
+  const loaded: LoadedAcross = { records: [...own.records], damaged: [...own.damaged], worktrees: [{ path: cwd, self: true, records: own.records.length, only: own.records.length }] };
+  const keys = new Set([...journalFileKeys(cwd).entries()].map(([name, key]) => `${name}:${key.split(":")[2]}`));
+  const seen = new Set<string>();
+  for (const folder of otherWorktrees(cwd)) {
+    const dir = journalDir(folder);
+    const read: WorktreeRead = { path: folder, self: false, records: 0, only: 0 };
+    let names: string[] = [];
+    try {
+      names = readdirSync(dir).filter(isStoreFile).sort();
+    } catch {
+      names = [];
+    }
+    for (const name of names) {
+      let text: string;
+      try {
+        const key = `${name}:${statSync(join(dir, name)).size}`;
+        if (keys.has(key)) continue;
+        keys.add(key);
+        text = readFileSync(join(dir, name), "utf8");
+      } catch {
+        continue;
+      }
+      for (const { line, number } of storeLines(text, seen)) {
+        const verdict = parseLine(line);
+        if (typeof verdict === "string") {
+          loaded.damaged.push({ file: join(dir, name), line: number, reason: verdict });
+          continue;
+        }
+        read.records += 1;
+        if (ids.has(verdict.id)) continue;
+        ids.add(verdict.id);
+        read.only += 1;
+        loaded.records.push(verdict);
+      }
+    }
+    loaded.worktrees.push(read);
   }
   loaded.records.sort(compareRecords);
   return loaded;

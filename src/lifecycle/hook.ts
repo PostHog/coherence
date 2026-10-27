@@ -80,7 +80,7 @@ import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
-import { storeRootOf, syntaxOf } from "../plugins/languages.ts";
+import { syntaxOf } from "../plugins/languages.ts";
 import { staleParsesNotice } from "../plugins/syntax-trees.ts";
 import { enforcedLanguageOf, readEnforcementConfig } from "../enforcement/config.ts";
 import { viaForm } from "../plugins/verify.ts";
@@ -92,6 +92,7 @@ import { escapeRegExp } from "../enforcement/totality.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
+import { deadEndBlock, readDeadEnds } from "../journal/dead-ends.ts";
 import { filesRead, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotSession, snapshotTrace, traceFile, type Snapshot } from "../economy/trace.ts";
 import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
@@ -475,7 +476,7 @@ export function languageNoticeBlock(root: string): string {
   } catch {
     return "";
   }
-  return languages.map((language) => syntaxOf(language, "notice")?.(root) ?? "").filter((notice) => notice !== "").map((notice) => `${notice}\n\n`).join("") + staleParsesNotice(storeRootOf(root) ?? root);
+  return languages.map((language) => syntaxOf(language, "notice")?.(root) ?? "").filter((notice) => notice !== "").map((notice) => `${notice}\n\n`).join("") + staleParsesNotice();
 }
 
 export function specBlock(root: string, now: number = Date.now()): string {
@@ -494,6 +495,8 @@ export function specBlock(root: string, now: number = Date.now()): string {
   // that only edits keeps a floor as old as its last full run, and says so.
   const quiet = floorQuiet(model.runs, now);
   if (quiet !== undefined) lines.push(quiet);
+  // A subsystem collecting defects across classes and rounds after its first guard: the design is wrong, not one guard (journal/dead-ends.ts). Never shortened.
+  lines.push(...deadEndBlock(readDeadEnds(root, model.components)));
   // A defect in a class already guarded: the protection was weaker than claimed (journal/defects.ts).
   const failures = model.defects?.guardFailures ?? [];
   if (failures.length > 0) {

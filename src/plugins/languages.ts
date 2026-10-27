@@ -31,7 +31,6 @@ import type { SourceSyntax } from "../economy/source.ts";
 import type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
 import { treeReaderOf, type TreeDeclaration, type TreeReader } from "./syntax-trees.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest, throughThisCore } from "./registry.ts";
-import { registryForLeaf } from "../adapters/project-config.ts";
 import { setLanguageData } from "../readings/scope/language-data.ts";
 
 /** The defaults file beside the bundled plugins. */
@@ -482,20 +481,6 @@ function exportAt(plugin: LoadedPlugin, at: string, field: string): unknown {
   return slots.get(key);
 }
 
-/**
- * Where a project's parses are kept: the repository's top when the project
- * is a leaf of a registry, else the project itself. A kept parse is keyed by
- * the text it parsed, so it serves any project; one store per repository lets
- * a command at the top (mass over every leaf) read what each leaf's warm-up
- * parsed, where a store per leaf left the top parsing everything again.
- */
-const storeRoots = new Map<string, string | undefined>();
-export function storeRootOf(root: string | undefined): string | undefined {
-  if (root === undefined) return undefined;
-  if (!storeRoots.has(root)) storeRoots.set(root, registryForLeaf(root)?.top ?? root);
-  return storeRoots.get(root);
-}
-
 /** The plugin a language's source slot answers from: the project's swap when it fills the slot, else the provider beneath it. */
 export function sourceProvider(language: string): LoadedPlugin | undefined {
   const swap = swapsNow().get(language);
@@ -511,7 +496,7 @@ export function sourceProvider(language: string): LoadedPlugin | undefined {
 export function treeReaderFor(language: string): TreeReader | undefined {
   const plugin = sourceProvider(language);
   if (plugin === undefined || extendersOf(language).some((p) => p.manifest.syntax?.source !== undefined)) return undefined;
-  return treeReaderOf(plugin, storeRootOf(rootNow()));
+  return treeReaderOf(plugin, rootNow());
 }
 
 /**
@@ -522,8 +507,8 @@ export function treeReaderFor(language: string): TreeReader | undefined {
 function treeSlot(plugin: LoadedPlugin, slot: SyntaxSlot): unknown {
   const key = `${plugin.dir}\u0000tree\u0000${slot}`;
   if (slots.has(key)) return slots.get(key);
-  // The project asking, at each call: the table is built once, and each project's parses are kept in its own folder.
-  const reader = (): TreeReader => treeReaderOf(plugin, storeRootOf(rootNow()))!;
+  // The project asking, at each call: the table is built once, and a project's files are kept parses, a line alone is not.
+  const reader = (): TreeReader => treeReaderOf(plugin, rootNow())!;
   // A question about one line (what it declares) parses the line alone: no project's store keeps it, since no file is that line.
   // A line that opens a bracket it does not close (export default function Page({) is read again with them closed, as its statement goes on.
   const lineDeclaration = (line: string): TreeDeclaration | undefined => {

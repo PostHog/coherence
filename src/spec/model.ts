@@ -287,6 +287,23 @@ function lexiconStackProblems(root: string, plugins: readonly LoadedPlugin[]): P
   }
 }
 
+/**
+ * The project's component folders, "." for the root's: each folder holding a
+ * spec the walk reads. The light way a journal write can afford: one walk and
+ * no spec parsed. A config that will not parse walks with no ignore list; the
+ * spec check says why.
+ */
+export function componentFolders(rootGiven: string): string[] {
+  const root = resolve(rootGiven);
+  let ignore: readonly string[] = [];
+  try {
+    ignore = readConfig(root).ignore;
+  } catch {
+    ignore = [];
+  }
+  return [...new Set(findSpecs(root, ignore).map((path) => folderOf(root, path)))].sort();
+}
+
 /** Every spec file under the root, sorted by path. */
 export function findSpecs(root: string, ignore: readonly string[] = []): string[] {
   return walkedFiles(root, ".", ignore).filter((rel) => rel.endsWith(SPEC_SUFFIX)).map((rel) => join(root, rel)).sort();

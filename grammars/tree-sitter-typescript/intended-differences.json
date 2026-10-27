@@ -1,0 +1,66 @@
+{
+  "about": "Every difference coherence.patch may make to what tree-sitter-typescript 0.23.2 reads, by construct. compare.mjs parses its corpus with the stock and the patched parsers and fails on any region of difference no entry here allows. An entry allows a region when the region is of its kind (improvement: the stock parser errs there and the patched one does not; regression: the other way about; both err: each errs, differently; reshape: neither errs), in one of its dialects, and overlaps a node its query captures as @construct in the tree of its side. Each entry must show in every case it names, in each of its dialects, so none outlives the patch. Keyed by construct and case name, never by byte offset, so the corpus may grow. No entry allows a token renamed: a leaf of the patched trees that is no type of its own spelling, or is named and spelled as one of the stock grammar's tokens, must be read as the stock trees read that spelling somewhere in the corpus, inside an improvement's region as anywhere else. An entry's tokens lists such a reading it brings ({text, type, named}), allowed only inside its own regions, and each must show there.",
+  "differences": [
+    {
+      "id": "import-type-arguments",
+      "construct": "an import type with type arguments: import('x').T<U>",
+      "kind": "improvement",
+      "dialects": ["typescript", "tsx"],
+      "side": "patched",
+      "query": "(member_expression object: [(call_expression function: (import)) (member_expression)] type_arguments: (type_arguments)) @construct",
+      "cases": ["coherence: Coherence: import types with type arguments"]
+    },
+    {
+      "id": "import-type-primary",
+      "construct": "an import type as a primary type: an array's element, an indexed type's object, keyof's operand, a type argument (import('x').T[], import('x').T<U>['k'], keyof import('x').T, Record<K, import('x').T[]>)",
+      "kind": "improvement",
+      "dialects": ["typescript", "tsx"],
+      "side": "patched",
+      "query": "[(array_type (member_expression object: [(call_expression function: (import)) (member_expression)]) @construct) (lookup_type (member_expression object: [(call_expression function: (import)) (member_expression)]) @construct) (index_type_query (member_expression object: [(call_expression function: (import)) (member_expression)]) @construct) (type_arguments (member_expression object: [(call_expression function: (import)) (member_expression)]) @construct)]",
+      "cases": ["coherence: Coherence: import types as primary types"]
+    },
+    {
+      "id": "member-named-in",
+      "construct": "a member named in or instanceof, or whose name begins with in, on the line after another member (in?: T, in = 2, in_progress, in$, in2, inü)",
+      "kind": "improvement",
+      "dialects": ["typescript", "tsx"],
+      "side": "patched",
+      "query": "([(property_signature name: (property_identifier) @construct) (public_field_definition name: (property_identifier) @construct)] (#match? @construct \"^in\"))",
+      "tokens": [{ "text": "instanceof", "type": "property_identifier", "named": true }],
+      "cases": [
+        "coherence: Coherence: members named in and instanceof after another member",
+        "coherence: Coherence: members whose names begin with in after another member"
+      ]
+    },
+    {
+      "id": "jsx-text-bare-ampersand",
+      "construct": "a bare & in JSX text, one that starts no character reference (Billing & Usage, &#x1234567;)",
+      "kind": "improvement",
+      "dialects": ["tsx"],
+      "side": "patched",
+      "query": "((jsx_text) @construct (#match? @construct \"&\"))",
+      "cases": [
+        "coherence-tsx: Coherence: a bare ampersand in JSX text and strings",
+        "coherence-tsx: Coherence: character references at their limits"
+      ]
+    },
+    {
+      "id": "jsx-string-bare-ampersand",
+      "construct": "a bare & in a JSX string, before a letter or the closing quote (to=\"?a=1&b=2\", title='Q&')",
+      "kind": "improvement",
+      "dialects": ["tsx"],
+      "side": "patched",
+      "query": "(jsx_attribute (string (string_fragment) @construct) (#eq? @construct \"&\"))",
+      "cases": ["coherence-tsx: Coherence: a bare ampersand in JSX text and strings"]
+    },
+    {
+      "id": "comparison-after-import-type",
+      "construct": "a comparison after an import type, which the import type's type arguments now take (x as import('x').T < y), as after any other type and as TypeScript's compiler refuses it",
+      "kind": "regression",
+      "dialects": ["typescript", "tsx"],
+      "side": "stock",
+      "query": "(binary_expression left: (as_expression (member_expression object: (call_expression function: (import)))) operator: \"<\") @construct",
+      "cases": ["limits: a comparison after an import type"]
+    }
+  ]
+}

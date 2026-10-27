@@ -7,7 +7,7 @@
  *   node src/cli.ts resolved <id> --because "<what the test showed>" [--as "<candidate>"]   (a defect: [--guard <component>/<invariant>] [--decision <id>])
  *   node src/cli.ts classify <defect-id> [--class <name>] [--introduced <origin>] [--caught <how>] --because "<evidence>"
  *   node src/cli.ts dismiss <id> --because "<why nobody will chase it>"
- *   node src/cli.ts defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]...
+ *   node src/cli.ts defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--component <folder>]
  *   node src/cli.ts experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"...
  *   node src/cli.ts experiment close <id> --result <stepId>=<result>...   (result: one of STEP_RESULTS)
  *   node src/cli.ts unable "<what you could not do>" --because "<the wall>"
@@ -162,7 +162,7 @@ export const JOURNAL_USAGE = [
   `  resolved <defect-id> --because "<what fixed it>" [--guard <component>/<invariant>] [--decision <id>] [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <${alternation(CAUGHT)}>]`,
   '      a defect\'s close owes a guard for its class (an invariant whose refutation is witnessed) or a decision saying why the fix suffices; spec --check names a close with neither',
   '  dismiss <id> --because "<why nobody will chase it>"',
-  `  defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <${alternation(CAUGHT)}>] [--cite <id>]...`,
+  `  defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--component <folder>] [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <${alternation(CAUGHT)}>] [--cite <id>]...`,
   '      --class is a kebab-case name declared once as the property "class <name>" of defect in a lexicon; give all three: they are what the convergence reading counts',
   '  classify <defect-id> [--class <name>] [--introduced <...>] [--caught <...>] --because "<the evidence>" [--over "<rejected>"]...   a decision citing the defect; the defect is never edited',
   '  experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"... [--cite <id>]...',

@@ -12,16 +12,16 @@ import { resolve } from "node:path";
 import { configIgnore } from "../adapters/project-files.ts";
 import { registryForLeaf } from "../adapters/project-config.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
-import { forProject, sourceProvider, storeRootOf } from "../plugins/languages.ts";
+import { forProject, sourceProvider } from "../plugins/languages.ts";
 import { warmParses } from "../plugins/syntax-trees.ts";
 import { sourceFiles } from "./source.ts";
 
 /**
  * Pre-read the project's files of every language it reads through a parser,
  * and, when the project is a leaf of a registry, the repository top's too:
- * the commands run there (mass, status) read every leaf, and the store they
- * read is the one the leaves share (storeRootOf). What each root and language
- * read, and how many of those it parsed rather than found kept.
+ * the commands run there (mass, status) read every leaf and the top's own
+ * files, and the user's one store keeps them all. What each root and
+ * language read, and how many of those it parsed rather than found kept.
  */
 export function warmProjectParses(rootGiven: string): { root: string; language: string; read: number; parsed: number; skipped?: true }[] {
   const root = resolve(rootGiven);
@@ -43,7 +43,7 @@ function warmRoot(root: string): { language: string; read: number; parsed: numbe
           if (text !== undefined) yield text;
         }
       })();
-      return [{ language, ...warmParses(plugin, storeRootOf(root)!, texts) }];
+      return [{ language, ...warmParses(plugin, root, texts) }];
     }),
   );
 }
