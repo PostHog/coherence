@@ -28,6 +28,10 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { STORE_NAMES, storeDir } from "../../src/journal/stores.ts";
+import { startParsers } from "../../src/plugins/syntax-trees.ts";
+
+// A reading through a language's parser needs its runtime started first, as the CLI starts it.
+await startParsers();
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const args = process.argv.slice(2);

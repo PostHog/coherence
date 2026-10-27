@@ -36,6 +36,10 @@ import { STORE_NAMES, storeDir, type RecordStore } from "../../src/journal/store
 import { journalFileKeys, loadJournal } from "../../src/journal/store.ts";
 import { loadWork } from "../../src/journal/work.ts";
 import { ATTRIBUTES_TEXT } from "../../src/lifecycle/state-files.ts";
+import { startParsers } from "../../src/plugins/syntax-trees.ts";
+
+// A reading through a language's parser needs its runtime started first, as the CLI starts it.
+await startParsers();
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const args = process.argv.slice(2);

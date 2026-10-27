@@ -17,6 +17,10 @@ import { fileURLToPath } from "node:url";
 import { readMirrors } from "../../src/readings/mirrors/mirrors.ts";
 import type { Group, SetRef } from "../../src/readings/mirrors/model.ts";
 import { alarmsOf, alarmText, surfaced } from "../../src/readings/mirrors/policy.ts";
+import { startParsers } from "../../src/plugins/syntax-trees.ts";
+
+// A reading through a language's parser needs its runtime started first, as the CLI starts it.
+await startParsers();
 
 const here = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);

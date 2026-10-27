@@ -22,6 +22,10 @@ import { SITE_WINDOW, latestOf, sitesLeftCount } from "../../src/readings/scope/
 import type { LatestEntry, ShellState } from "../../src/readings/scope/model.ts";
 import { flowOf } from "../../src/readings/scope/structure-flow.ts";
 import { loadSpecModel } from "../../src/spec/model.ts";
+import { startParsers } from "../../src/plugins/syntax-trees.ts";
+
+// A reading through a language's parser needs its runtime started first, as the CLI starts it.
+await startParsers();
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 process.chdir(root);

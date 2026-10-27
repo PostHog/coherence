@@ -12,6 +12,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { bothWays, sameMap } from "../../src/readings/scope/both-ways.ts";
+import { startParsers } from "../../src/plugins/syntax-trees.ts";
+
+// A reading through a language's parser needs its runtime started first, as the CLI starts it.
+await startParsers();
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const started = performance.now();
