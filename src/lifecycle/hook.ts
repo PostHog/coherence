@@ -80,7 +80,8 @@ import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
-import { syntaxOf } from "../plugins/languages.ts";
+import { storeRootOf, syntaxOf } from "../plugins/languages.ts";
+import { staleParsesNotice } from "../plugins/syntax-trees.ts";
 import { enforcedLanguageOf, readEnforcementConfig } from "../enforcement/config.ts";
 import { viaForm } from "../plugins/verify.ts";
 import { readPlugins } from "../plugins/registry.ts";
@@ -472,7 +473,9 @@ export function floorQuiet(runs: SpecModel["runs"], now: number): string | undef
  * from its language plugin's notice slot (TypeScript's: the project's
  * TypeScript ships no tsserver, from 7 on, and Coherence reads with its own):
  * said once, at the start, where the agent reads, so a reading made by
- * another compiler than the project's is never a surprise.
+ * another compiler than the project's is never a surprise. Beside them, a
+ * store of kept parses a warm-up found stale (syntax-trees.ts), since a
+ * reading made from stale parses is as much a surprise.
  */
 export function languageNoticeBlock(root: string): string {
   let languages: readonly string[];
@@ -481,7 +484,7 @@ export function languageNoticeBlock(root: string): string {
   } catch {
     return "";
   }
-  return languages.map((language) => syntaxOf(language, "notice")?.(root) ?? "").filter((notice) => notice !== "").map((notice) => `${notice}\n\n`).join("");
+  return languages.map((language) => syntaxOf(language, "notice")?.(root) ?? "").filter((notice) => notice !== "").map((notice) => `${notice}\n\n`).join("") + staleParsesNotice(storeRootOf(root) ?? root);
 }
 
 export function specBlock(root: string, now: number = Date.now()): string {

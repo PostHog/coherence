@@ -16,7 +16,7 @@ import { declarationsOf, importsOf } from "../economy/source.ts";
 import { forProject, registerProjectPlugins, syntaxOf } from "./languages.ts";
 import type { LoadedPlugin, PluginManifest } from "./plugin.ts";
 import { BUNDLED_DIR, readManifest } from "./registry.ts";
-import { importShapes, treeReaderOf, warmParses } from "./syntax-trees.ts";
+import { fingerprintOf, importShapes, KEPT_FROM, keptParseOf, staleParsesNotice, treeReaderOf, warmParses } from "./syntax-trees.ts";
 import { warmProjectParses } from "../economy/warm-parses.ts";
 import { Parser, Tree } from "web-tree-sitter";
 
@@ -237,9 +237,9 @@ test("a project's parses are kept between processes: a later process parses only
       await startParsers();
       const plugin = ${JSON.stringify({ name: "python", version: "0", dir: PYTHON, source: "bundled", manifest: { name: "python", version: "0", pluginApi: 2, treeSitter: { parser: "tree-sitter-python.wasm", queries: "python.scm", resolve: "python-source.ts#PYTHON_RESOLVE" } } })};
       const texts = Array.from({ length: 40 }, (_, i) => "from m" + i + " import (\\n    a,\\n    b" + (i === ${changed ?? -1} ? "_changed" : "") + ",\\n)\\n");
-      const counts = warmParses(plugin, ${JSON.stringify(at)}, texts);
+      const { read, parsed } = warmParses(plugin, ${JSON.stringify(at)}, texts);
       const imports = treeReaderOf(plugin, ${JSON.stringify(at)}).imports(texts[39]).map((i) => i.name + " <- " + i.specifier);
-      console.log(JSON.stringify({ ...counts, imports }));`;
+      console.log(JSON.stringify({ read, parsed, imports }));`;
     return JSON.parse(execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", probe], { encoding: "utf8" })) as { read: number; parsed: number; imports: string[] };
   };
   assert.deepEqual(pass(root, undefined), { read: 40, parsed: 40, imports: ["a <- m39", "b <- m39"] }, "a first process parses every text");
@@ -250,6 +250,81 @@ test("a project's parses are kept between processes: a later process parses only
   pass(bare, undefined);
   assert.deepEqual(readdirSync(bare), [], "a project with no .coherence folder gains none");
 });
+
+test("a kept parse is filed under every input it depends on: each treeSitter input KEPT_FROM names changes the fingerprint, each it leaves out changes no kept parse, and the code that reads a tree is syntax-trees.ts alone", () => {
+  const base = parserPlugin({});
+  const declared = base.manifest.treeSitter!;
+  const print = fingerprintOf(base.dir, declared);
+  for (const [key, how] of Object.entries(KEPT_FROM) as [keyof typeof KEPT_FROM, "file" | "value" | false][]) {
+    if (how === "file") {
+      const other = parserPlugin({});
+      writeFileSync(join(other.dir, declared[key]!), Buffer.concat([readFileSync(join(other.dir, declared[key]!)), Buffer.from("\n")]));
+      assert.notEqual(fingerprintOf(other.dir, declared), print, `a change to the ${key} file changes the fingerprint`);
+    } else if (how === "value") {
+      const one = fingerprintOf(base.dir, { ...declared, [key]: "::" });
+      assert.notEqual(one, print, `naming ${key} changes the fingerprint`);
+      assert.notEqual(fingerprintOf(base.dir, { ...declared, [key]: "." }), one, `a different ${key} changes the fingerprint`);
+    } else {
+      assert.equal(fingerprintOf(base.dir, { ...declared, [key]: "^_" }), print, `${key} is left out of the fingerprint`);
+      // So it must change no kept parse of any bundled plugin that reads through a parser, over the texts of its own check project.
+      for (const name of readdirSync(BUNDLED_DIR)) {
+        const manifest = readManifest(name, join(BUNDLED_DIR, name), "test").manifest;
+        const tree = manifest?.treeSitter;
+        if (tree === undefined) continue;
+        const texts = Object.values((JSON.parse(readFileSync(join(BUNDLED_DIR, name, "check.json"), "utf8")) as { files: Record<string, string> }).files);
+        const [one, two] = ["^_", "::"].map((value) => {
+          const dir = mkdtempSync(join(tmpdir(), "coherence-kept-from-"));
+          fixtures.push(dir);
+          for (const file of [tree.parser, tree.queries]) copyFileSync(join(BUNDLED_DIR, name, file), join(dir, file));
+          const plugin: LoadedPlugin = { name, version: "0", dir, source: dir, manifest: { ...manifest!, treeSitter: { ...tree, [key]: value } } };
+          return texts.map((t) => keptParseOf(plugin, t));
+        });
+        assert.deepEqual(one, two, `${key} changes no kept parse of ${name}'s check project`);
+      }
+    }
+  }
+  // The fingerprint digests this module's source as the code that turns a tree into what is kept, so that code must live nowhere else:
+  // a runtime import of another of Coherence's modules is one whose edit would change a kept parse under an unchanged fingerprint.
+  const source = readFileSync(resolve("src/plugins/syntax-trees.ts"), "utf8");
+  const own = [...source.matchAll(/^import (?!type )[^;]*?from "(\.[^"]+)";/gm)].map((m) => m[1]);
+  assert.deepEqual(own, ["../lifecycle/user-dir.ts"], "syntax-trees.ts imports at run time only the machine key's folder from the rest of Coherence");
+});
+
+test("a warm-up holds a sample of its kept parses to a fresh parse of the same text: a store that differs is discarded whole, the readings after it read fresh, and orient says so for a week", () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-stale-parses-"));
+  fixtures.push(root);
+  mkdirSync(join(root, ".coherence"));
+  const pass = (): { read: number; parsed: number; audited: number; stale: number; imports: string[] } => {
+    const probe = `import { startParsers, treeReaderOf, warmParses } from ${JSON.stringify(resolve("src/plugins/syntax-trees.ts"))};
+      await startParsers();
+      const plugin = ${JSON.stringify({ name: "python", version: "0", dir: PYTHON, source: "bundled", manifest: { name: "python", version: "0", pluginApi: 2, treeSitter: { parser: "tree-sitter-python.wasm", queries: "python.scm", resolve: "python-source.ts#PYTHON_RESOLVE" } } })};
+      const texts = Array.from({ length: 40 }, (_, i) => "from m" + i + " import (\\n    a,\\n    b,\\n)\\n");
+      const counts = warmParses(plugin, ${JSON.stringify(root)}, texts);
+      const imports = treeReaderOf(plugin, ${JSON.stringify(root)}).imports(texts[39]).map((i) => i.name + " <- " + i.specifier);
+      console.log(JSON.stringify({ ...counts, imports }));`;
+    return JSON.parse(execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", probe], { encoding: "utf8" })) as { read: number; parsed: number; audited: number; stale: number; imports: string[] };
+  };
+  const store = join(root, ".coherence", "parses", "python");
+  const kept = (): string[] => readdirSync(store).filter((f) => f.endsWith(".json") && f !== "audit.json");
+  assert.deepEqual([pass().audited, pass().stale], [0, 0], "a first warm-up has nothing kept to audit");
+  assert.deepEqual(pick(pass(), ["audited", "stale"]), { audited: 8, stale: 0 }, "a later one audits a sample of what it kept, which agrees");
+  // Stale as a fingerprint that misses an input leaves it: the same file, under the same seal, holding what other code read.
+  const [file] = kept();
+  const [seal, body] = readFileSync(join(store, file!), "utf8").split(/\n(.*)/s);
+  writeFileSync(join(store, file!), `${seal}\n${body!.replaceAll('"a"', '"stale"')}`);
+  const audited = pass();
+  assert.deepEqual(pick(audited, ["audited", "stale", "imports"]), { audited: 8, stale: 8, imports: ["a <- m39", "b <- m39"] }, "the audit finds the sample stale, and a reading after it reads a fresh parse");
+  assert.deepEqual(kept(), [], "the stale store is discarded whole");
+  const notice = staleParsesNotice(root);
+  assert.match(notice, /plugin python's kept parses differed from a fresh parse of the same text on 8 of the 8/);
+  assert.equal(staleParsesNotice(root, Date.now() + 8 * 86_400_000), "", "orient says it for a week");
+  assert.deepEqual(pick(pass(), ["stale", "imports"]), { stale: 0, imports: ["a <- m39", "b <- m39"] }, "the next warm-up keeps fresh parses again");
+});
+
+/** Some of an object's keys. */
+function pick<T extends object, K extends keyof T>(value: T, keys: K[]): Pick<T, K> {
+  return Object.fromEntries(keys.map((k) => [k, value[k]])) as Pick<T, K>;
+}
 
 test("an import that resolves to a module joins, of its files, those that declare the name it imports, and every one when it imports the module whole or no file declares the name", () => {
   const plugin = parserPlugin({ treeSitter: { parser: "zz.wasm", queries: "zz.scm", resolve: "module.ts#MODULE" } }, {
@@ -322,7 +397,7 @@ test("the parse store never reaches past the project's own folders: a link on it
   fixtures.push(linked);
   mkdirSync(join(linked, ".coherence", "parses"), { recursive: true });
   symlinkSync(victim, join(linked, ".coherence", "parses", "python"));
-  assert.deepEqual(warmParses(plugin, linked, texts), { read: 0, parsed: 0, skipped: true }, "a link on the store's path keeps no parses");
+  assert.deepEqual(warmParses(plugin, linked, texts), { read: 0, parsed: 0, audited: 0, stale: 0, skipped: true }, "a link on the store's path keeps no parses");
   assert.deepEqual(readdirSync(victim), ["id_rsa"], "the link's target is untouched");
 
   // A real store folder holding a forged store, a log that links out, and a file of someone else's.
@@ -338,7 +413,7 @@ test("the parse store never reaches past the project's own folders: a link on it
   const names = (): string[] => readdirSync(store).sort();
   writeFileSync(join(store, "notes.txt"), "someone else's\n");
   const first = warmParses(plugin, project, texts);
-  assert.deepEqual(first, { read: 2, parsed: 2 });
+  assert.deepEqual(first, { read: 2, parsed: 2, audited: 0, stale: 0 });
   const [own] = names().filter((n) => n.endsWith(".json"));
   assert.ok(own !== undefined, names().join(", "));
   const fp = own.slice(0, -".json".length);

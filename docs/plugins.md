@@ -377,8 +377,14 @@ warm-up a session start launches parses every source file once in the
 background; after that a reading of the whole project parses only the files
 that changed (PostHog's 20,000 Python files: 30 s for the first warm-up,
 2 s for the next, and mass in 3.4 s). A hook that reads a file or two parses
-it directly and never loads the store. Changing the parser or the queries
-changes the fingerprint, so nothing kept under the old ones is read.
+it directly and never loads the store. The fingerprint digests everything
+a kept parse depends on: the parser, the queries, the `separator`, the
+web-tree-sitter release and the Coherence code that reads a tree. Changing
+any of them changes the fingerprint, so nothing kept under the old ones is
+read; `privateName` and `resolve` are read after the store and change no
+kept parse. Each warm-up also parses a sample of the files it found kept
+and compares; a store that differs from a fresh parse is discarded, and the
+next session start says so.
 `plugin eject` copies a plugin's parser byte for byte with its queries, so
 an ejected copy reads as the bundled plugin read.
 

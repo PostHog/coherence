@@ -22,6 +22,7 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { userConfigDir } from "../lifecycle/user-dir.ts";
 import { createRequire } from "node:module";
 import { Language, Parser, Query, type Node, type QueryMatch } from "web-tree-sitter";
@@ -141,6 +142,46 @@ const DIRECT_PARSES = 16;
 const STORE_FORMAT = 4;
 
 /**
+ * Each treeSitter key, by whether what a kept parse holds depends on it: a
+ * file whose bytes shape every match (the parser, the queries), a value that
+ * shapes the text kept (the separator a prefix is joined by), or nothing kept
+ * (privateName and resolve are read after the store, by the reader). A Record
+ * over the manifest's keys, so a key added to treeSitter fails to compile
+ * until it is placed here, and a key that shapes a parse is never left out of
+ * the fingerprint (the separator was, until this was written).
+ */
+export const KEPT_FROM: Readonly<Record<keyof TreeSitterManifest, "file" | "value" | false>> = { parser: "file", queries: "file", separator: "value", privateName: false, resolve: false };
+
+/**
+ * The fingerprint a plugin's kept parses are filed under: every treeSitter
+ * input KEPT_FROM says a parse depends on, the store's format, the
+ * web-tree-sitter release, and this module's own source, which is the code
+ * that turns a tree into what is kept. A parse kept under any other is never
+ * read, so changing any of them parses every file again.
+ */
+export function fingerprintOf(dir: string, declared: TreeSitterManifest): string {
+  const hash = createHash("sha256");
+  for (const key of (Object.keys(KEPT_FROM) as (keyof TreeSitterManifest)[]).sort()) {
+    const how = KEPT_FROM[key];
+    if (how === false) continue;
+    const value = declared[key];
+    hash.update(`\u0000${key}\u0000`);
+    hash.update(value === undefined ? "\u0001" : how === "file" ? readFileSync(resolve(dir, value)) : `\u0002${value}`);
+  }
+  return hash.update(`\u0000${STORE_FORMAT}\u0000${runtimeVersion()}\u0000${extractionDigest()}`).digest("base64url").slice(0, 16);
+}
+
+let extraction: string | undefined;
+/** This module's own source, digested once: an edit to how a tree is read changes every fingerprint, so no parse kept by the old code is read by the new. */
+function extractionDigest(): string {
+  extraction ??= createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("base64url");
+  return extraction;
+}
+
+/** How many of a warm-up's kept parses it parses again to hold them to a fresh parse of the same text. */
+const AUDIT_SAMPLE = 8;
+
+/**
  * The reader of a plugin's language through its parser and queries, built on
  * first use; undefined for a plugin that names no parser. With a project
  * root, its parses are kept in the project's .coherence/parses by each text's
@@ -170,26 +211,87 @@ export function treeReaderOf(plugin: LoadedPlugin, root?: string): TreeReader | 
  * parses are rewritten to hold exactly these texts', so a file deleted or
  * changed since leaves nothing behind.
  */
-export function warmParses(plugin: LoadedPlugin, root: string, texts: Iterable<string>): { read: number; parsed: number; skipped?: true } {
+export function warmParses(plugin: LoadedPlugin, root: string, texts: Iterable<string>): { read: number; parsed: number; audited: number; stale: number; skipped?: true } {
   const reader = treeReaderOf(plugin, root) as (TreeReader & { store: ParseStore | undefined; keyOf(text: string): string }) | undefined;
-  if (reader === undefined || reader.store === undefined) return { read: 0, parsed: 0 };
+  if (reader === undefined || reader.store === undefined) return { read: 0, parsed: 0, audited: 0, stale: 0 };
   // One warm-up at a time: another that is running already reads every file.
-  if (!reader.store.lock()) return { read: 0, parsed: 0, skipped: true };
+  if (!reader.store.lock()) return { read: 0, parsed: 0, audited: 0, stale: 0, skipped: true };
   try {
     const keep = new Set<string>();
     let read = 0;
     const before = reader.store.parsed;
+    // A sample of the texts a kept parse answers, chosen evenly over the pass (a reservoir), each held after the pass to a fresh parse of it.
+    const sample: { text: string; kept: Found }[] = [];
+    let hits = 0;
     for (const text of texts) {
+      const key = reader.keyOf(text);
+      const kept = reader.store.get(key);
+      if (kept !== undefined) {
+        hits++;
+        if (sample.length < AUDIT_SAMPLE) sample.push({ text, kept });
+        else {
+          const at = Math.floor(Math.random() * hits);
+          if (at < AUDIT_SAMPLE) sample[at] = { text, kept };
+        }
+      }
       reader.imports(text);
-      keep.add(reader.keyOf(text));
+      keep.add(key);
       read++;
     }
     const parsed = reader.store.parsed - before;
-    reader.store.rewrite(keep);
-    return { read, parsed };
+    // A kept parse that differs from a fresh parse of the same text was kept under a fingerprint that leaves out something the parse depends on:
+    // the store is discarded whole, since no entry of it can be trusted, and the next session start says so (staleParsesNotice).
+    const fresh = compiled.get(plugin.dir)!;
+    const stale = sample.filter(({ text, kept }) => JSON.stringify(fresh.parse(text)) !== JSON.stringify(kept)).length;
+    if (stale > 0) {
+      reader.store.discard({ sampled: sample.length, stale });
+      readers.delete(`${plugin.dir}\u0000${root}`);
+    } else reader.store.rewrite(keep);
+    return { read, parsed, audited: sample.length, stale };
   } finally {
     reader.store.unlock();
   }
+}
+
+/** What a project's store would keep of a text read through a plugin's parser, as JSON: what the audit and the fingerprint's test hold kept parses to. */
+export function keptParseOf(plugin: LoadedPlugin, text: string): string {
+  if (plugin.manifest.treeSitter === undefined) throw new Error(`plugin ${plugin.name} names no parser`);
+  treeReaderOf(plugin);
+  return JSON.stringify(compiled.get(plugin.dir)!.parse(text));
+}
+
+/**
+ * What orient says of a project's kept parses that a warm-up found stale in
+ * the last AUDIT_NOTICE_DAYS: whose, on how many of the texts it sampled, and
+ * that the store was discarded. A stale store means a fingerprint leaves out
+ * something a parse depends on, a defect of Coherence or of the plugin, so it
+ * is said rather than healed in silence. Empty when none was.
+ */
+export function staleParsesNotice(root: string, now: number = Date.now()): string {
+  const folder = join(resolve(root), ".coherence", "parses");
+  let plugins: string[];
+  try {
+    if (!lstatSync(folder).isDirectory()) return "";
+    plugins = readdirSync(folder).filter((name) => PLUGIN_FOLDER.test(name)).sort();
+  } catch {
+    return "";
+  }
+  const lines: string[] = [];
+  for (const plugin of plugins) {
+    const path = join(folder, plugin, AUDIT_FILE);
+    try {
+      if (!lstatSync(join(folder, plugin)).isDirectory() || !lstatSync(path).isFile()) continue;
+      const audit = JSON.parse(readFileSync(path, "utf8")) as unknown;
+      if (typeof audit !== "object" || audit === null) continue;
+      const { at, sampled, stale } = audit as Record<string, unknown>;
+      if (typeof at !== "number" || typeof sampled !== "number" || typeof stale !== "number" || !Number.isInteger(sampled) || !Number.isInteger(stale)) continue;
+      if (now - at > AUDIT_NOTICE_DAYS * 86_400_000 || at > now) continue;
+      lines.push(`Kept parses: plugin ${plugin}'s kept parses differed from a fresh parse of the same text on ${stale} of the ${sampled} its warm-up sampled (${new Date(at).toISOString().slice(0, 10)}), so its store was discarded and every file is parsed again. The fingerprint they were kept under leaves out something a parse depends on (KEPT_FROM, fingerprintOf in src/plugins/syntax-trees.ts, or a change to the plugin's parsing that names no new parser or queries): a defect to record.`);
+    } catch {
+      // No audit, or one that will not read: nothing to say.
+    }
+  }
+  return lines.map((line) => `${line}\n\n`).join("");
 }
 
 function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
@@ -216,7 +318,7 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
     marksExports: query.captureNames.includes("exported"),
     capturesStatements: query.captureNames.includes("import"),
     exportedName: (name) => privateName === undefined || !privateName.test(name),
-    fingerprint: createHash("sha256").update(binary).update("\u0000").update(source).update(`\u0000${STORE_FORMAT}\u0000${runtimeVersion()}`).digest("base64url").slice(0, 16),
+    fingerprint: fingerprintOf(plugin.dir, declared),
     census(text) {
       const tree = parser.parse(text);
       if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
@@ -569,6 +671,35 @@ class ParseStore {
   }
 
   /**
+   * Drop every kept parse, in memory and on disk, and leave the audit that
+   * found them stale beside the store for orient to say (staleParsesNotice).
+   * Only the store's own files are removed; the audit is written afresh,
+   * never through a link.
+   */
+  discard(audit: { sampled: number; stale: number }): void {
+    this.entries = new Map();
+    this.added = [];
+    if (!existsSync(join(this.root, ".coherence")) || !this.safe()) return;
+    for (const name of existsSync(this.dir) ? readdirSync(this.dir) : []) {
+      if (!STORE_FILE.test(name)) continue;
+      try {
+        if (lstatSync(join(this.dir, name)).isFile()) rmSync(join(this.dir, name), { force: true });
+      } catch {
+        // Gone already.
+      }
+    }
+    try {
+      mkdirSync(this.dir, { recursive: true });
+      if (!this.safe()) return;
+      const path = join(this.dir, AUDIT_FILE);
+      rmSync(path, { force: true });
+      writeFileSync(path, JSON.stringify({ at: Date.now(), ...audit }), { flag: "wx", mode: 0o600 });
+    } catch {
+      // An audit that cannot be kept: the store is discarded all the same.
+    }
+  }
+
+  /**
    * Keep the texts named, as seen today, and every other kept parse seen in
    * the last RETAIN_DAYS, in one signed file, and remove the store's own other
    * files: the
@@ -617,6 +748,11 @@ function runtimeVersion(): string {
   }
   return runtime;
 }
+
+/** The file a warm-up that found the store stale leaves beside it, how long orient says so, and the folder names a plugin's store may have. */
+const AUDIT_FILE = "audit.json";
+const AUDIT_NOTICE_DAYS = 7;
+const PLUGIN_FOLDER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 /** The warm-up lock's file, beside the store, and how long one holds before another warm-up may take it over. */
 const WARM_LOCK = "warming.lock";
