@@ -19,7 +19,7 @@ import type { LoadedPlugin, PluginManifest } from "./plugin.ts";
 import { BUNDLED_DIR, readManifest } from "./registry.ts";
 import { fingerprintOf, importShapes, KEPT_FROM, keptParseOf, staleParsesNotice, treeReaderOf, warmParses } from "./syntax-trees.ts";
 import { warmProjectParses } from "../economy/warm-parses.ts";
-import { Parser, Tree } from "web-tree-sitter";
+import { Language, Parser, Tree } from "web-tree-sitter";
 
 const fixtures: string[] = [];
 after(() => {
@@ -163,6 +163,53 @@ test("the parser reads TypeScript's imports, declarations and default exports wh
   assert.deepEqual(castImports, ["late <- ./late.ts"]);
   assert.deepEqual(importShapes(sourceProvider("typescript")!, cast).map((i) => i.shapes), [["named"]], "and an import after it is at the top level, not inside a block");
   assert.deepEqual(declarationsOf("export const App = () => <div onClick={() => 1}>hi</div>;\nexport function Next() {}\n", "typescript").map((d) => d.name), ["App", "Next"], "and JSX still reads through the TSX grammar");
+});
+
+test("the bundled TypeScript parsers read what tree-sitter-typescript 0.23.2 cannot: an import type with type arguments or as an array's element, an indexed type's object or keyof's operand, a member named in or beginning with in after another, and a bare & in JSX text or a JSX string, each with every declaration after it", () => {
+  // Each shape is one PostHog's frontend writes; the stock grammar's error over it hid the declarations after it (grammars/tree-sitter-typescript/build.sh).
+  const shapes: Record<string, string> = {
+    "import type with type arguments": "export type Page = null | import('../lib/api').PaginatedResponse<Source>",
+    "kea's logic type": "export type L = import('node_modules/kea/lib').BuiltLogic<{ a: 1 }>",
+    "import type array": "export interface Settings { tables: import('~/queries/schema').Table[] | null }",
+    "import type parameter": "export const select = (members: import('../types').Member[] | null) => members",
+    "keyof an import type": "export type Field = keyof import('~/types').Criteria",
+    "indexed import type": "export type Kind = import('x').Logic<U>['kind']",
+    "import type in type arguments": "export type ById = Record<string, import('~/types').Recording[]>",
+    "member named in_": "export interface Summary {\n  ongoing: Incident[]\n  in_progress: Maintenance[]\n  instance_id: string\n  in: number\n}",
+    "bare & in JSX text": "export const Menu = () => <p>Billing & Usage &amp; more</p>",
+    "bare & in a JSX string": "export const Link = () => <a href=\"https://posthog.com?utm_medium=in-product&utm_campaign=x\">docs</a>",
+  };
+  // Each parses with no error: in a sample this small the stock grammar's error stays local, while across a file it swallowed what followed (18 of incidentStatusLogic.tsx's 26 declarations).
+  const grammars = ["tsx", "typescript"].map((dialect) => {
+    const parser = new Parser();
+    parser.setLanguage(Language.loadSync(new WebAssembly.Module(readFileSync(join(BUNDLED_DIR, "typescript", `tree-sitter-${dialect}.wasm`)))));
+    return { dialect, parser };
+  });
+  for (const [shape, line] of Object.entries(shapes)) {
+    for (const { dialect, parser } of grammars) {
+      if (dialect === "typescript" && shape.includes("JSX")) continue;
+      const tree = parser.parse(line)!;
+      assert.equal(tree.rootNode.hasError, false, `${shape}: the ${dialect} grammar parses it with no error`);
+      tree.delete();
+    }
+    const text = `${line}\nexport function after() {}\nimport { late } from "./late.ts";\n`;
+    const declared = declarationsOf(text, "typescript").map((d) => d.name);
+    assert.equal(declared.at(-1), "after", `${shape}: the declaration after it is read (${declared.join(", ")})`);
+    assert.equal(declared.length, 2, `${shape}: it declares its one name (${declared.join(", ")})`);
+    const imports: string[] = [];
+    syntaxOf("typescript", "source")!.importsOf(text, (name, specifier) => imports.push(`${name} <- ${specifier}`));
+    assert.deepEqual(imports, ["late <- ./late.ts"], `${shape}: the import after it is read`);
+  }
+  // An expression still continues onto a line that begins with the in or instanceof operator.
+  const operators = "export const has = key\n  in record\nexport const is = value\n  instanceof Row\nexport const in_flight = 1\n";
+  assert.deepEqual(declarationsOf(operators, "typescript").map((d) => d.name), ["has", "is", "in_flight"]);
+  for (const { dialect, parser } of grammars) {
+    const tree = parser.parse(operators)!;
+    assert.equal(tree.rootNode.hasError, false, `the ${dialect} grammar continues an expression onto a line beginning with in or instanceof`);
+    assert.equal(tree.rootNode.descendantsOfType("binary_expression").length, 2, `the ${dialect} grammar reads key in record and value instanceof Row as operators`);
+    tree.delete();
+    parser.delete();
+  }
 });
 
 test("a parser is held to what Coherence reads: a capture it reads nothing by, queries that do not compile against its parser or its alternate, and a reading before the runtime starts are each refused by name", () => {

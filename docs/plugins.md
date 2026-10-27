@@ -123,7 +123,7 @@ its text can disagree with another or miss a statement that spans lines.
 Every bundled language plugin reads this way: `go` (a package as a module,
 its qualified uses), `rust` (paths spelled in pieces), `typescript`
 (default exports; the TSX grammar, with the TypeScript grammar as its
-alternate). They are
+alternate, both patched). They are
 also the examples of an adapter over a language server: `go` drives gopls,
 `rust` a server with no npm package. `declared` completes the set. Their sources import the core as `../../src/plugins/api.ts`, the
 same module the package exports as `@posthog/coherence/plugin`; an ejected
@@ -361,6 +361,18 @@ declaration after it into the one before, so a reading can lose names past
 it without saying so. `coherence plugin calibrate` counts what the reading
 and the language server disagree on, so a project can see what its grammar
 misses. The bundled Go grammar (0.25) predates Go 1.26.
+
+When a grammar's release cannot read code a project writes, a plugin may
+carry its own build of it. The TypeScript plugin's two grammars are
+tree-sitter-typescript 0.23.2 with a patch, since upstream has merged no
+grammar change since that release: they read an import type with type
+arguments or as an array's element (`import('x').T<U>`, `import('x').T[]`),
+a member named `in` or beginning with it (`in_progress`) on the line after
+another, and a bare `&` in JSX text or a JSX string, each of which hid the
+declarations after it in PostHog's frontend. The patch and the script that
+rebuilds both parsers byte for byte are in `grammars/tree-sitter-typescript`;
+an optional destructured parameter in a function type (`({ a }?: T) => U`)
+and a parenthesized import type are still errors.
 
 A language with two grammars names the second as its `alternate`: a text
 whose tree from `parser` holds an error is parsed again with it, and the
