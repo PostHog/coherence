@@ -1,6 +1,6 @@
 {
   "name": "declared",
-  "version": "1.11.0-beta.2",
+  "version": "1.11.0-beta.3",
   "pluginApi": 3,
   "provides": {
     "declaredLanguages": true
