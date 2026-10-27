@@ -16,7 +16,7 @@ import { readEnforcementConfig } from "../enforcement/config.ts";
 import { computeMass, formatMass } from "../economy/mass.ts";
 import { declarationsOf, importsOf } from "../economy/source.ts";
 import { declares } from "../observation/interfaces.ts";
-import { syntaxOf } from "../plugins/languages.ts";
+import { parsedOf, syntaxOf } from "../plugins/languages.ts";
 import { codeOnly, packageNameOf, uncommented } from "../../plugins/go/go-source.ts";
 
 const madeFolders: string[] = [];
@@ -43,7 +43,7 @@ before(() => {
 });
 
 /** Go's topLevel slot, derived from its parser. */
-const atTop = (text: string, name: string): boolean => syntaxOf("go", "topLevel")!(text, name);
+const atTop = (text: string, name: string): boolean => parsedOf("go", "topLevel")!(text, name);
 
 const DECLARATIONS = [
   "package store",
@@ -191,7 +191,7 @@ test("a Go import is read single and grouped, named, dot and blank, never from a
     "}",
   ].join("\n");
   const imports: string[] = [];
-  syntaxOf("go", "source")!.importsOf(text, (name, specifier) => imports.push(`${name ?? "*"} <- ${specifier}`));
+  parsedOf("go", "source")!.importsOf(text, (name, specifier) => imports.push(`${name ?? "*"} <- ${specifier}`));
   assert.deepEqual(imports, ["Println <- fmt", "Row <- shop/store", "Seal <- shop/store", "ResponseWriter <- net/http", "* <- shop/side", "* <- shop/dot", "X <- shop/raw", "Marshal <- gopkg.in/yaml.v3"], "a variadic ...st.Row is a use; an unexported st.lower is none; a local named as a dot-imported package is no qualifier of it");
   assert.deepEqual(syntaxOf("go", "interfaces")!.importLists(text), ["shop/store as st, shop/side as _, shop/dot as ."]);
   assert.equal(uncommented(text).length, text.length);

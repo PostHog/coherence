@@ -26,7 +26,7 @@ import { deriveState, type Lack, type State } from "./state.ts";
 import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles, type Walked } from "../adapters/project-files.ts";
 import { configuredName, effectiveConfig, lexiconFileOf, readConfigFile } from "../adapters/project-config.ts";
 import { coreLanguageOfExtension, LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
-import { syntaxOf } from "../plugins/languages.ts";
+import { parsedOf } from "../plugins/languages.ts";
 import type { LoadedPlugin } from "../plugins/plugin.ts";
 import { readPlugins } from "../plugins/registry.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
@@ -772,20 +772,20 @@ function entranceGuardProblems(root: string, components: readonly Component[]): 
   }
   return problems;
 }
-/** Whether a file is source the spec model reads for a declaration: a file of a language whose plugin says what its top level declares. */
+/** Whether a file is source the spec model reads for a declaration: a file of a language whose plugin names a parser that says what its top level declares. */
 function isDeclaringSource(file: string): boolean {
   const language = languageOfFile(file);
-  return language !== undefined && syntaxOf(language, "topLevel") !== undefined;
+  return language !== undefined && parsedOf(language, "topLevel") !== undefined;
 }
 
 /**
  * Whether a source file's text declares the name at its top level, as the
- * file's language plugin reads its declarations (its topLevel slot): false
- * for a file of no language, or one whose plugin does not say.
+ * file's language is read through its plugin's parser (the topLevel
+ * reading): false for a file of no language, or one whose plugin names none.
  */
 export function declaresAtTop(text: string, name: string, file: string): boolean {
   const language = languageOfFile(file);
-  return language !== undefined && (syntaxOf(language, "topLevel")?.(text, name) ?? false);
+  return language !== undefined && (parsedOf(language, "topLevel")?.(text, name) ?? false);
 }
 
 /** Source files under a folder, sorted, never into the folders no walk enters. */

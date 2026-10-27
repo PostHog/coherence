@@ -118,9 +118,9 @@ The bundled plugins are the fullest examples, shipped in the package under
 <!-- claims: parser python, go, rust, typescript. Held by src/plugins/plugin-docs.test.ts against each plugin's manifest. -->
 For a language Coherence lacks, start from `python`: it reads its
 text through a tree-sitter parser and queries (below, reading through a
-parser), so the readings come from one parse and no hand-written reader of
-its text can disagree with another or miss a statement that spans lines.
-Every bundled language plugin reads this way: `go` (a package as a module,
+parser), the one way a plugin reads its language's text, so the readings
+come from one parse and none can disagree with another or miss a statement
+that spans lines. Every bundled language plugin reads this way: `go` (a package as a module,
 its qualified uses), `rust` (paths spelled in pieces), `typescript`
 (default exports; the TSX grammar, with the TypeScript grammar as its
 alternate, both patched). They are
@@ -135,7 +135,7 @@ copy names it the second way, and so should a plugin you write.
 {
   "name": "sample",
   "version": "0.1.0",
-  "pluginApi": 3,
+  "pluginApi": 4,
   "provides": { "language": "swift" },
   "extensions": [".swift"],
   "testFolders": ["Tests"],
@@ -153,16 +153,16 @@ copy names it the second way, and so should a plugin you write.
 | Key | Meaning |
 |---|---|
 | `name`, `version` | Who the plugin is. Every run entry its adapter or verifier answers names both. |
-| `pluginApi` | The interface version it was written for. This release runs `3` and reads plugins written for `1` to `3`: a plugin written for an older one loads, and the session start names it with what changed since. Any other version is refused, naming both. Version 3 brought the parser path (`treeSitter`), imports that resolve to a module of several files, the adapter's `topLevelSymbols`, and `check.json`'s `reference` map; `plugin check` holds a plugin to the reference reading and server agrees duties from 3, and tells a plugin written for 2 they are not held. |
-| `provides` | `language`: the language its adapter answers for (or `declaredLanguages: true`, the bundled declared plugin's, for the languages a config declares). A built-in name takes the built-in's place (see the swap rule). A new name needs `extensions` (or `files`), and the config's `language` must name it; the language is then read as a bundled one is, for that project: its files, test files and folders, its entrance rules, its CI steps and every syntax slot it fills. |
+| `pluginApi` | The interface version it was written for. This release runs `4` and reads plugins written for `1` to `4`: a plugin written for an older one loads, and the session start names it with what changed since. Any other version is refused, naming both. Version 4 removed the hand-written reader slots (`source`, `declares`, `topLevel` and `kept` under `syntax`): a language's text is read through `treeSitter` alone, and a manifest that fills one is refused naming the slot, whatever version it is written for. Version 3 brought the parser path (`treeSitter`), imports that resolve to a module of several files, the adapter's `topLevelSymbols`, and `check.json`'s `reference` map; `plugin check` holds a plugin to the reference reading and server agrees duties from 3, and tells a plugin written for 2 they are not held. |
+| `provides` | `language`: the language its adapter answers for (or `declaredLanguages: true`, the bundled declared plugin's, for the languages a config declares). A built-in name takes the built-in's place (see the swap rule). A new name needs `extensions` (or `files`), and the config's `language` must name it; the language is then read as a bundled one is, for that project: its files, test files and folders, its entrance rules, its CI steps, its parser and every syntax slot it fills. |
 | `extends` | The language whose adapter it is handed to wrap, as `base` (Convex extends `typescript`). A plugin for a language of its own extends nothing. |
 | `extensions` | The files a new language is written in. An extension a built-in, a declared language, or another plugin owns is refused. |
 | `module` | The module, relative to the manifest. Required for an adapter, and for a verifier with no `command`. |
 | `ladder` | The rungs the adapter grades on: `top`, `because`, `rungs`, and optionally `whenVacuous`, the rung a chokepoint stands on when the refutation could not see its staged uses (absent, the earned rung stands with the verdict not run). Absent, the wrapped adapter's; with none, reference-choked alone, enforced by Coherence's check. |
 | `verifiers` | The via forms it proves (below). A `command` must name `{name}`; a command that is never told what to prove is refused. An optional `match` is a regular expression its output must match for an exit 0 to pass. |
 | `lexicon` | Its lexicon layer, relative to the manifest. |
-| `syntax` | The syntax slots it fills, each `"<module beside the manifest>#<export>"` (below). |
-| `treeSitter` | The tree-sitter parser its language's text is read through, and the queries over it (below, reading through a parser). The core then derives the `source`, `declares` and `topLevel` slots and the `interfaces` slot's import answers from the parse, so the plugin fills none of those itself. |
+| `syntax` | The syntax slots it fills, each `"<module beside the manifest>#<export>"` (below). No slot reads the language's text: one that names `source`, `declares`, `topLevel` or `kept` is refused. |
+| `treeSitter` | The tree-sitter parser its language's text is read through, and the queries over it (below, reading through a parser): the one way a plugin reads its language's text. The core derives every reading of the text (the names a file declares, what each declares, its imports) and the `interfaces` slot's import answers from the parse; a language whose plugin names none is not read. |
 | `files` | The files a language is written in, as a regular expression `pattern` with an optional `except` (TypeScript, as JSON writes them: `\\.(?:[cm]?[tj]sx?)$` except `\\.d\\.ts$`); `extensions` is the short form for a plain list. |
 | `source` | `except`: of the language's files, those the plain source scan leaves out (TypeScript's JavaScript, Python's stubs). |
 | `serverExtensions` | The extensions the language server can report a site in or resolve a name to. |
@@ -233,27 +233,28 @@ there is not, so the copy never makes the name ambiguous.
 
 ### The syntax slots
 
-A language plugin should read its text through a parser (below, reading
-through a parser), which derives the `source`, `declares` and `topLevel`
-slots and the `interfaces` slot's import answers; it still fills the slots no
-parse answers (`entrances`, `notice`, `lists`, `boundaries`, the
-`interfaces` table's language facts). A plugin with no parser for its
-language can still read by hand-written slots; no bundled plugin does.
+A language plugin reads its text through a parser (below, reading through
+a parser), from which the core derives every reading of the text: the names
+a file declares and whether it exports each (the economy and mass), what
+each declares (the observation's interface map), what a file's top level
+declares (the spec model's check that a handler, guard or mirror exists),
+its imports, and the `interfaces` slot's import answers. The plugin fills
+the slots no parse answers (`entrances`, `notice`, `lists`, `boundaries`,
+the `interfaces` table's language facts). No slot reads the language's text:
+the hand-written reader slots of pluginApi 3 and before (`source`,
+`declares`, `topLevel`, `kept`) are gone, and a manifest that names one is
+refused naming the slot, whatever `pluginApi` it is written for.
 
-The readings scan a language by the tables its plugin's manifest names under
-`syntax`, each as `"<module>#<export>"`, loaded synchronously, once, when a
-reading first asks for that slot:
+The readings take what no parse answers from the tables its plugin's
+manifest names under `syntax`, each as `"<module>#<export>"`, loaded
+synchronously, once, when a reading first asks for that slot:
 
 | Slot | Read by | Type |
 |---|---|---|
 | `entrances` | entrance detection | `EntranceSyntax` |
-| `interfaces` | the Structure reading | `InterfaceSyntax` |
-| `kept` | the Structure reading's kept answers, when filled; else `interfaces.wildcardModules` | `(file, text) => string[]` |
-| `source` | the economy and mass | `SourceSyntax` |
-| `declares` | the observation's interface map | `(line) => "type" \| "value" \| "body" \| "unknown"` |
+| `interfaces` | the Structure reading; its `wildcardModules` also the Structure reading's kept answers | `InterfaceSyntax` |
 | `notice` | the session start | `(root) => string` |
 | `lists` | declared mirrors, for a list in the language's files; a file of a language whose plugin fills none is read as TypeScript | `(text, name) => Literal \| undefined` |
-| `topLevel` | the spec model's check that a handler, guard or mirror is declared | `(text, name) => boolean` |
 | `boundaries` | `scaffold import` and adoption | `BoundarySource`: a tool's declaration file read into modules, as tach's |
 
 An `EntranceSyntax`'s `manifestCandidates(read, exists, files)` is handed the
@@ -263,13 +264,13 @@ A candidate may carry a `name`, the one `scaffold entrances` proposes when
 the plugin knows a better one than its symbol gives (a Rust binary by the
 name its Cargo.toml gives it), so no language's layout is known in the core.
 
-Every type is exported from `@posthog/coherence/plugin`. A slot a plugin leaves empty reads as "not read for <language>", never as
-another language: a plugin that fills no `source` slot is named not read by
-mass and every reading that scans text, and one that fills no `interfaces`
-slot by the Structure reading. The kept answers read the `interfaces` slot's
-`wildcardModules`; the `kept` slot is still read when a plugin fills it, and
-`plugin check` fails a plugin whose two slots answer with one function or
-two spelled alike (its "one answer each" duty).
+Every type is exported from `@posthog/coherence/plugin`. A language read
+without a parser, or a slot a plugin leaves empty, reads as "not read for
+<language>", never as another language: a plugin that names no parser is
+named not read by mass and every reading that scans text, and one that
+fills no `interfaces` slot by the Structure reading. `plugin check` fails a
+plugin whose two slots answer with one function or two spelled alike (its
+"one answer each" duty).
 
 Two manifest fields name a language's files so the core never does:
 `basisFiles`, regular expressions a base name matches for the files besides
@@ -345,8 +346,7 @@ every file of the module when it imports the module whole or no file declares
 the name. Return the module and let Coherence choose: a plugin that picks one
 file of a module (its first, the one named after it) misses the importer's
 other files, and two plugins that pick differently read one project two ways.
-A plugin with a hand-written `source` slot may return a module from its
-`resolveModule` the same way; the bundled Go plugin does.
+The bundled Go plugin returns a package this way.
 
 Python's queries (`plugins/python/python.scm`) are the worked example:
 one pattern per shape of import, then one per kind of declaration, each
@@ -421,11 +421,14 @@ a constant whose value is JSX declares `unknown`.
 The plugin still fills the slots no parse answers: `entrances` (a
 framework's rules), `notice`, `lists`, `boundaries`, and an `interfaces`
 table for the language's own facts (whether its server narrows to bounds,
-its default exports). A manifest that names a parser and also fills
-`source`, `declares`, `topLevel` or `kept`, or an `interfaces` table that
-answers `importLists` or `wildcardModules`, is refused naming the slot: a
-second reader of the same text is how two readings of it come to disagree,
-as Python's two hand-written readers of its imports did.
+its default exports). A manifest that fills `source`, `declares`, `topLevel`
+or `kept`, the hand-written readers pluginApi 4 removed, is refused naming
+the slot, whatever version it is written for and whether or not it names a
+parser; to move one, write the queries that capture what it read, and the
+core derives the reading from them. An `interfaces` table that answers
+`importLists` or `wildcardModules` is refused naming the answer. A second
+reader of the same text is how two readings of it come to disagree, as
+Python's two hand-written readers of its imports did.
 
 Parsing costs: a WebAssembly parser reads about 11 MB of text a second, so
 Coherence keeps each text's parse in the user's own cache
@@ -609,25 +612,25 @@ one wanting changes a copy of it:
    | Duty | Holds when |
    |---|---|
    | file rule | the files `check.json` names as the language's are, and the others are not |
-   | declarations | the `topLevel` slot says which names a file declares, as `check.json` says |
+   | declarations | the parser's top-level reading says which names a file declares, as `check.json` says |
    | reference reading | the readings recover, over the check project, every relation of the reference project its `reference` map places there (below); held from pluginApi 3 |
    | references | the adapter reports every reference to the protected thing, and none else; one that reports none fails here, by name |
    | server agrees | every name the text reading finds a file declaring is a top-level symbol the language server reports for that file (the adapter's `topLevelSymbols`, required from pluginApi 3; a plugin written for 2 is told it is not held) |
    | chokepoint | the run grades the chokepoint as `check.json` expects, bypasses named, its refutation seen or refused |
-   | mass | mass reads the language, counts each file, and the `source` slot's scan finds in each the names `check.json`'s `readings.declared` gives |
-   | imports | the `source` slot's scan reads every import `readings.imports` names, resolved to its project file, and none else: what the economy's closure walks |
+   | mass | mass reads the language, counts each file, and the parser's scan finds in each the names `check.json`'s `readings.declared` gives |
+   | imports | the parser's scan reads every import `readings.imports` names, resolved to its project file, and none else: what the economy's closure walks |
    | interfaces | with each folder `readings.interfaces` names a component, the component interface reading finds the symbols one uses of another, and none else |
    | entrances | entrance detection finds every entrance `readings.entrances` names, by file, handler and rule, and none else |
-   | answers agree | where two slots answer one question of the same text, they agree over every file: a name `source` declares is one `topLevel` finds; a type declaration where `interfaces` and `declares` both say so; a name an `interfaces` import list renames is one `source` reads imported |
+   | answers agree | where two readings answer one question of the same text, they agree over every file: a name the scan declares is one the top-level reading finds; a type declaration where `interfaces` (its plugin's own facts among them) and the declares reading both say so; a name an `interfaces` import list renames is one the scan reads imported |
    | one answer each | no two of its slots answer with one function, or two spelled alike |
 
    Each duty passes, fails with why, or is not run with why (the
    language server is absent). The command exits 0 only when every one
    passes. The reading duties run each reading as a project's runs, through
-   the core, so a slot that answers in its type and reads nothing (a
-   `declarationOf` that always says `undefined`) fails every reading it
-   feeds, by what each missed, and so does a slot left empty: a slot's
-   success is what the readings that consume it recover. No plugin waives a
+   the core, so queries that capture nothing fail every reading they feed,
+   by what each missed, and so does a language read without a parser or a
+   slot left empty: a reading's success is what the readings that consume
+   it recover. No plugin waives a
    reading; a check project that names no `readings` fails each reading duty
    as nothing to check. The bundled plugin's `check.json` for the language, as the
    installed package ships it, is the minimum: every plugin for that
@@ -647,12 +650,12 @@ one wanting changes a copy of it:
    |---|---|
    | `files` | The project: each file's text by its path from the root. The check writes them into a scratch folder, with a config that runs the plugin, and reads nothing else. |
    | `language` | `{ "files": [...], "not": [...] }`: paths the file rule must take as the language's, and paths it must not. Only the names are read, so a path need not be in `files`. |
-   | `declarations` | `[{ "file", "name", "declared" }]`: what the `topLevel` slot must say of a name in one of `files`. |
+   | `declarations` | `[{ "file", "name", "declared" }]`: what the parser's top-level reading must say of a name in one of `files`. |
    | `protects`, `chokepoint` | The thing and its one way in, written as a spec bullet writes them (`Seal`, `Name in file.go`). |
    | `references` | Every reference to `protects` as `file:line`, the line 1-based, test files' included: the adapter must report exactly these, none missed and none more. |
    | `grade` | What the run grades the chokepoint (`broken`, `reference-choked`, `visibility-choked`). |
    | `bypasses` | The references outside the chokepoint the run must name, as `file:line`; a test file's never is one. |
-   | `readings` | What each reading of the language's text must recover over `files`, each compared exactly, each with at least one answer: `declared`, `{ "<file>": ["Name", ...] }` for every non-test file of the language; `imports`, `[{ "file", "module", "names" }]`, one per file and the project file it imports from, `"*"` for the module whole; `interfaces`, `[{ "from", "to", "symbols" }]`, component folders and the symbols of `to` that `from` uses; `entrances`, `[{ "file", "symbol", "rule" }]`, `symbol` empty when the file itself is the entrance. Write it for your small project before you write a slot: it is the slot's spec. |
+   | `readings` | What each reading of the language's text must recover over `files`, each compared exactly, each with at least one answer: `declared`, `{ "<file>": ["Name", ...] }` for every non-test file of the language; `imports`, `[{ "file", "module", "names" }]`, one per file and the project file it imports from, `"*"` for the module whole; `interfaces`, `[{ "from", "to", "symbols" }]`, component folders and the symbols of `to` that `from` uses; `entrances`, `[{ "file", "symbol", "rule" }]`, `symbol` empty when the file itself is the entrance. Write it for your small project before you write the queries: it is their spec. |
 4. **Swap back**: remove the `plugins` entry, and the bundled plugin answers
    again.
 
@@ -663,7 +666,12 @@ the module's `syntax` export into `plugin.json`
 (`"syntax": { "<slot>": "<module>#<export>" }`), made the member scan
 `plugin.json` data (`members`), and added the `kept`, `declares`, `notice`,
 `topLevel` and `boundaries` slots. A module that still exports `syntax` is
-refused at load, by name, rather than read as having none.
+refused at load, by name, rather than read as having none. `pluginApi` 4
+removed the hand-written reader slots (`source`, `declares`, `topLevel`,
+`kept`): a manifest that fills one is refused naming the slot, whatever
+version it is written for, and says to read the language through
+`treeSitter`, a grammar's `.wasm` and queries (above, reading through a
+parser). A plugin of 1 to 3 that fills none of them still loads.
 
 ## Roles
 

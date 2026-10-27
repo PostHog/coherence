@@ -90,10 +90,11 @@ test("the bundled plugins load from an installed package: every adapter module a
   const probe = `
     const languages = await import("@posthog/coherence/dist/plugins/languages.js");
     await (await import("@posthog/coherence/dist/plugins/syntax-trees.js")).startParsers();
-    const out = { languages: [...languages.LANGUAGES], files: {}, slots: {}, adapters: {} };
+    const out = { languages: [...languages.LANGUAGES], files: {}, slots: {}, parsed: {}, adapters: {} };
     for (const file of ["a.ts", "b.py", "c.rs"]) out.files[file] = languages.languageOfFile(file) ?? null;
     for (const language of languages.LANGUAGES) {
-      out.slots[language] = ["entrances", "interfaces", "source", "declares", "notice"].filter((slot) => languages.syntaxOf(language, slot) !== undefined);
+      out.slots[language] = ["entrances", "interfaces", "notice"].filter((slot) => languages.syntaxOf(language, slot) !== undefined);
+      out.parsed[language] = ["source", "declares", "topLevel"].filter((reading) => languages.parsedOf(language, reading) !== undefined);
       out.adapters[language] = languages.coreAdapter(language, process.cwd()).constructor.name;
     }
     out.adapters.declared = languages.declaredAdapter({ name: "swift", extensions: [".swift"], server: ["sourcekit-lsp"] }, process.cwd()).constructor.name;
@@ -103,15 +104,19 @@ test("the bundled plugins load from an installed package: every adapter module a
     languages: string[];
     files: Record<string, string | null>;
     slots: Record<string, string[]>;
+    parsed: Record<string, string[]>;
     adapters: Record<string, string>;
   };
   assert.deepEqual(said.languages, ["typescript", "python", "rust"]);
   assert.deepEqual(said.files, { "a.ts": "typescript", "b.py": "python", "c.rs": "rust" });
   assert.deepEqual(said.slots, {
-    typescript: ["entrances", "interfaces", "source", "declares", "notice"],
-    python: ["entrances", "interfaces", "source", "declares"],
-    rust: ["entrances", "interfaces", "source", "declares"],
+    typescript: ["entrances", "interfaces", "notice"],
+    python: ["entrances", "interfaces"],
+    rust: ["entrances", "interfaces"],
   });
+  // Each language's text read through its parser, as JavaScript too.
+  const everyReading = ["source", "declares", "topLevel"];
+  assert.deepEqual(said.parsed, { typescript: everyReading, python: everyReading, rust: everyReading });
   assert.deepEqual(said.adapters, { typescript: "TypeScriptAdapter", python: "PythonAdapter", rust: "RustAdapter", declared: "DeclaredAdapter" });
 
   // The package's own command, reading the project's TypeScript through the bundled plugin's entrance rules: a package script it runs is detected.

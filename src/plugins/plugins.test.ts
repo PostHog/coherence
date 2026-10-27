@@ -145,7 +145,7 @@ test("two plugins that provide one language are refused with both named, and so 
     ...manifest("old", { pluginApi: 0, provides: { language: "typescript" } }),
     "coherence.config.json": JSON.stringify({ plugins: { old: "./plugins/old" } }),
   });
-  assert.throws(() => readEnforcementConfig(older), /plugin old was written for pluginApi 0; this Coherence runs pluginApi 3 and reads plugins written for 1 to 3/);
+  assert.throws(() => readEnforcementConfig(older), /plugin old was written for pluginApi 0; this Coherence runs pluginApi 4 and reads plugins written for 1 to 4/);
   const misnamed = project({ ...manifest("real", {}), "coherence.config.json": JSON.stringify({ plugins: { alias: "./plugins/real" } }) });
   assert.throws(() => readEnforcementConfig(misnamed), /the plugin keyed alias names itself "real"/);
   assert.ok(loadSpecModel(twice).problems.some((p) => p.file === "coherence.config.json" && /both provide language typescript/.test(p.message)), "the spec check says it too");

@@ -15,7 +15,7 @@ import { computeMass, formatMass } from "../economy/mass.ts";
 import { declarationsOf, importsOf } from "../economy/source.ts";
 import { declares } from "../observation/interfaces.ts";
 import { isTypeDeclaration } from "../readings/scope/component-interfaces.ts";
-import { syntaxOf } from "../plugins/languages.ts";
+import { parsedOf, syntaxOf } from "../plugins/languages.ts";
 import { rustListOf } from "../../plugins/rust/rust-lists.ts";
 import { uncommented, useLeaves } from "../../plugins/rust/rust-source.ts";
 
@@ -85,7 +85,7 @@ test("a use tree is read leaf by leaf through nested braces, renames, self and g
   assert.equal(uncommented(text).length, text.length, "blanking keeps every offset");
   // Through the parser: each leaf spelled whole, its group's paths before it.
   const read: string[] = [];
-  syntaxOf("rust", "source")!.importsOf(text, (name, specifier) => read.push(name === undefined ? specifier : `${name} from ${specifier}`));
+  parsedOf("rust", "source")!.importsOf(text, (name, specifier) => read.push(name === undefined ? specifier : `${name} from ${specifier}`));
   assert.deepEqual(
     [...new Set(read)].sort(),
     ["::serde::Serialize", "Row from crate::store", "Seen from crate::after", "Serialize from ::serde", "crate::after::Seen", "crate::api", "crate::store::Row", "crate::store::seal", "crate::store::self", "helper from super::super::util", "seal from crate::store", "super::super::util::helper"],

@@ -4,7 +4,8 @@
  * claims about the bundled plugins are true of them. A plugin author follows
  * the guide, and the guide steered authors to hand-written readers after
  * Python moved to a parser (mnemion's Swift plugin, written from the
- * 1.11.0-beta.0 docs), so the guide is checked as code is.
+ * 1.11.0-beta.0 docs), which pluginApi 4 then removed, so the guide is
+ * checked as code is.
  */
 
 import assert from "node:assert/strict";
@@ -81,7 +82,7 @@ test("every plugin.json example in docs/plugins.md validates as a manifest of th
   }
 });
 
-test("docs/plugins.md's claims about the bundled plugins are true of them: each named as read through a parser names one, each named hand-written fills its source slot by hand, and the plugin it says to start from reads through a parser", () => {
+test("docs/plugins.md's claims about the bundled plugins are true of them: each named as read through a parser names one, and the plugin it says to start from reads through a parser", () => {
   const manifest = (name: string): PluginManifest => readManifest(name, join(BUNDLED_DIR, name), "docs/plugins.md").manifest!;
   const claims = [...DOC.matchAll(/<!-- claims: ([^.]*)\./g)].flatMap((m) => m[1]!.split(";").map((c) => c.trim()));
   assert.ok(claims.length > 0, "the guide says which bundled plugins read through a parser");
@@ -89,12 +90,12 @@ test("docs/plugins.md's claims about the bundled plugins are true of them: each 
     const [kind, ...rest] = claim.split(/\s+/);
     for (const name of rest.join(" ").split(",").map((n) => n.trim()).filter((n) => n !== "")) {
       const m = manifest(name);
+      // A plugin reads its text through a parser or not at all: no claim of another kind is one the code can hold.
       if (kind === "parser") assert.ok(m.treeSitter !== undefined, `the guide says ${name} reads through a parser; its manifest names none`);
-      else if (kind === "hand-written") assert.ok(m.treeSitter === undefined && m.syntax?.source !== undefined, `the guide says ${name} reads its text by hand; its manifest names a parser`);
       else assert.fail(`a claim of no known kind: ${claim}`);
     }
   }
   const start = /start from `(\w+)`/.exec(DOC);
   assert.ok(start !== null, "the guide names a plugin to start from");
-  assert.ok(manifest(start[1]!).treeSitter !== undefined, `the guide says to start from ${start[1]}, which reads with hand-written slots, not a parser`);
+  assert.ok(manifest(start[1]!).treeSitter !== undefined, `the guide says to start from ${start[1]}, which names no parser`);
 });

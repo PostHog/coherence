@@ -13,7 +13,7 @@ import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { Language, Parser } from "web-tree-sitter";
 import { declarationsOf } from "../economy/source.ts";
-import { syntaxOf } from "./languages.ts";
+import { parsedOf } from "./languages.ts";
 import { BUNDLED_DIR } from "./registry.ts";
 
 test("the bundled TypeScript parsers read what tree-sitter-typescript 0.23.2 cannot: an import type with type arguments or as an array's element, an indexed type's object or keyof's operand, a member named in or beginning with in after another, and a bare & in JSX text or a JSX string, each with every declaration after it, while in and instanceof still continue an expression and a character reference still reads as one", () => {
@@ -51,7 +51,7 @@ test("the bundled TypeScript parsers read what tree-sitter-typescript 0.23.2 can
     assert.equal(declared.at(-1), "after", `${shape}: the declaration after it is read (${declared.join(", ")})`);
     assert.equal(declared.length, 2, `${shape}: it declares its one name (${declared.join(", ")})`);
     const imports: string[] = [];
-    syntaxOf("typescript", "source")!.importsOf(text, (name, specifier) => imports.push(`${name} <- ${specifier}`));
+    parsedOf("typescript", "source")!.importsOf(text, (name, specifier) => imports.push(`${name} <- ${specifier}`));
     assert.deepEqual(imports, ["late <- ./late.ts"], `${shape}: the import after it is read`);
   }
   // An expression still continues onto a line that begins with the in or instanceof operator.

@@ -112,7 +112,8 @@ function dataProblems(raw: Record<string, unknown>, who: string): string[] {
     if (!isRecord(syntax)) problems.push(`${who}'s syntax maps each slot to "<module>#<export>"`);
     else
       for (const [slot, at] of Object.entries(syntax)) {
-        if (!(SYNTAX_SLOTS as readonly string[]).includes(slot)) problems.push(`${who}'s syntax names ${slot}, which is no slot (${SYNTAX_SLOTS.join(", ")})`);
+        if ((DERIVED_SLOTS as readonly string[]).includes(slot)) problems.push(handReaderRefused(who, slot));
+        else if (!(SYNTAX_SLOTS as readonly string[]).includes(slot)) problems.push(`${who}'s syntax names ${slot}, which is no slot (${SYNTAX_SLOTS.join(", ")})`);
         else if (typeof at !== "string" || !/^[^#/][^#]*#[A-Za-z_$][\w$]*$/.test(at) || isAbsolute(at)) problems.push(`${who}'s syntax.${slot} is "<module beside the manifest>#<export>"`);
       }
   }
@@ -120,10 +121,21 @@ function dataProblems(raw: Record<string, unknown>, who: string): string[] {
 }
 
 /**
+ * A manifest's syntax that names a slot the core derives from a language's
+ * parser (DERIVED_SLOTS): a hand-written reader of the language's text,
+ * which pluginApi 4 removed. Refused by name, whatever pluginApi the plugin
+ * is written for and whether or not it names a parser, rather than ignored:
+ * a second reader of a text is how two readings of it come to disagree, and
+ * a plugin whose reader went unread would read as one that reads nothing.
+ */
+function handReaderRefused(who: string, slot: string): string {
+  return `${who}'s syntax.${slot} is a hand-written reader of its language's text, which this Coherence does not read (pluginApi 4): read the language through treeSitter, a grammar's .wasm and queries, from which the core derives what ${slot} answered (docs/plugins.md, Reading through a parser)`;
+}
+
+/**
  * A manifest's treeSitter, checked: its parser and queries files beside the
- * manifest, its resolve "<module>#<export>", only on a plugin that provides a
- * language, and no slot the core derives from the parser filled by hand too:
- * a second reader of the same text is how two readings of it disagree.
+ * manifest, its resolve "<module>#<export>", and only on a plugin that
+ * provides a language.
  */
 function treeSitterProblems(raw: Record<string, unknown>, dir: string, language: string | undefined, who: string): string[] {
   const declared = raw["treeSitter"];
@@ -142,9 +154,6 @@ function treeSitterProblems(raw: Record<string, unknown>, dir: string, language:
   if (declared["privateName"] !== undefined && !compilesUnicode(declared["privateName"])) problems.push(shape);
   if (declared["separator"] !== undefined && (typeof declared["separator"] !== "string" || declared["separator"] === "")) problems.push(shape);
   if (language === undefined) problems.push(`${who} names a treeSitter parser but provides no language for it to read`);
-  const syntax = isRecord(raw["syntax"]) ? raw["syntax"] : {};
-  const twice = DERIVED_SLOTS.filter((slot) => syntax[slot] !== undefined);
-  if (twice.length > 0) problems.push(`${who} reads its text through treeSitter, so ${twice.map((s) => `syntax.${s}`).join(" and ")} would read it a second time: the core derives ${twice.length === 1 ? "that slot" : "those slots"} from the parser; remove ${twice.length === 1 ? "it" : "them"}`);
   return [...new Set(problems)];
 }
 

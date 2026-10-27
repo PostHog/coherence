@@ -14,8 +14,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { declarationsOf, importsOf } from "../economy/source.ts";
-import { forProject, registerProjectPlugins, sourceProvider, syntaxOf } from "./languages.ts";
-import type { LoadedPlugin, PluginManifest } from "./plugin.ts";
+import { forProject, parsedOf, registerProjectPlugins, sourceProvider, syntaxOf } from "./languages.ts";
+import { DERIVED_SLOTS, OLDEST_PLUGIN_API, PLUGIN_API, type LoadedPlugin, type PluginManifest } from "./plugin.ts";
+import { writeParserPlugin } from "./fixtures/parser-plugin.ts";
 import { BUNDLED_DIR, readManifest } from "./registry.ts";
 import { fingerprintOf, importShapes, KEPT_FROM, keptParseOf, staleParsesNotice, treeReaderOf, warmParses } from "./syntax-trees.ts";
 import { warmProjectParses } from "../economy/warm-parses.ts";
@@ -27,6 +28,7 @@ after(() => {
 });
 
 const PYTHON = join(BUNDLED_DIR, "python");
+const DOCS = readFileSync(resolve("docs/plugins.md"), "utf8");
 
 /** The Python plugin as the store's tests read it, by path. */
 const PY_PLUGIN: LoadedPlugin = { name: "python", version: "0", dir: PYTHON, source: "bundled", manifest: { name: "python", version: "0", pluginApi: 2, treeSitter: { parser: "tree-sitter-python.wasm", queries: "python.scm", resolve: "python-source.ts#PYTHON_RESOLVE" } } };
@@ -50,31 +52,37 @@ function inProcess(body: string, env: NodeJS.ProcessEnv = process.env): string {
   return execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", probe], { encoding: "utf8", env, timeout: 60_000 });
 }
 
-/** A plugin folder by path that reads a language "zz" through Python's parser, with the manifest and queries given. */
-function parserPlugin(manifest: Partial<PluginManifest>, files: Record<string, string> = {}): LoadedPlugin {
+/** A plugin folder by path that reads a language "zz" through Python's parser, with the manifest and files given. */
+function parserPlugin(manifest: Record<string, unknown>, files: Record<string, string> = {}): LoadedPlugin {
   const dir = mkdtempSync(join(tmpdir(), "coherence-syntax-trees-"));
   fixtures.push(dir);
-  copyFileSync(join(PYTHON, "tree-sitter-python.wasm"), join(dir, "zz.wasm"));
-  copyFileSync(join(PYTHON, "python.scm"), join(dir, "zz.scm"));
-  writeFileSync(join(dir, "resolve.ts"), "export const RESOLVE = { resolveModule: () => undefined, modulePaths: () => [] };\nexport const FACTS = { serverBounds: false, importLists: () => [] };\n");
-  writeFileSync(join(dir, "index.ts"), "export default {};\n");
-  for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
-  const full = { name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, extensions: [".zz"], module: "./index.ts", treeSitter: { parser: "zz.wasm", queries: "zz.scm", resolve: "resolve.ts#RESOLVE" }, ...manifest };
-  writeFileSync(join(dir, "plugin.json"), JSON.stringify(full));
-  return { name: "zz", version: "0.1.0", dir, source: dir, manifest: full as PluginManifest };
+  const full = writeParserPlugin(dir, manifest, files);
+  return { name: "zz", version: "0.1.0", dir, source: dir, manifest: full };
 }
 
-test("a plugin that names a parser and a hand-written reader of the same text is refused, naming the slot", () => {
-  for (const slot of ["source", "declares", "topLevel", "kept"] as const) {
-    const plugin = parserPlugin({ syntax: { [slot]: "resolve.ts#RESOLVE" } });
-    const read = readManifest("zz", plugin.dir, "coherence.config.json");
-    assert.equal(read.manifest, undefined, `syntax.${slot} beside a parser loads`);
-    assert.ok(read.problems.some((p) => p.includes(`syntax.${slot} would read it a second time`)), read.problems.join("\n"));
-  }
+test("a plugin that fills a hand-written reader slot (source, declares, topLevel or kept) is refused naming the slot and the parser to read through instead, whatever pluginApi it is written for and whether or not it names a parser", () => {
+  for (const pluginApi of [OLDEST_PLUGIN_API, PLUGIN_API - 1, PLUGIN_API])
+    for (const slot of DERIVED_SLOTS)
+      for (const parser of [true, false]) {
+        const plugin = parserPlugin({ pluginApi, syntax: { [slot]: "resolve.ts#RESOLVE" }, ...(parser ? {} : { treeSitter: undefined }) });
+        const read = readManifest("zz", plugin.dir, "coherence.config.json");
+        const what = `syntax.${slot} at pluginApi ${pluginApi}${parser ? " beside a parser" : ""}`;
+        assert.equal(read.manifest, undefined, `${what} loads`);
+        assert.deepEqual(
+          read.problems,
+          [`coherence.config.json: plugin zz's syntax.${slot} is a hand-written reader of its language's text, which this Coherence does not read (pluginApi 4): read the language through treeSitter, a grammar's .wasm and queries, from which the core derives what ${slot} answered (docs/plugins.md, Reading through a parser)`],
+          what,
+        );
+      }
+  assert.ok(DOCS.includes("\n### Reading through a parser\n"), "the section the refusal names is docs/plugins.md's");
+  // An extending plugin wraps no reader either.
+  const extending = parserPlugin({ provides: undefined, extends: "typescript", treeSitter: undefined, syntax: { source: "resolve.ts#RESOLVE" } });
+  assert.match(readManifest("zz", extending.dir, "coherence.config.json").problems.join("\n"), /plugin zz's syntax\.source is a hand-written reader/);
   assert.deepEqual(readManifest("zz", parserPlugin({}).dir, "coherence.config.json").problems, [], "a parser alone loads");
+  assert.deepEqual(readManifest("zz", parserPlugin({ pluginApi: OLDEST_PLUGIN_API, treeSitter: undefined, syntax: { notice: "notice.ts#NOTICE" } }, { "notice.ts": "export const NOTICE = () => \"\";\n" }).dir, "coherence.config.json").problems, [], "a plugin of an older interface that fills none of them loads");
 
   // An interfaces table that answers the imports the parser reads is refused when the slot is first asked.
-  const plugin = parserPlugin({ syntax: { interfaces: "resolve.ts#FACTS" } });
+  const plugin = parserPlugin({ syntax: { interfaces: "facts.ts#FACTS" } }, { "facts.ts": "export const FACTS = { serverBounds: false, importLists: () => [] };\n" });
   const root = mkdtempSync(join(tmpdir(), "coherence-syntax-trees-project-"));
   fixtures.push(root);
   registerProjectPlugins(root, [plugin]);
@@ -112,14 +120,14 @@ test("the parser reads Python's imports and declarations whole: across lines, in
     "",
   ].join("\n");
   const imports: string[] = [];
-  syntaxOf("python", "source")!.importsOf(text, (name, specifier) => imports.push(`${name ?? "(module)"} <- ${specifier}`));
+  parsedOf("python", "source")!.importsOf(text, (name, specifier) => imports.push(`${name ?? "(module)"} <- ${specifier}`));
   assert.deepEqual(imports, ["annotations <- __future__", "SECRET_COLUMNS <- store.secrets", "seal <- store.secrets", "(module) <- os.path", "(module) <- json", "render <- .views", "loads <- fast", "thing <- lazy"]);
   assert.deepEqual(
     declarationsOf(text, "python").map((d) => `${d.name}@${d.line} ${d.exported ? "exported" : "private"} ${d.declares}`),
     ["TEMPLATE@13 exported value", "TYPES@17 exported value", "handler@23 exported body"],
     "a constant whose value starts on a later line is declared; a class inside a string is not; a module variable is bound, not declared",
   );
-  const topLevel = syntaxOf("python", "topLevel")!;
+  const topLevel = parsedOf("python", "topLevel")!;
   assert.ok(topLevel(text, "logger") && topLevel(text, "_hidden") && topLevel(text, "handler"), "a bound name is at the top level");
   assert.ok(!topLevel(text, "Fake") && !topLevel(text, "thing"), "a name inside a string or a function is not");
   assert.deepEqual(syntaxOf("python", "interfaces")!.importLists(text), ["seal as sealed, json as j"]);
@@ -161,14 +169,14 @@ test("the parser reads TypeScript's imports, declarations and default exports wh
     "",
   ].join("\n");
   const imports: string[] = [];
-  syntaxOf("typescript", "source")!.importsOf(text, (name, specifier) => imports.push(`${name ?? "(module)"} <- ${specifier}`));
+  parsedOf("typescript", "source")!.importsOf(text, (name, specifier) => imports.push(`${name ?? "(module)"} <- ${specifier}`));
   assert.deepEqual(imports.sort(), ["(module) <- ./barrel.ts", "(module) <- ./polyfill.ts", "(module) <- ./store/rows.ts", "Ref <- react", "SECRET_COLUMNS <- ./store/secrets.ts", "audit <- ./audit.ts", "default <- react", "render <- ./audit.ts", "seal <- ./store/secrets.ts", "useState <- react"]);
   assert.deepEqual(
     declarationsOf(text, "typescript").map((d) => `${d.name}@${d.line} ${d.exported ? "exported" : "private"} ${d.declares}${d.isDefault ? " default" : ""}`),
     ["FIXTURE@11 private value", "Mode@15 exported value", "pick@16 exported body", "LIMIT@16 exported value", "TABLE@17 exported value", "made@18 exported unknown", "Row@19 exported type", "local@23 private body", "Page@28 exported body default"],
     "a declaration inside a template string is none; a const enum is named by its name; each name of a statement is declared, by what its value is",
   );
-  const topLevel = syntaxOf("typescript", "topLevel")!;
+  const topLevel = parsedOf("typescript", "topLevel")!;
   assert.ok(["GET", "POST", "auth", "handle", "show", "Page"].every((name) => topLevel(text, name)), "a destructured name and a name an export list exports are at the top level");
   assert.ok(!topLevel(text, "inner") && !topLevel(text, "Fake"), "a name inside a function or a template is not");
   const interfaces = syntaxOf("typescript", "interfaces")!;
@@ -181,7 +189,7 @@ test("the parser reads TypeScript's imports, declarations and default exports wh
   const cast = ['export function before() { const v = <any>window; return v; }', "export const angle = <string>input;", "export function after() {}", 'import { late } from "./late.ts";', ""].join("\n");
   assert.deepEqual(declarationsOf(cast, "typescript").map((d) => d.name), ["before", "angle", "after"], "every declaration after an old-style cast is read");
   const castImports: string[] = [];
-  syntaxOf("typescript", "source")!.importsOf(cast, (name, specifier) => castImports.push(`${name} <- ${specifier}`));
+  parsedOf("typescript", "source")!.importsOf(cast, (name, specifier) => castImports.push(`${name} <- ${specifier}`));
   assert.deepEqual(castImports, ["late <- ./late.ts"]);
   assert.deepEqual(importShapes(sourceProvider("typescript")!, cast).map((i) => i.shapes), [["named"]], "and an import after it is at the top level, not inside a block");
   assert.deepEqual(declarationsOf("export const App = () => <div onClick={() => 1}>hi</div>;\nexport function Next() {}\n", "typescript").map((d) => d.name), ["App", "Next"], "and JSX still reads through the TSX grammar");
@@ -587,4 +595,138 @@ test("a registry's leaves and its top share the user's one parse store: a warm-u
   const second = warmProjectParses(join(top, "b"));
   assert.deepEqual(second.map((w) => [w.root, w.read]), [[join(top, "b"), 1], [top, 3]], "b's warm-up reads its leaf and the top from the same store");
   assert.ok(![top, join(top, "a"), join(top, "b")].some((dir) => existsSync(join(dir, ".coherence", "parses"))), "no project keeps a store of its own");
+});
+
+/** Every source file the core runs, under src: tests, end-to-end tests and fixtures aside. */
+function coreSources(dir: string, into: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name !== "fixtures" && entry.name !== "fonts") coreSources(path, into);
+    } else if (entry.name.endsWith(".ts") && !/\.(test|e2e)\.ts$/.test(entry.name) && !/fixture/.test(entry.name)) into.push(path);
+  }
+  return into;
+}
+
+/** The functions that load a plugin's syntax slot or ask for one by name: a hand-written reader's name handed to any of them reads one. */
+const SLOT_ASKERS = ["syntaxOf", "slotExport", "fills", "fillsSlot", "exportAt"];
+
+/**
+ * Where a module's code reads a hand-written reader slot (DERIVED_SLOTS), as
+ * the TypeScript plugin's own parser reads it: a slot's name read off a
+ * manifest's syntax, by property or by a string index; a slot's name, or
+ * "syntax.<slot>", handed to a function that loads or asks for a slot; and a
+ * manifest's syntax indexed by a name that is not a parameter its function
+ * types as a SyntaxSlot, whose members the test below holds to name none.
+ */
+function handReaderReads(parsers: readonly Parser[], file: string, text: string): string[] {
+  // The TypeScript plugin's two grammars, as it reads a file: the first whose tree holds no error.
+  let tree = parsers[0]!.parse(text)!;
+  for (const parser of parsers.slice(1)) {
+    if (!tree.rootNode.hasError) break;
+    tree.delete();
+    tree = parser.parse(text)!;
+  }
+  try {
+    const found: string[] = [];
+    const at = (node: Node, what: string): void => void found.push(`${file}:${node.startPosition.row + 1}: ${what}`);
+    // An error the grammar recovers from may hide a read inside it: one within a line (the grammar's own slip over a \u0000 escape
+    // before a template's substitution, in two modules) hides nothing a line could not show, and one that spans lines is a finding.
+    const errors: Node[] = [];
+    const errs = (node: Node): void => {
+      if (node.isError || node.isMissing) errors.push(node);
+      else if (node.hasError) for (const child of node.children) errs(child!);
+    };
+    errs(tree.rootNode);
+    for (const error of errors) if (error.endPosition.row !== error.startPosition.row || /\b(source|declares|topLevel|kept)\b/.test(error.text)) at(error, `does not parse whole there (${JSON.stringify(error.text.slice(0, 60))}), so the scan cannot see a read in it`);
+    const slot = (name: string): boolean => (DERIVED_SLOTS as readonly string[]).includes(name);
+    const unquoted = (node: Node): string | undefined => (node.type === "string" ? node.text.slice(1, -1) : node.type === "template_string" && node.namedChildren.every((c) => c!.type === "string_fragment") ? node.text.slice(1, -1) : undefined);
+    // An object that is a manifest's syntax map, however it is reached: manifest.syntax, manifest.syntax?, raw["syntax"], a name syntax, a cast of any.
+    const syntaxMap = (node: Node): boolean => /\bsyntax\b/.test(node.text);
+    for (const member of tree.rootNode.descendantsOfType("member_expression")) {
+      const property = member!.childForFieldName("property")?.text ?? "";
+      if (slot(property) && syntaxMap(member!.childForFieldName("object")!)) at(member!, `reads syntax.${property}`);
+    }
+    for (const subscript of tree.rootNode.descendantsOfType("subscript_expression")) {
+      const object = subscript!.childForFieldName("object")!;
+      if (!syntaxMap(object)) continue;
+      const index = subscript!.childForFieldName("index")!;
+      const named = unquoted(index);
+      if (named !== undefined) {
+        if (slot(named)) at(subscript!, `reads syntax.${named}`);
+        continue;
+      }
+      // A name: a parameter of the function around it, typed as a slot only the slot types allow (SyntaxSlot, or a type parameter extending it).
+      let fn: Node | null = subscript!;
+      while (fn !== null && fn.type !== "function_declaration" && fn.type !== "method_definition") fn = fn.parent;
+      const parameter = fn?.childForFieldName("parameters")?.namedChildren.find((p) => p!.childForFieldName("pattern")?.text === index.text);
+      const type = parameter?.childForFieldName("type")?.text.replace(/^:\s*/, "");
+      const constraint = fn?.childForFieldName("type_parameters")?.namedChildren.find((p) => p!.childForFieldName("name")?.text === type)?.childForFieldName("constraint")?.text.replace(/^extends\s+/, "");
+      if (type !== "SyntaxSlot" && constraint !== "SyntaxSlot") at(subscript!, `indexes a manifest's syntax by ${index.text}, which is no parameter typed SyntaxSlot`);
+    }
+    for (const call of tree.rootNode.descendantsOfType("call_expression")) {
+      // Called by name, through a member, or through a cast of it: (syntaxOf as (l: string, s: string) => unknown)(language, "kept").
+      const callee = SLOT_ASKERS.find((name) => new RegExp(`\\b${name}\\b`).test(call!.childForFieldName("function")!.text));
+      if (callee === undefined) continue;
+      for (const argument of call!.childForFieldName("arguments")?.descendantsOfType(["string", "template_string"]) ?? []) {
+        const named = unquoted(argument!)?.replace(/^syntax\./, "");
+        if (named !== undefined && slot(named)) at(call!, `asks ${callee} for ${named}`);
+      }
+    }
+    return found;
+  } finally {
+    tree.delete();
+  }
+}
+
+test("no core code reads a hand-written source, declares, topLevel or kept slot: the slot types name none of them, and no module reads one off a manifest's syntax, asks for one by name, or indexes a manifest's syntax by any name but a SyntaxSlot", () => {
+  const [parser, tsx] = ["tree-sitter-typescript.wasm", "tree-sitter-tsx.wasm"].map((wasm) => {
+    const each = new Parser();
+    each.setLanguage(Language.loadSync(new WebAssembly.Module(readFileSync(join(BUNDLED_DIR, "typescript", wasm)))));
+    return each;
+  }) as [Parser, Parser];
+  try {
+    // The types a slot is named by: SYNTAX_SLOTS and SyntaxTables name none of the four, SyntaxSlot is SYNTAX_SLOTS's members, and a manifest's syntax is keyed by it, so the typecheck refuses a slot read by any of their names.
+    assert.deepEqual([...DERIVED_SLOTS].sort(), ["declares", "kept", "source", "topLevel"], "the slots a plugin no longer fills, which the registry refuses by");
+    const pluginTs = parser.parse(readFileSync(resolve("src/plugins/plugin.ts"), "utf8"))!;
+    try {
+      assert.equal(pluginTs.rootNode.hasError, false, "plugin.ts parses whole");
+      const declared = (type: string, name: string): Node | undefined => pluginTs.rootNode.descendantsOfType(type).find((n) => n!.childForFieldName("name")?.text === name) ?? undefined;
+      const listed = declared("variable_declarator", "SYNTAX_SLOTS")!.descendantsOfType("string").map((s) => s!.text.slice(1, -1));
+      assert.ok(listed.length > 0, "SYNTAX_SLOTS lists the slots a plugin fills");
+      assert.deepEqual(listed.filter((s) => (DERIVED_SLOTS as readonly string[]).includes(s)), [], "SYNTAX_SLOTS names no hand-written reader");
+      const tables = declared("interface_declaration", "SyntaxTables")!.descendantsOfType("property_signature").map((p) => p!.childForFieldName("name")!.text);
+      assert.deepEqual(tables.filter((s) => (DERIVED_SLOTS as readonly string[]).includes(s)), [], "SyntaxTables types no hand-written reader");
+      assert.equal(declared("type_alias_declaration", "SyntaxSlot")!.childForFieldName("value")!.text, "(typeof SYNTAX_SLOTS)[number]", "a slot is one SYNTAX_SLOTS lists");
+      const manifestSyntax = declared("interface_declaration", "PluginManifest")!.descendantsOfType("property_signature").find((p) => p!.childForFieldName("name")!.text === "syntax")!;
+      assert.equal(manifestSyntax.childForFieldName("type")!.text, ": Partial<Record<SyntaxSlot, string>>", "a manifest's syntax is keyed by SyntaxSlot");
+    } finally {
+      pluginTs.delete();
+    }
+
+    const sources = coreSources(resolve("src"));
+    assert.ok(sources.some((f) => f.endsWith(join("plugins", "languages.ts"))) && sources.some((f) => f.endsWith(join("plugins", "registry.ts"))), "the scan reads the modules that load slots");
+    const found = sources.flatMap((file) => handReaderReads([parser, tsx], file.slice(resolve("src").length + 1), readFileSync(file, "utf8")));
+    assert.deepEqual(found, [], "a language's text is read through its parser (languages.ts parsedOf), never a slot a plugin fills");
+
+    // The scan sees each shape it refuses, and passes the shapes the core reads a slot by.
+    const shapes = handReaderReads(
+      [parser],
+      "x.ts",
+      [
+        "const a = plugin.manifest.syntax?.source;",
+        "const b = (plugin.manifest.syntax as Record<string, string>)[\"kept\"];",
+        "const c = syntaxOf(language, \"topLevel\" as SyntaxSlot);",
+        "const d = exportAt(plugin, at, `syntax.declares`);",
+        "const h = (syntaxOf as (language: string, slot: string) => unknown)(language, \"kept\");",
+        "function e(plugin: LoadedPlugin, name: string): unknown { return plugin.manifest.syntax?.[name]; }",
+        "function f<S extends SyntaxSlot>(plugin: LoadedPlugin, slot: S): unknown { return plugin.manifest.syntax?.[slot]; }",
+        "function g(plugin: LoadedPlugin, slot: SyntaxSlot): unknown { return slotExport(plugin, slot) ?? plugin.manifest.syntax?.entrances; }",
+      ].join("\n"),
+    );
+    assert.deepEqual(shapes.sort(), ["x.ts:1: reads syntax.source", "x.ts:2: reads syntax.kept", "x.ts:3: asks syntaxOf for topLevel", "x.ts:4: asks exportAt for declares", "x.ts:5: asks syntaxOf for kept", "x.ts:6: indexes a manifest's syntax by name, which is no parameter typed SyntaxSlot"], shapes.join("\n"));
+  } finally {
+    parser.delete();
+    tsx.delete();
+  }
 });

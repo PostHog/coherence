@@ -20,7 +20,8 @@ import { instrumentFor } from "../adapters/index.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { BUNDLED_DIR, moduleOf, moduleSyncOf } from "./registry.ts";
 import { moduleSpecifiers } from "./specifiers.ts";
-import { ciNotes, ciSteps, entranceRules, environmentFolders, forProject, LANGUAGES, languageOfFile, providerOf, serverExtensions, syntaxOf } from "./languages.ts";
+import { writeParserPlugin } from "./fixtures/parser-plugin.ts";
+import { ciNotes, ciSteps, entranceRules, environmentFolders, forProject, LANGUAGES, languageOfFile, parsedOf, providerOf, serverExtensions, syntaxOf } from "./languages.ts";
 import { loadSpecModel } from "../spec/model.ts";
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -134,7 +135,7 @@ test("a project with no plugins key reads every language through the bundled plu
   for (const language of LANGUAGES) assert.equal(providerOf(language)?.dir, join(BUNDLED_DIR, language), `${language} is the bundled plugin's`);
   assert.deepEqual(["a.ts", "a.d.ts", "b.pyi", "c.rs", "d.swift"].map((f) => languageOfFile(f) ?? null), ["typescript", null, "python", "rust", null], "which files are a language's is each plugin's manifest data");
   assert.equal(instrumentFor("python", bare, config).constructor.name, "PythonAdapter", "the adapter is the bundled plugin's");
-  assert.equal(typeof syntaxOf("typescript", "source")?.declarationOf, "function");
+  assert.equal(typeof parsedOf("typescript", "source")?.importsOf, "function");
 
   const swapped = project({
     "coherence.config.json": JSON.stringify({ language: ["python"], plugins: { py: "./plugins/py" } }),
@@ -144,7 +145,7 @@ test("a project with no plugins key reads every language through the bundled plu
   readEnforcementConfig(swapped);
   assert.equal(providerOf("python")?.name, "py", "the project's plugin takes python's place");
   assert.equal(languageOfFile("x.py"), "python", "its files are the bundled plugin's, which it does not restate");
-  assert.equal(typeof syntaxOf("python", "source")?.declarationOf, "function", "the bundled plugin's source scan stands behind it");
+  assert.equal(typeof parsedOf("python", "source")?.importsOf, "function", "the bundled plugin's source scan stands behind it");
   assert.ok(isTestPath("src/check_x.py", []), "a field it declares is its own");
   assert.ok(!isTestPath("src/test_x.py", []), "and replaces the bundled plugin's");
   readEnforcementConfig(bare);
@@ -167,30 +168,29 @@ test("a plugin's testFolders name the folders its language keeps tests in, by ex
 });
 
 test("a plugin that provides a language no bundled plugin does is read as a bundled one is, for its project alone: its files, tests, folders, entrance rules, CI steps and syntax slots; a language nothing provides is refused by the spec check as by a run", () => {
-  const zz = (fields: Record<string, unknown> = {}): Record<string, string> => ({
-    "plugins/zz/plugin.json": JSON.stringify({
-      name: "zz",
-      version: "0.1.0",
-      pluginApi: 2,
-      provides: { language: "zz" },
-      module: "./index.ts",
-      extensions: [".zz"],
-      testFiles: ["_check\\.zz$"],
-      environmentFolders: ["zzdeps"],
-      entrances: { rules: [{ rule: "zz verb", plural: "zz verbs", detects: "a verb a zz file exports" }], notDetected: "a zz verb built at run time" },
-      ci: { note: "zz needs its server", steps: [{ name: "zz server", run: "install-zz-server" }] },
-      syntax: { topLevel: "top.ts#zzDeclaresAtTop" },
-      ...fields,
+  // Read through a parser (Python's, as zz), with every manifest field and a syntax slot no parse answers (notice).
+  const zz = (root: string, fields: Record<string, unknown> = {}): string => {
+    writeParserPlugin(
+      join(root, "plugins/zz"),
+      {
+        testFiles: ["_check\\.zz$"],
+        environmentFolders: ["zzdeps"],
+        entrances: { rules: [{ rule: "zz verb", plural: "zz verbs", detects: "a verb a zz file exports" }], notDetected: "a zz verb built at run time" },
+        ci: { note: "zz needs its server", steps: [{ name: "zz server", run: "install-zz-server" }] },
+        syntax: { notice: "notice.ts#zzNotice" },
+        ...fields,
+      },
+      { "index.ts": swapPlugin("zz", "zz", {})["plugins/zz/index.ts"]!, "notice.ts": 'export const zzNotice = () => "zz reads through its parser";\n' },
+    );
+    return root;
+  };
+  const root = zz(
+    project({
+      "coherence.config.json": JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }),
+      "app/Accounts.spec.md": "# Accounts\n\nThe accounts.\n\n## entrances\n- reset: an operator resets a password\n  handler: reset in app/accounts.zz\n- rename: an operator renames an account\n  handler: rename in app/accounts.zz\n",
+      "app/accounts.zz": "def reset():\n    pass\n",
     }),
-    "plugins/zz/index.ts": swapPlugin("zz", "zz", {})["plugins/zz/index.ts"]!,
-    "plugins/zz/top.ts": "export const zzDeclaresAtTop = (text, name) => text.split(\"\\n\").includes(`verb ${name}`);\n",
-  });
-  const root = project({
-    "coherence.config.json": JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }),
-    ...zz(),
-    "app/Accounts.spec.md": "# Accounts\n\nThe accounts.\n\n## entrances\n- reset: an operator resets a password\n  handler: reset in app/accounts.zz\n- rename: an operator renames an account\n  handler: rename in app/accounts.zz\n",
-    "app/accounts.zz": "verb reset\n",
-  });
+  );
   const config = readEnforcementConfig(root);
   assert.deepEqual(config.languages, ["zz"], "the plugin's language is among those the readings read, not set aside as unscanned");
   assert.doesNotThrow(() => readEnforcementConfig(root), "reading the config again never takes the plugin for another owner of its own .zz");
@@ -199,18 +199,19 @@ test("a plugin that provides a language no bundled plugin does is read as a bund
   assert.ok(environmentFolders().has("zzdeps"), "its environment folders are left out of every walk");
   assert.deepEqual(entranceRules("zz").map((r) => r.rule), ["zz verb"], "its entrance rules are the language's");
   assert.deepEqual([ciNotes(["zz"]), ciSteps(["zz"])], [["zz needs its server"], [{ name: "zz server", run: "install-zz-server" }]], "the CI workflow carries its note and its steps");
-  const topLevel = syntaxOf("zz", "topLevel");
-  assert.ok(typeof topLevel === "function" && topLevel("verb reset\n", "reset"), "its syntax slot answers for it");
+  assert.equal(syntaxOf("zz", "notice")?.(root), "zz reads through its parser", "its syntax slot answers for it");
+  const topLevel = parsedOf("zz", "topLevel");
+  assert.ok(typeof topLevel === "function" && topLevel("def reset():\n    pass\n", "reset"), "and its parser reads its text");
   const problems = loadSpecModel(root, { runs: false }).problems.map((p) => p.message).filter((m) => /entrance/.test(m));
   assert.equal(problems.length, 1, JSON.stringify(problems));
-  assert.match(problems[0]!, /entrance rename: handler rename is not declared at the top level of app\/accounts\.zz/, "the spec check reads its handlers by the plugin's slot: one declared, one not");
+  assert.match(problems[0]!, /entrance rename: handler rename is not declared at the top level of app\/accounts\.zz/, "the spec check reads its handlers through the plugin's parser: one declared, one not");
 
   const bare = project({ "coherence.config.json": JSON.stringify({ language: "typescript" }) });
   readEnforcementConfig(bare);
   assert.equal(languageOfFile("app/accounts.zz"), undefined, "a project that does not name the plugin reads none of it");
   assert.equal(forProject(root, () => languageOfFile("app/accounts.zz")), "zz", "while the one that does still reads it");
 
-  const taken = project({ "coherence.config.json": JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }), ...zz({ extensions: [".zz", ".py"] }) });
+  const taken = zz(project({ "coherence.config.json": JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }) }), { extensions: [".zz", ".py"] });
   assert.throws(() => readEnforcementConfig(taken), /plugin zz claims \.py, which python already reads/, "a bundled language's files are never a new language's");
 
   const unnamed = project({ "coherence.config.json": JSON.stringify({ language: "zz" }) });
@@ -279,11 +280,11 @@ test("a session start names each plugin the project brings whose syntax code run
   const { startReading } = await import("../lifecycle/hook.ts");
   const withSyntax = project({
     "coherence.config.json": JSON.stringify({ language: "python", plugins: { pyx: "./plugins/pyx" } }),
-    ...swapPlugin("pyx", "python", { syntax: { source: "source.ts#SOURCE" } }),
-    "plugins/pyx/source.ts": "export const SOURCE = { declarationOf: () => undefined, resolveModule: () => undefined, importsOf: () => {} };\n",
+    ...swapPlugin("pyx", "python", { syntax: { notice: "notice.ts#NOTICE" } }),
+    "plugins/pyx/notice.ts": 'export const NOTICE = () => "";\n',
   });
   const said = (await startReading(withSyntax)).text;
-  assert.match(said, /^Plugin code in this session's hooks: pyx \(\.\/plugins\/pyx: source\) runs as a reading reads its language, with the project's privileges\.$/m, said);
+  assert.match(said, /^Plugin code in this session's hooks: pyx \(\.\/plugins\/pyx: notice\) runs as a reading reads its language, with the project's privileges\.$/m, said);
   assert.equal(said.match(/Plugin code in this session's hooks/g)?.length, 1, "one line");
   const adapterOnly = project({ "coherence.config.json": JSON.stringify({ language: "python", plugins: { pyx: "./plugins/pyx" } }), ...swapPlugin("pyx", "python", {}) });
   assert.doesNotMatch((await startReading(adapterOnly)).text, /Plugin code in this session's hooks/, "a plugin whose code runs only in a run and the warm server");
@@ -293,14 +294,14 @@ test("a session start names each plugin the project brings whose syntax code run
 
 test("a session start names each plugin written for an older pluginApi with what changed since, in one line, and nothing for one on the current interface", async () => {
   const { startReading } = await import("../lifecycle/hook.ts");
-  const { PLUGIN_API } = await import("./plugin.ts");
+  const { PLUGIN_API, PLUGIN_API_CHANGES } = await import("./plugin.ts");
   const at = (pluginApi: number): string =>
     project({
       "coherence.config.json": JSON.stringify({ language: "python", plugins: { pyx: "./plugins/pyx" } }),
       ...swapPlugin("pyx", "python", { pluginApi }),
     });
   const older = (await startReading(at(PLUGIN_API - 1))).text;
-  assert.match(older, new RegExp(`^Plugins written for an older pluginApi \\(this Coherence runs ${PLUGIN_API}\\): pyx \\(${PLUGIN_API - 1}; since: ${PLUGIN_API}: a language plugin may read its text through a tree-sitter parser[^\\n]*\\)\\.$`, "m"), older);
+  assert.match(older, new RegExp(`^Plugins written for an older pluginApi \\(this Coherence runs ${PLUGIN_API}\\): pyx \\(${PLUGIN_API - 1}; since: ${PLUGIN_API}: ${PLUGIN_API_CHANGES[PLUGIN_API]!.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\)\\.$`, "m"), older);
   assert.equal(older.match(/older pluginApi/g)?.length, 1, "one line");
   assert.doesNotMatch((await startReading(at(PLUGIN_API))).text, /older pluginApi/, "a plugin on the interface this Coherence runs");
 });
@@ -338,17 +339,16 @@ test("a project's plugin reads the plugin interface of the Coherence that runs, 
   // The project installed another copy of the package, whose registry no plugin filled: what a global install, a checkout or another workspace's copy runs beside.
   const root = project({
     "coherence.config.json": JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }),
-    "plugins/zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, module: "./index.ts", extensions: [".zz"], syntax: { topLevel: "top.ts#zzDeclaresAtTop" } }),
+    "plugins/zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, module: "./index.ts", extensions: [".zz"], syntax: { notice: "notice.ts#zzNotice" } }),
     "plugins/zz/index.ts": 'import { languageOfFile } from "@posthog/coherence/plugin";\nexport default { adapter: () => { throw new Error("not asked"); }, languageOf: (file) => languageOfFile(file) };\n',
-    "plugins/zz/top.ts": 'import { languageOfFile } from "@posthog/coherence/dist/plugins/api.js";\nexport const zzDeclaresAtTop = (text, name) => languageOfFile("app/accounts.zz") === "zz" && text.includes(name);\n',
+    "plugins/zz/notice.ts": 'import { languageOfFile } from "@posthog/coherence/dist/plugins/api.js";\nexport const zzNotice = () => (languageOfFile("app/accounts.zz") === "zz" ? "zz is read" : "");\n',
     "node_modules/@posthog/coherence/package.json": JSON.stringify({ name: "@posthog/coherence", version: "0.0.1", type: "module", exports: { "./plugin": "./dist/plugins/api.js", "./dist/*": "./dist/*" } }),
     "node_modules/@posthog/coherence/dist/plugins/api.js": 'export const languageOfFile = () => undefined;\nexport const copy = "the project\'s";\n',
     "tools/copy.ts": 'export { copy } from "@posthog/coherence/plugin";\n',
   });
   const config = readEnforcementConfig(root);
   const plugin = config.plugins.find((p) => p.name === "zz")!;
-  const topLevel = syntaxOf("zz", "topLevel");
-  assert.ok(typeof topLevel === "function" && topLevel("verb reset\n", "reset"), "a syntax slot, loaded by require, reads the registry that holds zz");
+  assert.equal(syntaxOf("zz", "notice")?.(root), "zz is read", "a syntax slot, loaded by require, reads the registry that holds zz");
   type Probe = { languageOf: (file: string) => string | undefined };
   assert.equal((moduleSyncOf(plugin) as unknown as Probe).languageOf("app/accounts.zz"), "zz", "the module loaded by require reads it");
   assert.equal(((await moduleOf(plugin)) as unknown as Probe).languageOf("app/accounts.zz"), "zz", "the module loaded by import reads it");

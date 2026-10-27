@@ -5,8 +5,8 @@
  *
  *   file rule      the files check.json names as the language's are, and
  *                  those it names as not are not
- *   declarations   the topLevel slot says which names a file's top level
- *                  declares
+ *   declarations   the parser's topLevel reading says which names a file's
+ *                  top level declares
  *   references     the adapter reports every reference to the protected
  *                  thing, and none else; a plugin that reports none fails
  *                  here, by name
@@ -18,9 +18,9 @@
  *   chokepoint     the check grades the protected thing through the
  *                  chokepoint as check.json expects, bypasses named, its
  *                  refutation seen or refused, never missing
- *   answers agree  where two of its slots answer one question of the same
- *                  text (a declaration, a renamed import), their answers
- *                  agree over every file of the check project
+ *   answers agree  where two of its readings answer one question of the
+ *                  same text (a declaration, a renamed import), their
+ *                  answers agree over every file of the check project
  *   one answer each  no two of its slots answer with one function, or two
  *                  spelled alike: a question asked of the language belongs
  *                  to one slot, or its answers drift apart
@@ -56,7 +56,7 @@ import { declarationsOf, importsOf, isSourceFile } from "../economy/source.ts";
 import { DEFAULT_TEST_FOLDERS } from "../enforcement/config.ts";
 import { performRun } from "../enforcement/run.ts";
 import { detectedEntrances, readComponentInterfaces } from "../readings/scope/component-interfaces.ts";
-import { bundledAdapter, bundledPlugins, forProject, languageOfFile, registerProjectPlugins, repeatedAnswers, syntaxOf } from "./languages.ts";
+import { bundledAdapter, bundledPlugins, forProject, languageOfFile, parsedOf, registerProjectPlugins, repeatedAnswers, syntaxOf } from "./languages.ts";
 import { DUTY_SINCE, PLUGIN_API_CHANGES, type LoadedPlugin } from "./plugin.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
 import { proveVia, viaForm } from "./verify.ts";
@@ -464,27 +464,29 @@ function fileRule(project: CheckProject, language: string): Duty {
 
 function declarations(project: CheckProject, language: string): Duty {
   if (project.declarations.length === 0) return { name: "declarations", verdict: "fail", reason: "nothing to check: the check project names no declaration" };
-  const topLevel = syntaxOf(language, "topLevel");
-  if (topLevel === undefined) return { name: "declarations", verdict: "fail", reason: `no topLevel slot says what a ${language} file declares` };
+  const topLevel = parsedOf(language, "topLevel");
+  if (topLevel === undefined) return { name: "declarations", verdict: "fail", reason: `the ${language} plugin names no treeSitter parser, so nothing says what a ${language} file declares` };
   const wrong = project.declarations.filter((d) => topLevel(project.files[d.file] ?? "", d.name) !== d.declared).map((d) => `${d.name} in ${d.file} read as ${d.declared ? "not declared" : "declared"}`);
   return wrong.length === 0 ? { name: "declarations", verdict: "pass", reason: `${project.declarations.length} of ${project.declarations.length} read as expected` } : { name: "declarations", verdict: "fail", reason: wrong.join("; ") };
 }
 
 /**
- * answers agree: where two of the language's slots answer one question of the
- * same text, their answers agree over every file of the check project. A
- * name the source scan finds declared is one the topLevel slot finds at the
- * top level, and a type declaration where the interfaces slot reads one exactly
- * where the declares slot reads a type; and every name an
- * interfaces import list renames is one the source scan reads imported. Two
- * readers of one text that disagree are how a reading misses what another
- * finds (df-7ac38ee4: Python's source scan read nothing of a from-import
- * split across lines, which its interfaces slot read whole).
+ * answers agree: where two of the language's readings answer one question of
+ * the same text, their answers agree over every file of the check project. A
+ * name the source scan finds declared is one the topLevel reading finds at
+ * the top level, and a type declaration where the interfaces slot reads one
+ * (a fact its plugin may state itself) exactly where the declares reading
+ * reads a type; and every name an interfaces import list renames is one the
+ * source scan reads imported. Two readers of one text that disagree are how a
+ * reading misses what another finds (df-7ac38ee4: Python's source scan read
+ * nothing of a from-import split across lines, which its interfaces slot read
+ * whole); the parser derives each of them from one parse, and the duty holds
+ * the derivations and the plugin's own facts to one another.
  */
 function answersAgree(project: CheckProject, language: string): Duty {
-  const source = syntaxOf(language, "source");
-  const topLevel = syntaxOf(language, "topLevel");
-  const declares = syntaxOf(language, "declares");
+  const source = parsedOf(language, "source");
+  const topLevel = parsedOf(language, "topLevel");
+  const declares = parsedOf(language, "declares");
   const interfaces = syntaxOf(language, "interfaces");
   const files = project.language.files.filter((f) => project.files[f] !== undefined);
   const wrong: string[] = [];

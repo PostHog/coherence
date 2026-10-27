@@ -1,76 +1,71 @@
 /**
- * plugin check's "answers agree" duty: two slots that answer one question of
- * the same text are run over the check project and held to agree, so a
+ * plugin check's "answers agree" duty: two readings that answer one question
+ * of the same text are run over the check project and held to agree, so a
  * reader that misses what another reads is caught on the plugin's own
- * project (df-7ac38ee4, Python's two hand-written import readers).
+ * project (df-7ac38ee4, Python's two hand-written import readers). The
+ * parser derives every reading of the text from one parse; what a plugin
+ * still states itself (its interfaces table's facts) is held to the parse.
  */
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { after, test } from "node:test";
 import { checkPlugin } from "./check.ts";
+import { writeParserPlugin } from "./fixtures/parser-plugin.ts";
 
 const fixtures: string[] = [];
 after(() => {
   for (const dir of fixtures) rmSync(dir, { recursive: true, force: true });
 });
 
-const STAND_IN = 'const SYMBOLS = { "store/secrets.zz": ["SECRET_COLUMNS", "seal"], "api/render.zz": ["TEMPLATE", "render"] };\nexport default { adapter: ({ language }) => ({ language, ladder: { top: "reference-choked", because: "a stand-in", rungs: [] }, ready: async () => ({ ok: true }), topLevelSymbols: async (file) => (SYMBOLS[file] ?? []).map((name) => ({ name, line: 1, kind: 12 })), resolve: async () => ({ ok: false, reason: "a stand-in" }), references: async () => [], visibility: async () => ({ enforced: false, visible: true, evidence: "a stand-in" }), testFilter: (via) => via, refute: async () => ({ seen: false, staged: [], account: "a stand-in" }), forget: async () => {}, close: async () => {} }) };\n';
+/** A stand-in server that reports, of each file, the top-level symbols given. */
+function standIn(symbols: Record<string, string[]>): string {
+  return `const SYMBOLS = ${JSON.stringify(symbols)};\nexport default { adapter: ({ language }) => ({ language, ladder: { top: "reference-choked", because: "a stand-in", rungs: [] }, ready: async () => ({ ok: true }), topLevelSymbols: async (file) => (SYMBOLS[file] ?? []).map((name) => ({ name, line: 1, kind: 12 })), resolve: async () => ({ ok: false, reason: "a stand-in" }), references: async () => [], visibility: async () => ({ enforced: false, visible: true, evidence: "a stand-in" }), testFilter: (via) => via, refute: async () => ({ seen: false, staged: [], account: "a stand-in" }), forget: async () => {}, close: async () => {} }) };\n`;
+}
 
-/** Python's readers before its parser, by the same expressions: the source scan reads a from-import to the end of its first line, the interfaces slot reads a parenthesized list whole. */
-const OLD_READERS = `
-const PY_DECLARATION = /^(?:async\\s+)?(?:def|class)\\s+([A-Za-z_]\\w*)|^([A-Z_][A-Z0-9_]*)\\s*(?::[^=]+)?=/;
-const PY_FROM = /^from\\s+([\\w.]+)\\s+import\\s+([^\\n]+)$/gm;
-const PY_LIST = /^[ \\t]*(?:from\\s+\\S+\\s+)?import\\s+(\\([^)]*\\)|[^\\n]*(?:\\\\\\n[^\\n]*)*)/gm;
-export const SOURCE = {
-  declarationOf(line) { const m = PY_DECLARATION.exec(line); return m === null ? undefined : { name: m[1] ?? m[2], exported: true }; },
-  resolveModule: () => undefined,
-  importsOf(text, add) { for (const m of text.matchAll(PY_FROM)) for (const piece of m[2].replace(/[()]/g, "").split(",")) { const name = piece.trim().split(/\\s+as\\s+/)[0].trim(); if (name !== "" && name !== "*") add(name, m[1]); } },
-};
-export const INTERFACES = { isTypeDeclaration: () => false, isDefaultExport: () => false, serverBounds: false, importLists: (text) => [...text.matchAll(PY_LIST)].map((m) => m[1]), defaultNames: () => [], wildcardModules: () => [] };
-export const topLevel = (text, name) => new RegExp("^(?:def|class)\\\\s+" + name + "\\\\b|^" + name + "\\\\s*=", "m").test(text);
-`;
+const SECRETS = "SECRET_COLUMNS = []\n\ndef seal(row):\n    return row\n";
 
-function oldReaders(render: string): string {
+/** A plugin by path reading zz through Python's parser, its interfaces table's facts, its server and its check project's render file as given. */
+function parserPlugin(render: string, facts: string, symbols: Record<string, string[]>): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-answers-agree-"));
   fixtures.push(root);
-  const files: Record<string, string> = {
-    "zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 3, provides: { language: "zz" }, extensions: [".zz"], module: "./index.ts", syntax: { source: "readers.ts#SOURCE", interfaces: "readers.ts#INTERFACES", topLevel: "readers.ts#topLevel" } }),
-    "zz/index.ts": STAND_IN,
-    "zz/readers.ts": OLD_READERS,
-    "zz/check.json": JSON.stringify({
-      files: { "api/render.zz": render, "store/secrets.zz": "SECRET_COLUMNS = []\n\ndef seal(row):\n    return row\n" },
+  writeParserPlugin(join(root, "zz"), { syntax: { interfaces: "facts.ts#FACTS" } }, {
+    "index.ts": standIn(symbols),
+    "facts.ts": `export const FACTS = ${facts};\n`,
+    "check.json": JSON.stringify({
+      files: { "api/render.zz": render, "store/secrets.zz": SECRETS },
       language: { files: ["api/render.zz", "store/secrets.zz"], not: [] },
       declarations: [{ file: "store/secrets.zz", name: "seal", declared: true }],
       protects: "SECRET_COLUMNS", chokepoint: "seal", references: [], grade: "reference-choked", bypasses: [],
     }),
-  };
-  for (const [path, text] of Object.entries(files)) {
-    mkdirSync(dirname(join(root, path)), { recursive: true });
-    writeFileSync(join(root, path), text);
-  }
+  });
   return root;
 }
 
-test("plugin check fails a plugin whose two readers of one text disagree: an import list renaming a name the source scan never reads imported, named by file and name", async () => {
-  const split = oldReaders("from store.secrets import (\n    SECRET_COLUMNS,\n    seal as sealed,\n)\n\ndef render(row):\n    return sealed(row)\n");
+const RENDER = "from store.secrets import SECRET_COLUMNS, seal as sealed\n\nclass Row:\n    pass\n\ndef render(row):\n    return sealed(row)\n";
+const EVERY_SYMBOL = { "store/secrets.zz": ["SECRET_COLUMNS", "seal"], "api/render.zz": ["Row", "render"] };
+
+test("plugin check fails a plugin whose two readers of one text disagree: an interfaces table that reads a type declaration where the parser reads none, named by file and name", async () => {
+  // The plugin's own fact says a class line declares a type; Python's queries read a class as a body.
+  const split = parserPlugin(RENDER, '{ serverBounds: false, isTypeDeclaration: (line) => /^class\\s/.test(line) }', EVERY_SYMBOL);
   const failed = (await checkPlugin(split, "./zz")).duties.find((d) => d.name === "answers agree")!;
   assert.equal(failed.verdict, "fail", failed.reason);
-  assert.match(failed.reason, /api\/render\.zz: interfaces\.importLists renames seal, which source\.importsOf reads no import of/);
+  assert.match(failed.reason, /api\/render\.zz:3: interfaces reads Row's line as type declaration, declares as body/);
+  assert.doesNotMatch(failed.reason, /render\.zz:6|secrets\.zz/, "a line both read alike is no failure");
 
-  // The same import on one line: both readers read it, and the answers agree.
-  const oneLine = oldReaders("from store.secrets import SECRET_COLUMNS, seal as sealed\n\ndef render(row):\n    return sealed(row)\n");
-  const agreed = (await checkPlugin(oneLine, "./zz")).duties.find((d) => d.name === "answers agree")!;
+  // The fact left to the parse: both read the class line alike, and the answers agree.
+  const agreeing = parserPlugin(RENDER, "{ serverBounds: false }", EVERY_SYMBOL);
+  const agreed = (await checkPlugin(agreeing, "./zz")).duties.find((d) => d.name === "answers agree")!;
   assert.equal(agreed.verdict, "pass", agreed.reason);
 });
 
 test("plugin check fails a plugin whose text reading declares a name the language server reports no top-level symbol of, named by file and line", async () => {
-  // A class written inside a string: the line scan reads it as declared, the server knows no such symbol.
-  const misread = oldReaders(["from store.secrets import seal", "", "TEMPLATE = '''", "class Fake:", "    pass", "'''", "", "def render(row):", "    return seal(row)", ""].join("\n"));
+  // The parser declares render; a server whose account lacks it reports no such symbol.
+  const misread = parserPlugin(RENDER, "{ serverBounds: false }", { "store/secrets.zz": ["SECRET_COLUMNS", "seal"], "api/render.zz": ["Row"] });
   const failed = (await checkPlugin(misread, "./zz")).duties.find((d) => d.name === "server agrees")!;
   assert.equal(failed.verdict, "fail", failed.reason);
-  assert.match(failed.reason, /api\/render\.zz:4: the text reading declares Fake, which the language server reports no top-level symbol of/);
-  assert.doesNotMatch(failed.reason, /declares (render|seal|TEMPLATE)\b/, "a name the server reports is no failure");
+  assert.match(failed.reason, /api\/render\.zz:6: the text reading declares render, which the language server reports no top-level symbol of/);
+  assert.doesNotMatch(failed.reason, /declares (Row|seal|SECRET_COLUMNS)\b/, "a name the server reports is no failure");
 });

@@ -39,15 +39,14 @@
 import type { AdapterBounds, LanguageAdapter, Ladder } from "../adapters/adapter.ts";
 import type { DeclaredLanguage } from "../adapters/declared-config.ts";
 import type { EntranceSyntax } from "../adapters/entrance-candidates.ts";
-import type { ImportTarget, SourceSyntax } from "../economy/source.ts";
+import type { ImportTarget } from "../economy/source.ts";
 import type { Literal } from "../lifecycle/mirrors.ts";
-import type { InterfaceSymbol } from "../observation/interfaces.ts";
 import type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
 import type { BoundarySource } from "../scaffold/boundaries.ts";
 import type { Verdict } from "../enforcement/record.ts";
 
 /** The interface version this core runs. */
-export const PLUGIN_API = 3;
+export const PLUGIN_API = 4;
 
 /** The oldest interface version this core still reads: a plugin written for one from here to PLUGIN_API loads, and an older one is named at session start with what changed since; any other is refused, naming both. */
 export const OLDEST_PLUGIN_API = 1;
@@ -56,6 +55,7 @@ export const OLDEST_PLUGIN_API = 1;
 export const PLUGIN_API_CHANGES: Readonly<Record<number, string>> = {
   2: 'syntax slots moved from the module\'s syntax export to plugin.json ("syntax": { slot: "module#export" }), the member scan became plugin.json data (members), and kept, declares, notice, topLevel and boundaries joined the slots',
   3: 'a language plugin may read its text through a tree-sitter parser and queries (treeSitter) in place of the source, declares and topLevel slots; resolveModule may answer a module of several files ({ module, files }) and Coherence joins each imported name to the file that declares it; the adapter answers topLevelSymbols, and check.json maps the reference project (reference), which plugin check now holds a language plugin to',
+  4: 'the hand-written reader slots (syntax.source, syntax.declares, syntax.topLevel and syntax.kept) are gone: a language is read through treeSitter, a grammar\'s .wasm and queries, from which the core derives what they answered, and a manifest that fills one is refused, whatever pluginApi it is written for',
 };
 
 /** The interface version from which a duty holds: a plugin written for an older one is told so, never failed by a duty that did not exist when it was written. */
@@ -167,9 +167,9 @@ export interface PluginManifest {
   syntax?: Partial<Record<SyntaxSlot, string>>;
   /**
    * The parser the language's text is read through, and the queries over it
-   * (syntax-trees.ts): the core derives the source, declares and topLevel
-   * slots, and the interfaces slot's importLists and wildcardModules, from
-   * them, so the plugin fills none of those itself.
+   * (syntax-trees.ts): the one reader of the language's text. The core
+   * derives from them every reading of it (languages.ts ParsedReadings) and the interfaces
+   * slot's importLists and wildcardModules; no slot reads the text by hand.
    */
   treeSitter?: TreeSitterManifest;
   /** The rungs the plugin's adapter grades on; absent, the wrapped adapter's, else reference-choked alone. */
@@ -224,8 +224,15 @@ export const ADAPTER_METHODS = ["ready", "resolve", "references", "visibility", 
 type AdapterMethodMissing = Exclude<keyof LanguageAdapter, "language" | "ladder" | (typeof ADAPTER_METHODS)[number]>;
 export const ADAPTER_METHODS_COMPLETE: [AdapterMethodMissing] extends [never] ? true : AdapterMethodMissing = true;
 
-/** The slots the core derives for a plugin on the parser path, which its manifest may not also fill. */
+/**
+ * The slots a plugin once filled with a hand-written reader of its
+ * language's text, which the core now derives from the language's parser
+ * alone (languages.ts ParsedReadings; kept through the interfaces slot's wildcardModules):
+ * a manifest whose syntax names one is refused, whatever pluginApi it is
+ * written for, and no slot type below can name one.
+ */
 export const DERIVED_SLOTS = ["source", "declares", "topLevel", "kept"] as const;
+
 
 /** What a verifier is asked. */
 export interface VerifyRequest {
@@ -243,27 +250,20 @@ export interface VerifyResult {
   reason: string;
 }
 
-/** The syntax tables a plugin may supply for the readings, each optional, each loaded from the module its manifest names. */
+/** The syntax tables a plugin may supply for the readings, each optional, each loaded from the module its manifest names: what no parse answers, never a reader of the language's text (DERIVED_SLOTS). */
 export interface SyntaxTables {
   entrances?: EntranceSyntax;
   interfaces?: InterfaceSyntax;
-  source?: SourceSyntax;
-  /** The module files a file star-imports or wildcard re-exports, for the Structure reading's kept answers. */
-  kept?: (file: string, text: string) => string[];
-  /** What a declaration line's keyword says can execute, for the observation's interface reading. */
-  declares?: (line: string) => InterfaceSymbol["declares"];
   /** One line a session start says about the language's instrument at this root, or "" (TypeScript 7 ships no tsserver). */
   notice?: (root: string) => string;
   /** The mirror reader: the literal a list named `name` is set to in a file's text. */
   lists?: (text: string, name: string) => Literal | undefined;
-  /** Whether a file's text declares a name at its top level, for the spec model's check that a handler, guard or mirror exists. */
-  topLevel?: (text: string, name: string) => boolean;
   /** A tool of the language's whose declaration file scaffold import and adoption draft specs from (tach's tach.toml). */
   boundaries?: BoundarySource;
 }
 
 /** The slots by name, so a reading can say which one a plugin left empty. */
-export const SYNTAX_SLOTS = ["entrances", "interfaces", "source", "kept", "declares", "notice", "lists", "topLevel", "boundaries"] as const;
+export const SYNTAX_SLOTS = ["entrances", "interfaces", "notice", "lists", "boundaries"] as const;
 export type SyntaxSlot = (typeof SYNTAX_SLOTS)[number];
 
 /** What the adapter factory is handed. */

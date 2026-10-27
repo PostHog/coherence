@@ -1,9 +1,9 @@
 /**
  * What economy and mass read from the tree without an instrument: which
  * files are source, which top-level names a file declares, which names it
- * imports and from where, and which component a file lies in. A language
- * whose plugin names a parser is read through it (syntax-trees.ts); any other
- * by its plugin's plain scan. Neither asks a server: the adapter confirms
+ * imports and from where, and which component a file lies in. A language is
+ * read through the parser its plugin names (syntax-trees.ts), and one whose
+ * plugin names none is not read. Neither asks a server: the adapter confirms
  * what matters through resolve and references, and mass says when a number
  * came from the scan alone.
  */
@@ -14,7 +14,7 @@ import { isTestPath } from "../adapters/adapter.ts";
 import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import { languageOfFile } from "../adapters/language-files.ts";
-import { leftOutOfSource, syntaxOf, treeReaderFor } from "../plugins/languages.ts";
+import { leftOutOfSource, parsedOf, treeReaderFor } from "../plugins/languages.ts";
 import type { Declares } from "../plugins/syntax-trees.ts";
 import type { Component, SpecModel } from "../spec/model.ts";
 
@@ -47,26 +47,24 @@ export function toRelative(root: string, path: string): string | undefined {
 }
 
 /**
- * What the plain scan reads of one language's source, each language's in its
- * plugin's module (the `source` slot of its manifest's syntax): a language
- * whose plugin fills no such slot declares nothing, imports nothing and
- * resolves no specifier here, never reads as another language.
+ * What the scan reads of one language's source, derived from one parse
+ * through its plugin's parser (languages.ts parsedOf): a language whose
+ * plugin names no parser declares nothing, imports nothing and resolves no
+ * specifier here, never reads as another language.
  */
 export interface SourceSyntax {
-  /** The name a line declares at the top level and whether its file exports it, or undefined when it declares none; `also`, the further names one line declares (Go's const A, B = 1, 2). */
-  declarationOf(line: string): { name: string; exported: boolean; also?: string[] } | undefined;
   /** resolveModule for the language: the file a specifier names, or the module of several files it names (a Go package, a SwiftPM target). */
   resolveModule(root: string, from: string, specifier: string, vanished: ReadonlySet<string>): ImportTarget | undefined;
   /** Hands `add` each name the text imports with the specifier it comes from: undefined for a whole-module import. */
   importsOf(text: string, add: (name: string | undefined, specifier: string) => void): void;
 }
 
-/** The language's source scan, from its plugin; one that reads nothing for a language whose plugin fills no source slot. */
+/** The language's source scan, through its plugin's parser; one that reads nothing for a language whose plugin names none. */
 function sourceSyntax(language: Language): SourceSyntax {
-  return syntaxOf(language, "source") ?? NO_SOURCE;
+  return parsedOf(language, "source") ?? NO_SOURCE;
 }
 
-const NO_SOURCE: SourceSyntax = { declarationOf: () => undefined, resolveModule: () => undefined, importsOf: () => {} };
+const NO_SOURCE: SourceSyntax = { resolveModule: () => undefined, importsOf: () => {} };
 
 export interface Declaration {
   name: string;
@@ -79,24 +77,9 @@ export interface Declaration {
   isDefault?: boolean;
 }
 
-/** The top-level names a file declares: through the language's parser when its plugin names one, else by a plain scan of line starts. */
+/** The top-level names a file declares, through the language's parser; none when its plugin names no parser. */
 export function declarationsOf(text: string, language: Language): Declaration[] {
-  const tree = treeReaderFor(language);
-  if (tree !== undefined) return tree.declarations(text);
-  const found: Declaration[] = [];
-  const seen = new Set<string>();
-  const syntax = sourceSyntax(language);
-  text.split("\n").forEach((raw, index) => {
-    const line = raw.replace(/\r$/, "");
-    const declared = syntax.declarationOf(line);
-    if (declared === undefined) return;
-    for (const name of [declared.name, ...(declared.also ?? [])]) {
-      if (seen.has(name)) continue;
-      seen.add(name);
-      found.push({ name, line: index + 1, exported: declared.exported });
-    }
-  });
-  return found;
+  return treeReaderFor(language)?.declarations(text) ?? [];
 }
 
 export interface Import {
