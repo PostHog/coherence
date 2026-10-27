@@ -11,7 +11,7 @@ import { journalVerbs } from "../journal/cli.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
-import { BOUNDARY_RULE, CONTEXT_BUDGET, VOCABULARY_TOKENS, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, adopterExample, adopterInstruction, runHook, startReading, sessionBlock, type WarmDoor } from "./hook.ts";
+import { BOUNDARY_RULE, CONTEXT_BUDGET, VOCABULARY_TOKENS, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, ADOPTER_INSTRUCTION, runHook, startReading, sessionBlock, type WarmDoor } from "./hook.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { TRACES_DIR, recordReadTrace, recordWriteTrace } from "../economy/trace.ts";
@@ -28,10 +28,6 @@ import { currentGaps, readAndRecord, recordGapBaseline, structureFingerprint } f
 async function coherenceRejected(concept: string): Promise<string> {
   return rejectedNames(await loadLexicon(COHERENCE_LEXICON)).find((n) => n.concept === concept && !n.name.includes(" "))!.name;
 }
-async function adopterRule(): Promise<string> {
-  return adopterInstruction(adopterExample(await loadLexicon(COHERENCE_LEXICON)));
-}
-
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
 let root: string;
@@ -88,9 +84,10 @@ test("the block after the lexicon is under 120 words: session, decide template, 
   assert.match(cli, /^node \S*src\/cli\.ts$/, "an adopter is told the checkout the hook ran from, never a path into its node_modules");
   assert.ok(block.includes(`\n  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session abc123 --agent Explore\n`), block);
   assert.ok(block.includes(`Read the project journal from the project root:\n  ${cli} journal\n`), block);
-  const rule = await adopterRule();
+  const rule = ADOPTER_INSTRUCTION;
   assert.ok(block.endsWith(`${rule}\n`), "an adopter is given the rule its check enforces");
-  assert.ok(rule.includes(`say invariant, not ${await coherenceRejected("invariant")}`), "the example swap comes from the lexicon");
+  assert.match(rule, /restrict none of this project's\s+words/, "Coherence's names restrict none of an adopter's words");
+  for (const { name } of rejectedNames(await loadLexicon(COHERENCE_LEXICON))) assert.ok(!new RegExp(`\\b${name}\\b`, "i").test(rule), `the adopter rule names no word Coherence rejected (${name})`);
   assert.match(rule, /project's rejected names are defects/);
   assert.match(rule, /adoption baseline/);
   const own = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -119,8 +116,8 @@ test("SessionStart and SubagentStart inject both lexicons and the instruction as
     assert.match(context, /- widget: A thing with a knob\. \(also: gadget\)/);
     assert.match(context, /- rejected names: doohickey/);
     assert.ok(context.includes(`Read the project journal from the project root:\n  ${await cliName(root)} journal\n`));
-    assert.ok(context.endsWith(`${await adopterRule()}\n`));
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts; use these names when you mean Coherence's concepts\):/m, "an adopter's header does not call Coherence's rejected names defects");
+    assert.ok(context.endsWith(`${ADOPTER_INSTRUCTION}\n`));
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts; the tool's terms, which restrict none of this project's words\):/m, "an adopter's header says Coherence's names restrict none of its words");
     assert.ok(context.length <= CONTEXT_BUDGET);
   }
 });
@@ -207,20 +204,23 @@ test("an unknown noun in a changed file is advisory: Stop reports it and Subagen
   await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
 });
 
-test("in an adopter, Coherence's rejected names in the project's own code and prose never refuse a subagent stop", async () => {
+test("in an adopter, Coherence's rejected names in the project's own code, prose and specs never refuse a subagent stop, and the stop names none of them", async () => {
   // Its own starting tree: only the files that use Coherence's rejected names in the project's sense are changed.
   await writeFile(join(root, "clean.md"), "The widget is fine.\n");
   const place = await coherenceRejected("trust level");
   const surface = await coherenceRejected("scope");
   await writeFile(join(root, "places.ts"), `export const ${place} = 'loading dock';\nexport const ${surface} = ${place};\n`);
   await writeFile(join(root, "floor.md"), `The ${place} by the ${surface} holds the widget.\n`);
+  await writeFile(join(root, "Floor.spec.md"), `# Floor\n\nThe floor holds widgets.\n\n## invariants\n\n- the ${place} holds: the ${surface} keeps the widget.\n  because: the ${place} is the project's word\n`);
   try {
     const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
     assert.equal(subagent.exit, 0, `the project's own words never refuse: ${subagent.stderr}`);
-    assert.doesNotMatch(subagent.stdout + subagent.stderr, /REJECTED NAME/, "and nothing reports them as rejected names");
+    const said = subagent.stdout + subagent.stderr;
+    assert.doesNotMatch(said, /REJECTED NAME|ADVISORY|Coherence names?\b/, "and nothing reports or counts them");
   } finally {
     await rm(join(root, "places.ts"), { force: true });
     await rm(join(root, "floor.md"), { force: true });
+    await rm(join(root, "Floor.spec.md"), { force: true });
     await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
   }
 });
@@ -337,7 +337,7 @@ test("the start injection stays under the budget with escalations present: the v
     const context = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
     assert.ok(context.length <= CONTEXT_BUDGET, `${context.length} characters against a budget of ${CONTEXT_BUDGET}`);
     for (let n = 0; n < 8; n += 1) assert.ok(context.includes(`▲ ${ids[n]}  scope  ${what(n)} — only the owner can retire a vertebra, and this is the ${n}th`), `escalation ${n} is shown whole`);
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts; use these names when you mean Coherence's concepts\):\n\d+ more: /m, "in an adopter Coherence's layer is not ranked, and its names go before any of the project's");
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts; the tool's terms, which restrict none of this project's words\):\n\d+ more: /m, "in an adopter Coherence's layer is not ranked, and its names go before any of the project's");
     assert.match(context, /^Widgetry vocabulary \(61 concepts, most recently named first; [^)]*\):\n/m, "the project's layer in the order the journal last named it");
     assert.match(context, /^(Named only here \(full entries: [^)]*\): |\d+ more, the least recently named: )/m, "the project's vocabulary decayed: not every concept keeps its line");
     const vocabulary = context.slice(context.indexOf("Widgetry vocabulary"));
@@ -367,7 +367,7 @@ test("the start injection stays under the budget with escalations present: the v
       const light = contextOf(await runHook("SessionStart", { cwd: one, session_id: "s-light" }, one));
       assert.ok(light.length <= CONTEXT_BUDGET);
       assert.match(light, /^Escalations awaiting a human \(1\)/);
-      assert.match(light, /^Coherence vocabulary \(\d+ concepts; use these names when you mean Coherence's concepts\):\nNamed only here \(full entries: [^)]*\): invariant, requirement, /m, "with room to spare an adopter still sees Coherence's concepts by name alone, in the file's order");
+      assert.match(light, /^Coherence vocabulary \(\d+ concepts; the tool's terms, which restrict none of this project's words\):\nNamed only here \(full entries: [^)]*\): invariant, requirement, /m, "with room to spare an adopter still sees Coherence's concepts by name alone, in the file's order");
       assert.doesNotMatch(light, /^- invariant: /m, "and never their whole lines");
     } finally {
       await rm(one, { recursive: true, force: true });

@@ -97,9 +97,9 @@ import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } 
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
-import { loadLexicon, rejectedNames, renderCompactWithin, type Delivered, type Lexicon } from "./lexicon.ts";
+import { renderCompactWithin, type Delivered, type Lexicon } from "./lexicon.ts";
 import { lastNamed } from "./lexicon-recency.ts";
-import { COHERENCE_LEXICON, CONFIG_FILE, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
+import { CONFIG_FILE, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
 import { keepStateFiles } from "./state-files.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
@@ -155,27 +155,18 @@ export const INSTRUCTION = [
 
 /**
  * The rule in an adopter, matching what the check enforces there: Coherence's
- * rejected names cover only text that names Coherence's concepts, the
- * project's own rejected names are defects everywhere, and the check fails
- * only on findings newer than the adoption baseline. The example swap is drawn
- * from the lexicon, so Coherence's own source never spells a rejected name.
+ * vocabulary says what the tool's terms mean and restricts none of the
+ * project's words, the project's own rejected names are defects everywhere,
+ * and the check fails only on findings newer than the adoption baseline.
  */
-export function adopterInstruction(example: { concept: string; rejected: string }): string {
-  return [
-    "Use Coherence's names when you mean its concepts in specs, journal records",
-    `and the config: say ${example.concept}, not ${example.rejected}. Its rejected names cover only`,
-    "that use; this project's own words and senses stand everywhere else. The",
-    "project's rejected names are defects: replace them. Declare a new domain noun",
-    "in the lexicon, or map it as an alias, before this session ends. The check",
-    "fails only on findings newer than the adoption baseline.",
-  ].join(" ");
-}
-
-/** The example the adopter rule shows: the invariant concept and its first one-word rejected name. */
-export function adopterExample(coherence: Lexicon): { concept: string; rejected: string } {
-  const found = rejectedNames(coherence).find((n) => n.concept === "invariant" && !n.name.includes(" "));
-  return { concept: "invariant", rejected: found?.name ?? "another name" };
-}
+export const ADOPTER_INSTRUCTION = [
+  "Coherence's names describe the tool and restrict none of this project's",
+  "words: in its code, prose, specs, journal records and config, a word",
+  "Coherence also uses is the project's, in the project's sense. The",
+  "project's rejected names are defects: replace them. Declare a new domain noun",
+  "in the lexicon, or map it as an alias, before this session ends. The check",
+  "fails only on findings newer than the adoption baseline.",
+].join(" ");
 
 /** The agent name a journal write carries when the harness names none: the main thread. */
 const MAIN_AGENT = "main";
@@ -422,7 +413,7 @@ export async function sessionBlock(root: string, input: HookInput): Promise<stri
     `  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session ${id} --agent ${agent}`,
     "Read the project journal from the project root:",
     `  ${cli} journal`,
-    (await isCoherenceItself(root)) ? INSTRUCTION : adopterInstruction(adopterExample(await loadLexicon(COHERENCE_LEXICON))),
+    (await isCoherenceItself(root)) ? INSTRUCTION : ADOPTER_INSTRUCTION,
   ].join("\n") + "\n";
 }
 
