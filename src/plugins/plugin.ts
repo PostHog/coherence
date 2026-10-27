@@ -183,6 +183,8 @@ export interface PluginManifest {
 export interface TreeSitterManifest {
   /** The language's tree-sitter parser, compiled to WebAssembly (tree-sitter build --wasm, or the .wasm a grammar's npm package ships). */
   parser: string;
+  /** A second parser of the same language, read with the same queries when the parser's tree holds an error and its own holds fewer (TypeScript's TypeScript grammar beside its TSX grammar, for the old-style cast TSX cannot read). */
+  alternate?: string;
   /** The queries, in tree-sitter's query language, capturing what syntax-trees.ts's CAPTURES name. */
   queries: string;
   /** "<module beside the manifest>#<export>": where an import leads, which no parse can say. */
@@ -213,7 +215,7 @@ type ManifestKeyMissing = Exclude<keyof PluginManifest, (typeof MANIFEST_KEYS)[n
 export const MANIFEST_KEYS_COMPLETE: [ManifestKeyMissing] extends [never] ? true : ManifestKeyMissing = true;
 
 /** Every key of a manifest's treeSitter, held to its type as MANIFEST_KEYS is. */
-export const TREE_SITTER_KEYS = ["parser", "queries", "resolve", "privateName", "separator"] as const satisfies readonly (keyof TreeSitterManifest)[];
+export const TREE_SITTER_KEYS = ["parser", "alternate", "queries", "resolve", "privateName", "separator"] as const satisfies readonly (keyof TreeSitterManifest)[];
 type TreeSitterKeyMissing = Exclude<keyof TreeSitterManifest, (typeof TREE_SITTER_KEYS)[number]>;
 export const TREE_SITTER_KEYS_COMPLETE: [TreeSitterKeyMissing] extends [never] ? true : TreeSitterKeyMissing = true;
 

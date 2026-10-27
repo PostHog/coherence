@@ -128,10 +128,11 @@ function dataProblems(raw: Record<string, unknown>, who: string): string[] {
 function treeSitterProblems(raw: Record<string, unknown>, dir: string, language: string | undefined, who: string): string[] {
   const declared = raw["treeSitter"];
   if (declared === undefined) return [];
-  const shape = `${who}'s treeSitter is { "parser": "<.wasm beside the manifest>", "queries": "<.scm beside the manifest>", "resolve": "<module>#<export>", "privateName"?: "<regular expression>", "separator"?: "<a path's separator>" }`;
+  const shape = `${who}'s treeSitter is { "parser": "<.wasm beside the manifest>", "alternate"?: "<.wasm beside the manifest>", "queries": "<.scm beside the manifest>", "resolve": "<module>#<export>", "privateName"?: "<regular expression>", "separator"?: "<a path's separator>" }`;
   if (!isRecord(declared)) return [shape];
   const problems: string[] = [];
-  for (const key of ["parser", "queries"] as const) {
+  for (const key of ["parser", "alternate", "queries"] as const) {
+    if (key === "alternate" && declared[key] === undefined) continue;
     const path = declared[key];
     if (typeof path !== "string" || path === "" || isAbsolute(path)) problems.push(shape);
     else if (relative(dir, resolve(dir, path)).startsWith("..")) problems.push(`${who}'s treeSitter.${key} names ${path}, which leaves the plugin's folder`);

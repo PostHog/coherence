@@ -122,7 +122,8 @@ parser), so the readings come from one parse and no hand-written reader of
 its text can disagree with another or miss a statement that spans lines.
 Every bundled language plugin reads this way: `go` (a package as a module,
 its qualified uses), `rust` (paths spelled in pieces), `typescript`
-(default exports, and JavaScript and TSX through one grammar). They are
+(default exports; the TSX grammar, with the TypeScript grammar as its
+alternate). They are
 also the examples of an adapter over a language server: `go` drives gopls,
 `rust` a server with no npm package. `declared` completes the set. Their sources import the core as `../../src/plugins/api.ts`, the
 same module the package exports as `@posthog/coherence/plugin`; an ejected
@@ -309,6 +310,7 @@ language plugin reads this way (`plugins/python`, `plugins/go`,
 | Key | Meaning |
 |---|---|
 | `parser` | The language's parser compiled to WebAssembly, beside the manifest. Many grammars' npm packages ship one (`tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-java`, `tree-sitter-c`): copy the `.wasm` out of the package. For a grammar whose npm package ships none, look on the grammar's GitHub releases first: `tree-sitter-swift` attaches `tree-sitter-swift.wasm` to each release. Failing that, run `tree-sitter build --wasm` in the grammar's repository; the tree-sitter CLI compiles it with Emscripten, or with Docker or Podman when Emscripten is not installed. Coherence runs web-tree-sitter 0.27, which loads parsers built for language ABI 13 to 15. |
+| `alternate` | Optional: a second parser of the same language, beside the manifest, read with the same queries where the `parser`'s tree holds an error and its own holds fewer (TypeScript's TypeScript grammar beside its TSX grammar). The queries must compile against both. |
 | `queries` | A file of tree-sitter queries, beside the manifest, whose captures are the names below. A query that does not compile against the parser, or a capture Coherence reads nothing by, is refused naming the plugin. |
 | `resolve` | `"<module>#<export>"`: a `ModuleResolution`, `{ resolveModule(root, from, specifier, vanished), modulePaths(from, specifier), boundName?(specifier) }`. Where an import leads is the language's rule, not its syntax, so it stays code: `resolveModule` names the project file a specifier leads to, or, where the language's module is several files (a Go package, a SwiftPM target), the module as `{ module: "<folder>", files: ["<every file of it>"] }`, or `undefined` outside the project. `modulePaths` gives every spelling of the files a glob import names. `boundName`, optional, gives the name a whole-module import binds when it gives none (a Go package's name, from its path); absent, the specifier's last path element. |
 | `privateName` | For a language that exports by name rather than by a keyword: a regular expression a name it keeps private matches (Python's `^_`, Go's `^\\P{Lu}`), read with Unicode's character classes (the `u` flag). A language that exports by keyword captures `@exported` instead. |
@@ -352,14 +354,23 @@ anchored to the module so a nested definition is no top-level one. Go's
 (`go.scm`) add qualified uses, Rust's (`rust.scm`) prefixes, TypeScript's
 (`typescript.scm`) default exports and the queries' own captures.
 
-A grammar reads the language as its release knew it. Syntax newer than the
-grammar parses as an error node, and the statements around it still read;
-`coherence plugin calibrate` counts what the reading and the language
-server disagree on, so a project can see what its grammar misses. The
-bundled Go grammar (0.25) predates Go 1.26; TypeScript's TSX grammar reads
-every `.ts`, `.tsx` and `.js` file, so the one form TSX forbids, an
-angle-bracket type assertion (`<string>value`; write `value as string`),
-parses as an error there.
+A grammar reads the language as its release knew it, and text it cannot
+read is an error in the tree. Where the error lands is the grammar's
+recovery, not a rule: it may hold one expression, or swallow every
+declaration after it into the one before, so a reading can lose names past
+it without saying so. `coherence plugin calibrate` counts what the reading
+and the language server disagree on, so a project can see what its grammar
+misses. The bundled Go grammar (0.25) predates Go 1.26.
+
+A language with two grammars names the second as its `alternate`: a text
+whose tree from `parser` holds an error is parsed again with it, and the
+tree with fewer errors is read, through the same queries, which must
+compile against both. TypeScript reads every `.ts`, `.tsx` and `.js` file
+with the TSX grammar, since it reads JSX, and names the TypeScript grammar
+as its alternate: to TSX an old-style cast (`<any>value`) opens a JSX tag
+that swallows the rest of the file, and the TypeScript grammar reads it as
+a cast. Its queries name no JSX node, which the TypeScript grammar lacks, so
+a constant whose value is JSX declares `unknown`.
 
 The plugin still fills the slots no parse answers: `entrances` (a
 framework's rules), `notice`, `lists`, `boundaries`, and an `interfaces`
@@ -378,13 +389,14 @@ background; after that a reading of the whole project parses only the files
 that changed (PostHog's 20,000 Python files: 30 s for the first warm-up,
 2 s for the next, and mass in 3.4 s). A hook that reads a file or two parses
 it directly and never loads the store. The fingerprint digests everything
-a kept parse depends on: the parser, the queries, the `separator`, the
+a kept parse depends on: the parser and its `alternate`, the queries, the `separator`, the
 web-tree-sitter release and the Coherence code that reads a tree. Changing
 any of them changes the fingerprint, so nothing kept under the old ones is
 read; `privateName` and `resolve` are read after the store and change no
 kept parse. Each warm-up also parses a sample of the files it found kept
 and compares; a store that differs from a fresh parse is discarded, and the
-next session start says so.
+next session start says so. A store is read only where this machine's key
+signs its contents, so a store a repository commits feeds no reading.
 `plugin eject` copies a plugin's parser byte for byte with its queries, so
 an ejected copy reads as the bundled plugin read.
 

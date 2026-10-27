@@ -1,8 +1,9 @@
 ; TypeScript's and JavaScript's imports and top-level declarations, as the capture names Coherence reads (docs/plugins.md).
-; The parser beside it, tree-sitter-tsx.wasm, is the TSX grammar the tree-sitter-typescript 0.23.2 npm package ships, copied as is (language ABI 14).
-; One grammar reads every file the plugin's pattern takes (.ts, .tsx, .mts, .cts, .js, .jsx, .mjs, .cjs): the TSX grammar reads JSX, which the
-; package's TypeScript grammar refuses (3,196 of PostHog's 3,510 .tsx files), and reads every .ts file of PostHog's and Coherence's that the
-; TypeScript grammar reads, but for an old-style cast (<any>row), which it reads as an error inside the expression and nothing else.
+; The parsers beside it are the two grammars the tree-sitter-typescript 0.23.2 npm package ships, copied as is (language ABI 14):
+; tree-sitter-tsx.wasm reads every file the plugin's pattern takes (.ts, .tsx, .mts, .cts, .js, .jsx, .mjs, .cjs), since it reads JSX,
+; which the TypeScript grammar refuses (3,196 of PostHog's 3,510 .tsx files); tree-sitter-typescript.wasm is its alternate, read where the
+; TSX tree errs and the TypeScript tree errs less: an old-style cast (<any>row) is a JSX tag to TSX, one that swallows every declaration
+; after it, and a cast to TypeScript. Both compile these queries, so they name no JSX node: a constant whose value is JSX declares unknown.
 
 ; import x from "m" -- the module's default export, under a name of the file's own
 (import_statement
@@ -93,14 +94,14 @@
 (program
   (_ (variable_declarator
     name: (identifier) @name
-    value: [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (regex) (new_expression) (unary_expression) (jsx_element) (jsx_self_closing_element)
+    value: [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (regex) (new_expression) (unary_expression)
             [(as_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)]) (satisfies_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)])]
             [(as_expression . [(as_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)]) (satisfies_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)])]) (satisfies_expression . [(as_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)]) (satisfies_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)])])]]) @declaration.value))
 (program
   (export_statement
     declaration: (_ (variable_declarator
       name: (identifier) @name
-      value: [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (regex) (new_expression) (unary_expression) (jsx_element) (jsx_self_closing_element)
+      value: [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (regex) (new_expression) (unary_expression)
               [(as_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)]) (satisfies_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)])]
               [(as_expression . [(as_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)]) (satisfies_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)])]) (satisfies_expression . [(as_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)]) (satisfies_expression . [(object) (array) (string) (template_string) (number) (true) (false) (null) (undefined) (new_expression)])])]]) @declaration.value)) @exported)
 ((program (_ (variable_declarator name: (identifier) @name value: (call_expression function: (identifier) @_callee)) @declaration.value))

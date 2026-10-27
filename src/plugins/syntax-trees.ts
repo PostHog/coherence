@@ -25,7 +25,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { userConfigDir } from "../lifecycle/user-dir.ts";
 import { createRequire } from "node:module";
-import { Language, Parser, Query, type Node, type QueryMatch } from "web-tree-sitter";
+import { Language, Parser, Query, type Node, type QueryMatch, type Tree } from "web-tree-sitter";
 import type { LoadedPlugin, TreeSitterManifest } from "./plugin.ts";
 
 /** What a declaration declares, as the observation's interface reading names it. */
@@ -139,7 +139,7 @@ const RECENT = 4;
 const DIRECT_PARSES = 16;
 
 /** Bumped when what a kept parse holds changes, so an older store is never read as this one's. */
-const STORE_FORMAT = 4;
+const STORE_FORMAT = 5;
 
 /**
  * Each treeSitter key, by whether what a kept parse holds depends on it: a
@@ -150,7 +150,7 @@ const STORE_FORMAT = 4;
  * until it is placed here, and a key that shapes a parse is never left out of
  * the fingerprint (the separator was, until this was written).
  */
-export const KEPT_FROM: Readonly<Record<keyof TreeSitterManifest, "file" | "value" | false>> = { parser: "file", queries: "file", separator: "value", privateName: false, resolve: false };
+export const KEPT_FROM: Readonly<Record<keyof TreeSitterManifest, "file" | "value" | false>> = { parser: "file", alternate: "file", queries: "file", separator: "value", privateName: false, resolve: false };
 
 /**
  * The fingerprint a plugin's kept parses are filed under: every treeSitter
@@ -159,14 +159,14 @@ export const KEPT_FROM: Readonly<Record<keyof TreeSitterManifest, "file" | "valu
  * that turns a tree into what is kept. A parse kept under any other is never
  * read, so changing any of them parses every file again.
  */
-export function fingerprintOf(dir: string, declared: TreeSitterManifest): string {
+export function fingerprintOf(dir: string, declared: TreeSitterManifest, read: (path: string) => Buffer = (path) => readFileSync(resolve(dir, path))): string {
   const hash = createHash("sha256");
   for (const key of (Object.keys(KEPT_FROM) as (keyof TreeSitterManifest)[]).sort()) {
     const how = KEPT_FROM[key];
     if (how === false) continue;
     const value = declared[key];
     hash.update(`\u0000${key}\u0000`);
-    hash.update(value === undefined ? "\u0001" : how === "file" ? readFileSync(resolve(dir, value)) : `\u0002${value}`);
+    hash.update(value === undefined ? "\u0001" : how === "file" ? read(value) : `\u0002${value}`);
   }
   return hash.update(`\u0000${STORE_FORMAT}\u0000${runtimeVersion()}\u0000${extractionDigest()}`).digest("base64url").slice(0, 16);
 }
@@ -285,6 +285,8 @@ export function staleParsesNotice(root: string, now: number = Date.now()): strin
       if (typeof audit !== "object" || audit === null) continue;
       const { at, sampled, stale } = audit as Record<string, unknown>;
       if (typeof at !== "number" || typeof sampled !== "number" || typeof stale !== "number" || !Number.isInteger(sampled) || !Number.isInteger(stale)) continue;
+      // Said only when this machine wrote it, for this folder, in bounds a warm-up's audit can reach: a repository's own audit.json says nothing.
+      if (stale < 1 || stale > sampled || sampled > AUDIT_SAMPLE || readFileSync(path, "utf8") !== auditText(plugin, { at, sampled, stale })) continue;
       if (now - at > AUDIT_NOTICE_DAYS * 86_400_000 || at > now) continue;
       lines.push(`Kept parses: plugin ${plugin}'s kept parses differed from a fresh parse of the same text on ${stale} of the ${sampled} its warm-up sampled (${new Date(at).toISOString().slice(0, 10)}), so its store was discarded and every file is parsed again. The fingerprint they were kept under leaves out something a parse depends on (KEPT_FROM, fingerprintOf in src/plugins/syntax-trees.ts, or a change to the plugin's parsing that names no new parser or queries): a defect to record.`);
     } catch {
@@ -295,15 +297,24 @@ export function staleParsesNotice(root: string, now: number = Date.now()): strin
 }
 
 function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
-  const binary = readFileSync(resolve(plugin.dir, declared.parser));
-  const source = readFileSync(resolve(plugin.dir, declared.queries), "utf8");
-  const language = Language.loadSync(new WebAssembly.Module(binary));
-  let query: Query;
-  try {
-    query = new Query(language, source);
-  } catch (error) {
-    throw new Error(`plugin ${plugin.name}'s queries (${declared.queries}) do not compile against its parser: ${(error as Error).message}`);
-  }
+  // Each file read once, and the fingerprint digests the very bytes compiled, so an edit between two reads files no parse under the wrong one.
+  const files = new Map<string, Buffer<ArrayBuffer>>();
+  const read = (path: string): Buffer<ArrayBuffer> => {
+    let bytes = files.get(path);
+    if (bytes === undefined) files.set(path, (bytes = readFileSync(resolve(plugin.dir, path))));
+    return bytes;
+  };
+  const source = read(declared.queries).toString("utf8");
+  const load = (path: string, which: string): { language: Language; query: Query } => {
+    const language = Language.loadSync(new WebAssembly.Module(read(path)));
+    try {
+      return { language, query: new Query(language, source) };
+    } catch (error) {
+      throw new Error(`plugin ${plugin.name}'s queries (${declared.queries}) do not compile against its ${which} (${path}): ${(error as Error).message}`);
+    }
+  };
+  const { language, query } = load(declared.parser, "parser");
+  const alternate = declared.alternate === undefined ? undefined : load(declared.alternate, "alternate parser");
   const unknown = query.captureNames.filter((name) => !(CAPTURES as readonly string[]).includes(name) && !ownCapture(name));
   if (unknown.length > 0) throw new Error(`plugin ${plugin.name}'s queries capture ${unknown.map((n) => `@${n}`).join(", ")}, which Coherence reads nothing by; the captures are ${CAPTURES.map((c) => `@${c}`).join(", ")}`);
   // A language whose queries mark what is exported says it by @exported; one with no such mark exports by name, unless its privateName says otherwise.
@@ -314,14 +325,30 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
   const spell = speller(declared.separator ?? "");
   const parser = new Parser();
   parser.setLanguage(language);
+  const second = alternate === undefined ? undefined : new Parser();
+  if (alternate !== undefined) second!.setLanguage(alternate.language);
+  // The text's tree and the queries compiled for its parser: the parser's, unless it errs and the alternate's tree errs less
+  // (TypeScript's TSX grammar reads an old-style cast, <any>x, as a JSX tag that swallows the rest of the file; its TypeScript grammar reads it whole).
+  const treeOf = (text: string): { tree: Tree; query: Query } => {
+    const tree = parser.parse(text);
+    if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
+    if (second === undefined || !tree.rootNode.hasError) return { tree, query };
+    const other = second.parse(text);
+    if (other === null) return { tree, query };
+    if (errorsIn(other.rootNode) < errorsIn(tree.rootNode)) {
+      tree.delete();
+      return { tree: other, query: alternate!.query };
+    }
+    other.delete();
+    return { tree, query };
+  };
   return {
     marksExports: query.captureNames.includes("exported"),
     capturesStatements: query.captureNames.includes("import"),
     exportedName: (name) => privateName === undefined || !privateName.test(name),
-    fingerprint: fingerprintOf(plugin.dir, declared),
+    fingerprint: fingerprintOf(plugin.dir, declared, read),
     census(text) {
-      const tree = parser.parse(text);
-      if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
+      const { tree, query } = treeOf(text);
       try {
         const matches = query.matches(tree.rootNode);
         const spelled = prefixed ? spell(matches) : (node: Node) => node.text;
@@ -349,8 +376,7 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
     },
     // Every match of the queries over the text: read inside the tree's life, and the tree freed however the read ends.
     parse(text) {
-      const tree = parser.parse(text);
-      if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
+      const { tree, query } = treeOf(text);
       try {
         // A capture whose text no reading reads (a declaration's whole node, @bound, @exported) keeps its name and line alone, so a kept parse holds names, not bodies;
         // an import's specifier is kept spelled whole, its prefixes joined to it, and a prefix, a statement captured on its own, or the queries' own capture is kept nowhere.
@@ -364,6 +390,12 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
       }
     },
   };
+}
+
+/** How many error and missing nodes a tree holds, descending only into what holds one. */
+function errorsIn(node: Node): number {
+  if (node.isError || node.isMissing) return 1 + node.children.reduce((n, child) => n + (child !== null && child.hasError ? errorsIn(child) : 0), 0);
+  return node.children.reduce((n, child) => n + (child !== null && (child.hasError || child.isMissing) ? errorsIn(child) : 0), 0);
 }
 
 /**
@@ -524,13 +556,31 @@ class ParseStore {
   private readonly root: string;
   private readonly dir: string;
   private readonly fingerprint: string;
-  private readonly seal: string;
+  /** The store's files as last loaded or written by this process (their size, time and inode): a change is another process's, and reloads. */
+  private seen = "";
+  private checked = 0;
 
   private constructor(root: string, dir: string, fingerprint: string) {
     this.root = root;
     this.dir = dir;
     this.fingerprint = fingerprint;
-    this.seal = `${STORE_SEAL}${createHmac("sha256", machineKey()).update(fingerprint).digest("base64url")}`;
+  }
+
+  /** This machine's signature of text kept under this store's fingerprint: a store or a log line is read only when it carries it. */
+  private sign(text: string): string {
+    return createHmac("sha256", machineKey()).update(this.fingerprint).update("\u0000").update(text).digest("base64url");
+  }
+
+  /** The store's files, as a stat says them, to tell when another process changed them. */
+  private stamp(): string {
+    return [this.base, this.log].map((path) => {
+      try {
+        const stat = lstatSync(path);
+        return `${stat.ino}:${stat.size}:${stat.mtimeMs}`;
+      } catch {
+        return "-";
+      }
+    }).join("|");
   }
 
   private get base(): string {
@@ -557,29 +607,41 @@ class ParseStore {
     return true;
   }
 
-  /** A file of the store's own, read only when it is a regular file and signed with this machine's key on its first line. */
-  private readSigned(path: string): string[] {
+  /** A file of the store's own, its lines, read only when it is a regular file. */
+  private lines(path: string): string[] {
     try {
-      if (!lstatSync(path).isFile()) return [];
-      const lines = readFileSync(path, "utf8").split("\n");
-      return lines[0] === this.seal ? lines.slice(1) : [];
+      return lstatSync(path).isFile() ? readFileSync(path, "utf8").split("\n") : [];
     } catch {
       return [];
     }
   }
 
   get(key: string): Found | undefined {
+    // A process that lives long (the warm server) reloads what another process rewrote or discarded since, looking at most once a second.
+    if (this.entries !== undefined && Date.now() - this.checked > RELOAD_MS) {
+      this.checked = Date.now();
+      if (this.stamp() !== this.seen) this.entries = undefined;
+    }
     if (this.entries === undefined) {
       const entries = new Map<string, { found: Found; day: number }>();
+      this.seen = this.stamp();
+      this.checked = Date.now();
       if (this.safe()) {
         try {
-          const kept = JSON.parse(this.readSigned(this.base).join("\n") || "{}") as unknown;
+          // The store's first line signs the rest: a store whose contents this machine did not write is never read, whatever its seal.
+          const [seal, ...rest] = this.lines(this.base);
+          const body = rest.join("\n");
+          const kept = seal === `${STORE_SEAL}${this.sign(body)}` ? (JSON.parse(body) as unknown) : {};
           if (typeof kept === "object" && kept !== null && !Array.isArray(kept)) for (const [k, value] of Object.entries(kept)) if (Array.isArray(value) && value.length === 2 && typeof value[0] === "number" && isFound(value[1])) entries.set(k, { day: value[0], found: value[1] });
         } catch {
           // What a warm-up kept is unreadable: every text is parsed, and the next warm-up writes it again.
         }
-        for (const line of this.readSigned(this.log)) {
-          if (line === "") continue;
+        // Each line of the log signs itself: "<signature> <entry>".
+        for (const signed of this.lines(this.log)) {
+          const space = signed.indexOf(" ");
+          if (space < 0) continue;
+          const line = signed.slice(space + 1);
+          if (signed.slice(0, space) !== this.sign(line)) continue;
           try {
             const entry = JSON.parse(line) as unknown;
             if (Array.isArray(entry) && entry.length === 3 && typeof entry[0] === "string" && isFound(entry[1]) && typeof entry[2] === "number") entries.set(entry[0], { found: entry[1], day: entry[2] });
@@ -606,19 +668,20 @@ class ParseStore {
   /** Append what this process parsed, where the project has its .coherence folder and the store's path holds no link; never through a link. */
   flush(): void {
     if (this.added.length === 0) return;
-    const lines = this.added.map((entry) => `${JSON.stringify(entry)}\n`).join("");
+    const lines = this.added.map((entry) => JSON.stringify(entry)).map((line) => `${this.sign(line)} ${line}\n`).join("");
     this.added = [];
     if (!existsSync(join(this.root, ".coherence")) || !this.safe()) return;
     try {
       mkdirSync(this.dir, { recursive: true });
       if (!this.safe()) return;
-      const fresh = !existsSync(this.log);
       const fd = openSync(this.log, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
       try {
-        writeSync(fd, `${fresh ? `${this.seal}\n` : ""}${lines}`);
+        writeSync(fd, lines);
       } finally {
         closeSync(fd);
       }
+      // What this process wrote is no other's change.
+      if (this.entries !== undefined) this.seen = this.stamp();
     } catch {
       // A store that cannot be written only means the next process parses again.
     }
@@ -633,7 +696,11 @@ class ParseStore {
    */
   lock(): boolean {
     if (!existsSync(join(this.root, ".coherence")) || !this.safe()) return false;
-    mkdirSync(this.dir, { recursive: true });
+    try {
+      mkdirSync(this.dir, { recursive: true });
+    } catch {
+      return false;
+    }
     if (!this.safe()) return false;
     const path = join(this.dir, WARM_LOCK);
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -653,7 +720,9 @@ class ParseStore {
           continue;
         }
         if (held === undefined) return false;
-        if (alive(held.pid) && Date.now() - held.at < WARM_LOCK_MS) return false;
+        // A lock stamped in the future is no warm-up's: a committed one would otherwise hold every warm-up off for good.
+        const age = Date.now() - held.at;
+        if (alive(held.pid) && age >= 0 && age < WARM_LOCK_MS) return false;
         rmSync(path, { force: true });
       }
     }
@@ -679,6 +748,7 @@ class ParseStore {
   discard(audit: { sampled: number; stale: number }): void {
     this.entries = new Map();
     this.added = [];
+    this.checked = Date.now();
     if (!existsSync(join(this.root, ".coherence")) || !this.safe()) return;
     for (const name of existsSync(this.dir) ? readdirSync(this.dir) : []) {
       if (!STORE_FILE.test(name)) continue;
@@ -693,10 +763,11 @@ class ParseStore {
       if (!this.safe()) return;
       const path = join(this.dir, AUDIT_FILE);
       rmSync(path, { force: true });
-      writeFileSync(path, JSON.stringify({ at: Date.now(), ...audit }), { flag: "wx", mode: 0o600 });
+      writeFileSync(path, auditText(basename(this.dir), { at: Date.now(), ...audit }), { flag: "wx", mode: 0o600 });
     } catch {
       // An audit that cannot be kept: the store is discarded all the same.
     }
+    this.seen = this.stamp();
   }
 
   /**
@@ -714,12 +785,23 @@ class ParseStore {
     // repository's shared store never drops another leaf's files, and a file gone or changed ages out.
     const now = today();
     for (const [k, { found, day }] of this.entries!) if (keep.has(k) || now - day <= RETAIN_DAYS) kept[k] = [keep.has(k) ? now : day, found];
-    mkdirSync(this.dir, { recursive: true });
-    if (!this.safe()) return;
     const temporary = `${this.base}.${process.pid}`;
-    rmSync(temporary, { force: true });
-    writeFileSync(temporary, `${this.seal}\n${JSON.stringify(kept)}`, { flag: "wx", mode: 0o600 });
-    renameSync(temporary, this.base);
+    try {
+      mkdirSync(this.dir, { recursive: true });
+      if (!this.safe()) return;
+      rmSync(temporary, { force: true });
+      const body = JSON.stringify(kept);
+      writeFileSync(temporary, `${STORE_SEAL}${this.sign(body)}\n${body}`, { flag: "wx", mode: 0o600 });
+      renameSync(temporary, this.base);
+    } catch {
+      // A store path the project holds as something else (a folder named as the store's file): nothing is kept, and the warm-up goes on.
+      try {
+        if (lstatSync(temporary).isFile()) rmSync(temporary, { force: true });
+      } catch {
+        // Never made.
+      }
+      return;
+    }
     for (const name of readdirSync(this.dir)) {
       if (name === `${this.fingerprint}.json` || !STORE_FILE.test(name)) continue;
       const path = join(this.dir, name);
@@ -730,6 +812,7 @@ class ParseStore {
       }
     }
     this.added = [];
+    this.seen = this.stamp();
   }
 }
 
@@ -748,6 +831,15 @@ function runtimeVersion(): string {
   }
   return runtime;
 }
+
+/** An audit as a warm-up writes it: its counts, and this machine's signature of them and the store's folder. */
+function auditText(plugin: string, audit: { at: number; sampled: number; stale: number }): string {
+  const counts = JSON.stringify([plugin, audit.at, audit.sampled, audit.stale]);
+  return JSON.stringify({ ...audit, signature: createHmac("sha256", machineKey()).update(`audit\u0000${counts}`).digest("base64url") });
+}
+
+/** How often, at most, a long-lived process looks whether another rewrote the store it loaded. */
+const RELOAD_MS = 1000;
 
 /** The file a warm-up that found the store stale leaves beside it, how long orient says so, and the folder names a plugin's store may have. */
 const AUDIT_FILE = "audit.json";

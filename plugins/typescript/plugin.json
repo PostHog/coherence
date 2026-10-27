@@ -123,6 +123,7 @@
   "module": "index.ts",
   "treeSitter": {
     "parser": "tree-sitter-tsx.wasm",
+    "alternate": "tree-sitter-typescript.wasm",
     "queries": "typescript.scm",
     "resolve": "typescript-source.ts#TYPESCRIPT_RESOLVE"
   },
