@@ -22,6 +22,7 @@ import { homedir } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "./work-meter.ts";
+import { userConfigDir } from "./user-dir.ts";
 import { CAUGHT as JOURNAL_CAUGHT } from "../journal/record.ts";
 import { LANGUAGES } from "../adapters/index.ts";
 import { effectiveConfig, registryForLeaf } from "../adapters/project-config.ts";
@@ -79,9 +80,7 @@ export interface TelemetrySettings {
 
 /** The user's config directory for Coherence: $XDG_CONFIG_HOME/coherence or ~/.config/coherence; never inside a project. */
 export function telemetryDir(env: Env = process.env): string {
-  const xdg = env["XDG_CONFIG_HOME"];
-  const base = xdg !== undefined && xdg !== "" ? xdg : join(env["HOME"] ?? homedir(), ".config");
-  return join(base, "coherence");
+  return userConfigDir(env);
 }
 
 export const settingsPath = (env: Env = process.env): string => join(telemetryDir(env), "telemetry.json");

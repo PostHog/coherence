@@ -1,25 +1,17 @@
 /**
- * TypeScript's facts for the plain source scan: which top-level names a
- * line declares, which names a file imports, and where a relative specifier
- * resolves (source.ts reads them through SOURCE_SYNTAX).
+ * Where a TypeScript or JavaScript import leads: what no parse can say, since
+ * a module's place is the compiler's rule, not its syntax. What a file
+ * declares and imports is read through the TSX grammar and typescript.scm
+ * (the manifest's treeSitter), so this module reads no text.
  */
 
 import { statSync } from "node:fs";
 import { posix, resolve } from "node:path";
-import { isSourceFile, toRelative, type SourceSyntax } from "../../src/plugins/api.ts";
+import { isSourceFile, toRelative, type ModuleResolution } from "../../src/plugins/api.ts";
+import { specifierCandidates } from "./typescript.ts";
 
-const TS_DECLARATION = /^(export\s+)?(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:function\*?|const|let|var|class|interface|type|enum|namespace)\s+([A-Za-z_$][\w$]*)/;
-const TS_NAMED = /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
-const TS_DEFAULT = /import\s+(?:type\s+)?([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\})?\s*from\s*["']([^"']+)["']/g;
-const TS_NAMESPACE = /import\s+(?:type\s+)?\*\s+as\s+[A-Za-z_$][\w$]*\s+from\s*["']([^"']+)["']/g;
-const TS_SIDE = /(?:^|\n)\s*import\s*["']([^"']+)["']/g;
-
-/** A declaration is exported when its line says `export`; only a relative specifier names a project file. */
-export const TYPESCRIPT_SOURCE: SourceSyntax = {
-  declarationOf(line) {
-    const m = TS_DECLARATION.exec(line);
-    return m === null ? undefined : { name: m[2]!, exported: m[1] !== undefined };
-  },
+/** Only a relative specifier names a project file: the file itself, its TypeScript twin of a .js specifier, or a folder's index. */
+export const TYPESCRIPT_RESOLVE: ModuleResolution = {
   resolveModule(root, from, specifier, vanished) {
     if (!specifier.startsWith(".")) return undefined;
     const joined = posix.normalize(posix.join(posix.dirname(from), specifier));
@@ -36,17 +28,6 @@ export const TYPESCRIPT_SOURCE: SourceSyntax = {
     }
     return undefined;
   },
-  importsOf(text, add) {
-    for (const m of text.matchAll(TS_NAMED)) {
-      for (const piece of m[1]!.split(",")) {
-        const cleaned = piece.replace(/^\s*type\s+/, "").trim();
-        if (cleaned === "") continue;
-        const original = cleaned.split(/\s+as\s+/)[0]!.trim();
-        add(original, m[2]!);
-      }
-    }
-    for (const m of text.matchAll(TS_DEFAULT)) add("default", m[2]!);
-    for (const m of text.matchAll(TS_NAMESPACE)) add(undefined, m[1]!);
-    for (const m of text.matchAll(TS_SIDE)) add(undefined, m[1]!);
-  },
+  // Every file a wildcard re-export's specifier may name: without the file list, `./foo.js` is foo.ts in a NodeNext project and foo.js in a JavaScript one.
+  modulePaths: (from, specifier) => specifierCandidates(from, specifier),
 };

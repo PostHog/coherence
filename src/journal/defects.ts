@@ -136,6 +136,12 @@ export interface DefectState {
   class?: string;
   introduced?: string;
   caught?: Caught;
+  /** The files the defect names, as it was recorded; empty when it named none. */
+  files?: string[];
+  /** The component the defect record names, when it was written with one; a record older than the field names none. */
+  component?: string;
+  /** The short commit HEAD named when the defect was written, null where no git answered. */
+  commit?: string | null;
   /** The resolution that closed it, unretracted; absent while it is open. */
   resolution?: Resolution;
 }
@@ -151,15 +157,20 @@ function fold(into: DefectOrigin, from: DefectOrigin): void {
   if (from.caught !== undefined) into.caught = from.caught;
 }
 
-/** Every defect in the journal, oldest first, with its class, origin and catch folded and its close, if any. */
+/**
+ * Every defect in the journal, oldest first, with its class, origin and catch
+ * folded and its close, if any. A retracted defect is none: a withdrawn
+ * report is no fault, so no floor, convergence count or dead end reads it.
+ */
 export function defectStates(records: readonly JournalRecord[]): DefectState[] {
   const gone = retracted(records);
   const ordered = [...records].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   const states = new Map<string, DefectState>();
   for (const record of ordered) {
-    if (record.kind === "defect") {
+    if (record.kind === "defect" && !gone.has(record.id)) {
       const d = record as Defect;
-      const state: DefectState = { id: d.id, at: d.at, what: d.what };
+      const state: DefectState = { id: d.id, at: d.at, what: d.what, files: Array.isArray(d.files) ? d.files : [], commit: d.commit ?? null };
+      if (typeof d.component === "string") state.component = d.component;
       fold(state, d);
       states.set(d.id, state);
     } else if (gone.has(record.id)) {

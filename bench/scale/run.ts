@@ -28,6 +28,10 @@ import { parseArgs } from "node:util";
 import { generate, LEAVES } from "./generate.ts";
 import { TOOL_HOOKS } from "../../src/lifecycle/hook-events.ts";
 import { DEFAULT_LATENCY_BUDGET } from "../../src/lifecycle/hook-latency.ts";
+import { startParsers } from "../../src/plugins/syntax-trees.ts";
+
+// A reading through a language's parser needs its runtime started first, as the CLI starts it.
+await startParsers();
 
 const CLI = fileURLToPath(new URL("../../src/cli.ts", import.meta.url));
 const BUDGETS = fileURLToPath(new URL("./budgets.json", import.meta.url));

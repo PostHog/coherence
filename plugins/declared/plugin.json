@@ -1,7 +1,7 @@
 {
   "name": "declared",
-  "version": "1.10.1",
-  "pluginApi": 2,
+  "version": "1.11.0",
+  "pluginApi": 4,
   "provides": {
     "declaredLanguages": true
   },

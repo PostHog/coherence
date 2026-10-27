@@ -1,7 +1,7 @@
 {
   "name": "quint",
   "version": "0.1.0",
-  "pluginApi": 2,
+  "pluginApi": 4,
   "module": "index.ts",
   "verifiers": [
     {

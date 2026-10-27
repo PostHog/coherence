@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
 import { closureOf } from "../../enforcement/code-fingerprint.ts";
-import { isBasisFile, languageCode, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
+import { isBasisFile, languageCode, parsedOf, serverExtensions } from "../../plugins/languages.ts";
 import type { KeptReport } from "./model.ts";
 
 /** Where each language's kept answers live: transient, beside the recorded reading. */
@@ -71,10 +71,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..", "..");
 
 const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
-/** The module files a changed file star-imports or wildcard re-exports, as the component interface reading reads them (the interfaces slot's wildcardModules); a kept slot, from a plugin written before it was read so, is read first. */
+/** The module files a changed file star-imports or wildcard re-exports, as the component interface reading reads them (the parsed interfaces reading's wildcardModules). */
 function keptModules(language: Language, file: string, text: string): string[] {
-  const kept = syntaxOf(language, "kept");
-  return (typeof kept === "function" ? kept(file, text) : undefined) ?? syntaxOf(language, "interfaces")?.wildcardModules(file, text) ?? [];
+  return parsedOf(language, "interfaces")?.wildcardModules(file, text) ?? [];
 }
 
 /** One kept answer and what it depends on: the files it names and the names that, spelled in a changed file, could change it. */

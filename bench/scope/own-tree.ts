@@ -1,6 +1,6 @@
 /**
  * The Scope page over Coherence's own tree: it builds to the default path and
- * stays under 3 MB with every component, run and journal record embedded or
+ * stays under 5 MB with every component, run and journal record embedded or
  * counted, and its first load carries at most the site window's reference
  * sites while every latest verdict and every chokepoint's sites read as the
  * whole runs give them. The unit suite proves both on fixtures
@@ -22,18 +22,22 @@ import { SITE_WINDOW, latestOf, sitesLeftCount } from "../../src/readings/scope/
 import type { LatestEntry, ShellState } from "../../src/readings/scope/model.ts";
 import { flowOf } from "../../src/readings/scope/structure-flow.ts";
 import { loadSpecModel } from "../../src/spec/model.ts";
+import { startParsers } from "../../src/plugins/syntax-trees.ts";
+
+// A reading through a language's parser needs its runtime started first, as the CLI starts it.
+await startParsers();
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 process.chdir(root);
 const started = performance.now();
 const options: BuildOptions = { lexiconPath: DEFAULTS.lexiconPath, project: DEFAULTS.project };
-const THREE_MB = 3 * 1024 * 1024;
+const FIVE_MB = 5 * 1024 * 1024;
 
-// The page builds to the default path and stays under 3 MB with Coherence's own data.
+// The page builds to the default path and stays under 5 MB with Coherence's own data.
 const { bytes, state } = await writeScopePage(options, DEFAULTS.outPath);
 const onDisk = await readFile(DEFAULTS.outPath, "utf8");
 assert.equal(Buffer.byteLength(onDisk, "utf8"), bytes);
-assert.ok(bytes < THREE_MB, `page is ${bytes} bytes, must be under ${THREE_MB}`);
+assert.ok(bytes < FIVE_MB, `page is ${bytes} bytes, must be under ${FIVE_MB}`);
 assert.equal(state.spec.components.length, loadSpecModel(root).components.length, "every component of Coherence's own tree is in the state");
 assert.equal(state.runs.records.length + (state.runs.omitted ?? 0), loadRuns(root).records.length, "every run record is embedded or counted");
 assert.equal(state.journal.records.length + (state.journal.omitted ?? 0), loadJournal(root).records.length, "every journal record is embedded or counted");

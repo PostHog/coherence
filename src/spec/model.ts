@@ -16,7 +16,7 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { countWork, readProjectText, spawnSync } from "../lifecycle/work-meter.ts";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Mirror, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { creditedByCrossingAlone, crossingChecksTrust, resolveCovered } from "./covers.ts";
@@ -26,7 +26,7 @@ import { deriveState, type Lack, type State } from "./state.ts";
 import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles, type Walked } from "../adapters/project-files.ts";
 import { configuredName, effectiveConfig, lexiconFileOf, readConfigFile } from "../adapters/project-config.ts";
 import { coreLanguageOfExtension, LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
-import { syntaxOf } from "../plugins/languages.ts";
+import { parsedOf } from "../plugins/languages.ts";
 import type { LoadedPlugin } from "../plugins/plugin.ts";
 import { readPlugins } from "../plugins/registry.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
@@ -285,6 +285,23 @@ function lexiconStackProblems(root: string, plugins: readonly LoadedPlugin[]): P
   } catch (error) {
     return [{ file: CONFIG_FILE, line: 1, message: error instanceof Error ? error.message : String(error) }];
   }
+}
+
+/**
+ * The project's component folders, "." for the root's: each folder holding a
+ * spec the walk reads. The light way a journal write can afford: one walk and
+ * no spec parsed. A config that will not parse walks with no ignore list; the
+ * spec check says why.
+ */
+export function componentFolders(rootGiven: string): string[] {
+  const root = resolve(rootGiven);
+  let ignore: readonly string[] = [];
+  try {
+    ignore = readConfig(root).ignore;
+  } catch {
+    ignore = [];
+  }
+  return [...new Set(findSpecs(root, ignore).map((path) => folderOf(root, path)))].sort();
 }
 
 /** Every spec file under the root, sorted by path. */
@@ -567,6 +584,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       invariantsByFolder: new Map(components.map((c) => [c.folder, new Set(c.invariants.map((i) => i.name))])),
       coherenceTree: practiceFiles.size === 0 ? true : isCoherenceTree(root),
       records,
+      classes: () => declaredClasses(root, false),
     }),
   );
   const byName = new Map(components.map((c) => [c.folder, c]));
@@ -591,6 +609,21 @@ export function guardStanding(components: readonly Component[]): (guard: string)
     if (slash === -1 || invariant === undefined) return "missing";
     return invariant.enforcements.length > 0 && !invariant.lacks.includes("refutation") ? "witnessed" : "unwitnessed";
   };
+}
+
+/**
+ * A file a record names, as the project-relative path its owner is decided
+ * by: an absolute path made relative to the root, separators made forward,
+ * and every "." and ".." segment resolved, so gadget/../widget/knob.ts is
+ * widget/knob.ts; undefined for the root itself and for a path that leaves
+ * the project. Every reader that asks which component holds a named file
+ * passes it through here first.
+ */
+export function projectFile(root: string, named: string): string | undefined {
+  const relativeTo = isAbsolute(named) ? relative(root, named) : named;
+  const file = posix.normalize(relativeTo.split(sep).join("/").split("\\").join("/"));
+  if (file === "." || file === "" || file === ".." || file.startsWith("../") || posix.isAbsolute(file) || isAbsolute(file)) return undefined;
+  return file.replace(/\/+$/, "");
 }
 
 /** The component whose folder holds a project-relative file: the deepest component folder above it. */
@@ -755,20 +788,20 @@ function entranceGuardProblems(root: string, components: readonly Component[]): 
   }
   return problems;
 }
-/** Whether a file is source the spec model reads for a declaration: a file of a language whose plugin says what its top level declares. */
+/** Whether a file is source the spec model reads for a declaration: a file of a language whose plugin names a parser that says what its top level declares. */
 function isDeclaringSource(file: string): boolean {
   const language = languageOfFile(file);
-  return language !== undefined && syntaxOf(language, "topLevel") !== undefined;
+  return language !== undefined && parsedOf(language, "topLevel") !== undefined;
 }
 
 /**
  * Whether a source file's text declares the name at its top level, as the
- * file's language plugin reads its declarations (its topLevel slot): false
- * for a file of no language, or one whose plugin does not say.
+ * file's language is read through its plugin's parser (the topLevel
+ * reading): false for a file of no language, or one whose plugin names none.
  */
 export function declaresAtTop(text: string, name: string, file: string): boolean {
   const language = languageOfFile(file);
-  return language !== undefined && (syntaxOf(language, "topLevel")?.(text, name) ?? false);
+  return language !== undefined && (parsedOf(language, "topLevel")?.(text, name) ?? false);
 }
 
 /** Source files under a folder, sorted, never into the folders no walk enters. */

@@ -3,8 +3,8 @@
     "go.mod": "module shop\n\ngo 1.22\n",
     "store/secrets.go": "package store\n\n// SecretColumns is the protected thing.\nvar SecretColumns = []string{\"token\"}\n\n// Seal is the chokepoint: the one way a row leaves without its secrets.\nfunc Seal(row map[string]string) map[string]string {\n\tout := map[string]string{}\n\tfor k, v := range row {\n\t\tout[k] = v\n\t}\n\tfor _, column := range SecretColumns {\n\t\tdelete(out, column)\n\t}\n\treturn out\n}\n",
     "store/rows.go": "package store\n\n// Row is one stored row.\ntype Row map[string]string\n\n// The store's bounds.\nconst (\n\tMaxRows = 100\n\tmaxCols = 8\n)\n",
-    "api/render.go": "package api\n\nimport \"shop/store\"\n\n// Render seals the row, then reads the secret columns around the seal.\nfunc Render(row map[string]string) int {\n\tsealed := store.Seal(row)\n\treturn len(sealed) + len(store.SecretColumns)\n}\n",
-    "cmd/shop/main.go": "package main\n\nimport (\n\t\"fmt\"\n\t\"net/http\"\n\n\t\"shop/api\"\n\t\"shop/store\"\n)\n\nfunc main() {\n\thttp.HandleFunc(\"/rows\", serveRow)\n\tfmt.Println(http.ListenAndServe(\":8080\", nil))\n}\n\n// serveRow renders the row a request names.\nfunc serveRow(w http.ResponseWriter, r *http.Request) {\n\trow := store.Row{\"id\": r.URL.Path}\n\tfmt.Fprint(w, api.Render(row))\n}\n",
+    "api/render.go": "package api\n\nimport \"shop/store\"\n\n// Render seals the row, then reads the secret columns around the seal.\nfunc Render(row store.Row) int {\n\tsealed := store.Seal(row)\n\treturn len(sealed) + len(store.SecretColumns)\n}\n",
+    "cmd/shop/main.go": "package main\n\nimport (\n\t\"fmt\"\n\t\"net/http\"\n\n\t\"shop/api\"\n\tst \"shop/store\"\n)\n\nfunc main() {\n\thttp.HandleFunc(\"/rows\", serveRow)\n\tfmt.Println(http.ListenAndServe(\":8080\", nil))\n}\n\n// serveRow renders the row a request names.\nfunc serveRow(w http.ResponseWriter, r *http.Request) {\n\trow := st.Row{\"id\": r.URL.Path}\n\tfmt.Fprint(w, api.Render(row))\n}\n",
     "store/secrets_test.go": "package store\n\nimport \"testing\"\n\nfunc TestColumns(t *testing.T) {\n\tif len(SecretColumns) == 0 {\n\t\tt.Fatal(\"no secret columns\")\n\t}\n}\n",
     "README.md": "# A module\n"
   },
@@ -84,21 +84,29 @@
         "file": "api/render.go",
         "module": "store/secrets.go",
         "names": [
-          "*"
+          "Seal",
+          "SecretColumns"
         ]
       },
       {
         "file": "cmd/shop/main.go",
         "module": "api/render.go",
         "names": [
-          "*"
+          "Render"
         ]
       },
       {
         "file": "cmd/shop/main.go",
         "module": "store/rows.go",
         "names": [
-          "*"
+          "Row"
+        ]
+      },
+      {
+        "file": "api/render.go",
+        "module": "store/rows.go",
+        "names": [
+          "Row"
         ]
       }
     ],
@@ -107,6 +115,7 @@
         "from": "api",
         "to": "store",
         "symbols": [
+          "Row",
           "Seal",
           "SecretColumns"
         ]
@@ -138,5 +147,19 @@
         "rule": "http route"
       }
     ]
+  },
+  "reference": {
+    "files": {
+      "secrets": "store/secrets.go",
+      "rows": "store/rows.go",
+      "render": "api/render.go",
+      "main": "cmd/shop/main.go"
+    },
+    "names": {
+      "SECRET_COLUMNS": "SecretColumns",
+      "seal": "Seal",
+      "Row": "Row",
+      "render": "Render"
+    }
   }
 }

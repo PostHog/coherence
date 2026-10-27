@@ -653,7 +653,7 @@ export interface JournalViewState {
 /* Practices, as the spec model and Coherence's kernel hold them. */
 
 /** What fires a practice: a command's words, an edited path's glob with the text the edit adds, or nothing but a deliberate choice. */
-export type PracticeTrigger = { kind: "command"; words: string } | { kind: "edit"; glob: string; adding?: string | undefined } | { kind: "explicit" };
+export type PracticeTrigger = { kind: "command"; words: string } | { kind: "edit"; glob: string; adding?: string | undefined } | { kind: "defect"; class: string } | { kind: "explicit" };
 
 /**
  * One practice as the page holds it: the project's own, from a practice file

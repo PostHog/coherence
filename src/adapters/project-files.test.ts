@@ -10,7 +10,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
@@ -192,5 +192,34 @@ test("a folder the config names as a plugin is not the project's source: its fil
   } finally {
     await own?.close();
     rmSync(adopter, { recursive: true, force: true });
+  }
+});
+
+test("a reading is handed only files it can open: a pipe, a link to a pipe, a link to a folder and a link to nothing are no project file, in a repository or out of one, and a change keeps every path it names but a folder, a pipe or a link to one", () => {
+  for (const versioned of [true, false]) {
+    const root = mkdtempSync(join(tmpdir(), "coherence-unreadable-"));
+    try {
+      writeFileSync(join(root, "own.py"), "OWN = 1\n");
+      symlinkSync("own.py", join(root, "linked.py"));
+      spawnSync("mkfifo", [join(root, "pipe.py")]);
+      symlinkSync("pipe.py", join(root, "to-pipe.py"));
+      mkdirSync(join(root, "folder"));
+      writeFileSync(join(root, "folder", "inside.py"), "INSIDE = 1\n");
+      symlinkSync("folder", join(root, "to-folder.py"));
+      symlinkSync("nowhere.py", join(root, "dangling.py"));
+      writeFileSync(join(root, "deleted.py"), "GONE = 1\n");
+      if (versioned) {
+        spawnSync("git", ["init", "-q"], { cwd: root });
+        spawnSync("git", ["add", "-A"], { cwd: root });
+        spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "start"], { cwd: root });
+      }
+      rmSync(join(root, "deleted.py"));
+      assert.deepEqual(projectFiles(root), ["folder/inside.py", "linked.py", "own.py"], `${versioned ? "in a repository" : "out of one"}: a regular file, and a link to one, alone`);
+      // A change is every path it names but a folder, a pipe, a socket, a device or a link to a pipe, a socket or a device: a link relinked to a folder or left dangling changed, and a deleted file too.
+      const kept = [...keepProjectFiles(root, ["own.py", "folder", "pipe.py", "to-pipe.py", "to-folder.py", "dangling.py", "deleted.py"])].sort();
+      assert.deepEqual(kept, ["dangling.py", "deleted.py", "own.py", "to-folder.py"], `${versioned ? "in a repository" : "out of one"}: a path an edit names is kept unless a read of it would wait or it is a folder, a deleted file among them`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });

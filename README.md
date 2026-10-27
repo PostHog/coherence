@@ -413,7 +413,9 @@ test setup per runner, as [docs/config.md](docs/config.md#more-than-one-language
 Rust chokepoints are graded through rust-analyzer, found on the machine rather
 than installed by npm ([docs/enforcement.md](docs/enforcement.md#rust)); the
 economy and Scope readings read Rust's text by its crates' folder layout, and detect its
-binaries, build scripts, routes and foreign exports as entrances.
+binaries, examples, build scripts, routes and foreign exports (C, wasm-bindgen and
+UniFFI, an exported impl's methods among them) as entrances; a declared mirror
+reads a Rust list from the array a const or static is set to.
 Go is an opt-in bundled plugin, `"plugins": { "go": "bundled" }`, graded
 through gopls ([docs/plugins.md](docs/plugins.md#go)); a language Coherence
 lacks is a plugin you can write, held by `coherence plugin check` to what every
@@ -634,6 +636,25 @@ npm trusted publishing from `.github/workflows/release.yml` in the `Release`
 environment, with provenance and no stored token, and tags it as a GitHub
 release with generated notes. Any other change to package.json releases
 nothing. The workflow can also be run by hand from the Actions tab.
+
+A prerelease of a branch, before it merges, is a GitHub prerelease carrying
+the tarball, never npm. Bump the versions as above to a prerelease
+(`1.11.0-beta.4`), merge main into the branch, push it, and run the
+Prerelease workflow:
+
+```sh
+gh workflow run prerelease.yml -f ref=<branch> -f notes="$(cat notes.md)"
+```
+
+`.github/workflows/prerelease.yml` checks the branch out clean at its tip,
+with read access alone, and refuses (naming each reason) unless the version is
+a prerelease that every bundled plugin and mod following the package names,
+the commit is on a branch of PostHog/coherence and holds its main, and no tag
+of the version exists; then it packs the tarball there, installs it in an
+empty folder and runs `coherence plugin check typescript` and `plugin check
+python` from it. A second job, the only one that can write, tags that
+commit's sha and creates the prerelease on the tag, carrying the tarball.
+Nothing is cut from a local checkout.
 
 ## Further reading
 

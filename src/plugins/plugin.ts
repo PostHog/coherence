@@ -22,7 +22,7 @@
  *   syntax tables     the manifest's `syntax`: one optional slot per table
  *                     the readings scan by, each naming the export of a
  *                     module beside the manifest that holds it
- *                     ("typescript-source.ts#TYPESCRIPT_SOURCE"). A reading
+ *                     ("typescript-entrances.ts#TYPESCRIPT_ENTRANCES"). A reading
  *                     loads only the module of the slot it reads, at the
  *                     moment it reads it; a slot a plugin leaves empty is
  *                     read as "not read for <language>", never as another
@@ -39,15 +39,14 @@
 import type { AdapterBounds, LanguageAdapter, Ladder } from "../adapters/adapter.ts";
 import type { DeclaredLanguage } from "../adapters/declared-config.ts";
 import type { EntranceSyntax } from "../adapters/entrance-candidates.ts";
-import type { SourceSyntax } from "../economy/source.ts";
+import type { ImportTarget } from "../economy/source.ts";
 import type { Literal } from "../lifecycle/mirrors.ts";
-import type { InterfaceSymbol } from "../observation/interfaces.ts";
-import type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
+import type { InterfaceFacts } from "../readings/scope/component-interfaces.ts";
 import type { BoundarySource } from "../scaffold/boundaries.ts";
 import type { Verdict } from "../enforcement/record.ts";
 
 /** The interface version this core runs. */
-export const PLUGIN_API = 2;
+export const PLUGIN_API = 4;
 
 /** The oldest interface version this core still reads: a plugin written for one from here to PLUGIN_API loads, and an older one is named at session start with what changed since; any other is refused, naming both. */
 export const OLDEST_PLUGIN_API = 1;
@@ -55,6 +54,14 @@ export const OLDEST_PLUGIN_API = 1;
 /** What each interface version changed from the one before, for the line a session start says about a plugin written for an older one. */
 export const PLUGIN_API_CHANGES: Readonly<Record<number, string>> = {
   2: 'syntax slots moved from the module\'s syntax export to plugin.json ("syntax": { slot: "module#export" }), the member scan became plugin.json data (members), and kept, declares, notice, topLevel and boundaries joined the slots',
+  3: 'a language plugin may read its text through a tree-sitter parser and queries (treeSitter) in place of the source, declares and topLevel slots; resolveModule may answer a module of several files ({ module, files }) and Coherence joins each imported name to the file that declares it; the adapter answers topLevelSymbols, and check.json maps the reference project (reference), which plugin check now holds a language plugin to',
+  4: 'the hand-written reader slots (syntax.source, syntax.declares, syntax.topLevel and syntax.kept) are gone: a language is read through treeSitter, a grammar\'s .wasm and queries, from which the core derives what they answered, and a manifest that fills one is refused, whatever pluginApi it is written for; the interfaces table states serverBounds alone, its type declarations, default exports, import lists and wildcard imports read through the parser; a copy ejected from an older Coherence is ejected again (coherence plugin eject <name>) and its changes reapplied',
+};
+
+/** The interface version from which a duty holds, and what of that version it asks: a plugin written for an older one is told so, never failed by a duty that did not exist when it was written. */
+export const DUTY_SINCE: Readonly<Record<string, { since: number; asks: string }>> = {
+  "reference reading": { since: 3, asks: "check.json's map of the reference project (reference)" },
+  "server agrees": { since: 3, asks: "the adapter's topLevelSymbols" },
 };
 
 /** What changed between the interface version a plugin was written for and the one this core runs, oldest first. */
@@ -161,12 +168,85 @@ export interface PluginManifest {
   module?: string;
   /** Each syntax slot the plugin fills: "<module beside the manifest>#<export>". */
   syntax?: Partial<Record<SyntaxSlot, string>>;
+  /**
+   * The parser the language's text is read through, and the queries over it
+   * (syntax-trees.ts): the one reader of the language's text. The core
+   * derives from them every reading of its declarations, imports and exports
+   * (languages.ts ParsedReadings); no slot answers one of those by hand.
+   */
+  treeSitter?: TreeSitterManifest;
   /** The rungs the plugin's adapter grades on; absent, the wrapped adapter's, else reference-choked alone. */
   ladder?: Ladder;
   verifiers?: VerifierForm[];
   /** The lexicon fragment, relative to the manifest. */
   lexicon?: string;
 }
+
+/** A manifest's treeSitter: paths relative to the manifest. */
+export interface TreeSitterManifest {
+  /** The language's tree-sitter parser, compiled to WebAssembly (tree-sitter build --wasm, or the .wasm a grammar's npm package ships). */
+  parser: string;
+  /** A second parser of the same language, read with the same queries when the parser's tree holds an error and its own holds fewer (TypeScript's TypeScript grammar beside its TSX grammar, for the old-style cast TSX cannot read). */
+  alternate?: string;
+  /** The queries, in tree-sitter's query language, capturing what syntax-trees.ts's CAPTURES name. */
+  queries: string;
+  /** "<module beside the manifest>#<export>": where an import leads, which no parse can say. */
+  resolve: string;
+  /** For a language that exports by name rather than by a keyword its queries capture as @exported: a regular expression a name it keeps private matches (Python's "^_", Go's "^\P{Lu}"), read with Unicode's character classes. */
+  privateName?: string;
+  /** For queries that capture @import.prefix: the text the language joins a path's segments with (Rust's "::"), which joins each prefix to the path it prefixes. */
+  separator?: string;
+}
+
+/** Where an import leads: a plugin on the parser path supplies this as code, since a module's place is the language's rule, not its syntax. */
+export interface ModuleResolution {
+  /** What a specifier names from a file: one project-relative file, or a module of several (its folder and files), or undefined outside the project; `vanished` as for the source slot's. */
+  resolveModule(root: string, from: string, specifier: string, vanished: ReadonlySet<string>): ImportTarget | undefined;
+  /** Every spelling of the files a module specifier names from a file, resolved or not, for the word index's wildcard keys. */
+  modulePaths(from: string, specifier: string): string[];
+  /** The name a whole-module import binds in the importing file when the import gives none (a Go package's name, from its path), which the names the file uses through it are qualified by; absent, the specifier's last path element. */
+  boundName?(specifier: string): string;
+}
+
+/**
+ * Every key a manifest may carry, as docs/plugins.md's key table must list
+ * them; the type below fails to compile when PluginManifest gains a key this
+ * list lacks, so the list and the docs' table cannot drift from the type.
+ */
+export const MANIFEST_KEYS = ["name", "version", "pluginApi", "provides", "extends", "extensions", "files", "source", "serverExtensions", "testFiles", "testFolders", "basisFiles", "moduleFolders", "members", "entrances", "notScanned", "environmentFolders", "markedFolders", "ci", "wellKnown", "module", "syntax", "treeSitter", "ladder", "verifiers", "lexicon"] as const satisfies readonly (keyof PluginManifest)[];
+type ManifestKeyMissing = Exclude<keyof PluginManifest, (typeof MANIFEST_KEYS)[number]>;
+export const MANIFEST_KEYS_COMPLETE: [ManifestKeyMissing] extends [never] ? true : ManifestKeyMissing = true;
+
+/** Every key of a manifest's treeSitter, held to its type as MANIFEST_KEYS is. */
+export const TREE_SITTER_KEYS = ["parser", "alternate", "queries", "resolve", "privateName", "separator"] as const satisfies readonly (keyof TreeSitterManifest)[];
+type TreeSitterKeyMissing = Exclude<keyof TreeSitterManifest, (typeof TREE_SITTER_KEYS)[number]>;
+export const TREE_SITTER_KEYS_COMPLETE: [TreeSitterKeyMissing] extends [never] ? true : TreeSitterKeyMissing = true;
+
+/** Every method of a language adapter, as the docs' adapter table must list them, held to the LanguageAdapter type (its two fields, language and ladder, are no methods). */
+export const ADAPTER_METHODS = ["ready", "resolve", "references", "visibility", "refute", "testFilter", "forget", "close", "serverPid", "topLevelSymbols"] as const satisfies readonly Exclude<keyof LanguageAdapter, "language" | "ladder">[];
+type AdapterMethodMissing = Exclude<keyof LanguageAdapter, "language" | "ladder" | (typeof ADAPTER_METHODS)[number]>;
+export const ADAPTER_METHODS_COMPLETE: [AdapterMethodMissing] extends [never] ? true : AdapterMethodMissing = true;
+
+/**
+ * The slots a plugin once filled with a hand-written reader of its
+ * language's text, which the core now derives from the language's parser
+ * alone (languages.ts ParsedReadings; what kept answered is the parsed
+ * interfaces reading's wildcardModules): a manifest whose syntax names one is
+ * refused, whatever pluginApi it is written for, so no manifest the core
+ * loads holds one; and no slot type below can name one.
+ */
+export const DERIVED_SLOTS = ["source", "declares", "topLevel", "kept"] as const;
+
+/**
+ * What a plugin's interfaces table may state: its language's facts, none a
+ * reading of its text. The type declarations, default exports, import lists
+ * and wildcard imports pluginApi 3 read off the table are the parse's alone
+ * (languages.ts ParsedReadings interfaces), and a table that answers any
+ * other member is refused by name when it loads (languages.ts).
+ */
+export const INTERFACE_FACTS = ["serverBounds"] as const satisfies readonly (keyof InterfaceFacts)[];
+type InterfaceFactMissing = Exclude<keyof InterfaceFacts, (typeof INTERFACE_FACTS)[number]>;
+export const INTERFACE_FACTS_COMPLETE: [InterfaceFactMissing] extends [never] ? true : InterfaceFactMissing = true;
 
 /** What a verifier is asked. */
 export interface VerifyRequest {
@@ -184,27 +264,21 @@ export interface VerifyResult {
   reason: string;
 }
 
-/** The syntax tables a plugin may supply for the readings, each optional, each loaded from the module its manifest names. */
+/** The syntax tables a plugin may supply for the readings, each optional, each loaded from the module its manifest names: what no parse answers, never a reader of the language's text (DERIVED_SLOTS). */
 export interface SyntaxTables {
   entrances?: EntranceSyntax;
-  interfaces?: InterfaceSyntax;
-  source?: SourceSyntax;
-  /** The module files a file star-imports or wildcard re-exports, for the Structure reading's kept answers. */
-  kept?: (file: string, text: string) => string[];
-  /** What a declaration line's keyword says can execute, for the observation's interface reading. */
-  declares?: (line: string) => InterfaceSymbol["declares"];
+  /** The language's facts the component interface reading needs and no parse answers. */
+  interfaces?: InterfaceFacts;
   /** One line a session start says about the language's instrument at this root, or "" (TypeScript 7 ships no tsserver). */
   notice?: (root: string) => string;
   /** The mirror reader: the literal a list named `name` is set to in a file's text. */
   lists?: (text: string, name: string) => Literal | undefined;
-  /** Whether a file's text declares a name at its top level, for the spec model's check that a handler, guard or mirror exists. */
-  topLevel?: (text: string, name: string) => boolean;
   /** A tool of the language's whose declaration file scaffold import and adoption draft specs from (tach's tach.toml). */
   boundaries?: BoundarySource;
 }
 
 /** The slots by name, so a reading can say which one a plugin left empty. */
-export const SYNTAX_SLOTS = ["entrances", "interfaces", "source", "kept", "declares", "notice", "lists", "topLevel", "boundaries"] as const;
+export const SYNTAX_SLOTS = ["entrances", "interfaces", "notice", "lists", "boundaries"] as const;
 export type SyntaxSlot = (typeof SYNTAX_SLOTS)[number];
 
 /** What the adapter factory is handed. */

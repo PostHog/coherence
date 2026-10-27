@@ -1,7 +1,7 @@
 {
   "name": "typescript",
-  "version": "1.10.1",
-  "pluginApi": 2,
+  "version": "1.11.0",
+  "pluginApi": 4,
   "provides": {
     "language": "typescript"
   },
@@ -121,12 +121,15 @@
     ]
   },
   "module": "index.ts",
+  "treeSitter": {
+    "parser": "tree-sitter-tsx.wasm",
+    "alternate": "tree-sitter-typescript.wasm",
+    "queries": "typescript.scm",
+    "resolve": "typescript-source.ts#TYPESCRIPT_RESOLVE"
+  },
   "syntax": {
     "entrances": "typescript-entrances.ts#TYPESCRIPT_ENTRANCES",
     "interfaces": "typescript-scope.ts#TYPESCRIPT_INTERFACES",
-    "source": "typescript-source.ts#TYPESCRIPT_SOURCE",
-    "declares": "typescript-interfaces.ts#typescriptDeclares",
-    "notice": "tsserver.ts#tsserverNotice",
-    "topLevel": "typescript-top-level.ts#typescriptDeclaresAtTop"
+    "notice": "tsserver.ts#tsserverNotice"
   }
 }

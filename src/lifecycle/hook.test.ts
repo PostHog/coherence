@@ -588,7 +588,7 @@ test("the peer feed injects a peer's decisions and escalations and no other kind
     // One record of every other kind a peer can write, between two the feed must carry.
     const decision = idOf(verb(dir, "decide", "a peer chose the store", "--because", "b", "--session", "peer-1", "--agent", "scope"));
     const conjecture = idOf(verb(dir, "conjecture", "a peer noticed something", "--could-be", "one", "--discriminated-by", "a test", "--session", "peer-1", "--agent", "scope"));
-    const defect = idOf(verb(dir, "defect", "a peer saw a deviation", "--evidence", "a report", "--session", "peer-1", "--agent", "scope"));
+    const defect = idOf(verb(dir, "defect", "a peer saw a deviation", "--evidence", "a report", "--file", "src/a.ts", "--session", "peer-1", "--agent", "scope"));
     const wall = idOf(verb(dir, "unable", "a peer hit a wall", "--because", "no password", "--session", "peer-1", "--agent", "scope"));
     const retraction = idOf(verb(dir, "retract", decision, "--because", "the test said otherwise", "--session", "peer-1", "--agent", "scope"));
     const resolution = idOf(verb(dir, "resolved", conjecture, "--because", "the test showed one", "--session", "peer-1", "--agent", "scope"));

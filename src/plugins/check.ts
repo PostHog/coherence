@@ -5,14 +5,22 @@
  *
  *   file rule      the files check.json names as the language's are, and
  *                  those it names as not are not
- *   declarations   the topLevel slot says which names a file's top level
- *                  declares
+ *   declarations   the parser's topLevel reading says which names a file's
+ *                  top level declares
  *   references     the adapter reports every reference to the protected
  *                  thing, and none else; a plugin that reports none fails
  *                  here, by name
+ *   reference reading  the readings recover, over the check project, every
+ *                  relation of the reference project (REFERENCE) its map
+ *                  places there, as every language's plugin must
+ *   server agrees  every name the text reading finds a file declaring is a
+ *                  top-level symbol the language server reports for it
  *   chokepoint     the check grades the protected thing through the
  *                  chokepoint as check.json expects, bypasses named, its
  *                  refutation seen or refused, never missing
+ *   answers agree  where two of its readings answer one question of the
+ *                  same text (a declaration, a renamed import), their
+ *                  answers agree over every file of the check project
  *   one answer each  no two of its slots answer with one function, or two
  *                  spelled alike: a question asked of the language belongs
  *                  to one slot, or its answers drift apart
@@ -44,12 +52,12 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { computeMass } from "../economy/mass.ts";
-import { declarationsOf, importsOf } from "../economy/source.ts";
+import { declarationsOf, importsOf, isSourceFile } from "../economy/source.ts";
 import { DEFAULT_TEST_FOLDERS } from "../enforcement/config.ts";
 import { performRun } from "../enforcement/run.ts";
 import { detectedEntrances, readComponentInterfaces } from "../readings/scope/component-interfaces.ts";
-import { bundledAdapter, bundledPlugins, forProject, languageOfFile, registerProjectPlugins, repeatedAnswers, syntaxOf } from "./languages.ts";
-import type { LoadedPlugin } from "./plugin.ts";
+import { bundledAdapter, bundledPlugins, forProject, languageOfFile, parsedOf, registerProjectPlugins, repeatedAnswers } from "./languages.ts";
+import { DUTY_SINCE, type LoadedPlugin } from "./plugin.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
 import { proveVia, viaForm } from "./verify.ts";
 
@@ -70,6 +78,146 @@ export interface CheckProject {
   bypasses: string[];
   /** What each reading that scans the language's text must recover over the project; the bundled minimum for a language carries it. */
   readings?: Readings;
+  /** Which of the project's files and names play each part of the reference project every language plugin is held to read alike (REFERENCE). */
+  reference?: ReferenceMap;
+}
+
+/** A check project's map onto the reference project: the file playing each role, and the language's spelling of each name. */
+export interface ReferenceMap {
+  files: Record<ReferenceRole, string>;
+  names: Record<ReferenceName, string>;
+}
+
+/**
+ * The reference project, the same in every language: a store module of two
+ * files (secrets declaring SECRET_COLUMNS and seal, rows declaring Row), a
+ * render that uses all three, and an entry (main) that uses render. Every
+ * language plugin's check project maps its files and names onto these, and
+ * its readings must recover the same relations, so two plugins cannot read
+ * the same shape of project two ways: four plugins picked the file a module
+ * import reaches four ways, and each missed one of a two-file module's files
+ * (d-cb7829df).
+ */
+export const REFERENCE_ROLES = ["secrets", "rows", "render", "main"] as const;
+export type ReferenceRole = (typeof REFERENCE_ROLES)[number];
+export const REFERENCE_NAMES = ["SECRET_COLUMNS", "seal", "Row", "render"] as const;
+export type ReferenceName = (typeof REFERENCE_NAMES)[number];
+const REFERENCE: { declared: [ReferenceRole, ReferenceName[]][]; imports: [ReferenceRole, ReferenceRole, ReferenceName[]][] } = {
+  declared: [
+    ["secrets", ["SECRET_COLUMNS", "seal"]],
+    ["rows", ["Row"]],
+    ["render", ["render"]],
+  ],
+  imports: [
+    ["render", "secrets", ["SECRET_COLUMNS", "seal"]],
+    ["render", "rows", ["Row"]],
+    ["main", "render", ["render"]],
+  ],
+};
+
+/** Each relation of the reference project a language's readings recover over its check project, said as one line, and each it does not, with why. */
+export function referenceRelations(scratch: string, project: CheckProject, map: ReferenceMap, language: string): { held: string[]; missed: string[] } {
+  const held: string[] = [];
+  const missed: string[] = [];
+  const name = (n: ReferenceName): string => map.names[n];
+  for (const [role, names] of REFERENCE.declared) {
+    const file = map.files[role];
+    const found = new Set(declarationsOf(project.files[file] ?? "", language).map((d) => d.name));
+    const line = `${role} declares ${names.join(", ")}`;
+    const lacking = names.filter((n) => !found.has(name(n)));
+    (lacking.length === 0 ? held : missed).push(lacking.length === 0 ? line : `${line}: ${file} read declaring no ${lacking.map(name).join(", ")}`);
+  }
+  for (const [from, to, names] of REFERENCE.imports) {
+    const imports = importsOf(scratch, map.files[from], project.files[map.files[from]] ?? "", language).filter((i) => i.module === map.files[to]);
+    const reached = new Set(imports.map((i) => i.name ?? "*"));
+    const line = `${from} imports ${names.join(", ")} from ${to}`;
+    // A name is reached when an import names it, or when a whole-module import joins the file and the importer spells the name:
+    // a whole-module import alone reaches no name the importer never uses.
+    const text = project.files[map.files[from]] ?? "";
+    const spelled = (n: string): boolean => new RegExp(`(?<![\\w$])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w$])`).test(text);
+    const lacking = names.filter((n) => !reached.has(name(n)) && !(reached.has("*") && spelled(name(n))));
+    if (imports.length === 0) missed.push(`${line}: ${map.files[from]} read importing nothing from ${map.files[to]}`);
+    else if (lacking.length > 0) missed.push(`${line}: ${map.files[from]} read importing no ${lacking.map(name).join(", ")} from ${map.files[to]}`);
+    else held.push(line);
+  }
+  return { held, missed };
+}
+
+const UNMAPPED = "nothing to check: the check project maps none of its files onto the reference project (reference), so nothing holds this plugin to read it as every language does";
+
+/** One language plugin's reading of the reference project: each relation held or missed, or why it was not read. */
+export type ReferenceReading = { plugin: string; language: string; held: string[]; missed: string[] } | { plugin: string; language: string; notRead: string };
+
+/**
+ * coherence plugin compare: every language plugin's reading of the
+ * reference project side by side, the bundled ones (opt-in among them) and
+ * any the project's config names, each over the check project that maps it,
+ * so a plugin that reads the same shape of project another way stands out.
+ */
+export async function compareReference(configured: readonly LoadedPlugin[] = []): Promise<ReferenceReading[]> {
+  const bundled = readdirSync(BUNDLED_DIR)
+    .sort()
+    .flatMap((name): LoadedPlugin[] => {
+      const dir = join(BUNDLED_DIR, name);
+      if (!existsSync(join(dir, "plugin.json"))) return [];
+      const { manifest } = readManifest(name, dir, `bundled plugin ${name}`);
+      return manifest?.provides?.language === undefined ? [] : [{ name, version: manifest.version, dir, source: "bundled", manifest }];
+    });
+  const plugins = [...bundled, ...configured.filter((p) => p.manifest.provides?.language !== undefined && !bundled.some((b) => b.dir === p.dir))];
+  const out: ReferenceReading[] = [];
+  for (const plugin of plugins) {
+    const language = plugin.manifest.provides!.language!;
+    const projects = checkProjects(plugin, language);
+    const mapped = "refusal" in projects ? undefined : [...projects].reverse().find((p) => p.project.reference !== undefined);
+    if (mapped === undefined) {
+      out.push({ plugin: plugin.name, language, notRead: "refusal" in projects ? projects.refusal : "no check project of it maps the reference project" });
+      continue;
+    }
+    out.push({ plugin: plugin.name, language, ...(await inScratch(mapped.project, plugin, language, (scratch) => referenceRelations(scratch, mapped.project, mapped.project.reference!, language))) });
+  }
+  return out;
+}
+
+/** The comparison as the command prints it: each relation, and each plugin's mark for it. */
+export function compareText(readings: readonly ReferenceReading[]): string {
+  const read = readings.filter((r): r is Extract<ReferenceReading, { held: string[] }> => "held" in r);
+  const relation = (line: string): string => line.split(": ")[0]!;
+  const relations = [...new Set(read.flatMap((r) => [...r.held, ...r.missed].map(relation)))];
+  const width = Math.max(...relations.map((r) => r.length), 10);
+  const lines = [`the reference project, read by each language plugin over its check project`, `  ${"".padEnd(width)}  ${read.map((r) => r.plugin).join("  ")}`];
+  for (const rel of relations) lines.push(`  ${rel.padEnd(width)}  ${read.map((r) => (r.held.includes(rel) ? "yes" : r.missed.some((m) => relation(m) === rel) ? "NO" : "-").padEnd(r.plugin.length)).join("  ")}`);
+  for (const r of read) for (const m of r.missed) lines.push(`DIVERGES  ${r.plugin} (${r.language}): ${m}`);
+  for (const r of readings) if ("notRead" in r) lines.push(`not read: ${r.plugin} (${r.language}): ${r.notRead}`);
+  return lines.join("\n");
+}
+
+/** A scratch copy of a check project with the plugin in its language's place, the work run for it, and the copy gone after. */
+export async function inScratch<T>(project: CheckProject, plugin: LoadedPlugin, language: string, work: (scratch: string) => T | Promise<T>): Promise<T> {
+  const scratch = realpathSync(mkdtempSync(join(tmpdir(), "coherence-plugin-check-")));
+  try {
+    for (const [path, text] of Object.entries(project.files)) {
+      mkdirSync(dirname(join(scratch, path)), { recursive: true });
+      writeFileSync(join(scratch, path), text);
+    }
+    writeFileSync(join(scratch, CONFIG), JSON.stringify(checkConfig(project, plugin, language), null, 2) + "\n");
+    registerProjectPlugins(scratch, isDefault(plugin) ? [] : [plugin]);
+    return await forProject(scratch, () => work(scratch));
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+/**
+ * reference reading: the language's readings recover, over its check project,
+ * every relation of the reference project its reference map places there.
+ */
+function referenceRead(scratch: string, project: CheckProject, plugin: LoadedPlugin, language: string): Duty {
+  const older = notHeld("reference reading", plugin);
+  if (older !== undefined) return older;
+  const map = project.reference;
+  if (map === undefined) return { name: "reference reading", verdict: "fail", reason: UNMAPPED };
+  const { held, missed } = referenceRelations(scratch, project, map, language);
+  return missed.length === 0 ? { name: "reference reading", verdict: "pass", reason: `${held.length} of ${held.length} relations of the reference project read` } : { name: "reference reading", verdict: "fail", reason: missed.join("; ") };
 }
 
 /** The answers the text readings must give over a check project, each compared exactly. */
@@ -91,7 +239,7 @@ type ReadingDuty = (typeof READING_DUTIES)[number];
 /** One duty's outcome. */
 export interface Duty {
   /** A language plugin's duties, or a verifier's one per form it declares, as a bullet writes it ("[quint run]"). */
-  name: "file rule" | "declarations" | "references" | "chokepoint" | "one answer each" | ReadingDuty | `[${string}]`;
+  name: "file rule" | "declarations" | "answers agree" | "reference reading" | "references" | "server agrees" | "chokepoint" | "one answer each" | ReadingDuty | `[${string}]`;
   verdict: "pass" | "fail" | "not run";
   reason: string;
 }
@@ -151,13 +299,18 @@ export function checkProjectProblem(value: unknown): string | undefined {
       if (!each(readings["entrances"], ["file", "symbol", "rule"], [])) wrong.push('readings.entrances, a list of { "file", "symbol", "rule" }');
     }
   }
+  const reference = value["reference"];
+  if (reference !== undefined && !(record(reference) && record(reference["files"]) && record(reference["names"]) && REFERENCE_ROLES.every((r) => typeof (reference["files"] as Record<string, unknown>)[r] === "string") && REFERENCE_NAMES.every((n) => typeof (reference["names"] as Record<string, unknown>)[n] === "string"))) wrong.push(`reference, { "files": { ${REFERENCE_ROLES.map((r) => `"${r}"`).join(", ")} }, "names": { ${REFERENCE_NAMES.map((n) => `"${n}"`).join(", ")} } }`);
   return wrong.length === 0 ? undefined : `it lacks ${wrong.join("; ")}`;
 }
 
-const DUTIES = ["file rule", "declarations", "references", "chokepoint"] as const;
+const DUTIES = ["file rule", "declarations", "answers agree", "reference reading", "references", "server agrees", "chokepoint"] as const;
+
+/** Every duty plugin check holds a language plugin to, in the order it reports them: what docs/plugins.md's duty table must list. */
+export const LANGUAGE_DUTIES = [...DUTIES, ...READING_DUTIES, "one answer each"] as const;
 
 /** The check projects a plugin is held over: the minimum (the bundled plugin's check.json for its language, as the installed package ships it, which no copy edits) and, when it adds to that, the plugin's own. */
-function checkProjects(plugin: LoadedPlugin, language: string): { label: string; project: CheckProject }[] | { refusal: string } {
+export function checkProjects(plugin: LoadedPlugin, language: string): { label: string; project: CheckProject }[] | { refusal: string } {
   const read = (file: string, label: string): CheckProject | string => {
     let value: unknown;
     try {
@@ -244,8 +397,14 @@ async function languageDutiesOf(plugin: LoadedPlugin, language: string): Promise
     const worst = found.reduce((a, b) => (rank[b.verdict] > rank[a.verdict] ? b : a));
     return { name, verdict: worst.verdict, reason: found.map((d) => d.reason).join("; ") };
   };
+  // The reference project is held over the check projects that map it: one that maps none (an extending plugin's own, beside the bundled minimum that does) says nothing, unless none maps it.
+  const unmapped = (d: Duty): boolean => d.name === "reference reading" && d.reason.includes(UNMAPPED);
   return [
-    ...DUTIES.map((name) => worstOf(name, each.map((duties) => duties.find((d) => d.name === name)!))),
+    ...DUTIES.map((name) => {
+      const found = each.map((duties) => duties.find((d) => d.name === name)!);
+      const held = found.filter((d) => !unmapped(d));
+      return worstOf(name, held.length > 0 ? held : found);
+    }),
     // A reading duty is held over every project that names what the readings recover; a plugin over none of them reads, for all anyone can tell, nothing.
     ...READING_DUTIES.map((name) => {
       const found = each.flatMap((duties) => duties.filter((d) => d.name === name));
@@ -258,7 +417,7 @@ async function languageDutiesOf(plugin: LoadedPlugin, language: string): Promise
 /** Whether each of the plugin's answers is given by one slot alone (repeatedAnswers). */
 function oneAnswerEach(plugin: LoadedPlugin): Duty {
   const repeated = repeatedAnswers(plugin);
-  return repeated.length === 0 ? { name: "one answer each", verdict: "pass", reason: "no two slots give one answer" } : { name: "one answer each", verdict: "fail", reason: `${repeated.join("; ")}: keep the answer in one slot (the kept answers read interfaces.wildcardModules, so a kept slot that repeats it goes)` };
+  return repeated.length === 0 ? { name: "one answer each", verdict: "pass", reason: "no two slots give one answer" } : { name: "one answer each", verdict: "fail", reason: `${repeated.join("; ")}: keep the answer in one slot` };
 }
 
 /** A duty's outcome, or the duty failed with what it threw: one duty that throws never takes the others' outcomes with it. */
@@ -286,7 +445,7 @@ async function overProject(project: CheckProject, plugin: LoadedPlugin, language
       const readings = project.readings;
       // The plain scans read the scratch project before the adapter's duties write any spec into it.
       const scans = readings === undefined ? [] : [await guarded("mass", () => massRead(scratch, project, readings, language)), await guarded("imports", () => importsRead(scratch, project, readings, language)), await guarded("entrances", () => entrancesRead(scratch, readings, language))];
-      return [await guarded("file rule", () => fileRule(project, language)), await guarded("declarations", () => declarations(project, language)), ...scans, ...(await instrument(scratch, project, plugin, language))];
+      return [await guarded("file rule", () => fileRule(project, language)), await guarded("declarations", () => declarations(project, language)), await guarded("answers agree", () => answersAgree(project, language)), await guarded("reference reading", () => referenceRead(scratch, project, plugin, language)), ...scans, ...(await instrument(scratch, project, plugin, language))];
     });
   } finally {
     rmSync(scratch, { recursive: true, force: true });
@@ -305,10 +464,67 @@ function fileRule(project: CheckProject, language: string): Duty {
 
 function declarations(project: CheckProject, language: string): Duty {
   if (project.declarations.length === 0) return { name: "declarations", verdict: "fail", reason: "nothing to check: the check project names no declaration" };
-  const topLevel = syntaxOf(language, "topLevel");
-  if (topLevel === undefined) return { name: "declarations", verdict: "fail", reason: `no topLevel slot says what a ${language} file declares` };
+  const topLevel = parsedOf(language, "topLevel");
+  if (topLevel === undefined) return { name: "declarations", verdict: "fail", reason: `the ${language} plugin names no treeSitter parser, so nothing says what a ${language} file declares` };
   const wrong = project.declarations.filter((d) => topLevel(project.files[d.file] ?? "", d.name) !== d.declared).map((d) => `${d.name} in ${d.file} read as ${d.declared ? "not declared" : "declared"}`);
   return wrong.length === 0 ? { name: "declarations", verdict: "pass", reason: `${project.declarations.length} of ${project.declarations.length} read as expected` } : { name: "declarations", verdict: "fail", reason: wrong.join("; ") };
+}
+
+/**
+ * answers agree: where two of the language's readings answer one question of
+ * the same text, their answers agree over every file of the check project. A
+ * name the source scan finds declared is one the topLevel reading finds at
+ * the top level, and a type declaration where the interfaces reading reads
+ * one in the line alone exactly where the declares reading reads a type in
+ * the whole text; and every name an interfaces import list renames is one the
+ * source scan reads imported. Two readers of one text that disagree are how a
+ * reading misses what another finds (df-7ac38ee4: Python's source scan read
+ * nothing of a from-import split across lines, which its interfaces slot read
+ * whole); the parser derives each of them from one parse, so what the duty
+ * still finds is queries that read a declaration by what surrounds it, which
+ * the same queries over its line alone read otherwise.
+ */
+function answersAgree(project: CheckProject, language: string): Duty {
+  const source = parsedOf(language, "source");
+  const topLevel = parsedOf(language, "topLevel");
+  const declares = parsedOf(language, "declares");
+  const interfaces = parsedOf(language, "interfaces");
+  const files = project.language.files.filter((f) => project.files[f] !== undefined);
+  const wrong: string[] = [];
+  let compared = 0;
+  for (const file of files) {
+    const text = project.files[file]!;
+    const lines = text.split("\n");
+    for (const d of declarationsOf(text, language)) {
+      const line = (lines[d.line - 1] ?? "").replace(/\r$/, "");
+      if (topLevel !== undefined) {
+        compared++;
+        if (!topLevel(text, d.name)) wrong.push(`${file}:${d.line}: source declares ${d.name}, which topLevel finds no top-level declaration of`);
+      }
+      // What it declares, where two slots say: unknown is no answer (a call's result may or may not execute), so only two answers are compared.
+      const kind = d.declares ?? declares?.(line);
+      if (interfaces !== undefined && kind !== undefined && kind !== "unknown") {
+        compared++;
+        if (interfaces.isTypeDeclaration(line) !== (kind === "type")) wrong.push(`${file}:${d.line}: interfaces reads ${d.name}'s line as ${interfaces.isTypeDeclaration(line) ? "" : "no "}type declaration, declares as ${kind}`);
+      }
+    }
+    if (source !== undefined && interfaces !== undefined) {
+      const imported = new Set<string>();
+      source.importsOf(text, (name, specifier) => {
+        if (name !== undefined) imported.add(name);
+        imported.add(specifier);
+        imported.add(specifier.split(/[./:\\]+/).filter((s) => s !== "").pop() ?? specifier);
+      });
+      for (const list of interfaces.importLists(text)) {
+        for (const [, original] of list.matchAll(/([A-Za-z_$][\w$.:]*)\s+as\s+[A-Za-z_$][\w$]*/g)) {
+          compared++;
+          if (!imported.has(original!)) wrong.push(`${file}: interfaces.importLists renames ${original}, which source.importsOf reads no import of`);
+        }
+      }
+    }
+  }
+  if (compared === 0) return { name: "answers agree", verdict: "fail", reason: "nothing to check: no file of the check project gives two slots one question to answer (a declaration, or a renamed import)" };
+  return wrong.length === 0 ? { name: "answers agree", verdict: "pass", reason: `${compared} answers of two slots to one question agree` } : { name: "answers agree", verdict: "fail", reason: wrong.join("; ") };
 }
 
 /** Two sorted lists' difference, said: what the reading missed and what it found that the check project names none of. */
@@ -401,6 +617,45 @@ async function interfacesRead(scratch: string, readings: Readings, adapter: Lang
   }
 }
 
+/** A duty a plugin written for an older interface version is not held to, said as such and passed: it did not exist when the plugin was written. */
+function notHeld(name: "reference reading" | "server agrees", plugin: LoadedPlugin): Duty | undefined {
+  const { since, asks } = DUTY_SINCE[name]!;
+  const written = plugin.manifest.pluginApi;
+  return written >= since ? undefined : { name, verdict: "pass", reason: `not held: plugin ${plugin.name} is written for pluginApi ${written}, and ${name} holds from pluginApi ${since}, which brought what it asks: ${asks} (docs/plugins.md)` };
+}
+
+/**
+ * server agrees: every name the text readings find a file of the check
+ * project declaring at its top level is a top-level symbol the language
+ * server reports for that file. The server is the independent account: a
+ * name the reading finds and the server does not is a misread (a name read
+ * out of a string or a comment, as Python's line scan read 223 of PostHog's),
+ * whatever the check project's readings say. A name the server reports that
+ * the reading leaves out is no failure here, since a reading may leave names
+ * out by design (Python's lowercase module variables); coherence plugin
+ * calibrate counts those by kind over a real project.
+ */
+async function serverAgrees(project: CheckProject, language: string, adapter: LanguageAdapter, base: LanguageAdapter | undefined): Promise<Duty> {
+  // An adapter that extends a language and does not ask the server itself answers through the one it wraps, which is the same server.
+  const ask = adapter.topLevelSymbols?.bind(adapter) ?? base?.topLevelSymbols?.bind(base);
+  if (ask === undefined) return { name: "server agrees", verdict: "fail", reason: "the plugin's adapter offers no topLevelSymbols, which pluginApi 3 asks of a language adapter, so the text reading's declarations cannot be held to the language server's" };
+  const wrong: string[] = [];
+  let compared = 0;
+  for (const file of project.language.files) {
+    const text = project.files[file];
+    if (text === undefined || !isSourceFile(file, language)) continue;
+    const declared = declarationsOf(text, language);
+    if (declared.length === 0) continue;
+    const symbols = new Set((await ask(file)).map((s) => s.name));
+    for (const d of declared) {
+      compared++;
+      if (!symbols.has(d.name)) wrong.push(`${file}:${d.line}: the text reading declares ${d.name}, which the language server reports no top-level symbol of`);
+    }
+  }
+  if (compared === 0) return { name: "server agrees", verdict: "fail", reason: "nothing to check: the text reading finds no declaration in any file of the check project" };
+  return wrong.length === 0 ? { name: "server agrees", verdict: "pass", reason: `${compared} of ${compared} declarations the text reading finds are top-level symbols the server reports` } : { name: "server agrees", verdict: "fail", reason: wrong.join("; ") };
+}
+
 /** The plugin's adapter over the scratch project: its module's factory, handed the bundled adapter of the language it extends, which the check closes as the core does. */
 function adapterOf(scratch: string, plugin: LoadedPlugin, language: string): { adapter: LanguageAdapter; base: LanguageAdapter | undefined } {
   if (isDefault(plugin)) return { adapter: bundledAdapter(language, scratch)!, base: undefined };
@@ -417,11 +672,11 @@ async function instrument(scratch: string, project: CheckProject, plugin: Loaded
     ({ adapter, base } = adapterOf(scratch, plugin, language));
   } catch (error) {
     const reason = `the plugin's adapter could not be built: ${error instanceof Error ? error.message : String(error)}`;
-    return [{ name: "references", verdict: "fail", reason }, { name: "chokepoint", verdict: "fail", reason }, ...(project.readings === undefined ? [] : [{ name: "interfaces" as const, verdict: "fail" as const, reason }])];
+    return [{ name: "references", verdict: "fail", reason }, notHeld("server agrees", plugin) ?? { name: "server agrees", verdict: "fail", reason }, { name: "chokepoint", verdict: "fail", reason }, ...(project.readings === undefined ? [] : [{ name: "interfaces" as const, verdict: "fail" as const, reason }])];
   }
   try {
     const ready = await adapter.ready().catch((error: unknown) => ({ ok: false as const, reason: `ready() threw: ${error instanceof Error ? error.message : String(error)}` }));
-    if (!ready.ok) return [{ name: "references", verdict: "not run", reason: ready.reason }, { name: "chokepoint", verdict: "not run", reason: ready.reason }, ...(project.readings === undefined ? [] : [{ name: "interfaces" as const, verdict: "not run" as const, reason: ready.reason }])];
+    if (!ready.ok) return [{ name: "references", verdict: "not run", reason: ready.reason }, notHeld("server agrees", plugin) ?? { name: "server agrees", verdict: "not run", reason: ready.reason }, { name: "chokepoint", verdict: "not run", reason: ready.reason }, ...(project.readings === undefined ? [] : [{ name: "interfaces" as const, verdict: "not run" as const, reason: ready.reason }])];
     const hint = { component: ".", testFolders: [...DEFAULT_TEST_FOLDERS] };
     const references = await guarded("references", async (): Promise<Duty> => {
       if (project.references.length === 0) return { name: "references", verdict: "fail", reason: `nothing to check: the check project names no reference to ${project.protects}` };
@@ -435,6 +690,7 @@ async function instrument(scratch: string, project: CheckProject, plugin: Loaded
       if (missed.length > 0 || extra.length > 0) return { name: "references", verdict: "fail", reason: [missed.length > 0 ? `missed ${missed.join(", ")}` : "", extra.length > 0 ? `reported ${extra.join(", ")}, which is none` : ""].filter((s) => s !== "").join("; ") };
       return { name: "references", verdict: "pass", reason: `${sites.length} of ${project.references.length} references to ${project.protects}` };
     });
+    const server = await guarded("server agrees", () => notHeld("server agrees", plugin) ?? serverAgrees(project, language, adapter, base));
     // The interface reading asks the same adapter, before the chokepoint's run writes its spec.
     const readings = project.readings;
     const interfaces = readings === undefined ? [] : [await guarded("interfaces", () => interfacesRead(scratch, readings, adapter))];
@@ -453,7 +709,7 @@ async function instrument(scratch: string, project: CheckProject, plugin: Loaded
       ].filter((s) => s !== "");
       return wrong.length === 0 ? { name: "chokepoint", verdict: "pass", reason: `${project.protects} through ${project.chokepoint} graded ${graded.grade}, refutation ${graded.refutation}` } : { name: "chokepoint", verdict: "fail", reason: wrong.join("; ") };
     });
-    return [references, ...interfaces, chokepoint];
+    return [references, server, ...interfaces, chokepoint];
   } finally {
     try {
       await adapter.close();

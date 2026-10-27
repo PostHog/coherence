@@ -180,6 +180,20 @@ export interface Defect extends Head, Citing, DefectOrigin {
   what: string;
   evidence: string;
   files: string[];
+  /**
+   * The component the defect belongs to, as its folder: given with
+   * --component, or derived at the write as the one component whose folder
+   * holds every file it names. Absent on a record written before the field,
+   * or whose files name no single component; readers derive one then, and
+   * say they did.
+   */
+  component?: string;
+  /**
+   * Why no file or component of the project holds the fault, given with
+   * --unplaced in place of --file and --component: the defect counts toward
+   * no subsystem, and says why.
+   */
+  unplaced?: string;
 }
 
 /** One planned action or one observable criterion, with the id its result binds to. */
@@ -489,7 +503,7 @@ export const RECORD_ROLES: { readonly [K in AnyRecord["kind"]]: FieldRoles<Extra
   conjecture: { ...HEAD_ROLES, ...CITING_ROLES, observation: "prose", couldBe: "prose", discriminatedBy: "prose" },
   resolution: { ...HEAD_ROLES, ...ORIGIN_ROLES, of: "meta", because: "prose", as: "prose", guard: "prose", decision: "meta" },
   dismissal: { ...HEAD_ROLES, of: "meta", because: "prose" },
-  defect: { ...HEAD_ROLES, ...CITING_ROLES, ...ORIGIN_ROLES, what: "prose", evidence: "prose", files: "meta" },
+  defect: { ...HEAD_ROLES, ...CITING_ROLES, ...ORIGIN_ROLES, what: "prose", evidence: "prose", files: "meta", component: "meta", unplaced: "prose" },
   experiment: { ...HEAD_ROLES, ...CITING_ROLES, expectation: "prose", context: "prose", actions: { each: STEP_ROLES }, criteria: { each: STEP_ROLES } },
   close: { ...HEAD_ROLES, of: "meta", results: "meta", outcome: "meta" },
   unable: { ...HEAD_ROLES, ...CITING_ROLES, what: "prose", because: "prose" },

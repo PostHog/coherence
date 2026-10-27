@@ -1,9 +1,10 @@
 /**
- * The Go plugin's text scans (plugins/go/go-source.ts, go-scope.ts,
- * go-interfaces.ts, go-top-level.ts): what a line declares, alone or in a
- * grouped block, what a file imports and which of the package's files each
- * name it uses comes from, where an import path resolves by go.mod and
- * go.work, and that mass reads Go as it reads the other languages.
+ * The Go plugin's readings of its text through Go's parser and go.scm (the
+ * manifest's treeSitter) and plugins/go/go-source.ts: what a file declares
+ * at the package level and what each declares, what a file imports and
+ * which of the package's files each name it uses comes from, where an
+ * import path resolves by go.mod and go.work, and that mass reads Go as it
+ * reads the other languages.
  */
 
 import assert from "node:assert/strict";
@@ -15,10 +16,8 @@ import { readEnforcementConfig } from "../enforcement/config.ts";
 import { computeMass, formatMass } from "../economy/mass.ts";
 import { declarationsOf, importsOf } from "../economy/source.ts";
 import { declares } from "../observation/interfaces.ts";
-import { isTypeDeclaration } from "../readings/scope/component-interfaces.ts";
-import { GO_INTERFACES } from "../../plugins/go/go-scope.ts";
-import { codeOnly, importsIn, packageNameOf, uncommented } from "../../plugins/go/go-source.ts";
-import { goDeclaresAtTop } from "../../plugins/go/go-top-level.ts";
+import { parsedOf, syntaxOf } from "../plugins/languages.ts";
+import { codeOnly, packageNameOf, uncommented } from "../../plugins/go/go-source.ts";
 
 const madeFolders: string[] = [];
 after(() => {
@@ -42,6 +41,9 @@ function project(files: Record<string, string>): string {
 before(() => {
   project({});
 });
+
+/** Go's topLevel slot, derived from its parser. */
+const atTop = (text: string, name: string): boolean => parsedOf("go", "topLevel")!(text, name);
 
 const DECLARATIONS = [
   "package store",
@@ -84,6 +86,9 @@ const DECLARATIONS = [
   "*/",
   "var _ Reader = (*Entry)(nil)",
   "var Ready bool",
+  "var Sum = 1 + 2",
+  "var Once = func() int { return 1 }()",
+  "var β, Γ = `raw`, -1",
   "const Version = \"1\"",
   "type Count int",
   "type Arr [4]int",
@@ -96,10 +101,17 @@ const DECLARATIONS = [
   "\treturn inner",
   "}",
   "",
+  "var generated = `",
+  "package fake",
+  "func Fake() {}",
+  "`",
+  "",
+  "func After() {}",
+  "",
   "func main() { fmt.Println(Version) }",
 ].join("\n");
 
-test("a Go line declares a package-level func, type, var or const at column zero, or a member of a grouped block one level in; exported when its name starts upper case; a method, a field, a local, the blank identifier and a name in a comment or a raw string declare nothing", () => {
+test("a Go file declares a package-level func, type, var or const, alone or in a grouped block, each name of a list; exported when its name starts upper case; a method, a field, a local, the blank identifier and a name in a comment or a raw string (a package clause in one among it) declare nothing", () => {
   const found = declarationsOf(DECLARATIONS, "go").map((d) => [d.name, d.exported]);
   assert.deepEqual(found, [
     ["Entry", true],
@@ -107,42 +119,51 @@ test("a Go line declares a package-level func, type, var or const at column zero
     ["Rows", true],
     ["List", true],
     ["limit", false],
+    ["depth", false],
     ["usage", false],
     ["Write", true],
     ["Table", true],
     ["A", true],
     ["B", true],
     ["Ready", true],
+    ["Sum", true],
+    ["Once", true],
+    ["β", false],
+    ["Γ", true],
     ["Version", true],
     ["Count", true],
     ["Arr", true],
     ["Map", true],
+    ["generated", false],
+    ["After", true],
     ["main", false],
   ]);
-  for (const name of ["depth", "limit", "Reader", "B", "Map"]) assert.ok(goDeclaresAtTop(DECLARATIONS, name), `${name} is declared at the top level`);
-  for (const name of ["ID", "Name", "Read", "Hidden", "Commented", "_", "Method", "local", "inner", "store", "fmt"]) assert.ok(!goDeclaresAtTop(DECLARATIONS, name), `${name} is not`);
+  for (const name of ["depth", "limit", "Reader", "B", "Map", "β", "After"]) assert.ok(atTop(DECLARATIONS, name), `${name} is declared at the top level`);
+  for (const name of ["ID", "Name", "Read", "Hidden", "Commented", "Fake", "_", "Method", "local", "inner", "store", "fmt"]) assert.ok(!atTop(DECLARATIONS, name), `${name} is not`);
 });
 
-test("what a Go declaration line declares, alone or read by the scan just before: an interface or alias is a type only, a const a value, a var by what it is set to, a func, struct or other defined type a body", () => {
-  const lines = DECLARATIONS.split("\n");
-  declarationsOf(DECLARATIONS, "go");
-  const at = (start: string): string => lines.find((l) => l.startsWith(start))!;
-  const read = (start: string): [string, boolean] => [declares(at(start), "go"), isTypeDeclaration(at(start), "go")];
-  assert.deepEqual(read("type Entry"), ["body", false], "a struct's methods are declared apart from it");
-  assert.deepEqual(read("\tReader"), ["type", true]);
-  assert.deepEqual(read("\tRows"), ["type", true], "a grouped alias");
-  assert.deepEqual(read("\tList"), ["body", false], "a generic defined type, its type parameters passed over");
-  assert.deepEqual(read("\tlimit"), ["value", false]);
-  assert.deepEqual(read("\tWrite"), ["body", false], "a var set to a func literal");
-  assert.deepEqual(read("\tTable"), ["unknown", false], "a composite literal may hold a func");
-  assert.deepEqual(read("\tA ="), ["value", false]);
-  assert.deepEqual(read("var Ready"), ["unknown", false], "a var set later may hold a func");
-  assert.deepEqual(read("type Count"), ["body", false]);
-  assert.deepEqual(read("func Map"), ["body", false]);
+test("what a Go declaration declares, read in its file: an interface or alias is a type only, a const a value, a var by its first value, a func, struct or other defined type a body", () => {
+  const kinds = new Map(declarationsOf(DECLARATIONS, "go").map((d) => [d.name, d.declares]));
+  const read = (name: string): string | undefined => kinds.get(name);
+  assert.equal(read("Entry"), "body", "a struct's methods are declared apart from it");
+  assert.equal(read("Reader"), "type", "a grouped interface");
+  assert.equal(read("Rows"), "type", "a grouped alias");
+  assert.equal(read("List"), "body", "a generic defined type, its type parameters passed over");
+  assert.equal(read("limit"), "value");
+  assert.equal(read("usage"), "value", "a raw string, whatever lines it spans");
+  assert.equal(read("Write"), "body", "a var set to a func literal");
+  assert.equal(read("Once"), "unknown", "a func literal called: the var holds what it returns");
+  assert.equal(read("Table"), "unknown", "a composite literal may hold a func");
+  assert.equal(read("Sum"), "value", "no operator yields a func");
+  assert.equal(read("Γ"), "value", "each name of a list read by the list's first value");
+  assert.equal(read("A"), "value");
+  assert.equal(read("Ready"), "unknown", "a var set later may hold a func");
+  assert.equal(read("Count"), "body");
+  assert.equal(read("Map"), "body");
   assert.equal(declares("func (e *Entry) Method() string { return e.ID }", "go"), "unknown", "a method is no package-level declaration");
 });
 
-test("a Go import is read single and grouped, named, dot and blank, never from a comment or a string, and blanking keeps every offset", () => {
+test("a Go import is read single and grouped, named, dot and blank, never from a comment or a string, each whole package narrowed to the exported names the file uses through the name it binds; blanking keeps every offset", () => {
   const text = [
     "package api",
     "",
@@ -154,17 +175,31 @@ test("a Go import is read single and grouped, named, dot and blank, never from a
     "\t. \"shop/dot\"",
     "\t`shop/raw`",
     "\t// \"shop/commented\"",
+    "\t\"gopkg.in/yaml.v3\"",
     ")",
     "",
     "var s = \"import \\\"shop/in_string\\\"\"",
+    "var src = `",
+    "package fake",
+    "import \"shop/in_raw\"",
+    "`",
+    "",
+    "func Handle(w http.ResponseWriter, rows ...st.Row) {",
+    "\tfmt.Println(st.Seal(rows), st.lower, yaml.Marshal, raw.X)",
+    "\tdot := 1",
+    "\t_ = dot.Field",
+    "}",
   ].join("\n");
-  assert.deepEqual(importsIn(text).map((i) => `${i.alias ?? "-"} ${i.path}`), ["- fmt", "st shop/store", "- net/http", "_ shop/side", ". shop/dot", "- shop/raw"]);
+  const imports: string[] = [];
+  parsedOf("go", "source")!.importsOf(text, (name, specifier) => imports.push(`${name ?? "*"} <- ${specifier}`));
+  assert.deepEqual(imports, ["Println <- fmt", "Row <- shop/store", "Seal <- shop/store", "ResponseWriter <- net/http", "* <- shop/side", "* <- shop/dot", "X <- shop/raw", "Marshal <- gopkg.in/yaml.v3"], "a variadic ...st.Row is a use; an unexported st.lower is none; a local named as a dot-imported package is no qualifier of it");
+  assert.deepEqual(parsedOf("go", "interfaces")!.importLists(text), ["shop/store as st, shop/side as _, shop/dot as ."]);
   assert.equal(uncommented(text).length, text.length);
   assert.equal(codeOnly(text).length, text.length);
   assert.deepEqual(["shop/store", "gopkg.in/yaml.v3", "github.com/go-chi/chi/v5", "example.com/go-redis"].map(packageNameOf), ["store", "yaml", "chi", "redis"]);
 });
 
-test("a Go import path resolves under the module go.mod names, and the root's go.work, to the file of the package that declares each name the file uses through it; a package used for its side effects, dot-imported or never spelled is its first file; any other path resolves to nothing; a deleted file stands in for the names no file left declares", () => {
+test("a Go import path resolves under the module go.mod names, and the root's go.work, to the package, each name the file uses through it joining the file that declares it; a package used for its side effects, dot-imported or never spelled joins every file of it; any other path resolves to nothing; a deleted file stays among its files, so a name no file left declares still finds its importer", () => {
   const root = project({
     "go.mod": "module example.com/shop\n\ngo 1.22\n",
     "go.work": "go 1.22\n\nuse (\n\t.\n\t./tools\n)\n",
@@ -193,19 +228,22 @@ test("a Go import path resolves under the module go.mod names, and the root's go
     "}",
   ].join("\n");
   const imports = (file: string, text: string, vanished?: ReadonlySet<string>): string[] => importsOf(root, file, text, "go", vanished).map((i) => `${i.name ?? "*"} <- ${i.module}`);
-  assert.deepEqual(imports("api/render.go", api), ["* <- store/a_rows.go", "* <- store/secrets.go", "* <- side/side.go", "* <- tools/lint/lint.go"], "each name from the file that declares it; a blank import whole; a module go.work uses; the standard library and another module nothing");
-  assert.deepEqual(imports("api/render.go", "package api\n\nimport . \"example.com/shop/store\"\n\nvar x = Seal\n"), ["* <- store/a_rows.go"], "a dot import is of the package whole");
-  assert.deepEqual(imports("api/render.go", "package api\n\nimport \"example.com/shop/store\"\n"), ["* <- store/a_rows.go"], "an import whose names the file never spells is of the package whole");
+  assert.deepEqual(imports("api/render.go", api), ["Row <- store/a_rows.go", "Seal <- store/secrets.go", "SecretColumns <- store/secrets.go", "* <- side/side.go", "Run <- tools/lint/lint.go"], "each name from the file that declares it; a blank import whole; a module go.work uses; the standard library and another module nothing");
+  assert.deepEqual(imports("api/render.go", "package api\n\nimport . \"example.com/shop/store\"\n\nvar x = Seal\n"), ["* <- store/a_rows.go", "* <- store/secrets.go"], "a dot import is of the package whole");
+  assert.deepEqual(imports("api/render.go", "package api\n\nimport \"example.com/shop/store\"\n"), ["* <- store/a_rows.go", "* <- store/secrets.go"], "an import whose names the file never spells is of the package whole");
   const gone = new Set(["store/b_cache.go"]);
-  assert.deepEqual(imports("api/render.go", "package api\n\nimport \"example.com/shop/store\"\n\nvar c = store.Cache\nvar s = store.Seal\n", gone), ["* <- store/b_cache.go", "* <- store/secrets.go"], "a name no file left declares resolves to the deleted file, so its importer is found");
+  assert.deepEqual(imports("api/render.go", "package api\n\nimport \"example.com/shop/store\"\n\nvar c = store.Cache\nvar s = store.Seal\n", gone), ["Cache <- store/a_rows.go", "Cache <- store/b_cache.go", "Cache <- store/secrets.go", "Seal <- store/secrets.go"], "a name no file left declares joins every file of the package, the deleted one among them, so its importer is found");
 });
 
-test("the Go interfaces slot: Go renames packages, never names, so no import list holds an alias; it has no default export; gopls takes no bounds; a dot import's names are spelled at each use", () => {
-  assert.deepEqual(GO_INTERFACES.importLists("import st \"shop/store\"\n"), []);
-  assert.deepEqual(GO_INTERFACES.defaultNames("package x\n"), []);
-  assert.deepEqual(GO_INTERFACES.wildcardModules("api/render.go", "import . \"shop/store\"\n"), []);
-  assert.equal(GO_INTERFACES.isDefaultExport("func Render() {}"), false);
-  assert.equal(GO_INTERFACES.serverBounds, false);
+test("the Go interfaces reading: an interface or alias line is a type declaration, it has no default export, gopls takes no bounds, and a dot import keys no wildcard path, since its names are spelled at each use", () => {
+  const interfaces = parsedOf("go", "interfaces")!;
+  assert.equal(interfaces.isTypeDeclaration("type Reader interface{ Read() }"), true);
+  assert.equal(interfaces.isTypeDeclaration("type Rows = []Row"), true);
+  assert.equal(interfaces.isTypeDeclaration("type Row struct{}"), false);
+  assert.deepEqual(interfaces.defaultNames("package x\n"), []);
+  assert.deepEqual(interfaces.wildcardModules("api/render.go", "package api\n\nimport . \"shop/store\"\n"), []);
+  assert.equal(interfaces.isDefaultExport("func Render() {}"), false);
+  assert.equal(syntaxOf("go", "interfaces")?.serverBounds ?? false, false, "Go fills no interfaces table, so its server takes no bounds");
 });
 
 test("mass reads a Go project as it reads the other languages: its files counted, its declarations found, and no language named not read", () => {

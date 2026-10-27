@@ -78,17 +78,42 @@ function insideNested(root: string, rel: string, memo: Map<string, boolean>): bo
   return false;
 }
 
+/**
+ * Whether a listed path is a file a reading may open: a regular file, or a
+ * link to one. Never a folder, a pipe, a socket or a device, which a read
+ * waits on forever or reads without end, and never a link that leads to one
+ * of those or nowhere. The one test every enumeration of the project's files
+ * passes, so no reading is handed what it cannot read.
+ */
 function isFileOnDisk(root: string, rel: string): boolean {
   try {
-    return !lstatSync(join(root, rel)).isDirectory();
+    const entry = lstatSync(join(root, rel));
+    return entry.isFile() || (entry.isSymbolicLink() && statSync(join(root, rel)).isFile());
   } catch {
     return false;
   }
 }
 
-function isFolderOnDisk(root: string, rel: string): boolean {
+/**
+ * Whether what is at a path a change names is no file of the change: a
+ * folder, or a pipe, a socket or a device, which a read waits on forever or
+ * reads without end, or a link to one of those. A link git tracks is a file
+ * of the change whatever it leads to, a folder or nothing: relinked or left
+ * dangling, it changed. A path with nothing at it (a tracked file an edit
+ * deleted) is not.
+ */
+function isOtherOnDisk(root: string, rel: string): boolean {
+  let entry;
   try {
-    return lstatSync(join(root, rel)).isDirectory();
+    entry = lstatSync(join(root, rel));
+  } catch {
+    return false;
+  }
+  if (entry.isDirectory()) return true;
+  if (!entry.isSymbolicLink()) return !entry.isFile();
+  try {
+    const target = statSync(join(root, rel));
+    return !target.isFile() && !target.isDirectory();
   } catch {
     return false;
   }
@@ -385,7 +410,7 @@ export function keepProjectFiles(root: string, paths: readonly string[], listing
   const memo = new Map<string, boolean>();
   const plugins = pluginFolders(base);
   const candidates = [...new Set(paths.map((p) => projectRelative(base, p)).filter((rel): rel is string => rel !== undefined))].filter(
-    (rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && !isFolderOnDisk(base, rel) && !rel.split("/").includes(".git"),
+    (rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && !isOtherOnDisk(base, rel) && !rel.split("/").includes(".git"),
   );
   if (candidates.length === 0 || !inRepository(base)) {
     return new Set(inRepository(base) ? [] : candidates.filter((rel) => !rel.split("/").includes("node_modules")));

@@ -20,7 +20,7 @@ import { configIgnore, projectSites } from "../adapters/project-files.ts";
 import { componentOf, declarationsOf, isTest, sourceFiles } from "../economy/source.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
 import type { Language } from "../adapters/index.ts";
-import { syntaxOf } from "../plugins/languages.ts";
+import { parsedOf } from "../plugins/languages.ts";
 import type { SpecModel } from "../spec/model.ts";
 
 export interface InterfaceSite {
@@ -72,8 +72,8 @@ export function interfaceId(from: string, to: string): string {
 
 /** What a declaration line's keyword says can execute. */
 export function declares(line: string, language: Language): InterfaceSymbol["declares"] {
-  // Each language's reading is its plugin's (the declares slot); a language whose plugin fills none says nothing executes.
-  return syntaxOf(language, "declares")?.(line) ?? "unknown";
+  // Each language's reading is its parser's; a language whose plugin names none says nothing executes.
+  return parsedOf(language, "declares")?.(line) ?? "unknown";
 }
 
 
@@ -109,7 +109,7 @@ export async function readInterfaceMap(root: string, adapter: LanguageAdapter, m
         unanswered.set(file, error instanceof Error ? error.message : String(error));
         break;
       }
-      const kind = declares(lines[declaration.line - 1] ?? "", language);
+      const kind = declaration.declares ?? declares(lines[declaration.line - 1] ?? "", language);
       for (const site of projectSites(root, references)) {
         if (isTest(site.file, testFolders)) continue;
         const from = componentOf(model, site.file)?.folder;

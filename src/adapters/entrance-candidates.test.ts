@@ -236,6 +236,114 @@ describe("entrance detection", () => {
     }
   });
 
+  test("the Rust rules detect what wasm-bindgen and UniFFI export (an exported impl's pub methods and constructor as Type::method, a start fn) and an example's main at Cargo's default paths; never an extern block's imports, a private or plain impl's method, a trait impl wasm-bindgen cannot export, a test module or a tests.rs", () => {
+    const { root, files, remove } = project({
+      "Cargo.toml": '[package]\nname = "viewer"\n',
+      "src/lib.rs": [
+        "use wasm_bindgen::prelude::*;",
+        "",
+        "#[wasm_bindgen]",
+        'extern "C" {',
+        "    #[wasm_bindgen(js_namespace = console)]",
+        "    fn log(s: &str);",
+        "}",
+        "",
+        "#[wasm_bindgen(start)]",
+        "fn boot() {}",
+        "",
+        "/// The viewer: { a brace in a doc comment opens nothing.",
+        "#[wasm_bindgen]",
+        "pub struct Viewer {",
+        "    frames: u32,",
+        "}",
+        "",
+        "#[wasm_bindgen]",
+        "impl Viewer {",
+        "    #[wasm_bindgen(constructor)]",
+        "    pub fn new() -> Viewer {",
+        '        let close = "}";',
+        "        Viewer { frames: 0 }",
+        "    }",
+        "",
+        "    /// Draws a frame.",
+        "    pub fn draw(&mut self) {",
+        "        fn nested() {}",
+        "        if self.frames > 0 {",
+        "            nested();",
+        "        }",
+        "    }",
+        "",
+        "    #[wasm_bindgen(getter)]",
+        "    pub fn frames(&self) -> u32 {",
+        "        self.frames",
+        "    }",
+        "",
+        "    #[wasm_bindgen(skip)]",
+        "    pub fn skipped(&self) {}",
+        "    fn private(&self) {}",
+        "    pub(crate) fn crate_only(&self) {}",
+        "}",
+        "",
+        "impl Viewer {",
+        "    pub fn not_exported(&self) {}",
+        "}",
+        "",
+        "#[wasm_bindgen]",
+        "impl Default for Viewer {",
+        "    fn default() -> Self { Viewer::new() }",
+        "}",
+        "",
+        "#[uniffi::export]",
+        "pub fn open_store(path: String) -> u32 { 0 }",
+        "",
+        "#[uniffi::export]",
+        "impl Store {",
+        "    #[uniffi::constructor]",
+        "    pub fn new() -> Self { Store }",
+        "    pub fn rows(&self) -> u32 { 0 }",
+        "    fn private(&self) {}",
+        "}",
+        "",
+        "#[uniffi::export]",
+        "impl Shape for Ring {",
+        "    fn area(&self) -> f32 { 0.0 }",
+        "}",
+        "",
+        "#[cfg(test)]",
+        "mod tests {",
+        "    #[wasm_bindgen]",
+        "    impl Fake {",
+        "        pub fn fake(&self) {}",
+        "    }",
+        "}",
+      ].join("\n"),
+      "src/scene/tests.rs": '#[no_mangle]\npub extern "C" fn only_for_tests() {}\n',
+      "examples/demo.rs": "fn main() {}\n",
+      "examples/tour/main.rs": "fn main() {}\n",
+      "examples/tour/helper.rs": "fn main() {}\n",
+      "src/examples/inner.rs": "fn main() {}\n",
+    });
+    try {
+      const found = detectEntranceCandidates(root, { language: "rust", files, wrappers: [], testFolders: [] });
+      const rules = new Set(CANDIDATE_RULES["rust"]!.map((r) => r.rule));
+      for (const c of found) assert.ok(rules.has(c.rule) && c.why.length > 0, `${c.rule} is a listed rule and says why`);
+      const names = (rule: string): string[] => found.filter((c) => c.rule === rule).map((c) => `${c.file}:${c.line} ${c.symbol}`).sort();
+      assert.deepEqual(
+        names("foreign export"),
+        ["src/lib.rs:20 Viewer::new", "src/lib.rs:27 Viewer::draw", "src/lib.rs:34 Viewer::frames", "src/lib.rs:54 open_store", "src/lib.rs:59 Store::new", "src/lib.rs:61 Store::rows", "src/lib.rs:67 Ring::area", "src/lib.rs:9 boot"],
+        "an exported impl's methods by Type::method at their attributes; a skipped, private, pub(crate), plain impl's or wasm trait impl's method, a nested fn, an extern block's import and a test module's are none; a tests.rs is a test file",
+      );
+      assert.match(found.find((c) => c.symbol === "boot")!.why, /wasm_bindgen\(start\)/);
+      assert.match(found.find((c) => c.symbol === "Viewer::new")!.why, /constructor/);
+      assert.match(found.find((c) => c.symbol === "Ring::area")!.why, /uniffi::export/);
+      assert.deepEqual(names("example"), ["examples/demo.rs:1 main", "examples/tour/main.rs:1 main"], "an example's main at Cargo's default paths alone: a helper beside it and a module's examples folder under src/ are none");
+      assert.deepEqual(found.filter((c) => c.rule === "example").map((c) => entranceName(c)).sort(), ["example demo", "example tour"]);
+      assert.deepEqual(names("binary"), [], "an example is no binary");
+    } finally {
+      remove();
+    }
+  });
+
   test("the Go rules detect a command's main, a handler registered on a ServeMux, a route on a router the file imports, and a cgo export; a doc comment, a string, an inline handler, a test file and a router method in a file that imports no router detect nothing", () => {
     const { root, files, remove } = project({
       "coherence.config.json": JSON.stringify({ language: "go", plugins: { go: "bundled" } }),

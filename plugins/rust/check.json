@@ -2,15 +2,19 @@
   "files": {
     "Cargo.toml": "[package]\nname = \"shop\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[lib]\npath = \"src/lib.rs\"\n",
     "src/lib.rs": "pub mod store;\npub mod api;\n",
-    "src/store/mod.rs": "pub const SECRET_COLUMNS: &[&str] = &[\"token\"];\n\npub fn seal(row: &mut Vec<String>) {\n    row.retain(|c| !SECRET_COLUMNS.contains(&c.as_str()));\n}\n",
-    "src/api/mod.rs": "use crate::store::{seal, SECRET_COLUMNS};\n\npub fn render(row: &mut Vec<String>) -> usize {\n    seal(row);\n    SECRET_COLUMNS.len()\n}\n",
+    "src/store/mod.rs": "pub const SECRET_COLUMNS: &[&str] = &[\"token\"];\n\npub fn seal(row: &mut Vec<String>) {\n    row.retain(|c| !SECRET_COLUMNS.contains(&c.as_str()));\n}\n\npub mod rows;\n",
+    "src/api/mod.rs": "use crate::store::{seal, SECRET_COLUMNS};\nuse crate::store::rows::Row;\n\npub fn render(row: &mut Row) -> usize {\n    seal(&mut row.0);\n    SECRET_COLUMNS.len()\n}\n",
     "README.md": "# A crate\n",
-    "src/main.rs": "fn main() {\n    let mut row = vec![\"token\".to_string()];\n    println!(\"{}\", shop::api::render(&mut row));\n}\n"
+    "src/main.rs": "use shop::api::render;\nuse shop::store::{\n    rows::Row as Stored,\n    *,\n};\n\nfn main() {\n    use shop::store::rows::Row;\n    let mut row: Stored = Row(vec![\"token\".to_string()]);\n    println!(\"{}\", render(&mut row));\n}\n",
+    "src/store/rows.rs": "/// One stored row, by column.\npub struct Row(pub Vec<String>);\n"
   },
   "language": {
     "files": [
+      "src/api/mod.rs",
       "src/lib.rs",
-      "src/store/mod.rs"
+      "src/main.rs",
+      "src/store/mod.rs",
+      "src/store/rows.rs"
     ],
     "not": [
       "README.md",
@@ -43,13 +47,13 @@
   "chokepoint": "seal",
   "references": [
     "src/api/mod.rs:1",
-    "src/api/mod.rs:5",
+    "src/api/mod.rs:6",
     "src/store/mod.rs:4"
   ],
   "grade": "broken",
   "bypasses": [
     "src/api/mod.rs:1",
-    "src/api/mod.rs:5"
+    "src/api/mod.rs:6"
   ],
   "readings": {
     "declared": {
@@ -65,7 +69,11 @@
       ],
       "src/store/mod.rs": [
         "SECRET_COLUMNS",
+        "rows",
         "seal"
+      ],
+      "src/store/rows.rs": [
+        "Row"
       ]
     },
     "imports": [
@@ -90,6 +98,41 @@
         "names": [
           "*"
         ]
+      },
+      {
+        "file": "src/api/mod.rs",
+        "module": "src/store/rows.rs",
+        "names": [
+          "Row"
+        ]
+      },
+      {
+        "file": "src/store/mod.rs",
+        "module": "src/store/rows.rs",
+        "names": [
+          "*"
+        ]
+      },
+      {
+        "file": "src/main.rs",
+        "module": "src/api/mod.rs",
+        "names": [
+          "render"
+        ]
+      },
+      {
+        "file": "src/main.rs",
+        "module": "src/store/rows.rs",
+        "names": [
+          "Row"
+        ]
+      },
+      {
+        "file": "src/main.rs",
+        "module": "src/store/mod.rs",
+        "names": [
+          "*"
+        ]
       }
     ],
     "interfaces": [
@@ -97,7 +140,9 @@
         "from": "src/api",
         "to": "src/store",
         "symbols": [
+          "Row",
           "SECRET_COLUMNS",
+          "rows",
           "seal"
         ]
       }
@@ -109,5 +154,19 @@
         "rule": "binary"
       }
     ]
+  },
+  "reference": {
+    "files": {
+      "secrets": "src/store/mod.rs",
+      "rows": "src/store/rows.rs",
+      "render": "src/api/mod.rs",
+      "main": "src/main.rs"
+    },
+    "names": {
+      "SECRET_COLUMNS": "SECRET_COLUMNS",
+      "seal": "seal",
+      "Row": "Row",
+      "render": "render"
+    }
   }
 }

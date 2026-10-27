@@ -1,8 +1,9 @@
 /**
- * The plugin interface kept to one model of each language: a slot a plugin
- * leaves empty is said as not read, never read as an empty project; no
- * plugin answers one question in two slots; and the core names no
- * language's files, which are its plugin's to name.
+ * The plugin interface kept to one model of each language: a language whose
+ * plugin names no parser, or a slot a plugin leaves empty, is said as not
+ * read, never read as an empty project; no plugin answers one question in
+ * two slots; and the core names no language's files, which are its
+ * plugin's to name.
  */
 
 import assert from "node:assert/strict";
@@ -36,19 +37,18 @@ function project(files: Record<string, string>): string {
 
 const STAND_IN = 'export default { adapter: ({ language }) => ({ language, ladder: { top: "reference-choked", because: "a stand-in", rungs: [] }, ready: async () => ({ ok: true }), resolve: async () => ({ ok: false, reason: "a stand-in" }), references: async () => [], visibility: async () => ({ enforced: false, visible: true, evidence: "a stand-in" }), testFilter: (via) => via, refute: async () => ({ seen: false, staged: [], account: "a stand-in" }), forget: async () => {}, close: async () => {} }) };\n';
 
-test("a plugin that fills no source slot is named not read by mass, with why, never measured as a project of no code", () => {
+test("a plugin that names no parser is named not read by mass, with why, never measured as a project of no code", () => {
   const root = project({
     "coherence.config.json": JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }),
-    "plugins/zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, module: "./index.ts", extensions: [".zz"], syntax: { topLevel: "top.ts#zzDeclaresAtTop" } }),
+    "plugins/zz/plugin.json": JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, module: "./index.ts", extensions: [".zz"] }),
     "plugins/zz/index.ts": STAND_IN,
-    "plugins/zz/top.ts": "export const zzDeclaresAtTop = (text, name) => text.split(\"\\n\").includes(`verb ${name}`);\n",
     "app/accounts.zz": "verb reset\nverb rename\n",
   });
   readEnforcementConfig(root);
   const report = computeMass(root);
   assert.deepEqual(report.languages.read, []);
   assert.deepEqual(report.languages.unread.map((u) => u.language), ["zz"]);
-  assert.match(report.languages.unread[0]!.because, /the zz plugin fills no source slot/);
+  assert.match(report.languages.unread[0]!.because, /the zz plugin names no treeSitter parser/);
   assert.match(formatMass(report), /zz NOT READ/);
 });
 

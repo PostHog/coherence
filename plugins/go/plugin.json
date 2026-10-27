@@ -1,7 +1,7 @@
 {
   "name": "go",
   "version": "0.1.0",
-  "pluginApi": 2,
+  "pluginApi": 4,
   "provides": {
     "language": "go"
   },
@@ -23,12 +23,14 @@
     "vendor"
   ],
   "module": "index.ts",
+  "treeSitter": {
+    "parser": "tree-sitter-go.wasm",
+    "queries": "go.scm",
+    "resolve": "go-source.ts#GO_RESOLVE",
+    "privateName": "^\\P{Lu}"
+  },
   "syntax": {
-    "entrances": "go-entrances.ts#GO_ENTRANCES",
-    "interfaces": "go-scope.ts#GO_INTERFACES",
-    "source": "go-source.ts#GO_SOURCE",
-    "declares": "go-interfaces.ts#goDeclares",
-    "topLevel": "go-top-level.ts#goDeclaresAtTop"
+    "entrances": "go-entrances.ts#GO_ENTRANCES"
   },
   "ladder": {
     "top": "visibility-choked",

@@ -10,6 +10,7 @@
  * config the registry does not list is adopted there but not opted in.
  */
 
+import { deadEndLines, readDeadEnds } from "../journal/dead-ends.ts";
 import { realpathSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import type { Io } from "../journal/cli.ts";
@@ -49,6 +50,8 @@ export function specCommand(argv: string[], io: Io): number {
     return hasProblems(model) ? 1 : 0;
   }
   io.out(formatReport(model).trimEnd());
+  // Advisory, after the defect floor: subsystems at a dead end, read from every worktree's journal (journal/dead-ends.ts).
+  for (const line of deadEndLines(readDeadEnds(model.root, model.components))) io.out(line);
   const extra = registry === undefined ? [] : registryLines(registry);
   for (const line of extra) io.out(line);
   return hasProblems(model) || extra.length > 0 ? 1 : 0;

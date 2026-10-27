@@ -1,6 +1,6 @@
 {
   "name": "@posthog/coherence",
-  "version": "1.10.1",
+  "version": "1.11.0",
   "description": "A prosthetic for proprioception: specs, invariants, and the readings that keep an agent balanced.",
   "type": "module",
   "license": "MIT",
@@ -79,5 +79,8 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
+  },
+  "dependencies": {
+    "web-tree-sitter": "0.27.1"
   }
 }

@@ -86,25 +86,23 @@ import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
 import { KeptAnswers } from "./kept-answers.ts";
 import { DECLARED_NOT_READ, languagesRead, notScannedYet, unscannedOf } from "./languages-read.ts";
-import { fillsSlot, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
+import { parsedOf, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, InterfaceUnanswered, KeptReport, ReachReference, ScopedReading } from "./model.ts";
 
 /**
- * What the reading knows of one language's syntax without its server, each
- * language's in its plugin's module (the `interfaces` slot of its manifest's
- * syntax): a language whose plugin fills no such slot is named not read
- * (notScannedYet) before the reading reaches it, never read as another
- * language.
+ * What the reading reads of one language's text without its server, each
+ * derived from one parse through the parser its plugin names (languages.ts
+ * parsedOf), never a plugin's own reader of the text: a language whose plugin
+ * names no parser is named not read (notScannedYet) before the reading
+ * reaches it, never read as another language.
  */
-export interface InterfaceSyntax {
+export interface InterfaceReadings {
   /** Whether a declaration line declares a type only (an interface or a type alias). */
   isTypeDeclaration(line: string): boolean;
   /** Whether a declaration line is its module's default export. */
   isDefaultExport(line: string): boolean;
-  /** Whether the language's server narrows to bounds, so a reader that keeps one warm starts a bounded one of its own. */
-  serverBounds: boolean;
   /** The import and export lists a file's text holds, each the text its `original as alias` renames are read from. */
   importLists(text: string): string[];
   /** The names a file's text exports as a default by name. */
@@ -113,16 +111,27 @@ export interface InterfaceSyntax {
   wildcardModules(file: string, text: string): string[];
 }
 
-/** A language's syntax for the reading, from its plugin; one that reads nothing for a language whose plugin fills no interfaces slot. */
-function interfaceSyntax(language: Language): InterfaceSyntax {
-  return syntaxOf(language, "interfaces") ?? NO_INTERFACES;
+/**
+ * What a plugin's interfaces table states of its language (the `interfaces`
+ * slot of its manifest's syntax): a fact no parse answers, and no reading of
+ * the language's text, which the table cannot hold (plugin.ts
+ * INTERFACE_FACTS, refused by name in languages.ts).
+ */
+export interface InterfaceFacts {
+  /** Whether the language's server narrows to bounds, so a reader that keeps one warm starts a bounded one of its own. */
+  serverBounds: boolean;
 }
 
-const NO_INTERFACES: InterfaceSyntax = { isTypeDeclaration: () => false, isDefaultExport: () => false, serverBounds: false, importLists: () => [], defaultNames: () => [], wildcardModules: () => [] };
+/** A language's readings for the reading, from its parse; ones that read nothing for a language whose plugin names no parser. */
+function interfaceReadings(language: Language): InterfaceReadings {
+  return parsedOf(language, "interfaces") ?? NO_READINGS;
+}
+
+const NO_READINGS: InterfaceReadings = { isTypeDeclaration: () => false, isDefaultExport: () => false, importLists: () => [], defaultNames: () => [], wildcardModules: () => [] };
 
 /** Whether a declaration line declares a type only (an interface or a type alias): a route never follows one. */
 export function isTypeDeclaration(line: string, language: Language): boolean {
-  return interfaceSyntax(language).isTypeDeclaration(line);
+  return interfaceReadings(language).isTypeDeclaration(line);
 }
 
 interface ReachNode {
@@ -259,7 +268,7 @@ export const HEAP_HEADROOM_MB = 2048;
  */
 export function interfaceAdapter(root: string, language: Language): { adapter: LanguageAdapter; bounds: string } | undefined {
   const ignore = configIgnore(root);
-  if (!interfaceSyntax(language).serverBounds || ignore.length === 0) return undefined;
+  if (syntaxOf(language, "interfaces")?.serverBounds !== true || ignore.length === 0) return undefined;
   return { adapter: boundedAdapter(language, root, ignore, configuredBudget(root).memoryMB), bounds: ignore.join("\n") };
 }
 
@@ -312,7 +321,7 @@ export interface WordIndex {
 /** The word index over the component code, each file with the component it belongs to. */
 export function wordIndex(root: string, code: ReadonlyMap<string, string>, language: Language, read: (file: string) => string = (file) => readFileSync(join(root, file), "utf8")): WordIndex {
   const files = [...code.keys()].sort();
-  const syntax = interfaceSyntax(language);
+  const syntax = interfaceReadings(language);
   const owners = new Map<string, Set<string>>();
   const where = new Map<string, Map<number, number>>();
   const direct = new Map<string, Set<string>>();
@@ -755,7 +764,7 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
 /** One language's reading (see readComponentInterfaces): its component code, through its adapter (started here when not given). */
 async function readLanguage(root: string, language: Language, given: LanguageAdapter | undefined, options: ReadOptions, part: LanguagePart): Promise<InterfaceReading> {
   // A language whose declarations and imports no scan reads yet is named as not read, never parsed as another language.
-  const notScanned = notScannedYet(language) ?? (fillsSlot(language, "interfaces") ? undefined : `the ${language} plugin fills no interfaces slot, so the reading reads no ${language} declaration or import list`);
+  const notScanned = notScannedYet(language) ?? (parsedOf(language, "interfaces") !== undefined ? undefined : `the ${language} plugin names no treeSitter parser, so the reading reads no ${language} declaration or import list`);
   if (notScanned !== undefined) return { kind: "unread", because: notScanned };
   const config = readEnforcementConfig(root);
   const { model, budget, started } = part;
@@ -866,9 +875,10 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
       const lines = text.split("\n");
       for (const declaration of declarationsOf(text, language)) {
         const line = lines[declaration.line - 1] ?? "";
-        const type = isTypeDeclaration(line, language);
+        // A language read through a parser says what each declaration declares, and whether it is the default export, in the same parse; another answers by its line.
+        const type = declaration.declares !== undefined ? declaration.declares === "type" : isTypeDeclaration(line, language);
         const id = `${file}#${declaration.name}`;
-        const isDefault = interfaceSyntax(language).isDefaultExport(line);
+        const isDefault = declaration.isDefault ?? interfaceReadings(language).isDefaultExport(line);
         declared.push({ id, component: owner, name: declaration.name, file, type, exported: declaration.exported, isDefault });
         nodes.set(id, { component: owner, name: declaration.name, file, type });
         if (declaration.exported) declarations += 1;

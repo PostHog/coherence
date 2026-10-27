@@ -1,0 +1,143 @@
+# Cuts a prerelease of @posthog/coherence from a branch, before it merges: a
+# GitHub prerelease carrying the package's tarball, and never npm, which
+# release.yml publishes to from main alone, through the Release environment.
+# Run it by hand, from the Actions tab or with
+#
+#   gh workflow run prerelease.yml -f ref=<branch> -f notes="$(cat notes.md)"
+#
+# Two jobs. build, with read access alone, checks the branch out clean at its
+# tip, with full history, so the tarball is packed from that commit and
+# nothing else: no contributor's working tree, remote or local ref has a say
+# in what ships, which is why cutting moved here from a local script whose
+# view of them kept diverging from what would ship. Before it installs or
+# packs, src/lifecycle/prerelease.ts refuses, naming each reason, unless the
+# version is a prerelease that every bundled plugin and mod following the
+# package names, the commit is on a branch of the repository package.json
+# names and holds its main, and no tag of the version exists. It then packs
+# the tarball, installs it in an empty folder and runs the TypeScript and
+# Python plugins' checks from it, which read through their bundled parsers,
+# and hands the tarball on as an artifact. release, the one job that can
+# write, creates the version's tag at the commit build checked out, by its
+# sha, never the branch's name, which may move while this runs (refused if
+# the tag exists by then), and the prerelease on that tag, carrying the
+# tarball. It checks nothing out and runs no code of the branch's.
+#
+# What this workflow does is held by how it is built and by its runs. The
+# unit test only lints its shape: dispatched by hand alone, each job's
+# permissions, every action pinned by commit.
+name: Prerelease
+
+run-name: Prerelease of ${{ inputs.ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The branch to cut, at its tip when the run starts (a branch name, not a tag or a commit)
+        required: true
+        type: string
+      notes:
+        description: The release notes, in Markdown
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# One prerelease at a time, so the tag the check finds free is still free when
+# the release creates it. GitHub keeps one run pending behind the one running:
+# a third dispatch cancels the pending second, which shows as cancelled before
+# it has checked out anything, and is dispatched again. A run in progress is
+# never cancelled, so no cut stops between its tag and its release.
+concurrency:
+  group: prerelease
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      version: ${{ steps.commit.outputs.version }}
+    steps:
+      # The branch by its full ref, so a tag or a commit is refused here; full history, so the check can read main's ancestry.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/${{ inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.18"
+
+      # The commit released, resolved once: every later step, and the release job, names it by this sha.
+      - name: The commit and version cut
+        id: commit
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: May this commit be cut?
+        run: node --disable-warning=ExperimentalWarning src/lifecycle/prerelease.ts
+
+      # No dependency's install script runs here.
+      - run: npm ci --ignore-scripts
+
+      # prepare builds dist; the tarball is checked before it is handed on.
+      - run: npm pack
+
+      # The package as an adopter installs it, outside this checkout. Each copy of the TypeScript parsers it carries (the
+      # one the installed command loads, dist/bundled, and plugins/) must be byte for byte the digests parsers.sha256
+      # records, the ones the build makes: a plugin check passes a stock or wrongly built parser that reads its fixtures.
+      # Then each plugin check reads its fixtures through the plugin's bundled parser and exits 1 on any check that fails,
+      # so a tarball missing a plugin or a parser fails here too.
+      - name: Check the tarball's parsers and that it reads TypeScript and Python
+        env:
+          VERSION: ${{ steps.commit.outputs.version }}
+        run: |
+          mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
+          npm init -y >/dev/null
+          npm install --ignore-scripts "$GITHUB_WORKSPACE/posthog-coherence-$VERSION.tgz"
+          for parsers in node_modules/@posthog/coherence/dist/bundled/typescript node_modules/@posthog/coherence/plugins/typescript; do
+            (cd "$parsers" && shasum -a 256 -c "$GITHUB_WORKSPACE/grammars/tree-sitter-typescript/parsers.sha256")
+          done
+          npx --no coherence plugin check typescript
+          npx --no coherence plugin check python
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tarball
+          path: posthog-coherence-${{ steps.commit.outputs.version }}.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # contents: write creates the tag and the release; nothing is published to npm, so no id-token.
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: tarball
+          path: ${{ runner.temp }}/tarball
+
+      # The tag is created at the sha build checked out, and creating a tag that exists fails, so the release is never
+      # made on a tag at another commit; --verify-tag then releases on that tag alone. The notes reach the shell through
+      # the environment, never spliced into the script.
+      - name: Create the GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.build.outputs.sha }}
+          VERSION: ${{ needs.build.outputs.version }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/v$VERSION" -f "sha=$SHA" >/dev/null
+          printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md" "$RUNNER_TEMP/tarball/posthog-coherence-$VERSION.tgz"

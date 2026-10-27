@@ -27,6 +27,10 @@ import type { Decision } from "../../src/journal/record.ts";
 import { shardFor } from "../../src/journal/shards.ts";
 import { appendRecord, loadJournal } from "../../src/journal/store.ts";
 import { isStoreFile } from "../../src/journal/stores.ts";
+import { startParsers } from "../../src/plugins/syntax-trees.ts";
+
+// A reading through a language's parser needs its runtime started first, as the CLI starts it.
+await startParsers();
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";

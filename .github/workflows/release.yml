@@ -6,6 +6,16 @@
 # check job compares that version with npm's, and the publish job runs only
 # for a version npm does not have yet, so any other change to package.json
 # releases nothing. It can also be run by hand from the Actions tab.
+#
+# A prerelease cut from a branch, before it merges, is a GitHub prerelease with
+# the tarball and never npm: prerelease.yml cuts it, run by hand
+# (gh workflow run prerelease.yml -f ref=<branch> -f notes=...), from the
+# branch checked out clean, and only when it holds main.
+#
+# A prerelease version (1.11.0-beta.0) publishes under its own dist-tag (beta),
+# never latest, and its GitHub release is marked a prerelease: npm install
+# @posthog/coherence and Coherence's update notice, which read latest, never
+# reach it; npm install @posthog/coherence@beta does.
 name: Release
 
 on:
@@ -83,9 +93,18 @@ jobs:
           npm install --ignore-scripts "$GITHUB_WORKSPACE"/posthog-coherence-*.tgz
           npx --no coherence spec --check
 
-      - run: npm publish posthog-coherence-*.tgz --access public --provenance
+      # A prerelease publishes under its identifier's tag (1.11.0-beta.0 under beta); any other version under latest.
+      - name: Publish
+        run: |
+          tag=latest
+          # The prerelease identifier's leading letters (beta.1 -> beta, alpha-2.3 -> alpha, rc.2 -> rc); next when it has none (1.11.0-0).
+          case "$VERSION" in *-*) tag=$(printf '%s' "${VERSION#*-}" | sed 's/[^A-Za-z].*$//'); [ -n "$tag" ] || tag=next ;; esac
+          npm publish posthog-coherence-*.tgz --access public --provenance --tag "$tag"
 
       - name: Tag the release on GitHub
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes
+        run: |
+          prerelease=""
+          case "$VERSION" in *-*) prerelease=--prerelease ;; esac
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes $prerelease

@@ -45,6 +45,7 @@ test("plugin eject copies a bundled plugin's source and its check.json into the 
   assert.deepEqual(filesUnder(copy), [...filesUnder(join(PLUGIN_SOURCES, "typescript")), "package.json"].sort(), "every file of the bundled plugin, its check.json among them, and a package.json naming its modules ES modules");
   assert.deepEqual(JSON.parse(readFileSync(join(copy, "package.json"), "utf8")), { type: "module", private: true });
   assert.ok(filesUnder(copy).includes("check.json"), "its tests come with it");
+  assert.ok(readFileSync(join(copy, "tree-sitter-tsx.wasm")).equals(readFileSync(join(PLUGIN_SOURCES, "typescript", "tree-sitter-tsx.wasm"))), "its parser copied byte for byte, never read as text");
   for (const file of filesUnder(copy).filter((f) => f.endsWith(".ts"))) {
     const text = readFileSync(join(copy, file), "utf8");
     assert.doesNotMatch(text, /"\.\.\/\.\.\/src\//, `${file} reaches into no core module`);
@@ -69,7 +70,7 @@ test("plugin eject copies a bundled plugin's source and its check.json into the 
 test("plugin check holds a plugin to every duty, bundled or by path, and a plugin that reports no references fails, by name", async (t) => {
   budget(t, 20, "d-467bd43d");
   const bundled = await checkPlugin(process.cwd(), "typescript");
-  assert.deepEqual(bundled.duties.map((o) => [o.name, o.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["references", "pass"], ["chokepoint", "pass"], ["mass", "pass"], ["imports", "pass"], ["interfaces", "pass"], ["entrances", "pass"], ["one answer each", "pass"]], JSON.stringify(bundled.duties));
+  assert.deepEqual(bundled.duties.map((o) => [o.name, o.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["answers agree", "pass"], ["reference reading", "pass"], ["references", "pass"], ["server agrees", "pass"], ["chokepoint", "pass"], ["mass", "pass"], ["imports", "pass"], ["interfaces", "pass"], ["entrances", "pass"], ["one answer each", "pass"]], JSON.stringify(bundled.duties));
 
   // A plugin that takes typescript's place and answers every references query with nothing.
   const root = project({
@@ -95,7 +96,7 @@ test("plugin check hands the adapter its scratch project's real path, so a serve
     "real/index.ts": 'import { realpathSync } from "node:fs";\nexport default { adapter: ({ root, base }) => ({ language: base.language, ladder: base.ladder, ready: async () => (realpathSync(root) === root ? base.ready() : { ok: false, reason: `handed ${root}, whose real path is ${realpathSync(root)}` }), resolve: (n, h) => base.resolve(n, h), references: (d) => base.references(d), visibility: (d, c) => base.visibility(d, c), testFilter: (v) => base.testFilter(v), refute: (p, o, e, c) => base.refute(p, o, e, c), forget: (f) => base.forget(f), close: async () => {} }) };\n',
   });
   const checked = await checkPlugin(root, "./real");
-  assert.deepEqual(checked.duties.map((o) => [o.name, o.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["references", "pass"], ["chokepoint", "pass"], ["mass", "pass"], ["imports", "pass"], ["interfaces", "pass"], ["entrances", "pass"], ["one answer each", "pass"]], JSON.stringify(checked.duties));
+  assert.deepEqual(checked.duties.map((o) => [o.name, o.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["answers agree", "pass"], ["reference reading", "pass"], ["references", "pass"], ["server agrees", "pass"], ["chokepoint", "pass"], ["mass", "pass"], ["imports", "pass"], ["interfaces", "pass"], ["entrances", "pass"], ["one answer each", "pass"]], JSON.stringify(checked.duties));
 });
 
 test("plugin check passes nothing over nothing: a check.json with no cases fails each duty as nothing to check, {} is refused by name, the bundled minimum stands under a copy's own, and a duty that throws is named while the others report", async () => {
@@ -124,7 +125,7 @@ test("plugin check passes nothing over nothing: a check.json with no cases fails
   assert.ok(shapeless.duties.every((o) => o.verdict === "fail" && /plugin honest's .*check\.json is no check project: it lacks files.*language.*declarations.*protects.*references/.test(o.reason)), JSON.stringify(shapeless.duties));
 
   const thrown = await checkPlugin(root, "./throws");
-  assert.deepEqual(thrown.duties.map((o) => o.name), ["file rule", "declarations", "references", "chokepoint", "mass", "imports", "interfaces", "entrances", "one answer each"], "every duty reported");
+  assert.deepEqual(thrown.duties.map((o) => o.name), ["file rule", "declarations", "answers agree", "reference reading", "references", "server agrees", "chokepoint", "mass", "imports", "interfaces", "entrances", "one answer each"], "every duty reported");
   const failed = thrown.duties.find((o) => o.name === "references")!;
   assert.equal(failed.verdict, "fail");
   assert.match(failed.reason, /threw: deaf by design/);
@@ -178,5 +179,5 @@ test("plugin check holds a plugin that both extends a language and proves via fo
   });
   const checked = await checkPlugin(root, "./both");
   assert.equal(checked.language, "typescript + verifier");
-  assert.deepEqual(checked.duties.map((d) => [d.name, d.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["references", "pass"], ["chokepoint", "pass"], ["mass", "pass"], ["imports", "pass"], ["interfaces", "pass"], ["entrances", "pass"], ["one answer each", "pass"], ["[both exit]", "pass"]], JSON.stringify(checked.duties));
+  assert.deepEqual(checked.duties.map((d) => [d.name, d.verdict]), [["file rule", "pass"], ["declarations", "pass"], ["answers agree", "pass"], ["reference reading", "pass"], ["references", "pass"], ["server agrees", "pass"], ["chokepoint", "pass"], ["mass", "pass"], ["imports", "pass"], ["interfaces", "pass"], ["entrances", "pass"], ["one answer each", "pass"], ["[both exit]", "pass"]], JSON.stringify(checked.duties));
 });

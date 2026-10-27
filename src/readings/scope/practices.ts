@@ -46,6 +46,7 @@ function normalize(text: string): string {
 export function whenText(trigger: PracticeTrigger): string {
   if (trigger.kind === "command") return `When you run \`${trigger.words}\``;
   if (trigger.kind === "edit") return `When you edit \`${trigger.glob}\`${trigger.adding ? ` adding \`${trigger.adding}\`` : ""}`;
+  if (trigger.kind === "defect") return `When a defect is recorded, classified or closed as \`${trigger.class}\``;
   return "On purpose";
 }
 
@@ -56,7 +57,7 @@ export interface WhenLine {
   practices: string[];
 }
 
-/** The project's working rules by what sets them off: commands, then edits, then the practices taken up on purpose. */
+/** The project's working rules by what sets them off: commands, then edits, then a defect's class, then the practices taken up on purpose. */
 export function whenYou(practices: readonly Pick<ScopePractice, "id" | "triggers">[]): WhenLine[] {
   const lines = new Map<string, WhenLine>();
   for (const practice of practices) {
@@ -67,7 +68,7 @@ export function whenYou(practices: readonly Pick<ScopePractice, "id" | "triggers
       lines.set(when, line);
     }
   }
-  const order: Record<PracticeTrigger["kind"], number> = { command: 0, edit: 1, explicit: 2 };
+  const order: Record<PracticeTrigger["kind"], number> = { command: 0, edit: 1, defect: 2, explicit: 3 };
   return [...lines.values()].sort((a, b) => order[a.kind] - order[b.kind] || a.when.localeCompare(b.when));
 }
 

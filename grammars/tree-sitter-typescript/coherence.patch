@@ -1,0 +1,197 @@
+diff --git a/common/define-grammar.js b/common/define-grammar.js
+index efb0b76..d6e5b2a 100644
+--- a/common/define-grammar.js
++++ b/common/define-grammar.js
+@@ -257,6 +257,34 @@ module.exports = function defineGrammar(dialect) {
+         ),
+       ),
+ 
++      // A JSX string reads a bare '&' (to="x?a=1&b=2", title='Q&') as text; tree-sitter-javascript reads only an
++      // '&' that starts a character reference or is followed by neither '#' nor a letter, and one before the
++      // closing quote took the quote with it.
++      unescaped_double_jsx_string_fragment: _ => token.immediate(prec(1, /([^"&]|&[^#A-Za-z"])+/)),
++      unescaped_single_jsx_string_fragment: _ => token.immediate(prec(1, /([^'&]|&[^#A-Za-z'])+/)),
++      _jsx_string: $ => choice(
++        seq(
++          '"',
++          repeat(choice(
++            alias($.unescaped_double_jsx_string_fragment, $.string_fragment),
++            $.html_character_reference,
++            // A pattern, not the string '&': a string would be one token with every & operator, renamed with it.
++            alias(token.immediate(/&/), $.string_fragment),
++          )),
++          '"',
++        ),
++        seq(
++          '\'',
++          repeat(choice(
++            alias($.unescaped_single_jsx_string_fragment, $.string_fragment),
++            $.html_character_reference,
++            // A pattern, not the string '&': a string would be one token with every & operator, renamed with it.
++            alias(token.immediate(/&/), $.string_fragment),
++          )),
++          '\'',
++        ),
++      ),
++
+       // This rule is only referenced by expression when the dialect is 'tsx'
+       jsx_opening_element: $ => prec.dynamic(-1, seq(
+         $._jsx_start_opening_element,
+@@ -691,7 +719,9 @@ module.exports = function defineGrammar(dialect) {
+       // required beforehand. This allows for parsing of annotations such as
+       // foo: import('x').y.z;
+       // but was a nightmare to get working.
+-      _type_query_member_expression_in_type_annotation: $ => seq(
++      // Right-associative so a `<` after the property opens its type arguments, as TypeScript reads
++      // `x as import('a').T<U>`.
++      _type_query_member_expression_in_type_annotation: $ => prec.right(seq(
+         field('object', choice(
+           $.import,
+           alias($._type_query_member_expression_in_type_annotation, $.member_expression),
+@@ -702,7 +732,9 @@ module.exports = function defineGrammar(dialect) {
+           $.private_property_identifier,
+           alias($.identifier, $.property_identifier),
+         )),
+-      ),
++        // import('x').T<U>: the type arguments of an imported generic type.
++        optional(field('type_arguments', $.type_arguments)),
++      )),
+       _type_query_call_expression_in_type_annotation: $ => seq(
+         field('function', choice(
+           $.import,
+@@ -726,8 +758,6 @@ module.exports = function defineGrammar(dialect) {
+         $.readonly_type,
+         $.constructor_type,
+         $.infer_type,
+-        prec(-1, alias($._type_query_member_expression_in_type_annotation, $.member_expression)),
+-        prec(-1, alias($._type_query_call_expression_in_type_annotation, $.call_expression)),
+       ),
+ 
+       tuple_parameter: $ => seq(
+@@ -782,6 +812,10 @@ module.exports = function defineGrammar(dialect) {
+         $.intersection_type,
+         $.union_type,
+         'const',
++        // An import type is a primary type, so it is an array's element (import('x').T[]), an indexed
++        // type's object, keyof's operand and a type argument, as TypeScript reads it.
++        prec(-1, alias($._type_query_member_expression_in_type_annotation, $.member_expression)),
++        prec(-1, alias($._type_query_call_expression_in_type_annotation, $.call_expression)),
+       ),
+ 
+       template_type: $ => seq('${', choice($.primary_type, $.infer_type), '}'),
+diff --git a/common/scanner.h b/common/scanner.h
+index 23b78b5..e81808f 100644
+--- a/common/scanner.h
++++ b/common/scanner.h
+@@ -19,6 +19,25 @@ static void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
+ 
+ static void skip(TSLexer *lexer) { lexer->advance(lexer, true); }
+ 
++// Whether c is JavaScript's white space or a line terminator beyond ASCII, which ends a name as a space does.
++static bool is_unicode_space(int32_t c) {
++    return c == 0xA0 || c == 0x1680 || (c >= 0x2000 && c <= 0x200A) || c == 0x2028 || c == 0x2029 || c == 0x202F ||
++           c == 0x205F || c == 0x3000 || c == 0xFEFF;
++}
++
++// Whether c can continue an identifier, so `in` or `instanceof` before it is only a prefix of a longer
++// name (in_progress, $in, instanceId2), never the operator.
++static bool is_identifier_part(int32_t c) { return iswalnum(c) || c == '_' || c == '$' || c == '\\' || (c > 0x7F && !is_unicode_space(c)); }
++
++// After a word that is a member's name or an operator (in, instanceof): whether the line before ends, as it does before a member,
++// since no expression continues with `in :`, `in ?` or `in =`.
++static bool member_follows(TSLexer *lexer) {
++    while (iswspace(lexer->lookahead) || is_unicode_space(lexer->lookahead)) {
++        skip(lexer);
++    }
++    return lexer->lookahead == ':' || lexer->lookahead == '?' || lexer->lookahead == '=';
++}
++
+ static bool scan_template_chars(TSLexer *lexer) {
+     lexer->result_symbol = TEMPLATE_CHARS;
+     for (bool has_content = false;; has_content = true) {
+@@ -172,8 +191,9 @@ static bool scan_automatic_semicolon(TSLexer *lexer, const bool *valid_symbols,
+             }
+             skip(lexer);
+ 
+-            if (!iswalpha(lexer->lookahead)) {
+-                return false;
++            if (!is_identifier_part(lexer->lookahead)) {
++                // A member named `in` (`in: number`, `in?: T`, `in = 2`).
++                return member_follows(lexer);
+             }
+ 
+             for (unsigned i = 0; i < 8; i++) {
+@@ -183,8 +203,9 @@ static bool scan_automatic_semicolon(TSLexer *lexer, const bool *valid_symbols,
+                 skip(lexer);
+             }
+ 
+-            if (!iswalpha(lexer->lookahead)) {
+-                return false;
++            if (!is_identifier_part(lexer->lookahead)) {
++                // A member named `instanceof`.
++                return member_follows(lexer);
+             }
+             break;
+     }
+@@ -273,6 +294,33 @@ static bool scan_closing_comment(TSLexer *lexer) {
+     return true;
+ }
+ 
++// Whether the lexer, at an '&', stands at a character reference (&amp; &#123; &#x7B;). It consumes what it
++// reads; the caller has marked the end before the '&'.
++static bool at_character_reference(TSLexer *lexer) {
++    advance(lexer);
++    unsigned digits = 0;
++    if (lexer->lookahead == '#') {
++        advance(lexer);
++        if (lexer->lookahead == 'x' || lexer->lookahead == 'X') {
++            advance(lexer);
++            for (; digits < 6 && iswxdigit(lexer->lookahead); digits++) {
++                advance(lexer);
++            }
++        } else {
++            for (; digits < 5 && iswdigit(lexer->lookahead); digits++) {
++                advance(lexer);
++            }
++        }
++    } else {
++        for (; digits < 30 && ((lexer->lookahead >= 'a' && lexer->lookahead <= 'z') ||
++                               (lexer->lookahead >= 'A' && lexer->lookahead <= 'Z'));
++             digits++) {
++            advance(lexer);
++        }
++    }
++    return digits > 0 && lexer->lookahead == ';';
++}
++
+ static bool scan_jsx_text(TSLexer *lexer) {
+     // saw_text will be true if we see any non-whitespace content, or any whitespace content that is not a newline and
+     // does not immediately follow a newline.
+@@ -282,7 +330,18 @@ static bool scan_jsx_text(TSLexer *lexer) {
+     bool at_newline = false;
+ 
+     while (lexer->lookahead != 0 && lexer->lookahead != '<' && lexer->lookahead != '>' && lexer->lookahead != '{' &&
+-           lexer->lookahead != '}' && lexer->lookahead != '&') {
++           lexer->lookahead != '}') {
++        if (lexer->lookahead == '&') {
++            // A character reference ends the text before it; a bare '&' (Billing & Usage) is text.
++            lexer->mark_end(lexer);
++            if (at_character_reference(lexer)) {
++                lexer->result_symbol = JSX_TEXT;
++                return saw_text;
++            }
++            saw_text = true;
++            at_newline = false;
++            continue;
++        }
+         bool is_wspace = iswspace(lexer->lookahead);
+         if (lexer->lookahead == '\n') {
+             at_newline = true;
+@@ -310,6 +369,7 @@ static bool scan_jsx_text(TSLexer *lexer) {
+         advance(lexer);
+     }
+ 
++    lexer->mark_end(lexer);
+     lexer->result_symbol = JSX_TEXT;
+     return saw_text;
+ }

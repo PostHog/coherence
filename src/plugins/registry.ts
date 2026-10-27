@@ -13,7 +13,8 @@
  * Refused, with what to change: a manifest that will not read, a name that is
  * not the key, a pluginApi this core does not run, two plugins that provide
  * one language or prove one via form, a new language without extensions or
- * with one another language owns. A project without the key reads nothing
+ * with one another language owns, a syntax that fills a hand-written reader
+ * slot pluginApi 4 removed (with the eject to redo first, for a copy). A project without the key reads nothing
  * here and does exactly the work it did before plugins.
  */
 
@@ -22,7 +23,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 
 import { createRequire, registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { landsWithin } from "./within.ts";
-import { MANIFEST, OLDEST_PLUGIN_API, PLUGIN_API, SYNTAX_SLOTS, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
+import { DERIVED_SLOTS, MANIFEST, OLDEST_PLUGIN_API, PLUGIN_API, SYNTAX_SLOTS, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -55,6 +56,17 @@ function compiles(value: unknown): value is string {
   }
 }
 
+/** Whether a value is a regular expression read with Unicode's character classes (\p{Lu}), as a treeSitter privateName is. */
+function compilesUnicode(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    new RegExp(value, "u");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Whether a value is one CI step: an action pinned to a full commit, or one command, never both, each value one line. */
 function ciStep(value: unknown): boolean {
   if (!isRecord(value)) return false;
@@ -72,7 +84,7 @@ function ciStep(value: unknown): boolean {
 }
 
 /** The faults in a manifest's data fields: the readings read them in a hook, so each is checked as the reading will use it. */
-function dataProblems(raw: Record<string, unknown>, who: string): string[] {
+function dataProblems(raw: Record<string, unknown>, who: string, name: string): string[] {
   const problems: string[] = [];
   const files = raw["files"];
   if (files !== undefined && (!isRecord(files) || !compiles(files["pattern"]) || (files["except"] !== undefined && !compiles(files["except"])))) problems.push(`${who}'s files is { "pattern": "<regular expression>", "except"?: "<regular expression>" }`);
@@ -99,13 +111,77 @@ function dataProblems(raw: Record<string, unknown>, who: string): string[] {
   const syntax = raw["syntax"];
   if (syntax !== undefined) {
     if (!isRecord(syntax)) problems.push(`${who}'s syntax maps each slot to "<module>#<export>"`);
-    else
+    else {
+      const readers = DERIVED_SLOTS.filter((slot) => Object.hasOwn(syntax, slot));
+      if (readers.length > 0) problems.push(handReadersRefused(who, name, raw, readers));
       for (const [slot, at] of Object.entries(syntax)) {
+        if ((DERIVED_SLOTS as readonly string[]).includes(slot)) continue;
         if (!(SYNTAX_SLOTS as readonly string[]).includes(slot)) problems.push(`${who}'s syntax names ${slot}, which is no slot (${SYNTAX_SLOTS.join(", ")})`);
         else if (typeof at !== "string" || !/^[^#/][^#]*#[A-Za-z_$][\w$]*$/.test(at) || isAbsolute(at)) problems.push(`${who}'s syntax.${slot} is "<module beside the manifest>#<export>"`);
       }
+    }
   }
   return problems;
+}
+
+/**
+ * A manifest's syntax that names a slot the core derives from a language's
+ * parser (DERIVED_SLOTS): a hand-written reader of the language's text,
+ * which pluginApi 4 removed. Refused, in one problem naming every such slot,
+ * whatever pluginApi the plugin is written for and whether or not it names a
+ * parser, rather than ignored: a second reader of a text is how two readings
+ * of it come to disagree, and a plugin whose reader went unread would read as
+ * one that reads nothing. Every manifest the core loads passes through here
+ * (readManifest), so no reading of the core can meet one.
+ *
+ * The plugins that fill one are copies `plugin eject` made from Coherence
+ * 1.10 and before, whose bundled language plugins filled source, declares and
+ * topLevel by hand, and plugins written from the 1.10 guide. The recovery
+ * named first is the ejected copy's, the simplest: eject again from this
+ * version and reapply the changes. A copy is told apart by its name, which
+ * eject keeps and the config's key must match: a plugin named as a bundled
+ * one is said plainly to be ejected from an older Coherence (bundledEjected).
+ */
+function handReadersRefused(who: string, name: string, raw: Record<string, unknown>, readers: readonly string[]): string {
+  const slots = readers.map((slot) => `syntax.${slot}`);
+  const named = slots.length === 1 ? slots[0]! : `${slots.slice(0, -1).join(", ")} and ${slots[slots.length - 1]!}`;
+  const what = `${named} ${slots.length === 1 ? "is a hand-written reader" : "are hand-written readers"} of its language's text, which this Coherence does not read (pluginApi 4 removed them)`;
+  const fromScratch = `a plugin written from scratch reads its language through treeSitter, a grammar's .wasm and queries, from which the core derives what ${slots.length === 1 ? "that slot" : "those slots"} answered (docs/plugins.md, Reading through a parser)`;
+  if (bundledEjected(name)) {
+    const version = typeof raw["version"] === "string" ? `, version ${raw["version"]}` : "";
+    return `${who} is ejected from an older Coherence (a copy of the bundled ${name} plugin${version}): its ${what}. To recover, eject it again from this version and reapply your changes: set plugins.${name} to "bundled" in the config, run \`coherence plugin eject ${name} --to <a new folder>\`, then carry your changes into the new copy. Otherwise, ${fromScratch}`;
+  }
+  return `${who}'s ${what}. If it is a copy \`coherence plugin eject\` made from an older Coherence, eject it again from this version (\`coherence plugin eject <the bundled plugin it copies> --to <a new folder>\`, its entry in the config set to "bundled" first) and reapply your changes; ${fromScratch}`;
+}
+
+/** Whether a plugin by path carries a bundled plugin's name: a copy eject made, since eject keeps the manifest's name and the config's key must match it. */
+function bundledEjected(name: string): boolean {
+  return /^[a-z][a-z0-9-]*$/.test(name) && existsSync(join(BUNDLED_DIR, name, MANIFEST));
+}
+
+/**
+ * A manifest's treeSitter, checked: its parser and queries files beside the
+ * manifest, its resolve "<module>#<export>", and only on a plugin that
+ * provides a language.
+ */
+function treeSitterProblems(raw: Record<string, unknown>, dir: string, language: string | undefined, who: string): string[] {
+  const declared = raw["treeSitter"];
+  if (declared === undefined) return [];
+  const shape = `${who}'s treeSitter is { "parser": "<.wasm beside the manifest>", "alternate"?: "<.wasm beside the manifest>", "queries": "<.scm beside the manifest>", "resolve": "<module>#<export>", "privateName"?: "<regular expression>", "separator"?: "<a path's separator>" }`;
+  if (!isRecord(declared)) return [shape];
+  const problems: string[] = [];
+  for (const key of ["parser", "alternate", "queries"] as const) {
+    if (key === "alternate" && declared[key] === undefined) continue;
+    const path = declared[key];
+    if (typeof path !== "string" || path === "" || isAbsolute(path)) problems.push(shape);
+    else if (relative(dir, resolve(dir, path)).startsWith("..")) problems.push(`${who}'s treeSitter.${key} names ${path}, which leaves the plugin's folder`);
+    else if (!existsSync(join(dir, path))) problems.push(`${who}'s treeSitter.${key} names ${path}, which is not beside its ${MANIFEST}`);
+  }
+  if (typeof declared["resolve"] !== "string" || !/^[^#/][^#]*#[A-Za-z_$][\w$]*$/.test(declared["resolve"])) problems.push(shape);
+  if (declared["privateName"] !== undefined && !compilesUnicode(declared["privateName"])) problems.push(shape);
+  if (declared["separator"] !== undefined && (typeof declared["separator"] !== "string" || declared["separator"] === "")) problems.push(shape);
+  if (language === undefined) problems.push(`${who} names a treeSitter parser but provides no language for it to read`);
+  return [...new Set(problems)];
 }
 
 /** The manifest at `dir`, checked against the interface; every fault named. */
@@ -126,7 +202,7 @@ export function readManifest(name: string, dir: string, where: string): { manife
   if (typeof api !== "number" || !Number.isInteger(api) || api < OLDEST_PLUGIN_API || api > PLUGIN_API) problems.push(`${where}: plugin ${name} was written for pluginApi ${JSON.stringify(api)}; this Coherence runs pluginApi ${PLUGIN_API} and reads plugins written for ${OLDEST_PLUGIN_API} to ${PLUGIN_API}`);
   const provides = raw["provides"];
   if (provides !== undefined && (!isRecord(provides) || (provides["language"] !== undefined && (typeof provides["language"] !== "string" || provides["language"] === "")) || (provides["declaredLanguages"] !== undefined && provides["declaredLanguages"] !== true))) problems.push(`${where}: plugin ${name}'s provides is { "language": "<name>" }`);
-  problems.push(...dataProblems(raw, `${where}: plugin ${name}`));
+  problems.push(...dataProblems(raw, `${where}: plugin ${name}`, name));
   if (raw["extends"] !== undefined && (typeof raw["extends"] !== "string" || raw["extends"] === "")) problems.push(`${where}: plugin ${name}'s extends names one language`);
   if (raw["extensions"] !== undefined && (!strings(raw["extensions"]) || !(raw["extensions"] as string[]).every((e) => /^\.[A-Za-z0-9.+-]+$/.test(e)))) problems.push(`${where}: plugin ${name}'s extensions is a list like [".swift"]`);
   for (const key of ["module", "lexicon"] as const) if (raw[key] !== undefined && (typeof raw[key] !== "string" || raw[key] === "" || isAbsolute(raw[key] as string))) problems.push(`${where}: plugin ${name}'s ${key} is a path relative to its ${MANIFEST}`);
@@ -152,6 +228,7 @@ export function readManifest(name: string, dir: string, where: string): { manife
   if (verifierForms.some((v) => v.command === undefined) && raw["module"] === undefined) problems.push(`${where}: plugin ${name} proves a via form with no command and has no module to verify it`);
   const language = isRecord(provides) && typeof provides["language"] === "string" ? provides["language"] : undefined;
   if ((language !== undefined || typeof raw["extends"] === "string" || isRecord(provides) && provides["declaredLanguages"] === true) && raw["module"] === undefined) problems.push(`${where}: plugin ${name} provides or extends a language adapter but names no module`);
+  problems.push(...treeSitterProblems(raw, dir, language, `${where}: plugin ${name}`));
   if (problems.length > 0) return { problems };
   return { manifest: raw as unknown as PluginManifest, problems };
 }

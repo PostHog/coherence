@@ -7,7 +7,7 @@
  *   node src/cli.ts resolved <id> --because "<what the test showed>" [--as "<candidate>"]   (a defect: [--guard <component>/<invariant>] [--decision <id>])
  *   node src/cli.ts classify <defect-id> [--class <name>] [--introduced <origin>] [--caught <how>] --because "<evidence>"
  *   node src/cli.ts dismiss <id> --because "<why nobody will chase it>"
- *   node src/cli.ts defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]...
+ *   node src/cli.ts defect "<what failed>" --evidence "<reproducer or report>" (--file <path>... [--component <folder>] | --component <folder> | --unplaced "<why>")
  *   node src/cli.ts experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"...
  *   node src/cli.ts experiment close <id> --result <stepId>=<result>...   (result: one of STEP_RESULTS)
  *   node src/cli.ts unable "<what you could not do>" --because "<the wall>"
@@ -153,7 +153,7 @@ export const journalVerbs: Record<string, Command> = {
 export const JOURNAL_USAGE = [
   WORK_USAGE,
   "journal verbs (each needs --session <id> --agent <name>; a write binds to the one active order its session owns, or to --work <id>):",
-  "  (--cite <id>, repeatable, names an earlier journal or work record this one rests on or is about, here or committed on another branch; an id found nowhere refuses the write)",
+  "  (--cite <id>, repeatable, names an earlier journal or work record this one rests on or is about, in any worktree's journal or committed on another branch; an id found nowhere refuses the write)",
   "  (--human records words the agent attributes to a human, apart from its own because; it is not proof a human wrote them)",
   '  decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--cite <id>]...',
   '  retract <id> --because "<what refuted it>"',
@@ -162,8 +162,9 @@ export const JOURNAL_USAGE = [
   `  resolved <defect-id> --because "<what fixed it>" [--guard <component>/<invariant>] [--decision <id>] [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <${alternation(CAUGHT)}>]`,
   '      a defect\'s close owes a guard for its class (an invariant whose refutation is witnessed) or a decision saying why the fix suffices; spec --check names a close with neither',
   '  dismiss <id> --because "<why nobody will chase it>"',
-  `  defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <${alternation(CAUGHT)}>] [--cite <id>]...`,
+  `  defect "<what failed>" --evidence "<reproducer or report>" (--file <path>... [--component <folder>] | --component <folder> | --unplaced "<why>") [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <${alternation(CAUGHT)}>] [--cite <id>]...`,
   '      --class is a kebab-case name declared once as the property "class <name>" of defect in a lexicon; give all three: they are what the convergence reading counts',
+  '      where it lies is required: --file for each file of the fault, or --component; --unplaced "<why>" only when no file or component of the project holds it, since such a defect counts toward no dead end',
   '  classify <defect-id> [--class <name>] [--introduced <...>] [--caught <...>] --because "<the evidence>" [--over "<rejected>"]...   a decision citing the defect; the defect is never edited',
   '  experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"... [--cite <id>]...',
   `  experiment close <id> --result <stepId>=<${alternation(STEP_RESULTS)}>...`,

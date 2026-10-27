@@ -377,3 +377,6 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   because: the server forwarded the protected thing and the chokepoint alone, so a served refutation of a check that exempts a folder never staged its use from outside the folder, and the occasion an adapter is told would never have reached it
   refuted: made the server's client send the protected thing and the chokepoint alone, as before, dropping the exempt folder and the occasion (server.ts) -> "a served refutation stages what the adapter in process stages, the exempt folder and the occasion carried" went red in server.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
   kinds: none
+- a via that maps to no test is said, never graded as a fail: When a run's batched pass finds no reported test whose title, or a group's title above it, is a bullet's via, while the same via run alone selects a test by pattern and passes, run --each names the via as naming no test exactly, with the titles it selected alone, instead of printing a fail batched beside a pass alone.
+  because: three bullets read 'no test ran' in every full batched run and passed alone, and run --each printed both verdicts without saying they disagreed, so the floor graded them failing while each targeted run passed (df-03839b92)
+  kinds: none

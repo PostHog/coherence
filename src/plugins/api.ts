@@ -25,6 +25,7 @@ export {
   type Definition,
   type Ladder,
   type LanguageAdapter,
+  type ServerSymbol,
   type Occasion,
   type Position,
   type Range,
@@ -45,12 +46,13 @@ export { languageOfFile } from "../adapters/language-files.ts";
 export { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, nestedCheckouts, nestedFolder, neverWalkedName, projectListing, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "../adapters/project-files.ts";
 // TOML's line lookup is exported under its own name: entrance detection has a lineOf of its own.
 export { lineOf as tomlLineOf, parseToml, TomlError, type TomlTable, type TomlValue } from "../adapters/toml.ts";
-export { isSourceFile, toRelative, type SourceSyntax } from "../economy/source.ts";
+export { isSourceFile, toRelative, type ImportTarget } from "../economy/source.ts";
 export { configRecord } from "../adapters/project-config.ts";
 export { killTree } from "../enforcement/totality.ts";
+export type { Literal } from "../lifecycle/mirrors.ts";
 export { spawn, spawnSync } from "../lifecycle/work-meter.ts";
 export { typescriptCompiler } from "./specifiers.ts";
 export type { InterfaceSymbol } from "../observation/interfaces.ts";
-export type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
+export type { InterfaceFacts } from "../readings/scope/component-interfaces.ts";
 export { readOwners, type BoundaryModule, type BoundarySource, type Exposure } from "../scaffold/boundaries.ts";
 export { ScaffoldError } from "../scaffold/scaffold.ts";
