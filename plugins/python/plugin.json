@@ -1,6 +1,6 @@
 {
   "name": "python",
-  "version": "1.11.0-beta.3",
+  "version": "1.11.0",
   "pluginApi": 4,
   "provides": {
     "language": "python"
