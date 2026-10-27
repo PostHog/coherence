@@ -162,9 +162,10 @@ export function ejectPlugin(root: string, name: string, to?: string): Ejected {
   // A plugin the project runs bundled is the one being copied: the copy takes that entry's place. One it runs from a path is a copy already.
   if (name in plugins && plugins[name] !== "bundled") throw new EjectError(`plugin eject: ${CONFIG_FILE} already runs plugin ${name} from ${JSON.stringify(plugins[name])}; remove that entry to eject it again`);
   // Every file read and rewritten before any is written: a refusal leaves nothing behind.
-  const copies = filesUnder(source).map((file) => {
+  // A module is rewritten as text; any other file (a parser's .wasm among them) is copied byte for byte, never read as text.
+  const copies: { rel: string; text: string | Buffer }[] = filesUnder(source).map((file) => {
     const rel = relative(source, file);
-    return { rel, text: ejectedSource(rel, readFileSync(file, "utf8")) };
+    return { rel, text: /\.[cm]?[jt]sx?$/.test(rel) ? ejectedSource(rel, readFileSync(file, "utf8")) : readFileSync(file) };
   });
   // The copy's modules are ES modules run as TypeScript: a package.json saying so, unless it carries one, keeps Node from guessing (and
   // warning) at every load, whatever the project's own package.json says.

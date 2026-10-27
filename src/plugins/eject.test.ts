@@ -45,6 +45,7 @@ test("plugin eject copies a bundled plugin's source and its check.json into the 
   assert.deepEqual(filesUnder(copy), [...filesUnder(join(PLUGIN_SOURCES, "typescript")), "package.json"].sort(), "every file of the bundled plugin, its check.json among them, and a package.json naming its modules ES modules");
   assert.deepEqual(JSON.parse(readFileSync(join(copy, "package.json"), "utf8")), { type: "module", private: true });
   assert.ok(filesUnder(copy).includes("check.json"), "its tests come with it");
+  assert.ok(readFileSync(join(copy, "tree-sitter-tsx.wasm")).equals(readFileSync(join(PLUGIN_SOURCES, "typescript", "tree-sitter-tsx.wasm"))), "its parser copied byte for byte, never read as text");
   for (const file of filesUnder(copy).filter((f) => f.endsWith(".ts"))) {
     const text = readFileSync(join(copy, file), "utf8");
     assert.doesNotMatch(text, /"\.\.\/\.\.\/src\//, `${file} reaches into no core module`);

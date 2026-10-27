@@ -51,6 +51,8 @@ export interface TreeDeclaration {
   line: number;
   exported: boolean;
   declares: Declares;
+  /** Whether it is its module's default export (TypeScript's export default function): its match captures @default. */
+  isDefault: boolean;
 }
 
 /** The shapes an import takes, as the census counts them: what it brings in, and how it is written. */
@@ -83,13 +85,23 @@ export interface TreeReader {
   topLevel(text: string): Set<string>;
   /** Every name the text uses through a qualifier (@use.qualifier, @use.name: Go's st.Seal), by the qualifier; empty for a language whose queries capture no use. */
   uses(text: string): Map<string, Set<string>>;
+  /** The names the text exports as its default by name (TypeScript's export default foo, export { foo as default }): each @default a match without a declaration captures. */
+  defaults(text: string): string[];
 }
 
-/** The capture names a plugin's queries may use: any other is refused by name, never passed over. */
-export const CAPTURES = ["import", "import.from", "import.module", "import.name", "import.alias", "import.glob", "import.prefix", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported", "use.qualifier", "use.name"] as const;
+/**
+ * The capture names a plugin's queries may use: any other is refused by
+ * name, never passed over, but for one whose name starts with an underscore,
+ * which is the queries' own for a predicate to test (#eq? @_alias "default")
+ * and is read by nothing.
+ */
+export const CAPTURES = ["import", "import.from", "import.module", "import.name", "import.alias", "import.glob", "import.default", "import.prefix", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported", "default", "use.qualifier", "use.name"] as const;
 
 /** The captures whose text a reading reads (an import's specifier spelled whole, with its prefixes; a qualified use's qualifier and name); every other capture is read by its name and line. */
-const TEXT_READ = new Set(["import.from", "import.module", "import.name", "import.alias", "name", "use.qualifier", "use.name"]);
+const TEXT_READ = new Set(["import.from", "import.module", "import.name", "import.alias", "import.default", "name", "default", "use.qualifier", "use.name"]);
+
+/** A capture the queries keep for a predicate alone. */
+const ownCapture = (name: string): boolean => name.startsWith("_");
 
 let started: Promise<void> | undefined;
 let ready = false;
@@ -190,7 +202,7 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
   } catch (error) {
     throw new Error(`plugin ${plugin.name}'s queries (${declared.queries}) do not compile against its parser: ${(error as Error).message}`);
   }
-  const unknown = query.captureNames.filter((name) => !(CAPTURES as readonly string[]).includes(name));
+  const unknown = query.captureNames.filter((name) => !(CAPTURES as readonly string[]).includes(name) && !ownCapture(name));
   if (unknown.length > 0) throw new Error(`plugin ${plugin.name}'s queries capture ${unknown.map((n) => `@${n}`).join(", ")}, which Coherence reads nothing by; the captures are ${CAPTURES.map((c) => `@${c}`).join(", ")}`);
   // A language whose queries mark what is exported says it by @exported; one with no such mark exports by name, unless its privateName says otherwise.
   // Read with Unicode's classes (\p{Lu}), since a language that exports by name may say it by a letter's case (Go).
@@ -239,11 +251,11 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
       if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
       try {
         // A capture whose text no reading reads (a declaration's whole node, @bound, @exported) keeps its name and line alone, so a kept parse holds names, not bodies;
-        // an import's specifier is kept spelled whole, its prefixes joined to it, and a prefix, or a statement captured on its own, is kept nowhere else.
+        // an import's specifier is kept spelled whole, its prefixes joined to it, and a prefix, a statement captured on its own, or the queries' own capture is kept nowhere.
         const matches = query.matches(tree.rootNode);
         const spelled = prefixed ? spell(matches) : (node: Node) => node.text;
         return matches
-          .map((match) => match.captures.filter((c) => c.name !== "import.prefix").map((c) => [c.name, c.name === "import.from" || c.name === "import.module" ? spelled(c.node) : TEXT_READ.has(c.name) ? c.node.text : "", c.node.startPosition.row + 1] as [string, string, number]))
+          .map((match) => match.captures.filter((c) => c.name !== "import.prefix" && !ownCapture(c.name)).map((c) => [c.name, c.name === "import.from" || c.name === "import.module" ? spelled(c.node) : TEXT_READ.has(c.name) ? c.node.text : "", c.node.startPosition.row + 1] as [string, string, number]))
           .filter((captures) => captures.some(([name]) => name !== "import"));
       } finally {
         tree.delete();
@@ -310,8 +322,11 @@ function readerOver(compiled: Compiled, store: ParseStore | undefined): TreeRead
         const module = of("import.module");
         if (from === undefined && module === undefined) continue;
         const alias = of("import.alias")?.text;
+        const bindsDefault = of("import.default");
         if (module !== undefined) found.push({ name: undefined, specifier: module.text, line: module.line, ...(alias === undefined ? {} : { alias }) });
         else if (of("import.glob") !== undefined) found.push({ name: undefined, glob: true, specifier: from!.text, line: from!.line });
+        // A default import brings in the module's default export, bound to a name of the file's own: no rename of any name the module declares.
+        else if (bindsDefault !== undefined) found.push({ name: "default", specifier: from!.text, line: bindsDefault.line });
         else {
           const name = of("import.name");
           if (name !== undefined) found.push({ name: name.text, specifier: from!.text, line: name.line, ...(alias === undefined ? {} : { alias }) });
@@ -326,11 +341,13 @@ function readerOver(compiled: Compiled, store: ParseStore | undefined): TreeRead
         const name = captures.find((c) => c.name === "name");
         if (kind === undefined || name === undefined) continue;
         const exported = marksExports ? captures.some((c) => c.name === "exported") : exportedName(name.text);
-        found.push({ name: name.text, line: name.line, exported, declares: kind.name.slice("declaration.".length) as Declares });
+        found.push({ name: name.text, line: name.line, exported, declares: kind.name.slice("declaration.".length) as Declares, isDefault: captures.some((c) => c.name === "default") });
       }
-      // A name declared twice is the first declaration's, as a reader going down the file meets it.
+      // A name declared twice is the first declaration's, as a reader going down the file meets it; of two matches of one name on one line,
+      // the one that says what it declares, so queries may match any value as unknown beside the values they know (TypeScript's const x = <anything>).
       const seen = new Set<string>();
-      return found.sort((a, b) => a.line - b.line).filter((d) => !seen.has(d.name) && seen.add(d.name) !== undefined);
+      const unknown = (d: TreeDeclaration): number => (d.declares === "unknown" ? 1 : 0);
+      return found.sort((a, b) => a.line - b.line || unknown(a) - unknown(b)).filter((d) => !seen.has(d.name) && seen.add(d.name) !== undefined);
     },
     topLevel(text) {
       const names = new Set<string>();
@@ -351,6 +368,14 @@ function readerOver(compiled: Compiled, store: ParseStore | undefined): TreeRead
         used.set(qualifier.text, names);
       }
       return used;
+    },
+    defaults(text) {
+      const names: string[] = [];
+      for (const captures of matches(text)) {
+        if (captures.some((c) => c.name.startsWith("declaration."))) continue;
+        for (const c of captures) if (c.name === "default") names.push(c.text);
+      }
+      return names;
     },
     store,
     keyOf,

@@ -22,7 +22,7 @@
  *   syntax tables     the manifest's `syntax`: one optional slot per table
  *                     the readings scan by, each naming the export of a
  *                     module beside the manifest that holds it
- *                     ("typescript-source.ts#TYPESCRIPT_SOURCE"). A reading
+ *                     ("typescript-entrances.ts#TYPESCRIPT_ENTRANCES"). A reading
  *                     loads only the module of the slot it reads, at the
  *                     moment it reads it; a slot a plugin leaves empty is
  *                     read as "not read for <language>", never as another

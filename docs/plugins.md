@@ -115,15 +115,16 @@ copy still gives an editor and a typecheck the interface's types.
 
 The bundled plugins are the fullest examples, shipped in the package under
 `plugins/`.
-<!-- claims: parser python; hand-written go, rust, typescript. Held by src/plugins/plugin-docs.test.ts against each plugin's manifest. -->
+<!-- claims: parser python, go, rust, typescript. Held by src/plugins/plugin-docs.test.ts against each plugin's manifest. -->
 For a language Coherence lacks, start from `python`: it reads its
 text through a tree-sitter parser and queries (below, reading through a
 parser), so the readings come from one parse and no hand-written reader of
 its text can disagree with another or miss a statement that spans lines.
-`go` and `rust` still read their text with hand-written syntax slots; take
-them as examples of an adapter over a language server (`go` drives gopls,
-`rust` a server with no npm package), not of how to read text. `typescript`
-and `declared` complete the set. Their sources import the core as `../../src/plugins/api.ts`, the
+Every bundled language plugin reads this way: `go` (a package as a module,
+its qualified uses), `rust` (paths spelled in pieces), `typescript`
+(default exports, and JavaScript and TSX through one grammar). They are
+also the examples of an adapter over a language server: `go` drives gopls,
+`rust` a server with no npm package. `declared` completes the set. Their sources import the core as `../../src/plugins/api.ts`, the
 same module the package exports as `@posthog/coherence/plugin`; an ejected
 copy names it the second way, and so should a plugin you write.
 
@@ -236,7 +237,7 @@ through a parser), which derives the `source`, `declares` and `topLevel`
 slots and the `interfaces` slot's import answers; it still fills the slots no
 parse answers (`entrances`, `notice`, `lists`, `boundaries`, the
 `interfaces` table's language facts). A plugin with no parser for its
-language reads by hand-written slots, as `go` and `rust` do today.
+language can still read by hand-written slots; no bundled plugin does.
 
 The readings scan a language by the tables its plugin's manifest names under
 `syntax`, each as `"<module>#<export>"`, loaded synchronously, once, when a
@@ -292,8 +293,9 @@ over its syntax tree, in place of hand-written readers. Coherence parses
 each file once per reading and derives every reading of its text from the
 same parse: the names a file declares at its top level, what each declares,
 and every import. A statement is read whole, whatever lines it spans; text
-inside a string or a comment is never read as code. The bundled Python
-plugin reads this way (`plugins/python`).
+inside a string or a comment is never read as code. Every bundled
+language plugin reads this way (`plugins/python`, `plugins/go`,
+`plugins/rust`, `plugins/typescript`).
 
 ```json
 "treeSitter": {
@@ -308,8 +310,9 @@ plugin reads this way (`plugins/python`).
 |---|---|
 | `parser` | The language's parser compiled to WebAssembly, beside the manifest. Many grammars' npm packages ship one (`tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-java`, `tree-sitter-c`): copy the `.wasm` out of the package. For a grammar whose npm package ships none, look on the grammar's GitHub releases first: `tree-sitter-swift` attaches `tree-sitter-swift.wasm` to each release. Failing that, run `tree-sitter build --wasm` in the grammar's repository; the tree-sitter CLI compiles it with Emscripten, or with Docker or Podman when Emscripten is not installed. Coherence runs web-tree-sitter 0.27, which loads parsers built for language ABI 13 to 15. |
 | `queries` | A file of tree-sitter queries, beside the manifest, whose captures are the names below. A query that does not compile against the parser, or a capture Coherence reads nothing by, is refused naming the plugin. |
-| `resolve` | `"<module>#<export>"`: a `ModuleResolution`, `{ resolveModule(root, from, specifier, vanished), modulePaths(from, specifier) }`. Where an import leads is the language's rule, not its syntax, so it stays code: `resolveModule` names the project file a specifier leads to, or, where the language's module is several files (a Go package, a SwiftPM target), the module as `{ module: "<folder>", files: ["<every file of it>"] }`, or `undefined` outside the project. `modulePaths` gives every spelling of the files a glob import names. |
-| `privateName` | For a language that exports by name rather than by a keyword: a regular expression a name it keeps private matches (Python's `^_`). A language that exports by keyword captures `@exported` instead. |
+| `resolve` | `"<module>#<export>"`: a `ModuleResolution`, `{ resolveModule(root, from, specifier, vanished), modulePaths(from, specifier), boundName?(specifier) }`. Where an import leads is the language's rule, not its syntax, so it stays code: `resolveModule` names the project file a specifier leads to, or, where the language's module is several files (a Go package, a SwiftPM target), the module as `{ module: "<folder>", files: ["<every file of it>"] }`, or `undefined` outside the project. `modulePaths` gives every spelling of the files a glob import names. `boundName`, optional, gives the name a whole-module import binds when it gives none (a Go package's name, from its path); absent, the specifier's last path element. |
+| `privateName` | For a language that exports by name rather than by a keyword: a regular expression a name it keeps private matches (Python's `^_`, Go's `^\\P{Lu}`), read with Unicode's character classes (the `u` flag). A language that exports by keyword captures `@exported` instead. |
+| `separator` | For queries that capture `@import.prefix`: the text the language joins a path's segments with (Rust's `::`), which joins each prefix to the path it prefixes. |
 
 The captures:
 
@@ -321,10 +324,18 @@ The captures:
 | `@import.alias` | the name it is bound to, when renamed | the alias |
 | `@import.glob` | the glob (`*`) | every name the module exports |
 | `@import.module` | the module of a whole-module import (`import os.path`) | the specifier |
+| `@import.prefix` | a path a group spells in pieces (Rust's `use a::b::{c, d}`: the `a::b`) | joined by `separator` to each specifier inside it, so `a::b::c` is read whole |
+| `@import.default` | the name a default import binds (TypeScript's `import foo from "./m"`) | the module's default export, under that name |
 | `@declaration.body`, `@declaration.value`, `@declaration.type`, `@declaration.unknown` | a top-level declaration, by what it declares | the declaration; its line is its `@name`'s |
 | `@name` | the declaration's name | the name |
 | `@bound` | a top-level name the file binds without declaring it (Python's lowercase module variables) | the spec model's check that a handler, guard or mirror exists reads it; mass does not |
 | `@exported` | anything in a declaration's match | the file exports it |
+| `@default` | anything in a declaration's match, or a name alone (`export default foo`) | the file exports it, or that name, as its default |
+| `@use.qualifier`, `@use.name` | a use through a whole-module import (Go's `st.Seal`) | the file uses that name of the module it binds as the qualifier, so the import joins only the file that declares it |
+
+A capture whose name starts with an underscore (`@_alias`) is the queries'
+own, for a predicate to test (`(#eq? @_alias "default")`); Coherence reads
+nothing by it and never refuses it.
 
 An import that resolves to a module joins, of the module's files, those
 that declare the name it imports (read through the plugin's own parser), and
@@ -337,7 +348,18 @@ A plugin with a hand-written `source` slot may return a module from its
 
 Python's queries (`plugins/python/python.scm`) are the worked example:
 one pattern per shape of import, then one per kind of declaration, each
-anchored to the module so a nested definition is no top-level one.
+anchored to the module so a nested definition is no top-level one. Go's
+(`go.scm`) add qualified uses, Rust's (`rust.scm`) prefixes, TypeScript's
+(`typescript.scm`) default exports and the queries' own captures.
+
+A grammar reads the language as its release knew it. Syntax newer than the
+grammar parses as an error node, and the statements around it still read;
+`coherence plugin calibrate` counts what the reading and the language
+server disagree on, so a project can see what its grammar misses. The
+bundled Go grammar (0.25) predates Go 1.26; TypeScript's TSX grammar reads
+every `.ts`, `.tsx` and `.js` file, so the one form TSX forbids, an
+angle-bracket type assertion (`<string>value`; write `value as string`),
+parses as an error there.
 
 The plugin still fills the slots no parse answers: `entrances` (a
 framework's rules), `notice`, `lists`, `boundaries`, and an `interfaces`
@@ -357,6 +379,8 @@ that changed (PostHog's 20,000 Python files: 30 s for the first warm-up,
 2 s for the next, and mass in 3.4 s). A hook that reads a file or two parses
 it directly and never loads the store. Changing the parser or the queries
 changes the fingerprint, so nothing kept under the old ones is read.
+`plugin eject` copies a plugin's parser byte for byte with its queries, so
+an ejected copy reads as the bundled plugin read.
 
 Every language plugin's `check.json` maps its files and names onto one
 reference project, the same in every language, under `reference`:
@@ -675,8 +699,10 @@ it) reads a Go module through gopls:
   test code.
 - **Read by the readings.** Go's files, tests and `vendor` folder, and its
   top-level declarations, so the spec check reads an entrance's handler or
-  a guard in a Go file. Not yet: entrance detection (declare each under
-  `## entrances`) and the text scans mass and the economy read by.
+  a guard in a Go file; its entrances (a `main` package's `main`, an HTTP
+  handler it registers); and its imports through its parser: a package is
+  one module of its files, and a use through the package (`st.Seal`) joins
+  the file that declares the name.
 - **gopls** is found from `COHERENCE_GOPLS`, else the `PATH`, else
   `go env GOPATH`/bin; with none, every Go chokepoint reads not run with
   how to install it. `ci install` sets up Go and gopls in the workflow it
