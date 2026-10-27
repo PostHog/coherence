@@ -1,8 +1,8 @@
 diff --git a/common/define-grammar.js b/common/define-grammar.js
-index efb0b76..31ca201 100644
+index efb0b76..d6e5b2a 100644
 --- a/common/define-grammar.js
 +++ b/common/define-grammar.js
-@@ -257,6 +257,32 @@ module.exports = function defineGrammar(dialect) {
+@@ -257,6 +257,34 @@ module.exports = function defineGrammar(dialect) {
          ),
        ),
  
@@ -17,7 +17,8 @@ index efb0b76..31ca201 100644
 +          repeat(choice(
 +            alias($.unescaped_double_jsx_string_fragment, $.string_fragment),
 +            $.html_character_reference,
-+            alias(token.immediate('&'), $.string_fragment),
++            // A pattern, not the string '&': a string would be one token with every & operator, renamed with it.
++            alias(token.immediate(/&/), $.string_fragment),
 +          )),
 +          '"',
 +        ),
@@ -26,7 +27,8 @@ index efb0b76..31ca201 100644
 +          repeat(choice(
 +            alias($.unescaped_single_jsx_string_fragment, $.string_fragment),
 +            $.html_character_reference,
-+            alias(token.immediate('&'), $.string_fragment),
++            // A pattern, not the string '&': a string would be one token with every & operator, renamed with it.
++            alias(token.immediate(/&/), $.string_fragment),
 +          )),
 +          '\'',
 +        ),
@@ -35,7 +37,7 @@ index efb0b76..31ca201 100644
        // This rule is only referenced by expression when the dialect is 'tsx'
        jsx_opening_element: $ => prec.dynamic(-1, seq(
          $._jsx_start_opening_element,
-@@ -691,7 +717,9 @@ module.exports = function defineGrammar(dialect) {
+@@ -691,7 +719,9 @@ module.exports = function defineGrammar(dialect) {
        // required beforehand. This allows for parsing of annotations such as
        // foo: import('x').y.z;
        // but was a nightmare to get working.
@@ -46,7 +48,7 @@ index efb0b76..31ca201 100644
          field('object', choice(
            $.import,
            alias($._type_query_member_expression_in_type_annotation, $.member_expression),
-@@ -702,7 +730,9 @@ module.exports = function defineGrammar(dialect) {
+@@ -702,7 +732,9 @@ module.exports = function defineGrammar(dialect) {
            $.private_property_identifier,
            alias($.identifier, $.property_identifier),
          )),
@@ -57,7 +59,7 @@ index efb0b76..31ca201 100644
        _type_query_call_expression_in_type_annotation: $ => seq(
          field('function', choice(
            $.import,
-@@ -726,8 +756,6 @@ module.exports = function defineGrammar(dialect) {
+@@ -726,8 +758,6 @@ module.exports = function defineGrammar(dialect) {
          $.readonly_type,
          $.constructor_type,
          $.infer_type,
@@ -66,7 +68,7 @@ index efb0b76..31ca201 100644
        ),
  
        tuple_parameter: $ => seq(
-@@ -782,6 +810,10 @@ module.exports = function defineGrammar(dialect) {
+@@ -782,6 +812,10 @@ module.exports = function defineGrammar(dialect) {
          $.intersection_type,
          $.union_type,
          'const',
@@ -195,10 +197,10 @@ index 23b78b5..e81808f 100644
  }
 diff --git a/test/corpus/coherence-tsx.txt b/test/corpus/coherence-tsx.txt
 new file mode 100644
-index 0000000..d7deb14
+index 0000000..54f1789
 --- /dev/null
 +++ b/test/corpus/coherence-tsx.txt
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,94 @@
 +==========================================
 +Coherence: a bare ampersand in JSX text and strings
 +==========================================
@@ -270,12 +272,35 @@ index 0000000..d7deb14
 +          (identifier))
 +        (jsx_closing_element
 +          (identifier))))))
++==========================================
++Coherence: character references at their limits
++==========================================
++
++const e = <p>&#x10FFFF;|&#x1234567;|&#12345;|&#123456;|&aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;|&aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;</p>;
++
++---
++
++(program
++  (lexical_declaration
++    (variable_declarator
++      (identifier)
++      (jsx_element
++        (jsx_opening_element
++          (identifier))
++        (html_character_reference)
++        (jsx_text)
++        (html_character_reference)
++        (jsx_text)
++        (html_character_reference)
++        (jsx_text)
++        (jsx_closing_element
++          (identifier))))))
 diff --git a/test/corpus/coherence.txt b/test/corpus/coherence.txt
 new file mode 100644
-index 0000000..02eb6c9
+index 0000000..b75380b
 --- /dev/null
 +++ b/test/corpus/coherence.txt
-@@ -0,0 +1,219 @@
+@@ -0,0 +1,282 @@
 +==========================================
 +Coherence: import types with type arguments
 +==========================================
@@ -495,3 +520,66 @@ index 0000000..02eb6c9
 +    (identifier)
 +    (identifier)
 +    (statement_block)))
++==========================================
++Coherence: members whose names begin with in after another member
++==========================================
++
++interface N {
++  a: number
++  in$: number
++  b: number
++  in2: number
++  c: number
++  inü: number
++  d: number
++  in\u0061: number
++  e: number
++  instanceof$: number
++}
++
++---
++
++(program
++  (interface_declaration
++    (type_identifier)
++    (interface_body
++      (property_signature
++        (property_identifier)
++        (type_annotation
++          (predefined_type)))
++      (property_signature
++        (property_identifier)
++        (type_annotation
++          (predefined_type)))
++      (property_signature
++        (property_identifier)
++        (type_annotation
++          (predefined_type)))
++      (property_signature
++        (property_identifier)
++        (type_annotation
++          (predefined_type)))
++      (property_signature
++        (property_identifier)
++        (type_annotation
++          (predefined_type)))
++      (property_signature
++        (property_identifier)
++        (type_annotation
++          (predefined_type)))
++      (property_signature
++        (property_identifier)
++        (type_annotation
++          (predefined_type)))
++      (property_signature
++        (property_identifier)
++        (type_annotation
++          (predefined_type)))
++      (property_signature
++        (property_identifier)
++        (type_annotation
++          (predefined_type)))
++      (property_signature
++        (property_identifier)
++        (type_annotation
++          (predefined_type))))))

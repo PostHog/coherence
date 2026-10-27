@@ -78,20 +78,30 @@ function insideNested(root: string, rel: string, memo: Map<string, boolean>): bo
   return false;
 }
 
+/**
+ * Whether a listed path is a file a reading may open: a regular file, or a
+ * link to one. Never a folder, a pipe, a socket or a device, which a read
+ * waits on forever or reads without end, and never a link that leads to one
+ * of those or nowhere. The one test every enumeration of the project's files
+ * passes, so no reading is handed what it cannot read.
+ */
 function isFileOnDisk(root: string, rel: string): boolean {
   try {
-    return !lstatSync(join(root, rel)).isDirectory();
+    const entry = lstatSync(join(root, rel));
+    return entry.isFile() || (entry.isSymbolicLink() && statSync(join(root, rel)).isFile());
   } catch {
     return false;
   }
 }
 
-function isFolderOnDisk(root: string, rel: string): boolean {
+/** Whether something is at a listed path that no reading may open: a folder, a pipe, a socket, a device, or a link to one or to nothing. A path with nothing at it (a tracked file an edit deleted) is not. */
+function isOtherOnDisk(root: string, rel: string): boolean {
   try {
-    return lstatSync(join(root, rel)).isDirectory();
+    lstatSync(join(root, rel));
   } catch {
     return false;
   }
+  return !isFileOnDisk(root, rel);
 }
 
 function gitList(root: string, pathspecs: readonly string[]): string[] {
@@ -385,7 +395,7 @@ export function keepProjectFiles(root: string, paths: readonly string[], listing
   const memo = new Map<string, boolean>();
   const plugins = pluginFolders(base);
   const candidates = [...new Set(paths.map((p) => projectRelative(base, p)).filter((rel): rel is string => rel !== undefined))].filter(
-    (rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && !isFolderOnDisk(base, rel) && !rel.split("/").includes(".git"),
+    (rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && !isOtherOnDisk(base, rel) && !rel.split("/").includes(".git"),
   );
   if (candidates.length === 0 || !inRepository(base)) {
     return new Set(inRepository(base) ? [] : candidates.filter((rel) => !rel.split("/").includes("node_modules")));

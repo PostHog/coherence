@@ -309,7 +309,7 @@ language plugin reads this way (`plugins/python`, `plugins/go`,
 
 | Key | Meaning |
 |---|---|
-| `parser` | The language's parser compiled to WebAssembly, beside the manifest. Many grammars' npm packages ship one (`tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-java`, `tree-sitter-c`): copy the `.wasm` out of the package. For a grammar whose npm package ships none, look on the grammar's GitHub releases first: `tree-sitter-swift` attaches `tree-sitter-swift.wasm` to each release. Failing that, run `tree-sitter build --wasm` in the grammar's repository; the tree-sitter CLI compiles it with Emscripten, or with Docker or Podman when Emscripten is not installed. Coherence runs web-tree-sitter 0.27, which loads parsers built for language ABI 13 to 15. |
+| `parser` | The language's parser compiled to WebAssembly, beside the manifest. Many grammars' npm packages ship one (`tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-java`, `tree-sitter-c`): copy the `.wasm` out of the package. For a grammar whose npm package ships none, look on the grammar's GitHub releases first: `tree-sitter-swift` attaches `tree-sitter-swift.wasm` to each release. Failing that, run `tree-sitter build --wasm` in the grammar's repository; the tree-sitter CLI (0.27) compiles it with wasi-sdk's clang and optimizes it with binaryen's wasm-opt, each downloaded on first use, or the copies `TREE_SITTER_WASI_SDK_PATH` and `TREE_SITTER_BINARYEN_PATH` name. Coherence runs web-tree-sitter 0.27, which loads parsers built for language ABI 13 to 15. |
 | `alternate` | Optional: a second parser of the same language, beside the manifest, read with the same queries where the `parser`'s tree holds an error and its own errors cover less of the text (TypeScript's TypeScript grammar beside its TSX grammar). It is compiled the first time a text needs it, and queries that do not compile against it are refused then. |
 | `queries` | A file of tree-sitter queries, beside the manifest, whose captures are the names below. A query that does not compile against the parser, or a capture Coherence reads nothing by, is refused naming the plugin. |
 | `resolve` | `"<module>#<export>"`: a `ModuleResolution`, `{ resolveModule(root, from, specifier, vanished), modulePaths(from, specifier), boundName?(specifier) }`. Where an import leads is the language's rule, not its syntax, so it stays code: `resolveModule` names the project file a specifier leads to, or, where the language's module is several files (a Go package, a SwiftPM target), the module as `{ module: "<folder>", files: ["<every file of it>"] }`, or `undefined` outside the project. `modulePaths` gives every spelling of the files a glob import names. `boundName`, optional, gives the name a whole-module import binds when it gives none (a Go package's name, from its path); absent, the specifier's last path element. |
@@ -368,19 +368,27 @@ tree-sitter-typescript 0.23.2 with a patch, since upstream has merged no
 grammar change since that release: they read an import type with type
 arguments or as an array's element (`import('x').T<U>`, `import('x').T[]`),
 a member named `in` or `instanceof` (`in?: T`, `in = 2`) or beginning with
-`in` (`in_progress`) on the line after another, and a bare `&` in JSX text
-or a JSX string, each of which hid the declarations after it in PostHog's
-frontend. The patch and the script that rebuilds both parsers byte for byte
-are in `grammars/tree-sitter-typescript` in Coherence's repository; the
-script builds nothing until the grammar's own test corpus and Coherence's
-(each fix, and each form it must leave alone, with its whole expected tree)
-pass in both dialects, and CI rebuilds both parsers on every pull request
-and fails unless they come out as the ones bundled. Still
-errors: an optional destructured parameter in a function type
-(`({ a }?: T) => U`), a parenthesized import type, `typeof import('x')` as
-a call's type argument (`importOriginal<typeof import('x')>()`), a method
-named `in` after another member, and a comparison whose `<` begins the line
-after `as import('x').T`.
+`in` (`in_progress`, `in$`) on the line after another, and a bare `&` in JSX
+text or a JSX string, each of which hid the declarations after it in
+PostHog's frontend. The patch and the script that rebuilds both parsers byte
+for byte are in `grammars/tree-sitter-typescript` in Coherence's repository.
+The script fetches every input and checks it by its digest (the upstream
+commit, tree-sitter-javascript, and the CLI, clang and wasm-opt the parsers
+are compiled with), builds nothing until the grammar's own test corpus and
+Coherence's (each fix, and each form it must leave alone, with its whole
+expected tree) pass in both dialects, and writes the bundled parsers only
+once each is the digest it records. CI rebuilds both on every pull request
+and fails its checks unless they come out as the ones bundled. Still
+errors, as with the stock grammar: an optional destructured parameter in a
+function type (`({ a }?: T) => U`), a parenthesized import type, `typeof
+import('x')` as a call's type argument (`importOriginal<typeof
+import('x')>()`), a method named `in` after another member, and variance
+annotations (`<in out T>`). A comparison after an import type
+(`x as import('x').T < y`) now errs too, as it does after any other type
+(`x as T < y`) and as TypeScript's own compiler refuses it. Around a
+parenthesized import type the patched grammar can recover less of what
+follows: over about 80,000 files of real TypeScript, mostly type
+declarations, it read 4 declarations fewer there, and 2,601 more elsewhere.
 
 A language with two grammars names the second as its `alternate`: a text
 whose tree from `parser` holds an error is parsed again with it, and the
@@ -419,11 +427,13 @@ kept parse. Each warm-up also parses a sample of the files it found kept
 and compares; a store that differs from a fresh parse is discarded, and the
 next session start says so. A store is read only where this machine's key
 signs its contents, and a line of its log only where the line signs
-itself and names the store's generation, which only a warm-up's rewrite
-changes, so a store or log a repository commits feeds no reading; a log
-whose lines fail more than a killed process's torn line would is read no
+itself and names the store's generation, which only a warm-up's rewrite or
+discard changes, so a store or log a repository commits feeds no reading; a
+log whose lines fail more than a killed process's torn line would is read no
 further, so however many lines a repository commits it costs a few
-signatures.
+signatures. The warm-up reads only a project's regular source files, never
+one through a link or larger than 16 MB, and a file nested thousands deep
+around an error is read like any other.
 `plugin eject` copies a plugin's parser byte for byte with its queries, so
 an ejected copy reads as the bundled plugin read.
 

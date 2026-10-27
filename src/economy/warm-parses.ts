@@ -7,7 +7,7 @@
  * detached, so no hook waits on it.
  */
 
-import { readFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { configIgnore } from "../adapters/project-files.ts";
 import { registryForLeaf } from "../adapters/project-config.ts";
@@ -39,14 +39,38 @@ function warmRoot(root: string): { language: string; read: number; parsed: numbe
       const files = sourceFiles(root, language, ignore);
       const texts = (function* () {
         for (const file of files) {
-          try {
-            yield readFileSync(resolve(root, file), "utf8");
-          } catch {
-            // A file gone since the walk listed it is no text to keep.
-          }
+          const text = warmText(resolve(root, file));
+          if (text !== undefined) yield text;
         }
       })();
       return [{ language, ...warmParses(plugin, storeRootOf(root)!, texts) }];
     }),
   );
+}
+
+/** The largest source file a warm-up reads: a generated file larger is read when a reading asks for it, never unasked. */
+const WARM_MAX_BYTES = 16 * 1024 * 1024;
+
+/**
+ * A source file's text as the warm-up reads it, unasked at a session start:
+ * only a regular file, never through a link (one that leads out of the
+ * project, or to a pipe or a device), never blocking, and none larger than
+ * WARM_MAX_BYTES. Undefined for anything else, or a file gone since the walk
+ * listed it.
+ */
+function warmText(path: string): string | undefined {
+  let fd: number;
+  try {
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  } catch {
+    return undefined;
+  }
+  try {
+    const stat = fstatSync(fd);
+    return stat.isFile() && stat.size <= WARM_MAX_BYTES ? readFileSync(fd, "utf8") : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    closeSync(fd);
+  }
 }

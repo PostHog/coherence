@@ -19,7 +19,7 @@
  * parse #638 of one file by never freeing them.
  */
 
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { closeSync, constants, fstatSync, linkSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -226,6 +226,12 @@ export function warmParses(plugin: LoadedPlugin, root: string, texts: Iterable<s
     for (const text of texts) {
       const key = reader.keyOf(text);
       const kept = reader.store.get(key);
+      // Each text read on its own: one the reader cannot read is kept nowhere, and the pass goes on to the next.
+      try {
+        reader.imports(text);
+      } catch {
+        continue;
+      }
       if (kept !== undefined) {
         hits++;
         if (sample.length < AUDIT_SAMPLE) sample.push({ text, kept });
@@ -234,7 +240,6 @@ export function warmParses(plugin: LoadedPlugin, root: string, texts: Iterable<s
           if (at < AUDIT_SAMPLE) sample[at] = { text, kept };
         }
       }
-      reader.imports(text);
       keep.add(key);
       read++;
     }
@@ -269,9 +274,10 @@ export function keptParseOf(plugin: LoadedPlugin, text: string): string {
  */
 export function staleParsesNotice(root: string, now: number = Date.now()): string {
   const lines: string[] = [];
-  for (const folder of StoreFolder.all(root)) {
+  // As many plugins' folders as a project could run, read sorted: a repository's thousand folders cost a session start no more.
+  for (const folder of StoreFolder.all(root).slice(0, AUDIT_FOLDERS_MAX)) {
     const plugin = folder.name;
-    const text = folder.read(AUDIT_FILE);
+    const text = folder.read(AUDIT_FILE, AUDIT_MAX_BYTES);
     if (text === undefined) continue;
     try {
       const audit = JSON.parse(text) as unknown;
@@ -279,7 +285,7 @@ export function staleParsesNotice(root: string, now: number = Date.now()): strin
       const { at, sampled, stale } = audit as Record<string, unknown>;
       if (typeof at !== "number" || typeof sampled !== "number" || typeof stale !== "number" || !Number.isInteger(sampled) || !Number.isInteger(stale)) continue;
       // Said only when this machine wrote it, for this folder, in bounds a warm-up's audit can reach: a repository's own audit.json says nothing.
-      if (stale < 1 || stale > sampled || sampled > AUDIT_SAMPLE || text !== auditText(plugin, { at, sampled, stale })) continue;
+      if (stale < 1 || stale > sampled || sampled > AUDIT_SAMPLE || !same(text, auditText(plugin, { at, sampled, stale }))) continue;
       if (now - at > AUDIT_NOTICE_DAYS * 86_400_000 || at > now) continue;
       lines.push(`Kept parses: plugin ${plugin}'s kept parses differed from a fresh parse of the same text on ${stale} of the ${sampled} its warm-up sampled (${new Date(at).toISOString().slice(0, 10)}), so its store was discarded and every file is parsed again. The fingerprint they were kept under leaves out something a parse depends on (KEPT_FROM, fingerprintOf in src/plugins/syntax-trees.ts, or a change to the plugin's parsing that names no new parser or queries): a defect to record.`);
     } catch {
@@ -337,14 +343,21 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
     const tree = parser.parse(text);
     if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
     if (declared.alternate === undefined || !tree.rootNode.hasError) return { tree, query };
-    const other = second()!.parser.parse(text);
-    if (other === null) return { tree, query };
-    if (errorSpan(other.rootNode) < errorSpan(tree.rootNode)) {
+    // Each tree freed however the choice ends: the alternate's refusal of the queries throws here.
+    let other: Tree | null = null;
+    try {
+      other = second()!.parser.parse(text);
+      if (other === null || errorSpan(other.rootNode) >= errorSpan(tree.rootNode)) return { tree, query };
+      const chosen = other;
+      other = null;
       tree.delete();
-      return { tree: other, query: alternate!.query };
+      return { tree: chosen, query: alternate!.query };
+    } catch (error) {
+      tree.delete();
+      throw error;
+    } finally {
+      other?.delete();
     }
-    other.delete();
-    return { tree, query };
   };
   return {
     marksExports: query.captureNames.includes("exported"),
@@ -396,11 +409,21 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
   };
 }
 
-/** How much of the text a tree's errors cover, in bytes: an error node its whole span, a missing node one; descending only into what holds one. */
-function errorSpan(node: Node): number {
-  if (node.isError) return Math.max(1, node.endIndex - node.startIndex);
-  if (node.isMissing) return 1;
-  return node.children.reduce((n, child) => n + (child !== null && (child.hasError || child.isMissing) ? errorSpan(child) : 0), 0);
+/**
+ * How much of the text a tree's errors cover, in bytes: an error node its
+ * whole span, a missing node one; descending only into what holds one. Walked
+ * with a stack of its own, never by recursion: a file nested ten thousand
+ * deep around an error is a project's to write, and a reading's stack is not.
+ */
+function errorSpan(root: Node): number {
+  let span = 0;
+  const pending: Node[] = [root];
+  for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
+    if (node.isError) span += Math.max(1, node.endIndex - node.startIndex);
+    else if (node.isMissing) span += 1;
+    else for (const child of node.children) if (child !== null && (child.hasError || child.isMissing)) pending.push(child);
+  }
+  return span;
 }
 
 /**
@@ -564,8 +587,10 @@ class ParseStore {
 
   private readonly folder: StoreFolder;
   private readonly fingerprint: string;
-  /** The generation of the store this process loaded or last wrote: "" where there was none. */
+  /** The generation of the store this process loaded or last wrote: "" where there was none it could trust. */
   private generation = "";
+  /** The store file's first line as this process last saw it, trusted or not: it reads the store again only once the line changes. */
+  private seen: string | undefined;
   private checked = 0;
 
   private constructor(folder: StoreFolder, fingerprint: string) {
@@ -592,29 +617,27 @@ class ParseStore {
     return match === null ? undefined : { generation: match[1]!, signature: match[2]! };
   }
 
-  /** The generation the store's file holds now, read from its first line alone: "" where there is none. */
-  private generationOnDisk(): string {
-    return ParseStore.sealOf(this.folder.firstLine(this.base))?.generation ?? "";
-  }
-
   get(key: string): Found | undefined {
-    // A process that lives long (the warm server) reads the store again once another process rewrote or discarded it, looking at most once a second.
+    // A process that lives long (the warm server) reads the store again once another process rewrote or discarded it, looking at most once a
+    // second. It looks at the first line as it last saw it, not at the generation it trusted: a store this machine did not sign is read once,
+    // and again only when it changes.
     if (this.entries !== undefined && Date.now() - this.checked > RELOAD_MS) {
       this.checked = Date.now();
-      if (this.generationOnDisk() !== this.generation) this.entries = undefined;
+      if (this.folder.firstLine(this.base) !== this.seen) this.entries = undefined;
     }
     if (this.entries === undefined) {
       const entries = new Map<string, { found: Found; day: number }>();
       this.checked = Date.now();
       this.generation = "";
-      const text = this.folder.read(this.base);
+      const { text, firstLine } = this.folder.readWithFirstLine(this.base);
+      this.seen = firstLine;
       if (text !== undefined) {
         try {
           // The store's first line signs its generation and the rest: a store whose contents this machine did not write is never read, whatever its seal.
           const newline = text.indexOf("\n");
           const seal = ParseStore.sealOf(newline < 0 ? text : text.slice(0, newline));
           const body = newline < 0 ? "" : text.slice(newline + 1);
-          if (seal !== undefined && seal.signature === this.sign(`${seal.generation}\n${body}`)) {
+          if (seal !== undefined && same(seal.signature, this.sign(`${seal.generation}\n${body}`))) {
             const kept = JSON.parse(body) as unknown;
             if (typeof kept === "object" && kept !== null && !Array.isArray(kept)) for (const [k, value] of Object.entries(kept)) if (Array.isArray(value) && value.length === 2 && typeof value[0] === "number" && isFound(value[1])) entries.set(k, { day: value[0], found: value[1] });
             this.generation = seal.generation;
@@ -631,7 +654,7 @@ class ParseStore {
         if (signed === "") continue;
         const space = signed.indexOf(" ");
         const line = signed.slice(space + 1);
-        if (space !== SIGNATURE_LENGTH || signed.slice(0, space) !== this.sign(line)) {
+        if (space !== SIGNATURE_LENGTH || !same(signed.slice(0, space), this.sign(line))) {
           if (++torn > LOG_TORN_MAX) break;
           continue;
         }
@@ -657,10 +680,11 @@ class ParseStore {
     if (this.added.length >= FLUSH_EVERY) this.flush();
   }
 
-  /** Append what this process parsed, under the generation it parsed against: a process that never loaded the store reads the generation first. */
+  /** Append what this process parsed, under the generation it trusted: a process that never loaded the store loads it first, so it never tags its lines with a generation it did not check. */
   flush(): void {
     if (this.added.length === 0) return;
-    const generation = this.entries === undefined ? this.generationOnDisk() : this.generation;
+    if (this.entries === undefined) this.get("");
+    const generation = this.generation;
     const lines = this.added.map(([k, found, day]) => JSON.stringify([k, found, day, generation])).map((line) => `${this.sign(line)} ${line}\n`).join("");
     this.added = [];
     if (this.folder.ensure()) this.folder.append(this.log, lines);
@@ -671,24 +695,51 @@ class ParseStore {
    * when a live warm-up of another process does, so two warm-ups (a session
    * start and the prompt after it) never parse the project twice or remove
    * each other's files. A lock whose process is gone, older than
-   * WARM_LOCK_MS, or stamped in the future is taken over; a folder or a link
-   * where the lock goes is no warm-up's, and the warm-up goes on without it.
+   * WARM_LOCK_MS, stamped in the future, or no lock a warm-up writes (one it
+   * cannot read) is taken over, by one warm-up alone however many try at
+   * once; a folder or a link where the lock goes is no warm-up's, and the
+   * warm-up goes on without it.
    */
   lock(): boolean {
     if (!this.folder.ensure()) return false;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       if (this.folder.create(WARM_LOCK, `${process.pid} ${Date.now()}`)) return true;
-      const held = this.folder.read(WARM_LOCK);
-      if (held === undefined) {
-        if (this.folder.holdsOther(WARM_LOCK)) return true;
-        continue;
+      if (this.folder.holdsOther(WARM_LOCK)) return true;
+      const held = this.folder.firstLine(WARM_LOCK);
+      if (held !== undefined) {
+        const [pid, at] = held.split(" ").map(Number);
+        const age = Date.now() - (at ?? 0);
+        if (alive(pid ?? 0) && age >= 0 && age < WARM_LOCK_MS) return false;
       }
-      const [pid, at] = held.split(" ").map(Number);
-      const age = Date.now() - (at ?? 0);
-      if (alive(pid ?? 0) && age >= 0 && age < WARM_LOCK_MS) return false;
-      this.folder.remove(WARM_LOCK);
+      if (!this.takeOver(held)) return false;
     }
     return false;
+  }
+
+  /**
+   * Remove a lock judged dead, by its first line (undefined: one no warm-up
+   * can read), as one warm-up alone may: under a lock of the taking-over's
+   * own, which only one process creates, and only while the lock is still
+   * the one judged, so a warm-up that judged a lock another has since taken
+   * never removes the live one in its place. Whether to try the lock again;
+   * false where another warm-up is taking it over now.
+   */
+  private takeOver(judged: string | undefined): boolean {
+    const guarded = this.folder.create(WARM_TAKEOVER, `${process.pid} ${Date.now()}`);
+    if (!guarded && !this.folder.holdsOther(WARM_TAKEOVER)) {
+      // A taking-over is a moment's work: one older than WARM_TAKEOVER_MS, or no taking-over's at all, died in it and is removed.
+      const [, at] = (this.folder.firstLine(WARM_TAKEOVER) ?? "").split(" ").map(Number);
+      const age = Date.now() - (at ?? 0);
+      if (!(age >= 0 && age < WARM_TAKEOVER_MS)) this.folder.remove(WARM_TAKEOVER);
+      return false;
+    }
+    // A folder or a link where the taking-over's lock goes is no warm-up's: the lock is taken over unguarded, as a repository chose.
+    try {
+      if (!this.folder.holdsOther(WARM_LOCK) && this.folder.firstLine(WARM_LOCK) === judged) this.folder.remove(WARM_LOCK);
+      return true;
+    } finally {
+      if (guarded) this.folder.remove(WARM_TAKEOVER);
+    }
   }
 
   /** Give the warm-up lock back. */
@@ -699,16 +750,16 @@ class ParseStore {
   /**
    * Drop every kept parse, in memory and on disk, and leave the audit that
    * found them stale beside the store for orient to say (staleParsesNotice).
-   * Only the store's own files are removed. The store's file goes with them,
-   * so its generation is none, and every process that loaded it reads again.
+   * The store is sealed empty under a new generation, so every process that
+   * loaded it reads again, whatever generation it held, and only the store's
+   * own other files are removed.
    */
   discard(audit: { sampled: number; stale: number }): void {
     this.entries = new Map();
     this.added = [];
-    this.generation = "";
     this.checked = Date.now();
     if (!this.folder.ensure()) return;
-    for (const name of this.folder.names()) if (STORE_FILE.test(name)) this.folder.remove(name);
+    this.seal({});
     this.folder.remove(AUDIT_FILE);
     this.folder.create(AUDIT_FILE, auditText(this.folder.name, { at: Date.now(), ...audit }));
   }
@@ -728,18 +779,30 @@ class ParseStore {
     // repository's shared store never drops another leaf's files, and a file gone or changed ages out.
     const now = today();
     for (const [k, { found, day }] of this.entries!) if (keep.has(k) || now - day <= RETAIN_DAYS) kept[k] = [keep.has(k) ? now : day, found];
+    this.seal(kept);
+    this.added = [];
+  }
+
+  /**
+   * Write the store whole under a new generation, signed, and remove the
+   * store's own other files: the log, other fingerprints' stores, a killed
+   * warm-up's temporary files. The one place a generation is made and the
+   * store's file written, for a rewrite and a discard alike.
+   */
+  private seal(kept: Record<string, [number, Found]>): void {
     const body = JSON.stringify(kept);
     const generation = newGeneration();
+    const first = `${STORE_SEAL}${generation} ${this.sign(`${generation}\n${body}`)}`;
     // A store path the project holds as something else (a folder named as the store's file): nothing is kept, and the warm-up goes on.
-    if (!this.folder.replace(this.base, `${STORE_SEAL}${generation} ${this.sign(`${generation}\n${body}`)}\n${body}`)) return;
+    if (!this.folder.replace(this.base, `${first}\n${body}`)) return;
     for (const name of this.folder.names()) if (name !== this.base && STORE_FILE.test(name)) this.folder.remove(name);
-    this.added = [];
     this.generation = generation;
+    this.seen = first;
     this.checked = Date.now();
   }
 }
 
-/** A store's new generation: made only by a rewrite, so no append can change the generation a process loaded. */
+/** A store's new generation: made only where the store is sealed (a rewrite or a discard), so no append can change the generation a process loaded. */
 function newGeneration(): string {
   return randomBytes(9).toString("base64url");
 }
@@ -822,18 +885,32 @@ class StoreFolder {
     return this.#safe();
   }
 
-  /** A file of the folder opened to read: a regular file no larger than STORE_MAX_BYTES, never through a link or a pipe. */
-  #open(name: string): number | undefined {
+  /** A file of the folder opened to read: a regular file no larger than max bytes, never through a link or a pipe. */
+  #open(name: string, max: number = STORE_MAX_BYTES): number | undefined {
+    return this.#openFile(name, constants.O_RDONLY, max);
+  }
+
+  /**
+   * The one way a file of the store is opened, to read or to write: where
+   * every folder from .coherence down is a real folder, never through a link
+   * (O_NOFOLLOW), never waiting on a pipe (O_NONBLOCK), and kept open only
+   * where it is a regular file no larger than max bytes and, to be written,
+   * has no second name a hard link could carry the write out by. A caller
+   * names what it does, never how the file is opened, so no caller can open
+   * one another way.
+   */
+  #openFile(name: string, flags: number, max: number = STORE_MAX_BYTES): number | undefined {
     if (!this.#safe()) return undefined;
     let fd: number;
     try {
-      fd = openSync(join(this.#dir, name), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+      fd = openSync(join(this.#dir, name), flags | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
     } catch {
       return undefined;
     }
     try {
       const stat = fstatSync(fd);
-      if (stat.isFile() && stat.size <= STORE_MAX_BYTES) return fd;
+      const writes = (flags & (constants.O_WRONLY | constants.O_RDWR)) !== 0;
+      if (stat.isFile() && stat.size <= max && (!writes || stat.nlink === 1)) return fd;
     } catch {
       // Unreadable: as if absent.
     }
@@ -841,14 +918,20 @@ class StoreFolder {
     return undefined;
   }
 
-  /** A file's whole text, or undefined where it is absent or no file of the store's may be. */
-  read(name: string): string | undefined {
-    const fd = this.#open(name);
-    if (fd === undefined) return undefined;
+  /** A file's whole text, or undefined where it is absent, larger than max bytes, or no file of the store's may be. */
+  read(name: string, max: number = STORE_MAX_BYTES): string | undefined {
+    return this.readWithFirstLine(name, max).text;
+  }
+
+  /** A file's whole text and its first line as firstLine reads it, both from one opening of the file, so the two never describe two files. */
+  readWithFirstLine(name: string, max: number = STORE_MAX_BYTES): { text: string | undefined; firstLine: string | undefined } {
+    const fd = this.#open(name, max);
+    if (fd === undefined) return { text: undefined, firstLine: undefined };
     try {
-      return readFileSync(fd, "utf8");
+      const bytes = readFileSync(fd);
+      return { text: bytes.toString("utf8"), firstLine: StoreFolder.#head(bytes) };
     } catch {
-      return undefined;
+      return { text: undefined, firstLine: undefined };
     } finally {
       closeSync(fd);
     }
@@ -860,15 +943,19 @@ class StoreFolder {
     if (fd === undefined) return undefined;
     try {
       const head = Buffer.alloc(MAX_FIRST_LINE);
-      const got = readSync(fd, head, 0, head.length, 0);
-      const text = head.subarray(0, got);
-      const end = text.indexOf(10);
-      return text.subarray(0, end < 0 ? got : end).toString("utf8");
+      return StoreFolder.#head(head.subarray(0, readSync(fd, head, 0, head.length, 0)));
     } catch {
       return undefined;
     } finally {
       closeSync(fd);
     }
+  }
+
+  /** The first line of a file's bytes, no more of them than MAX_FIRST_LINE read. */
+  static #head(bytes: Buffer): string {
+    const head = bytes.subarray(0, MAX_FIRST_LINE);
+    const end = head.indexOf(10);
+    return head.subarray(0, end < 0 ? head.length : end).toString("utf8");
   }
 
   /** A file's lines, read a chunk at a time, so a reader that stops early reads no further than it got. */
@@ -877,19 +964,21 @@ class StoreFolder {
     if (fd === undefined) return;
     try {
       const chunk = Buffer.alloc(1 << 20);
-      let pending = Buffer.alloc(0);
+      // The pieces of a line not yet ended, joined once when it ends: a line of any length costs its own bytes, never their square.
+      let pending: Buffer[] = [];
       for (;;) {
         const got = readSync(fd, chunk, 0, chunk.length, null);
         if (got === 0) break;
-        let text = Buffer.concat([pending, chunk.subarray(0, got)]);
+        let text = chunk.subarray(0, got);
         // A newline byte is never inside a character's bytes, so each line decodes whole.
         for (let end = text.indexOf(10); end >= 0; end = text.indexOf(10)) {
-          yield text.subarray(0, end).toString("utf8");
+          yield Buffer.concat([...pending, text.subarray(0, end)]).toString("utf8");
+          pending = [];
           text = text.subarray(end + 1);
         }
-        pending = Buffer.from(text);
+        if (text.length > 0) pending.push(Buffer.from(text));
       }
-      if (pending.length > 0) yield pending.toString("utf8");
+      if (pending.length > 0) yield Buffer.concat(pending).toString("utf8");
     } finally {
       closeSync(fd);
     }
@@ -897,32 +986,49 @@ class StoreFolder {
 
   /** Append to a regular file, made where absent, never through a link or into a pipe. */
   append(name: string, text: string): void {
-    if (!this.#safe()) return;
+    const fd = this.#openFile(name, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT);
+    if (fd === undefined) return;
     try {
-      const fd = openSync(join(this.#dir, name), constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
-      try {
-        if (fstatSync(fd).isFile()) writeSync(fd, text);
-      } finally {
-        closeSync(fd);
-      }
+      writeSync(fd, text);
     } catch {
       // A file that cannot be written only means the next process parses again.
+    } finally {
+      closeSync(fd);
     }
   }
 
-  /** Create a file where none is: false where one, or anything else, already is. */
-  create(name: string, text: string): boolean {
-    if (!this.#safe()) return false;
+  /** A new file written whole, made exclusively: false where one, or anything else, already is at the name. */
+  #write(name: string, text: string): boolean {
+    const fd = this.#openFile(name, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL);
+    if (fd === undefined) return false;
     try {
-      const fd = openSync(join(this.#dir, name), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
-      try {
-        writeSync(fd, text);
-      } finally {
-        closeSync(fd);
-      }
+      writeSync(fd, text);
       return true;
     } catch {
       return false;
+    } finally {
+      closeSync(fd);
+    }
+  }
+
+  /**
+   * Create a file where none is, whole: written under a temporary name of
+   * this process's, then linked into place, which fails where anything is
+   * at the name. No reader ever sees it empty or half written. False where
+   * one, or anything else, already is.
+   */
+  create(name: string, text: string): boolean {
+    if (!this.#safe()) return false;
+    const temporary = `${name}.${process.pid}.new`;
+    this.remove(temporary);
+    if (!this.#write(temporary, text)) return false;
+    try {
+      linkSync(join(this.#dir, temporary), join(this.#dir, name));
+      return true;
+    } catch {
+      return false;
+    } finally {
+      this.remove(temporary);
     }
   }
 
@@ -940,7 +1046,7 @@ class StoreFolder {
     if (!this.#safe()) return false;
     const temporary = `${name}.${process.pid}`;
     this.remove(temporary);
-    if (!this.create(temporary, text)) return false;
+    if (!this.#write(temporary, text)) return false;
     try {
       renameSync(join(this.#dir, temporary), join(this.#dir, name));
       return true;
@@ -996,6 +1102,13 @@ function auditText(plugin: string, audit: { at: number; sampled: number; stale: 
 /** A signature's length: an HMAC-SHA256 in base64url. */
 const SIGNATURE_LENGTH = 43;
 
+/** Whether a signature a file carries is the one this machine makes, compared in a time that says nothing of where they differ. */
+function same(carried: string, made: string): boolean {
+  const a = Buffer.from(carried);
+  const b = Buffer.from(made);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 /** How many lines of a log may fail their signature (a line a killed process tore) before the log is read no further. */
 const LOG_TORN_MAX = 8;
 
@@ -1008,11 +1121,17 @@ const RELOAD_MS = 1000;
 /** The file a warm-up that found the store stale leaves beside it, how long orient says so, and the folder names a plugin's store may have. */
 const AUDIT_FILE = "audit.json";
 const AUDIT_NOTICE_DAYS = 7;
+/** The most of an audit read (a warm-up's is about 150 bytes), and of plugins' folders whose audits a session start reads. */
+const AUDIT_MAX_BYTES = 4096;
+const AUDIT_FOLDERS_MAX = 64;
 const PLUGIN_FOLDER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 /** The warm-up lock's file, beside the store, and how long one holds before another warm-up may take it over. */
 const WARM_LOCK = "warming.lock";
 const WARM_LOCK_MS = 10 * 60 * 1000;
+/** The lock one warm-up holds while it takes over a dead warm-up lock, and how long one lasts before it is a dead taking-over's. */
+const WARM_TAKEOVER = "warming.lock.takeover";
+const WARM_TAKEOVER_MS = 30 * 1000;
 
 /** Whether a process is alive (signal 0 asks without sending). */
 function alive(pid: number): boolean {

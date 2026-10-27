@@ -10,7 +10,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
@@ -192,5 +192,27 @@ test("a folder the config names as a plugin is not the project's source: its fil
   } finally {
     await own?.close();
     rmSync(adopter, { recursive: true, force: true });
+  }
+});
+
+test("a reading is handed only files it can open: a pipe, a link to a pipe, a link to a folder and a link to nothing are no project file, in a repository or out of one, nor a path an edit names", () => {
+  for (const versioned of [true, false]) {
+    const root = mkdtempSync(join(tmpdir(), "coherence-unreadable-"));
+    try {
+      writeFileSync(join(root, "own.py"), "OWN = 1\n");
+      symlinkSync("own.py", join(root, "linked.py"));
+      spawnSync("mkfifo", [join(root, "pipe.py")]);
+      symlinkSync("pipe.py", join(root, "to-pipe.py"));
+      mkdirSync(join(root, "folder"));
+      writeFileSync(join(root, "folder", "inside.py"), "INSIDE = 1\n");
+      symlinkSync("folder", join(root, "to-folder.py"));
+      symlinkSync("nowhere.py", join(root, "dangling.py"));
+      if (versioned) spawnSync("git", ["init", "-q"], { cwd: root });
+      assert.deepEqual(projectFiles(root), ["folder/inside.py", "linked.py", "own.py"], `${versioned ? "in a repository" : "out of one"}: a regular file, and a link to one, alone`);
+      const kept = [...keepProjectFiles(root, ["own.py", "pipe.py", "to-pipe.py", "to-folder.py", "dangling.py", "deleted.py"])].sort();
+      assert.deepEqual(kept.filter((f) => f !== "deleted.py"), ["own.py"], "a path an edit names is kept only where it can be opened");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
