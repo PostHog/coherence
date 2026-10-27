@@ -16,7 +16,7 @@
  * attributes to a human, stored apart from its own because.
  */
 
-import { isAbsolute, relative, sep } from "node:path";
+import { isAbsolute } from "node:path";
 import { JournalError, onePositional, parseFlags, required, type FlagShape, type Parsed } from "./args.ts";
 import {
   INSTRUMENT_IS_WRONG,
@@ -49,10 +49,10 @@ import {
   alternation,
   spoken,
 } from "./record.ts";
-import { componentFolders, componentHolding, loadSpecModel, projectPractices } from "../spec/model.ts";
+import { componentFolders, componentHolding, loadSpecModel, projectFile, projectPractices } from "../spec/model.ts";
 import { originFields } from "./defects.ts";
 import { amendCommand, floorGaps, type ModelPractice } from "../spec/practices.ts";
-import { appendRecordTo, gitState, loadJournal, type Loaded } from "./store.ts";
+import { appendRecordTo, gitState, loadJournal, loadJournalAcrossWorktrees, type Loaded } from "./store.ts";
 import { describeBinding, loadWork } from "./work.ts";
 import { recordsOnOtherBranches } from "./branches.ts";
 import { recordDefectTelemetry } from "../lifecycle/telemetry.ts";
@@ -109,9 +109,11 @@ export const CITE: Record<string, FlagShape> = { cite: "many" };
 
 /**
  * The records a write cites, checked against both stores: each --cite must
- * name a record already in the journal or the work store, of any kind, or
- * one another branch has committed (a parallel session's, before it merges),
- * and none may be given twice. An id found nowhere is refused: that is a typo. Returns the field to spread into the record,
+ * name a record already in the journal of any worktree of the repository
+ * (the journals the dead-end reading reads, so an id it names can be cited
+ * from any checkout) or in the work store, of any kind, or one another
+ * branch has committed (a parallel session's, before it merges), and none
+ * may be given twice. An id found nowhere is refused: that is a typo. Returns the field to spread into the record,
  * empty when nothing is cited, so a record that cites nothing looks exactly
  * like one written before citations existed. This is the one site that
  * accepts a citation.
@@ -120,7 +122,7 @@ export function citations(parsed: Parsed, cwd: string): { cites?: string[] } {
   const given = parsed.many.get("cite") ?? [];
   if (given.length === 0) return {};
   const known = new Set<string>([
-    ...loadJournal(cwd).records.map((record) => record.id),
+    ...answerable(cwd).records.map((record) => record.id),
     ...loadWork(cwd).records.map((record) => record.id),
   ]);
   const seen = new Set<string>();
@@ -132,18 +134,35 @@ export function citations(parsed: Parsed, cwd: string): { cites?: string[] } {
   const unknown = given.filter((id) => !known.has(id));
   const elsewhere = unknown.length === 0 ? new Map() : recordsOnOtherBranches(cwd, unknown);
   const missing = unknown.find((id) => !elsewhere.has(id));
-  if (missing !== undefined) throw new JournalError(`--cite ${missing}: no journal or work record has that id, here or committed on another branch; cite a record that exists (journal, work inspect)`);
+  if (missing !== undefined) throw new JournalError(`--cite ${missing}: no journal or work record has that id, in any worktree or committed on another branch; cite a record that exists (journal, work inspect)`);
   return { cites: given };
 }
 
-/** Each cited id, with the branch that holds it when this checkout does not. */
+/** Each cited id, with where it lies when this checkout does not hold it: another worktree's journal, or another branch. */
 function citedWhere(cwd: string, ids: readonly string[]): string[] {
   const local = new Set<string>([...loadJournal(cwd).records.map((r) => r.id), ...loadWork(cwd).records.map((r) => r.id)]);
-  const elsewhere = recordsOnOtherBranches(cwd, ids.filter((id) => !local.has(id)));
+  const away = ids.filter((id) => !local.has(id));
+  const worktrees = new Set(away.length === 0 ? [] : answerable(cwd).records.map((r) => r.id));
+  const elsewhere = recordsOnOtherBranches(cwd, away.filter((id) => !worktrees.has(id)));
   return ids.map((id) => {
+    if (worktrees.has(id)) return `${id} (in another worktree's journal, not in this checkout)`;
     const found = elsewhere.get(id);
     return found === undefined ? id : `${id} (on branch ${found.branch}, not in this checkout)`;
   });
+}
+
+/**
+ * The journal a verb that answers or cites an earlier record looks in: every
+ * worktree's, the self's included, which is what the dead-end reading reads;
+ * an id that reading names, and a remedy it prints, works from any checkout.
+ * A store file of this checkout's own that cannot be read refuses the write,
+ * as loadJournal does: it may hold the answer the verb would duplicate.
+ */
+function answerable(cwd: string): Loaded {
+  const loaded = loadJournalAcrossWorktrees(cwd);
+  const unread = loaded.damaged.find((d) => d.line === 0 && !isAbsolute(d.file));
+  if (unread !== undefined) throw new JournalError(`the journal cannot be read: ${unread.file} ${unread.reason}`);
+  return loaded;
 }
 
 /** The words a human said, as the agent attributes them; refused when given blank. */
@@ -171,7 +190,7 @@ function write(ctx: Context, record: JournalRecord, extra: string[] = []): Writt
 /** The record an id names, refused when absent or of another kind. */
 function target<K extends Kind>(loaded: Loaded, id: string, kind: K | null, verb: string): JournalRecord & { kind: K } {
   const found = loaded.records.find((record) => record.id === id);
-  if (found === undefined) throw new JournalError(`${verb}: no record with id ${id}`);
+  if (found === undefined) throw new JournalError(`${verb}: no record with id ${id} in the journal of any worktree`);
   if (kind !== null && found.kind !== kind) {
     throw new JournalError(`${verb}: ${id} is a ${found.kind}, not a ${kind}`);
   }
@@ -216,7 +235,7 @@ export function retract(argv: string[], ctx: Context): Written {
   const who = attribution(parsed);
   const of = onePositional(parsed, "the id to retract");
   const because = required(parsed, "because", "a retraction records what refuted the record");
-  const loaded = loadJournal(ctx.cwd);
+  const loaded = answerable(ctx.cwd);
   const found = target(loaded, of, null, "retract");
   if (found.kind === "retraction") throw new JournalError(`retract: ${of} is itself a retraction`);
   refuseIfAnswered(loaded, of, "retract", ["retraction"]);
@@ -261,7 +280,7 @@ export function resolved(argv: string[], ctx: Context): Written {
   const who = attribution(parsed);
   const of = onePositional(parsed, "the conjecture or defect id");
   const because = required(parsed, "because", "a resolution records what the test showed, or what fixed the defect");
-  const loaded = loadJournal(ctx.cwd);
+  const loaded = answerable(ctx.cwd);
   const found = target(loaded, of, null, "resolved");
   if (found.kind !== "conjecture" && found.kind !== "defect") throw new JournalError(`resolved: ${of} is a ${found.kind}, not a conjecture or a defect`);
   refuseIfAnswered(loaded, of, "resolved", ["resolution", "dismissal"]);
@@ -323,8 +342,7 @@ export function classify(argv: string[], ctx: Context): Written {
   const who = attribution(parsed);
   const of = onePositional(parsed, "the defect id");
   const because = required(parsed, "because", "a classification records the evidence it rests on");
-  const loaded = loadJournal(ctx.cwd);
-  target(loaded, of, "defect", "classify");
+  target(answerable(ctx.cwd), of, "defect", "classify");
   const fields = originFields(originGiven(parsed), ctx.cwd);
   if (Object.keys(fields).length === 0) throw new JournalError("classify: give at least one of --class, --introduced, --caught");
   const said = [fields.class === undefined ? "" : `class ${fields.class}`, fields.introduced === undefined ? "" : `introduced ${fields.introduced}`, fields.caught === undefined ? "" : `caught ${fields.caught}`].filter((s) => s !== "");
@@ -340,7 +358,7 @@ export function dismiss(argv: string[], ctx: Context): Written {
   const who = attribution(parsed);
   const of = onePositional(parsed, "the conjecture id");
   const because = required(parsed, "because", "a dismissal records why nobody will chase the conjecture");
-  const loaded = loadJournal(ctx.cwd);
+  const loaded = answerable(ctx.cwd);
   target(loaded, of, "conjecture", "dismiss");
   refuseIfAnswered(loaded, of, "dismiss", ["resolution", "dismissal"]);
   const record: Dismissal = { ...head("dismissal", who, ctx, `${of}\n${because}`), of, because };
@@ -349,22 +367,22 @@ export function dismiss(argv: string[], ctx: Context): Written {
 
 /**
  * The component a defect belongs to, settled at the write. A file's owner is
- * the deepest component folder above it; a file outside the project or
- * outside every component has none. Without --component the record carries
- * the one component that owns every file the defect names, and none when the
- * files have several owners, when one has none, or when it names no file,
- * with a line saying why. --component is refused unless it names a component
- * folder that owns every file the defect names: a defect's own files decide
- * where it counts, so naming another component cannot move it out of the
- * dead-end reading of the one that holds the fault. A defect whose files lie
- * in several components takes no --component and counts toward each.
+ * the deepest component folder above it, decided on the path with every "."
+ * and ".." resolved (projectFile); a file outside the project or outside
+ * every component has none. Without --component the record carries the one
+ * component that owns every file the defect names, and none when the files
+ * have several owners or when one has none, with a line saying why.
+ * --component is refused unless it names a component folder that owns every
+ * file the defect names: a defect's own files decide where it counts, so
+ * naming another component cannot move it out of the dead-end reading of the
+ * one that holds the fault. A defect whose files lie in several components
+ * takes no --component and counts toward each.
  */
 function defectComponent(given: string | undefined, files: readonly string[], cwd: string): { component?: string; note?: string } {
   const folders = componentFolders(cwd);
   const owners = files.map((named) => {
-    const file = (isAbsolute(named) ? relative(cwd, named) : named).split(sep).join("/").replace(/^\.\//, "");
-    const outside = file === "" || file === ".." || file.startsWith("../") || isAbsolute(file);
-    return { named, owner: outside ? undefined : componentHolding(folders.map((f) => ({ folder: f })), file)?.folder };
+    const file = projectFile(cwd, named);
+    return { named, owner: file === undefined ? undefined : componentHolding(folders.map((f) => ({ folder: f })), file)?.folder };
   });
   const loose = owners.filter((o) => o.owner === undefined).map((o) => o.named);
   const held = new Set(owners.flatMap((o) => (o.owner === undefined ? [] : [o.owner])));
@@ -381,19 +399,51 @@ function defectComponent(given: string | undefined, files: readonly string[], cw
   }
   if (loose.length === 0 && held.size === 1) return { component: [...held][0]! };
   const how = "the dead-end reading derives where it counts from its files and says so";
-  if (files.length === 0) return { note: `  no component: it names no file; give --file <path> for each file of the fault, or --component <folder>, so the dead-end reading reads where it counts` };
   if (loose.length > 0) return { note: `  no component: ${loose.join(", ")} lie${loose.length === 1 ? "s" : ""} in no component; ${how}` };
   return { note: `  no component: its files lie in ${[...held].sort().join(" and ")}, so it counts toward each; ${how}` };
 }
 
+/**
+ * Where a defect lies, required at the write: --file for each file of the
+ * fault, or --component, or --unplaced with why no file or component of the
+ * project holds it. A defect with none of them counts toward no subsystem,
+ * so the dead-end reading could never see it; the verb asks rather than
+ * writes it.
+ */
+function defectPlace(parsed: Parsed, cwd: string): { files: string[]; component?: string; unplaced?: string; note?: string } {
+  const files = parsed.many.get("file") ?? [];
+  const component = parsed.one.get("component");
+  const unplaced = parsed.one.get("unplaced");
+  if (unplaced !== undefined) {
+    if (unplaced.trim() === "") throw new JournalError("--unplaced needs why no file or component of the project holds the fault");
+    if (files.length > 0 || component !== undefined) throw new JournalError("--unplaced says no file or component holds the fault; give it, or --file/--component, not both");
+    return { files, unplaced, note: "  unplaced: it counts toward no subsystem's dead end, as --unplaced says" };
+  }
+  if (files.length === 0 && component === undefined) {
+    const folders = componentFolders(cwd);
+    throw new JournalError(
+      `defect: say where the fault lies, or the dead-end reading counts it nowhere: --file <path> for each file of the fault (repeatable), or --component <folder>${folders.length === 0 ? "" : ` (components: ${folders.join(", ")})`}; when no file or component of the project holds it, --unplaced "<why>"`,
+    );
+  }
+  return { files, ...defectComponent(component, files, cwd) };
+}
+
 export function defect(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ evidence: "one", file: "many", component: "one", ...ORIGIN, ...CITE }));
+  const parsed = parseFlags(argv, withCommon({ evidence: "one", file: "many", component: "one", unplaced: "one", ...ORIGIN, ...CITE }));
   const who = attribution(parsed);
   const what = onePositional(parsed, "what failed");
   const evidence = required(parsed, "evidence", "a defect carries the reproducer or report that made it one");
-  const files = parsed.many.get("file") ?? [];
-  const placed = defectComponent(parsed.one.get("component"), files, ctx.cwd);
-  const record: Defect = { ...head("defect", who, ctx, what), what, evidence, files, ...(placed.component === undefined ? {} : { component: placed.component }), ...originFields(originGiven(parsed), ctx.cwd), ...citations(parsed, ctx.cwd) };
+  const placed = defectPlace(parsed, ctx.cwd);
+  const record: Defect = {
+    ...head("defect", who, ctx, what),
+    what,
+    evidence,
+    files: placed.files,
+    ...(placed.component === undefined ? {} : { component: placed.component }),
+    ...(placed.unplaced === undefined ? {} : { unplaced: placed.unplaced }),
+    ...originFields(originGiven(parsed), ctx.cwd),
+    ...citations(parsed, ctx.cwd),
+  };
   const written = write(ctx, record, placed.note === undefined ? [] : [placed.note]);
   recordDefectTelemetry(ctx.cwd, record);
   return written;
@@ -445,7 +495,7 @@ function experimentClose(argv: string[], ctx: Context): Written {
   const parsed = parseFlags(argv, withCommon({ result: "many" }));
   const who = attribution(parsed);
   const of = onePositional(parsed, "the experiment id");
-  const loaded = loadJournal(ctx.cwd);
+  const loaded = answerable(ctx.cwd);
   const open = target(loaded, of, "experiment", "experiment close");
   refuseIfAnswered(loaded, of, "experiment close", ["close"]);
   const results: Record<string, StepResult> = {};
@@ -495,7 +545,7 @@ export function acknowledge(argv: string[], ctx: Context): Written {
   const who = attribution(parsed);
   const of = onePositional(parsed, "the escalation id");
   const because = required(parsed, "because", "an acknowledgement records what the human decided");
-  const loaded = loadJournal(ctx.cwd);
+  const loaded = answerable(ctx.cwd);
   target(loaded, of, "escalation", "acknowledge");
   refuseIfAnswered(loaded, of, "acknowledge", ["acknowledgement"]);
   const record: Acknowledgement = { ...head("acknowledgement", who, ctx, `${of}\n${because}`), of, because, ...humanWords(parsed) };

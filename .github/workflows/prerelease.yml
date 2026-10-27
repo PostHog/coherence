@@ -90,15 +90,21 @@ jobs:
       # prepare builds dist; the tarball is checked before it is handed on.
       - run: npm pack
 
-      # The package as an adopter installs it, outside this checkout: each plugin check reads its fixtures through the
-      # plugin's bundled parser and exits 1 on any check that fails, so a tarball missing a plugin or a parser fails here.
-      - name: Check the tarball reads TypeScript and Python
+      # The package as an adopter installs it, outside this checkout. Each copy of the TypeScript parsers it carries (the
+      # one the installed command loads, dist/bundled, and plugins/) must be byte for byte the digests parsers.sha256
+      # records, the ones the build makes: a plugin check passes a stock or wrongly built parser that reads its fixtures.
+      # Then each plugin check reads its fixtures through the plugin's bundled parser and exits 1 on any check that fails,
+      # so a tarball missing a plugin or a parser fails here too.
+      - name: Check the tarball's parsers and that it reads TypeScript and Python
         env:
           VERSION: ${{ steps.commit.outputs.version }}
         run: |
           mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
           npm init -y >/dev/null
           npm install --ignore-scripts "$GITHUB_WORKSPACE/posthog-coherence-$VERSION.tgz"
+          for parsers in node_modules/@posthog/coherence/dist/bundled/typescript node_modules/@posthog/coherence/plugins/typescript; do
+            (cd "$parsers" && shasum -a 256 -c "$GITHUB_WORKSPACE/grammars/tree-sitter-typescript/parsers.sha256")
+          done
           npx --no coherence plugin check typescript
           npx --no coherence plugin check python
 

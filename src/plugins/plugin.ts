@@ -58,8 +58,11 @@ export const PLUGIN_API_CHANGES: Readonly<Record<number, string>> = {
   4: 'the hand-written reader slots (syntax.source, syntax.declares, syntax.topLevel and syntax.kept) are gone: a language is read through treeSitter, a grammar\'s .wasm and queries, from which the core derives what they answered, and a manifest that fills one is refused, whatever pluginApi it is written for; the interfaces table states serverBounds alone, its type declarations, default exports, import lists and wildcard imports read through the parser; a copy ejected from an older Coherence is ejected again (coherence plugin eject <name>) and its changes reapplied',
 };
 
-/** The interface version from which a duty holds: a plugin written for an older one is told so, never failed by a duty that did not exist when it was written. */
-export const DUTY_SINCE: Readonly<Record<string, number>> = { "reference reading": 3, "server agrees": 3 };
+/** The interface version from which a duty holds, and what of that version it asks: a plugin written for an older one is told so, never failed by a duty that did not exist when it was written. */
+export const DUTY_SINCE: Readonly<Record<string, { since: number; asks: string }>> = {
+  "reference reading": { since: 3, asks: "check.json's map of the reference project (reference)" },
+  "server agrees": { since: 3, asks: "the adapter's topLevelSymbols" },
+};
 
 /** What changed between the interface version a plugin was written for and the one this core runs, oldest first. */
 export function changesSince(pluginApi: number): string[] {

@@ -57,7 +57,7 @@ import { DEFAULT_TEST_FOLDERS } from "../enforcement/config.ts";
 import { performRun } from "../enforcement/run.ts";
 import { detectedEntrances, readComponentInterfaces } from "../readings/scope/component-interfaces.ts";
 import { bundledAdapter, bundledPlugins, forProject, languageOfFile, parsedOf, registerProjectPlugins, repeatedAnswers } from "./languages.ts";
-import { DUTY_SINCE, PLUGIN_API_CHANGES, type LoadedPlugin } from "./plugin.ts";
+import { DUTY_SINCE, type LoadedPlugin } from "./plugin.ts";
 import { BUNDLED_DIR, moduleSyncOf, readManifest } from "./registry.ts";
 import { proveVia, viaForm } from "./verify.ts";
 
@@ -619,9 +619,9 @@ async function interfacesRead(scratch: string, readings: Readings, adapter: Lang
 
 /** A duty a plugin written for an older interface version is not held to, said as such and passed: it did not exist when the plugin was written. */
 function notHeld(name: "reference reading" | "server agrees", plugin: LoadedPlugin): Duty | undefined {
-  const since = DUTY_SINCE[name]!;
+  const { since, asks } = DUTY_SINCE[name]!;
   const written = plugin.manifest.pluginApi;
-  return written >= since ? undefined : { name, verdict: "pass", reason: `not held: plugin ${plugin.name} is written for pluginApi ${written}, and ${name} holds from pluginApi ${since} (${PLUGIN_API_CHANGES[since]!.split(";")[0]}...; docs/plugins.md)` };
+  return written >= since ? undefined : { name, verdict: "pass", reason: `not held: plugin ${plugin.name} is written for pluginApi ${written}, and ${name} holds from pluginApi ${since}, which brought what it asks: ${asks} (docs/plugins.md)` };
 }
 
 /**

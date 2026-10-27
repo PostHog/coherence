@@ -1,7 +1,8 @@
 Forms compare.mjs reads beside the grammar's corpus and Coherence's: the one the patch reads worse than the stock
-grammar (a comparison after an import type, which intended-differences.json lists as a regression), and those both
-grammars still err on, which must stay as the stock grammar reads them. No expected trees: the comparison's only
-reference is the stock parser.
+grammar (a comparison after an import type, which intended-differences.json lists as a regression and names as its
+case), and those both grammars still err on, which must stay as the stock grammar reads them: compare.mjs fails on any
+region of difference in a case no entry names, whatever an entry's query overlaps. No expected trees: the comparison's
+only reference is the stock parser.
 
 ==================
 a comparison after an import type

@@ -22,10 +22,11 @@
  */
 
 import { createHash, randomBytes } from "node:crypto";
-import { closeSync, constants, fstatSync, futimesSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { closeSync, constants, existsSync, fstatSync, futimesSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { userCacheDir } from "../lifecycle/user-dir.ts";
+import { userInfo } from "node:os";
 import { createRequire } from "node:module";
 import { Language, Parser, Query, type Node, type QueryMatch, type Tree } from "web-tree-sitter";
 import type { LoadedPlugin, TreeSitterManifest } from "./plugin.ts";
@@ -101,10 +102,19 @@ export interface TreeReader {
  * which is the queries' own for a predicate to test (#eq? @_alias "default")
  * and is read by nothing.
  */
-export const CAPTURES = ["import", "import.from", "import.module", "import.name", "import.alias", "import.glob", "import.default", "import.prefix", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported", "default", "use.qualifier", "use.name"] as const;
+export const CAPTURES = ["import", "import.from", "import.module", "import.name", "import.alias", "import.glob", "import.default", "import.prefix", "declaration.body", "declaration.value", "declaration.type", "declaration.unknown", "bound", "name", "exported", "default", "use.qualifier", "use.name", "misread"] as const;
 
 /** The captures whose text a reading reads (an import's specifier spelled whole, with its prefixes; a qualified use's qualifier and name); every other capture is read by its name and line. */
-const TEXT_READ = new Set(["import.from", "import.module", "import.name", "import.alias", "import.default", "name", "default", "use.qualifier", "use.name"]);
+const TEXT_READ = new Set(["import.from", "import.module", "import.name", "import.alias", "import.default", "name", "default", "use.qualifier", "use.name", "misread"]);
+
+/**
+ * The predicates Coherence evaluates beyond tree-sitter's own (match?, eq?,
+ * any-of? and their negations): web-tree-sitter hands any other back
+ * unapplied, so one a plugin wrote that nothing evaluates is refused by name
+ * rather than matching as if it were not there. not-parent-type? @c t1 t2...
+ * holds where the node @c captured has a parent of none of those types.
+ */
+const PREDICATES = ["not-parent-type?"] as const;
 
 /** A capture the queries keep for a predicate alone. */
 const ownCapture = (name: string): boolean => name.startsWith("_");
@@ -125,7 +135,8 @@ type Found = [name: string, text: string, line: number][][];
 
 /** A parser compiled once per plugin: what every reader of its language shares. */
 interface Compiled {
-  parse(text: string): Found;
+  /** The text's matches; undefined where reading it would take more work than any text may (PARSE_WORK_MAX, QUERY_WORK_MAX). */
+  parse(text: string): Found | undefined;
   census(text: string): { line: number; shapes: ImportShape[]; specifier: string }[];
   capturesStatements: boolean;
   marksExports: boolean;
@@ -201,7 +212,8 @@ export function treeReaderOf(plugin: LoadedPlugin, root?: string): TreeReader | 
       parser = compile(plugin, plugin.manifest.treeSitter);
       compiled.set(plugin.dir, parser);
     }
-    reader = readerOver(parser, root === undefined ? undefined : ParseStore.of(plugin.name, parser.fingerprint));
+    const store = root === undefined ? undefined : ParseStore.of(plugin.name, parser.fingerprint);
+    reader = readerOver(plugin.name, parser, store !== undefined && store.outside(root!) ? store : undefined);
     readers.set(key, reader);
   }
   return reader;
@@ -230,7 +242,9 @@ export function warmParses(plugin: LoadedPlugin, root: string, texts: Iterable<s
     let answer: { found: Found; kept?: true };
     try {
       answer = reader.read(text);
-    } catch {
+    } catch (error) {
+      // A runtime that aborted takes every later parse in the process with it: the pass stops, and what it read stands.
+      if (/\bAborted\b/.test(String(error))) break;
       continue;
     }
     if (answer.kept === true) {
@@ -248,7 +262,15 @@ export function warmParses(plugin: LoadedPlugin, root: string, texts: Iterable<s
   // A kept parse that differs from a fresh parse of the same text was kept under a fingerprint that leaves out something the parse depends on:
   // the store is removed whole, since no entry of it can be trusted, and the next session start says so (staleParsesNotice).
   const fresh = compiled.get(plugin.dir)!;
-  const stale = sample.filter(({ text, kept }) => JSON.stringify(fresh.parse(text)) !== JSON.stringify(kept)).length;
+  const stale = sample.filter(({ text, kept }) => {
+    try {
+      const again = fresh.parse(text);
+      return again !== undefined && JSON.stringify(again) !== JSON.stringify(kept);
+    } catch {
+      // A fresh parse that throws holds the kept one to nothing.
+      return false;
+    }
+  }).length;
   if (stale > 0) {
     store.discard({ sampled: sample.length, stale });
     for (const key of [...readers.keys()]) if (key.startsWith(`${plugin.dir}\u0000`)) readers.delete(key);
@@ -261,7 +283,33 @@ export function warmParses(plugin: LoadedPlugin, root: string, texts: Iterable<s
 export function keptParseOf(plugin: LoadedPlugin, text: string): string {
   if (plugin.manifest.treeSitter === undefined) throw new Error(`plugin ${plugin.name} names no parser`);
   treeReaderOf(plugin);
-  return JSON.stringify(compiled.get(plugin.dir)!.parse(text));
+  return JSON.stringify(compiled.get(plugin.dir)!.parse(text) ?? null);
+}
+
+/**
+ * What orient says of a parser's misreads and unread texts in the last
+ * AUDIT_NOTICE_DAYS, by plugin, the last of each. A misread is a text whose
+ * parse holds what the plugin's queries capture as @misread (for TypeScript,
+ * a reserved word read as a name, which valid source never binds), said with
+ * its word and the line it stands on, so the file can be found: the parser
+ * reads that form wrongly, and a reading of the file may be wrong with it. An
+ * unread text is one whose parse or query passed the work any reading may
+ * spend on a text (PARSE_WORK_MAX, QUERY_WORK_MAX), said with its size and
+ * first line: readings take it as declaring and importing nothing. Each is
+ * said rather than passed over. Empty when none was.
+ */
+export function parserNotice(now: number = Date.now()): string {
+  const recent = ({ at }: { at: number }): boolean => at <= now && now - at <= AUDIT_NOTICE_DAYS * 86_400_000;
+  const day = (at: number): string => new Date(at).toISOString().slice(0, 10);
+  const misreads = ParseStore.notes(MISREADS)
+    .filter(recent)
+    .map(({ plugin, at, word, line, text }) => `Misread: plugin ${plugin}'s parser read "${word}", which the language never binds, as a name on line ${line} of a file it read (${day(at)}): ${JSON.stringify(text)}. Its grammar misreads that form, so readings of that file may be wrong: a defect to record against the plugin's parser (for the bundled TypeScript plugin, grammars/tree-sitter-typescript).\n\n`);
+  const unreads = ParseStore.notes(UNREADS)
+    .filter(recent)
+    .map(({ plugin, at, word, text }) => `Unread: plugin ${plugin}'s parser stopped reading a text of ${word} bytes that begins ${JSON.stringify(text)} (${day(at)}), past the work a reading may spend on one text, so readings take it as declaring and importing nothing. A generated or minified file can be left out by the config's ignore; one people write is a defect to record against the plugin's parser.\n\n`);
+  const off = storeOff();
+  const store = off === undefined ? [] : [`Kept parses: none are kept, since the user's cache is not the user's alone (${off}), so every reading parses every file again. Make that folder the user's alone, or set XDG_CACHE_HOME to one that is.\n\n`];
+  return [...store, ...misreads, ...unreads].join("");
 }
 
 /**
@@ -290,11 +338,32 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
   const source = read(declared.queries).toString("utf8");
   const load = (path: string, which: string): { language: Language; query: Query } => {
     const language = Language.loadSync(new WebAssembly.Module(read(path)));
+    let query: Query;
     try {
-      return { language, query: new Query(language, source) };
+      query = new Query(language, source);
     } catch (error) {
       throw new Error(`plugin ${plugin.name}'s queries (${declared.queries}) do not compile against its ${which} (${path}): ${(error as Error).message}`);
     }
+    for (const predicate of query.predicates.flat()) {
+      const [first, ...rest] = predicate.operands;
+      if (!(PREDICATES as readonly string[]).includes(predicate.operator)) throw new Error(`plugin ${plugin.name}'s queries use #${predicate.operator}, which nothing evaluates; the predicates are tree-sitter's own and ${PREDICATES.map((p) => `#${p}`).join(", ")}`);
+      if (first?.type !== "capture" || rest.length === 0 || rest.some((step) => step.type !== "string")) throw new Error(`plugin ${plugin.name}'s queries use #${predicate.operator} with a capture first and then node types, never as written`);
+    }
+    return { language, query };
+  };
+  // Every match of the queries over a tree, each held to the predicates Coherence evaluates (PREDICATES), within QUERY_WORK_MAX of the
+  // query's progress calls; undefined where the query is cut short, since a part of the matches would read as all of them.
+  const matchesOf = (query: Query, root: Node): QueryMatch[] | undefined => {
+    let work = 0;
+    let over = false;
+    const all = query.matches(root, { progressCallback: () => (over = ++work > QUERY_WORK_MAX) });
+    return over ? undefined : all.filter((match) =>
+      query.predicates[match.patternIndex]!.every((predicate) => {
+        const [first, ...types] = predicate.operands;
+        const captured = match.captures.filter((c) => first?.type === "capture" && c.name === first.name);
+        return captured.every((c) => !types.some((step) => step.type === "string" && c.node.parent?.type === step.value));
+      }),
+    );
   };
   const { language, query } = load(declared.parser, "parser");
   // The alternate is compiled the first time a tree errs (215 of PostHog's 21,160 TypeScript files), so a process that never needs it,
@@ -323,14 +392,23 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
   // The text's tree and the queries compiled for its parser: the parser's, unless it errs and the alternate's errors cover less of the text
   // (TypeScript's TSX grammar reads an old-style cast, <any>x, as a JSX tag that swallows the rest of the file; its TypeScript grammar reads it whole).
   // Measured in what the errors cover, not how many there are: one error that swallows the file loses more than two that hold a token each.
-  const treeOf = (text: string): { tree: Tree; query: Query } => {
-    const tree = parser.parse(text);
-    if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
+  // A text is parsed within PARSE_WORK_MAX of the parser's progress calls, a count the same text always makes, so whether it is read
+  // never depends on the machine or its load; a parse cut short is undefined, and the parser is reset, or its next parse would resume it.
+  const bounded = (on: Parser, text: string): Tree | undefined => {
+    let work = 0;
+    const tree = on.parse(text, null, { progressCallback: () => ++work > PARSE_WORK_MAX });
+    if (tree !== null) return tree;
+    on.reset();
+    return undefined;
+  };
+  const treeOf = (text: string): { tree: Tree; query: Query } | undefined => {
+    const tree = bounded(parser, text);
+    if (tree === undefined) return undefined;
     if (declared.alternate === undefined || !tree.rootNode.hasError) return { tree, query };
     // Each tree freed however the choice ends: the alternate's refusal of the queries throws here.
     let other: Tree | null = null;
     try {
-      other = second()!.parser.parse(text);
+      other = bounded(second()!.parser, text) ?? null;
       if (other === null || errorSpan(other.rootNode) >= errorSpan(tree.rootNode)) return { tree, query };
       const chosen = other;
       other = null;
@@ -349,9 +427,11 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
     exportedName: (name) => privateName === undefined || !privateName.test(name),
     fingerprint: fingerprintOf(plugin.dir, declared, read),
     census(text) {
-      const { tree, query } = treeOf(text);
+      const read = treeOf(text);
+      if (read === undefined) return [];
+      const { tree, query } = read;
       try {
-        const matches = query.matches(tree.rootNode);
+        const matches = matchesOf(query, tree.rootNode) ?? [];
         const spelled = prefixed ? spell(matches) : (node: Node) => node.text;
         // A statement its queries capture on its own ((use_declaration) @import): the import of a match that captures none is in the innermost one holding it.
         const statements = matches.flatMap((match) => match.captures.filter((c) => c.name === "import").map((c) => c.node));
@@ -377,11 +457,17 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
     },
     // Every match of the queries over the text: read inside the tree's life, and the tree freed however the read ends.
     parse(text) {
-      const { tree, query } = treeOf(text);
+      const read = treeOf(text);
+      if (read === undefined) return undefined;
+      const { tree, query } = read;
       try {
         // A capture whose text no reading reads (a declaration's whole node, @bound, @exported) keeps its name and line alone, so a kept parse holds names, not bodies;
         // an import's specifier is kept spelled whole, its prefixes joined to it, and a prefix, a statement captured on its own, or the queries' own capture is kept nowhere.
-        const matches = query.matches(tree.rootNode);
+        // A @misread match is kept only from a tree with no error: an error's recovery may read any word as any node.
+        const erring = tree.rootNode.hasError;
+        const all = matchesOf(query, tree.rootNode);
+        if (all === undefined) return undefined;
+        const matches = all.filter((match) => !(erring && match.captures.some((c) => c.name === "misread")));
         const spelled = prefixed ? spell(matches) : (node: Node) => node.text;
         return matches
           .map((match) => match.captures.filter((c) => c.name !== "import.prefix" && !ownCapture(c.name)).map((c) => [c.name, c.name === "import.from" || c.name === "import.module" ? spelled(c.node) : TEXT_READ.has(c.name) ? c.node.text : "", c.node.startPosition.row + 1] as [string, string, number]))
@@ -420,23 +506,32 @@ function errorSpan(root: Node): number {
  */
 function speller(separator: string): (matches: QueryMatch[]) => (node: Node) => string {
   return (matches) => {
-    const prefixes: { start: number; end: number; within: [number, number]; text: string }[] = [];
+    // Each prefix filed under the node that holds it, so a specifier finds the prefixes over it by walking up its own ancestors:
+    // what that costs is how deep the specifier stands, never how many prefixes the file holds (a scan of every prefix per specifier
+    // took 15 s over a 300 KB file of grouped uses).
+    const byParent = new Map<number, { start: number; end: number; text: string }[]>();
     const seen = new Set<number>();
     for (const match of matches)
       for (const c of match.captures) {
         if (c.name !== "import.prefix" || seen.has(c.node.id) || c.node.parent === null) continue;
         seen.add(c.node.id);
-        prefixes.push({ start: c.node.startIndex, end: c.node.endIndex, within: [c.node.parent.startIndex, c.node.parent.endIndex], text: c.node.text });
+        const held = byParent.get(c.node.parent.id) ?? [];
+        held.push({ start: c.node.startIndex, end: c.node.endIndex, text: c.node.text });
+        byParent.set(c.node.parent.id, held);
       }
-    prefixes.sort((a, b) => a.start - b.start);
+    for (const held of byParent.values()) held.sort((x, y) => x.start - y.start);
     return (node) => {
-      const over = prefixes.filter((p) => p.end <= node.startIndex && p.within[0] <= node.startIndex && node.endIndex <= p.within[1]);
-      return [...over.map((p) => p.text), node.text].join(separator);
+      const over: string[][] = [];
+      for (let at = node.parent; at !== null; at = at.parent) {
+        const held = byParent.get(at.id);
+        if (held !== undefined) over.push(held.filter((prefix) => prefix.end <= node.startIndex).map((prefix) => prefix.text));
+      }
+      return [...over.reverse().flat(), node.text].join(separator);
     };
   };
 }
 
-function readerOver(compiled: Compiled, store: ParseStore | undefined): KeptReader {
+function readerOver(plugin: string, compiled: Compiled, store: ParseStore | undefined): KeptReader {
   const { marksExports, exportedName } = compiled;
   const keyOf = (text: string): string => createHash("sha256").update(text).digest("hex").slice(0, 32);
   // The last few texts' matches in memory, so the readings a pass asks of one file (its declarations, then its imports) share one parse;
@@ -447,10 +542,16 @@ function readerOver(compiled: Compiled, store: ParseStore | undefined): KeptRead
     if (known !== undefined) return { found: known.found };
     const key = store === undefined ? undefined : keyOf(text);
     const kept = key !== undefined ? store!.get(key) : undefined;
-    const found = kept ?? compiled.parse(text);
-    if (kept === undefined && key !== undefined) store!.put(key, found);
+    const parsed = kept ?? compiled.parse(text);
+    // A text past the work any reading may spend on one is read as matching nothing, kept nowhere, and said at orient (parserNotice).
+    if (parsed === undefined) ParseStore.writeNote(UNREADS, plugin, { at: Date.now(), line: 1, word: String(Buffer.byteLength(text)), text: lineOf(text, 1) });
+    else if (kept === undefined && key !== undefined) store!.put(key, parsed);
+    const found = parsed ?? [];
     recent.unshift({ text, found });
     recent.length = Math.min(recent.length, RECENT);
+    // A word the queries say the language never binds, read as a name: the parser misread the text, which orient says (parserNotice).
+    const misread = found.flat().find(([name]) => name === "misread");
+    if (misread !== undefined) ParseStore.writeNote(MISREADS, plugin, { at: Date.now(), word: misread[1], line: misread[2], text: lineOf(text, misread[2]) });
     return kept === undefined ? { found } : { found, kept: true };
   };
   const raw = (text: string): Found => read(text).found;
@@ -592,7 +693,9 @@ class ParseStore {
     } catch {
       return;
     }
-    if (ownFolder(dirname(path))) writeWhole(path, JSON.stringify(found));
+    // A parse larger than the store reads back is kept nowhere: kept, it would be parsed again and written again at every reading.
+    const kept = JSON.stringify(found);
+    if (Buffer.byteLength(kept) <= PARSE_MAX_BYTES && ownFolder(dirname(path))) writeWhole(path, kept);
   }
 
   /** Remove every kept parse of this fingerprint, renamed out of the way first so no reader meets half a store, and leave the audit that found them stale for orient to say. */
@@ -605,6 +708,34 @@ class ParseStore {
       // A store another warm-up removed first.
     }
     ParseStore.writeAudit(this.#plugin, { at: Date.now(), ...audit });
+  }
+
+  /**
+   * Whether this store lies outside a project and the repository that holds
+   * it: a cache folder set inside a checkout (as CI caches often are) holds
+   * what the repository commits, so a repository could hand its readings
+   * parses of its own; a store there is not used for that project.
+   */
+  outside(root: string): boolean {
+    try {
+      // The parses folder holding the store, which stands while the store's own folder comes and goes (a discard removes it whole).
+      const store = join(realpathSync(dirname(this.#dir)), basename(this.#dir));
+      // The repository is the nearest folder up holding .git, never a farther one (a home folder kept as a repository of its own).
+      let top = resolve(root);
+      try {
+        top = realpathSync(root);
+      } catch {
+        // A root not on disk (a reading of texts alone) is taken as written.
+      }
+      for (let at = top; dirname(at) !== at; at = dirname(at))
+        if (existsSync(join(at, ".git"))) {
+          top = at;
+          break;
+        }
+      return store !== top && !store.startsWith(top + sep);
+    } catch {
+      return false;
+    }
   }
 
   /** A kept parse's file: a folder of the key's first two digits, holding a file of the rest, as git files a loose object. */
@@ -624,7 +755,9 @@ class ParseStore {
     if (parses === undefined) return;
     const swept = join(parses, SWEPT);
     try {
-      if (now - lstatSync(swept).mtimeMs < DAY_MS) return;
+      const since = now - lstatSync(swept).mtimeMs;
+      // Swept within the day; a time ahead of now (a clock that ran fast) is no sweep at all.
+      if (since >= 0 && since < DAY_MS) return;
     } catch {
       // Never swept.
     }
@@ -636,6 +769,9 @@ class ParseStore {
         return false;
       }
     };
+    // A write that died leaves its temporary file wherever the store writes whole: beside the swept file, among the audits and notes, in a shard.
+    for (const folder of [parses, ...[AUDITS, MISREADS, UNREADS].map((kind) => join(parses, kind))])
+      for (const file of listed(folder)) if (TEMPORARY.test(file) && older(join(folder, file), HOUR_MS)) rmSync(join(folder, file), { force: true });
     for (const name of listed(parses)) {
       const path = join(parses, name);
       if (STALE_STORE.test(name)) rmSync(path, { recursive: true, force: true });
@@ -662,6 +798,35 @@ class ParseStore {
       return;
     }
     writeWhole(join(parses, AUDITS, `${plugin}.json`), JSON.stringify(audit));
+  }
+
+  /** Leave the last note of a kind (a misread, an unread text) a reading met, by plugin, for orient. */
+  static writeNote(kind: typeof MISREADS | typeof UNREADS, plugin: string, note: { at: number; word: string; line: number; text: string }): void {
+    const parses = parsesFolder();
+    if (parses === undefined || !PLUGIN_NAME.test(plugin)) return;
+    try {
+      mkdirSync(join(parses, kind), { recursive: true, mode: 0o700 });
+    } catch {
+      return;
+    }
+    writeWhole(join(parses, kind, `${plugin}.json`), JSON.stringify(note));
+  }
+
+  /** The notes of a kind readings left, by plugin, each checked for shape. */
+  static notes(kind: typeof MISREADS | typeof UNREADS): { plugin: string; at: number; word: string; line: number; text: string }[] {
+    const parses = parsesFolder();
+    if (parses === undefined) return [];
+    return listed(join(parses, kind))
+      .filter((name) => name.endsWith(".json") && PLUGIN_NAME.test(name.slice(0, -5)))
+      .flatMap((name) => {
+        try {
+          const { at, word, line, text } = JSON.parse(ownFile(join(parses, kind, name), AUDIT_MAX_BYTES, false) ?? "") as Record<string, unknown>;
+          if (typeof at !== "number" || typeof word !== "string" || !Number.isInteger(line) || typeof text !== "string") return [];
+          return [{ plugin: name.slice(0, -5), at, word, line: line as number, text }];
+        } catch {
+          return [];
+        }
+      });
   }
 
   /** The audits warm-ups left, by plugin, each checked for shape. */
@@ -697,6 +862,17 @@ function parsesFolder(): string | undefined {
   return usersAlone(parses) ? parses : undefined;
 }
 
+/** Why the user's parse store is not used, where it is not: what usersAlone found on its path; undefined where it is used. */
+function storeOff(): string | undefined {
+  const parses = join(userCacheDir(), "parses");
+  try {
+    mkdirSync(parses, { recursive: true, mode: 0o700 });
+  } catch (error) {
+    return `${parses} cannot be made (${(error as NodeJS.ErrnoException).code ?? "an error"})`;
+  }
+  return whyNotUsersAlone(parses);
+}
+
 /**
  * Whether no one but this user (and the system) can change what a path
  * leads to, as written and once every link on it is followed: each folder on
@@ -708,24 +884,56 @@ function parsesFolder(): string | undefined {
  * this user does not trust, so a store judged the user's alone stays so.
  */
 function usersAlone(path: string): boolean {
+  return whyNotUsersAlone(path) === undefined;
+}
+
+/** Why a path is not the user's alone, as usersAlone judges it, naming the folder; undefined where it is. */
+function whyNotUsersAlone(path: string): string | undefined {
   const me = process.getuid?.();
   const trusted = (entry: { uid: number }): boolean => me === undefined || entry.uid === me || entry.uid === 0;
   const own = (entry: { uid: number; mode: number }): boolean => (me === undefined || entry.uid === me) && (entry.mode & 0o022) === 0;
-  const walk = (at: string): boolean => {
+  // Others may write a folder whose mode lets them, unless it is sticky, or only its group may and the group is the user's own alone.
+  const othersMayWrite = (entry: { mode: number; gid: number }): boolean => (entry.mode & 0o1000) === 0 && ((entry.mode & 0o002) !== 0 || ((entry.mode & 0o020) !== 0 && !personalGroup(entry.gid)));
+  const walk = (at: string): string | undefined => {
     for (let here = at; ; here = dirname(here)) {
       const entry = lstatSync(here);
-      if (!trusted(entry)) return false;
-      if (entry.isDirectory() && (entry.mode & 0o022) !== 0 && (entry.mode & 0o1000) === 0) return false;
-      if (dirname(here) === here) return true;
+      if (!trusted(entry)) return `${here} is owned by another user`;
+      if (entry.isDirectory() && othersMayWrite(entry)) return `others may write ${here}`;
+      if (dirname(here) === here) return undefined;
     }
   };
   try {
     const real = realpathSync(path);
     // The folder and the one it is in this user's own; every folder and link on the way trusted.
-    return walk(path) && walk(real) && own(lstatSync(real)) && own(lstatSync(dirname(real))) && lstatSync(real).isDirectory();
-  } catch {
-    return false;
+    return walk(path) ?? walk(real) ?? (own(lstatSync(real)) && lstatSync(real).isDirectory() ? undefined : `${real} is not this user's own folder`) ?? (own(lstatSync(dirname(real))) ? undefined : `${dirname(real)} is not this user's own folder`);
+  } catch (error) {
+    return `${path} cannot be read (${(error as NodeJS.ErrnoException).code ?? "an error"})`;
   }
+}
+
+let personal: { gid: number; alone: boolean } | undefined;
+/**
+ * Whether a group is the user's own alone: the user's primary group, named as
+ * the user is, with no other member, as Debian and Ubuntu make one for each
+ * user (their umask 002 leaves ~/.cache writable by it). Read from /etc/group
+ * once; a system that keeps groups elsewhere has none counted as personal.
+ */
+function personalGroup(gid: number): boolean {
+  if (personal === undefined || personal.gid !== gid) {
+    let alone = false;
+    try {
+      const name = userInfo().username;
+      if (gid === process.getgid?.()) {
+        const line = readFileSync("/etc/group", "utf8").split("\n").find((l) => l.split(":")[2] === String(gid));
+        const [group, , , members = ""] = (line ?? "").split(":");
+        alone = group === name && members.split(",").every((m) => m === "" || m === name);
+      }
+    } catch {
+      alone = false;
+    }
+    personal = { gid, alone };
+  }
+  return personal.alone;
 }
 
 /** Whether a folder of the store's is this user's own, a real folder, not a link, that no one else may write: a kept parse's folder, checked at each read. */
@@ -758,7 +966,13 @@ function ownFile(path: string, max: number, stamp: boolean): string | undefined 
     const me = process.getuid?.();
     if (!entry.isFile() || (me !== undefined && entry.uid !== me) || (entry.mode & 0o022) !== 0 || entry.size > max) return undefined;
     const now = Date.now();
-    if (stamp && now - entry.mtimeMs > DAY_MS) futimesSync(fd, now / 1000, now / 1000);
+    if (stamp && now - entry.mtimeMs > DAY_MS) {
+      try {
+        futimesSync(fd, now / 1000, now / 1000);
+      } catch {
+        // A file whose time cannot be stamped (a read-only cache) is read all the same; the sweep may take it sooner.
+      }
+    }
     return readFileSync(fd, "utf8");
   } catch {
     return undefined;
@@ -805,6 +1019,8 @@ const TEMPORARY = /\.tmp$/;
 const STALE_STORE = /^[0-9a-f]{24}\.stale-[0-9a-f]{16}$/;
 const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const AUDITS = "audits";
+const MISREADS = "misreads";
+const UNREADS = "unreads";
 const SWEPT = "swept";
 
 /** The web-tree-sitter release that parses, read from its package once: a parse kept under another release is never read as this one's. */
@@ -834,6 +1050,30 @@ const PARSE_MAX_BYTES = 32 * 1024 * 1024;
 
 /** The largest audit read: one is a few numbers. */
 const AUDIT_MAX_BYTES = 4096;
+
+/**
+ * How much work a reading may spend on one text, counted in the parser's and
+ * the query's progress calls, which the same text always makes alike: past
+ * either, the text is read as matching nothing and said at orient. PostHog's
+ * largest source file, a 4.9 MB generated API client, makes 11,521 parse
+ * calls and 1,325 query calls; 4 MB of a=1 lines makes 209,812 and 121,304,
+ * and the runtime aborts, taking every later parse in the process with it,
+ * near twice that.
+ */
+const PARSE_WORK_MAX = 100_000;
+const QUERY_WORK_MAX = 60_000;
+
+/** A text's line, trimmed and cut to a length a notice can carry; empty past the text's last line. */
+function lineOf(text: string, line: number): string {
+  let start = 0;
+  for (let n = 1; n < line; n++) {
+    const next = text.indexOf("\n", start);
+    if (next === -1) return "";
+    start = next + 1;
+  }
+  const end = text.indexOf("\n", start);
+  return text.slice(start, end === -1 ? undefined : end).slice(0, 400).trim().slice(0, 160);
+}
 
 /** Whether a value is a kept parse: matches of captures, each [name, text, line]. */
 function isFound(value: unknown): value is Found {

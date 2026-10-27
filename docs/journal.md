@@ -17,7 +17,7 @@ absent. A single-value flag given twice is refused.
 - `resolved <id> --because "<what the test showed>" [--as "<candidate>"]`: resolves a conjecture.
 - `resolved <defect-id> --because "<what fixed it>" [--guard <component folder>/<invariant>] [--decision <id>]`: closes a defect (see Defects below).
 - `dismiss <id> --because "<why nobody will chase it>"`
-- `defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--component <folder>] [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <review|ci|probe|adopter|self|test>] [--cite <id>]...`
+- `defect "<what failed>" --evidence "<reproducer or report>" (--file <path>... [--component <folder>] | --component <folder> | --unplaced "<why>") [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <review|ci|probe|adopter|self|test>] [--cite <id>]...`
 - `classify <defect-id> [--class <name>] [--introduced <...>] [--caught <...>] --because "<the evidence>"`: a decision citing the defect that gives the fields it lacked.
 - `experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"... [--cite <id>]...`: prints step ids.
 - `experiment close <id> --result <stepId>=<pass|fail|unknown>...`: every step needs a result; the outcome is derived.
@@ -57,10 +57,15 @@ fields, which the practice close a defect asks for:
   pull request makes the defect fix-induced.
 - `caught`: review, ci, probe, adopter, self or test.
 
-A defect also names its `component`, the folder of the spec it belongs to:
-`--component <folder>`, or, without it, the one component whose folder holds
-every file `--file` names. Files in several components, or none, write no
-component, and the verb says how to name one.
+A defect says where it lies: `--file` for each file of the fault, or
+`--component <folder>`, or, only when no file or component of the project
+holds it, `--unplaced "<why>"`; with none of them the verb refuses and says
+what to pass, since a defect placed nowhere counts toward no dead end. It
+names its `component`, the folder of the spec it belongs to: `--component
+<folder>`, or, without it, the one component whose folder holds every file
+`--file` names, each path read with its `.` and `..` resolved. Files in
+several components, or none, write no component, and the verb says how to
+name one.
 
 A defect recorded without them stays valid. The journal is append-only, so
 `classify` gives them later as a decision citing the defect; every reader

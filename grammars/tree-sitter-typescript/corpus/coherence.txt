@@ -661,3 +661,30 @@ in o) {}
     (identifier)
     (identifier)
     (statement_block)))
+
+==========================================
+Coherence: in and instanceof continue an expression across lines before a parenthesis
+==========================================
+
+const r5 = key
+  in (record)
+const r6 = value
+  instanceof (Date)
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (binary_expression
+        (identifier)
+        (parenthesized_expression
+          (identifier)))))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (binary_expression
+        (identifier)
+        (parenthesized_expression
+          (identifier))))))

@@ -16,7 +16,7 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { countWork, readProjectText, spawnSync } from "../lifecycle/work-meter.ts";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Mirror, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { creditedByCrossingAlone, crossingChecksTrust, resolveCovered } from "./covers.ts";
@@ -609,6 +609,21 @@ export function guardStanding(components: readonly Component[]): (guard: string)
     if (slash === -1 || invariant === undefined) return "missing";
     return invariant.enforcements.length > 0 && !invariant.lacks.includes("refutation") ? "witnessed" : "unwitnessed";
   };
+}
+
+/**
+ * A file a record names, as the project-relative path its owner is decided
+ * by: an absolute path made relative to the root, separators made forward,
+ * and every "." and ".." segment resolved, so gadget/../widget/knob.ts is
+ * widget/knob.ts; undefined for the root itself and for a path that leaves
+ * the project. Every reader that asks which component holds a named file
+ * passes it through here first.
+ */
+export function projectFile(root: string, named: string): string | undefined {
+  const relativeTo = isAbsolute(named) ? relative(root, named) : named;
+  const file = posix.normalize(relativeTo.split(sep).join("/").split("\\").join("/"));
+  if (file === "." || file === "" || file === ".." || file.startsWith("../") || posix.isAbsolute(file) || isAbsolute(file)) return undefined;
+  return file.replace(/\/+$/, "");
 }
 
 /** The component whose folder holds a project-relative file: the deepest component folder above it. */

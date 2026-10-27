@@ -157,13 +157,17 @@ function fold(into: DefectOrigin, from: DefectOrigin): void {
   if (from.caught !== undefined) into.caught = from.caught;
 }
 
-/** Every defect in the journal, oldest first, with its class, origin and catch folded and its close, if any. */
+/**
+ * Every defect in the journal, oldest first, with its class, origin and catch
+ * folded and its close, if any. A retracted defect is none: a withdrawn
+ * report is no fault, so no floor, convergence count or dead end reads it.
+ */
 export function defectStates(records: readonly JournalRecord[]): DefectState[] {
   const gone = retracted(records);
   const ordered = [...records].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   const states = new Map<string, DefectState>();
   for (const record of ordered) {
-    if (record.kind === "defect") {
+    if (record.kind === "defect" && !gone.has(record.id)) {
       const d = record as Defect;
       const state: DefectState = { id: d.id, at: d.at, what: d.what, files: Array.isArray(d.files) ? d.files : [], commit: d.commit ?? null };
       if (typeof d.component === "string") state.component = d.component;

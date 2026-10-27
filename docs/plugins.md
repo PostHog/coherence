@@ -347,10 +347,18 @@ The captures:
 | `@exported` | anything in a declaration's match | the file exports it |
 | `@default` | anything in a declaration's match, or a name alone (`export default foo`) | the file exports it, or that name, as its default |
 | `@use.qualifier`, `@use.name` | a use through a whole-module import (Go's `st.Seal`) | the file uses that name of the module it binds as the qualifier, so the import joins only the file that declares it |
+| `@misread` | a node valid source never holds (TypeScript's reserved words read as a name) | the parser misread the text: in a tree with no error, orient says so with the word and its line |
 
 A capture whose name starts with an underscore (`@_alias`) is the queries'
 own, for a predicate to test (`(#eq? @_alias "default")`); Coherence reads
 nothing by it and never refuses it.
+
+Beside tree-sitter's own predicates (`#match?`, `#eq?`, `#any-of?` and their
+negations), Coherence evaluates `#not-parent-type? @capture type...`, which
+holds where the captured node's parent is none of those types: the
+TypeScript plugin exempts an import's or an export's name, where a reserved
+word is valid (`export { x as default }`), from `@misread`. Any other
+predicate is refused by name, since nothing would evaluate it.
 
 An import that resolves to a module joins, of the module's files, those
 that declare the name it imports (read through the plugin's own parser), and
@@ -408,13 +416,24 @@ node, over that corpus, TypeScript's own lib declaration files and
 Coherence's source. Any difference `intended-differences.json` does not name
 by its construct fails the build, as does any token the patched parsers read
 as another type than the stock ones do, any expected tree the bundled
-parsers do not read, and any intended difference that does not show as the
-one region of each case it names, one form to a case; the list names six
-fixes and one regression, below. The build phase writes the bundled parsers
+parsers do not read, any intended difference that does not show as the
+one region of each case it names, one form to a case, and any difference at
+all in a corpus case no entry names, whatever an entry's query overlaps; the
+list names six fixes and one regression, below. That holds over those inputs alone: a form
+none of them holds can read differently with no check failing (a scanner
+that also took `in (` as a member's name read `key\n  in (record)` as a call
+of a function named `in`, and passed every check). Where the misread leaves
+a reserved word as a name, the plugin's `@misread` query catches it in
+whatever file Coherence reads, and orient says so. The patch's files cannot
+change the corpus, but its code runs in the build (`define-grammar.js` under
+node when the grammar is generated, `scanner.h` compiled into the corpus
+run), with the build's working folder open to it; nothing checks what it
+does there. The build phase writes the bundled parsers
 only once each is the digest `parsers.sha256` records. CI runs it on every
 pull request in a container with no network, and fails its checks unless
 every difference is listed and both parsers come out as the ones bundled. Still
-errors, as with the stock grammar: an optional destructured parameter in a
+errors, as with the stock grammar, each a case in `corpus/limits.txt` that
+must read exactly as the stock parsers read it: an optional destructured parameter in a
 function type (`({ a }?: T) => U`), a parenthesized import type, `typeof
 import('x')` as a call's type argument (`importOriginal<typeof
 import('x')>()`), a method named `in` (`in() {}`) after another member, and variance
@@ -487,10 +506,20 @@ what its path leads to: every folder and link on the way owned by the user
 or the system, none others may write unless it is sticky (the system's
 temporary folder), and the store's own folders the user's alone; each kept
 parse is read only where it is the user's own regular file, no link, that no
-one else may write. Elsewhere every text is parsed. The
-warm-up reads only a project's regular source files, never one through a
-link or larger than 16 MB, and a file nested thousands deep around an error
-is read like any other.
+one else may write. A folder only the user's own personal group may write
+(the user's primary group, named as the user, with no other member, as
+Debian and Ubuntu make one) counts as the user's; access lists (macOS ACLs)
+are not read. A store inside the repository being read, as a cache set
+inside a checkout puts it, is not used for that repository. Elsewhere every
+text is parsed, and orient says the store is off and why. The warm-up reads
+only a project's regular source files whose real path is inside the project,
+never one through a link or larger than 16 MB, and a file nested thousands
+deep around an error is read like any other. Each parse and query of a text
+stops past a fixed amount of work, counted in the parser's own progress
+calls, the same on every machine: a text past it (a generated file of
+millions of one-line statements; PostHog's largest source file uses a tenth
+of the bound) reads as declaring and importing nothing, is kept nowhere, and
+orient names it.
 `plugin eject` copies a plugin's parser byte for byte with its queries, so
 an ejected copy reads as the bundled plugin read.
 

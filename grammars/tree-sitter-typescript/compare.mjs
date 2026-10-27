@@ -9,10 +9,14 @@
 // renamed or aliased) fails wherever it stands, an improvement's region among it: no intended difference renames one.
 // Each intended difference names the corpus cases it must show in, one form to a case, and fails unless each of those
 // cases, in each of its dialects, holds exactly one region of difference and that region is one it allows: a form that
-// breaks back to the stock reading, or into another difference, fails in its own case, whatever the others show. The
-// patched parsers are also held to every expected tree the corpus declares, the whole tree, as tree-sitter test holds
-// the native build: an improvement's case must declare one, so a form is held to its fixed reading, not merely to
-// reading with no error. The corpus is read from where the patch cannot write: the clean upstream tree and this folder.
+// breaks back to the stock reading, or into another difference, fails in its own case, whatever the others show. A
+// corpus case no entry names, in any corpus (upstream's, Coherence's, limits.txt), must read exactly as the stock
+// parsers read it: any region of difference in it fails, whatever an entry's query overlaps, so a form the patch is
+// not meant to touch cannot change unnoticed under an entry whose query happens to reach it; a file's regions, which no
+// entry names, are allowed by an entry's kind, dialects and query alone. The patched parsers are also held to every
+// expected tree the corpus declares, the whole tree, as tree-sitter test holds the native build: an improvement's case
+// must declare one, so a form is held to its fixed reading, not merely to reading with no error. The corpus is read
+// from where the patch cannot write: the clean upstream tree and this folder.
 //
 // node compare.mjs --runtime <web-tree-sitter folder> --stock <folder> --patched <folder> --intended <json>
 //   --cases <test/corpus folder>... --files <folder>...
@@ -20,7 +24,8 @@
 // folder as tree-sitter's corpus format, each case an input with the tree it expects, if any; --files reads every .ts,
 // .tsx, .mts and .cts below the folder, node_modules left out. Every input is read by both dialects for the comparison;
 // an expected tree holds the dialects its case is for (those its :language attributes name, the TSX grammar alone for a
-// file named *-tsx.txt, else both). Exits 1 on any difference no entry allows, or any expected tree not read.
+// file named *-tsx.txt, else both). Exits 1 on any difference no entry allows, any difference in a case no entry names,
+// or any expected tree not read.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
@@ -99,7 +104,7 @@ function inputs() {
         seen.set(label, n);
         const dialects = c.languages.length > 0 ? c.languages : basename(file, ".txt").endsWith("-tsx") ? ["tsx"] : DIALECTS;
         if (dialects.some((d) => !DIALECTS.includes(d))) fail(`${label}: no dialect ${dialects.join(", ")}`);
-        all.push({ key: n === 1 ? label : `${label} (${n})`, text: c.text, expected: c.expected, dialects });
+        all.push({ key: n === 1 ? label : `${label} (${n})`, text: c.text, expected: c.expected, dialects, isCase: true });
       }
     }
     from(folder);
@@ -109,7 +114,7 @@ function inputs() {
       for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
         const path = join(dir, entry.name);
         if (entry.isDirectory()) { if (entry.name !== "node_modules") walk(path); }
-        else if (/\.[mc]?tsx?$/.test(entry.name)) all.push({ key: `${basename(folder)}/${relative(folder, path)}`, text: readFileSync(path, "utf8"), expected: null, dialects: [] });
+        else if (/\.[mc]?tsx?$/.test(entry.name)) all.push({ key: `${basename(folder)}/${relative(folder, path)}`, text: readFileSync(path, "utf8"), expected: null, dialects: [], isCase: false });
       }
     };
     walk(folder);
@@ -324,9 +329,17 @@ for (const input of inputs()) {
     const parseRegions = named.has(input.key) ? [] : null;
     if (parseRegions !== null) parsesOfNamed.set(`${input.key}\u0000${dialect}`, parseRegions);
     const allowed = [];
+    const overlaps = (entry, region) => capturesOf(entry).some((c) => c.start < region.end && region.start < c.end);
     for (const region of regions) {
       const kind = kindOf(region);
-      const allowing = entries.filter((e) => e.kind === kind && e.dialects.includes(dialect) && capturesOf(e).some((c) => c.start < region.end && region.start < c.end));
+      // A corpus case no entry names reads exactly as the stock parsers read it, in every corpus alike: any region of
+      // difference in it fails, whatever an entry's query overlaps, so no entry's query reaches past the cases it names.
+      if (input.isCase && parseRegions === null) {
+        const overlapping = entries.filter((e) => e.dialects.includes(dialect) && overlaps(e, region)).map((e) => e.id);
+        failures.push(`${input.key} (${dialect}): a case no intended difference names holds ${kind === "improvement" ? "an" : "a"} ${kind} at ${region.start}..${region.end} under ${region.parent || "the root"}, stock ${region.stockTypes.join(" ") || "nothing"}, patched ${region.patchedTypes.join(" ") || "nothing"}: ${excerpt(input.text, region.start, region.end)}; ${overlapping.length === 0 ? "no entry's query overlaps it" : `the query of ${overlapping.join(", ")} overlaps it`}, and a case no entry names must read as the stock parsers read it`);
+        continue;
+      }
+      const allowing = entries.filter((e) => e.kind === kind && e.dialects.includes(dialect) && overlaps(e, region));
       parseRegions?.push({ kind, allowing: new Set(allowing.map((e) => e.id)) });
       for (const entry of allowing) {
         entry.seen.add(`${input.key}\u0000${dialect}`);
@@ -373,6 +386,6 @@ if (renames.length + failures.length > 0) {
   for (const r of renames) console.error(`  ✕ ${r}`);
   for (const f of failures.slice(0, 100)) console.error(`  ✕ ${f}`);
   if (failures.length > 100) console.error(`  … and ${failures.length - 100} more`);
-  fail(`${renames.length} token${renames.length === 1 ? "" : "s"} renamed and ${failures.length} other failure${failures.length === 1 ? "" : "s"}: differences between the stock and patched parsers that intended-differences.json does not allow, intended ones not shown as their cases' one region, or expected trees not read`);
+  fail(`${renames.length} token${renames.length === 1 ? "" : "s"} renamed and ${failures.length} other failure${failures.length === 1 ? "" : "s"}: differences between the stock and patched parsers that intended-differences.json does not allow, any in a case no entry names, intended ones not shown as their cases' one region, or expected trees not read`);
 }
-console.log("compare.mjs: every difference between the stock and patched parsers is one intended-differences.json allows, each in its own cases, and the patched parsers read every expected tree");
+console.log("compare.mjs: every difference between the stock and patched parsers is one intended-differences.json allows, each in its own cases, every case no entry names reads as the stock parsers read it, and the patched parsers read every expected tree");

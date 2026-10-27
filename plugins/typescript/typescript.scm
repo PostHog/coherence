@@ -147,3 +147,10 @@
 (program (export_statement (export_clause (export_specifier name: (_) @name !alias))) @bound)
 (program (export_statement (export_clause (export_specifier alias: (_) @name))) @bound)
 (program (export_statement (namespace_export (identifier) @name)) @bound)
+
+; A reserved word read as a name: valid TypeScript binds none, but for an import's or an export's name (export { x as default },
+; export * as default), so in a tree with no error this is the grammar misreading the text, and orient says so (misreadNotice).
+; Over 171,579 files of PostHog's and of node_modules, error-free trees held such a name under those three parents alone.
+((identifier) @misread
+  (#match? @misread "^(break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|false|finally|for|function|if|import|in|instanceof|new|null|return|super|switch|this|throw|true|try|typeof|var|void|while|with)$")
+  (#not-parent-type? @misread import_specifier export_specifier namespace_export))

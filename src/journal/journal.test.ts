@@ -459,7 +459,7 @@ test("a write binds to the one active order its session owns; none or several bi
     for (const verb of [
       ["conjecture", "o", "--discriminated-by", "t"],
       ["unable", "w", "--because", "b"],
-      ["defect", "d", "--evidence", "e"],
+      ["defect", "d", "--evidence", "e", "--file", "src/a.ts"],
       ["escalate", "e", "--because", "b"],
       ["experiment", "create", "x", "--action", "a", "--success", "c"],
     ]) {
@@ -517,7 +517,7 @@ test("citations resolve at the write: an unknown id refuses the write, a record 
     assert.deepEqual((byId(cwd, decided) as { cites?: string[] }).cites, ["d-0ld00001", conjectured, order, move], "a decision cites a journal record of any kind, a work order, and a work order's move");
     for (const [verb, ...args] of [
       ["escalate", "a human must see", "--because", "b"],
-      ["defect", "it broke", "--evidence", "e"],
+      ["defect", "it broke", "--evidence", "e", "--file", "src/a.ts"],
       ["conjecture", "maybe", "--discriminated-by", "t"],
       ["unable", "could not", "--because", "wall"],
       ["experiment", "create", "it works", "--action", "try", "--success", "green"],
@@ -597,7 +597,7 @@ test("--human records the words an agent attributes to a human, apart from its b
     const acked = idOf(run("acknowledge", escalated, "--because", "kept", "--human", "keep it", ...WHO));
     assert.equal((byId(cwd, acked) as { human?: string }).human, "keep it");
     assert.equal(run("decide", "blank", "--because", "b", "--human", " ", ...WHO).code, 1, "blank human words are refused");
-    assert.equal(run("defect", "no human here", "--evidence", "e", "--human", "x", ...WHO).code, 1, "a verb that does not carry human words refuses the flag");
+    assert.equal(run("defect", "no human here", "--evidence", "e", "--file", "src/a.ts", "--human", "x", ...WHO).code, 1, "a verb that does not carry human words refuses the flag");
     const timeline = run("journal").out.join("\n");
     assert.match(timeline, /because: the owner ruled it\n    human \(as the agent attributes\): call it lexicon, but not yet/, "the timeline labels the words as the agent's attribution");
   } finally {
@@ -731,7 +731,7 @@ test("a record committed on another branch may be cited and read, and says where
 
     const typo = run("decide", "x", "--because", "b", "--cite", "d-00000000", "--session", "main-1", "--agent", "main");
     assert.equal(typo.code, 1);
-    assert.match(typo.err.join("\n"), /--cite d-00000000: no journal or work record has that id, here or committed on another branch/);
+    assert.match(typo.err.join("\n"), /--cite d-00000000: no journal or work record has that id, in any worktree or committed on another branch/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

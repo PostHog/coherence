@@ -600,12 +600,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: put a Coherence name an adopter writes in a journal record at risk again, as where Coherence's sense speaks -> the via went red in vocabulary-signal.test.ts at config; restored, green (2026-10-24)
   kinds: none
-- no totals are injected: No hook injection carries a total: orient names the ranked recurring terms that lack a definition and the senses at risk, a handful at most, or says nothing; regulate names only what this session introduced.
-  over: every SessionStart, SubagentStart, PostToolUse and Stop injection, with nothing owed, something owed at the start, and something introduced during the session
+- no totals are injected: No hook injection carries a total: orient names the ranked recurring terms that lack a definition and the senses at risk, a handful at most, or says nothing; regulate names only what this session introduced; the dead-end reading speaks at orient only when a subsystem is at a dead end, with the counts its alarm rests on, and says nothing of what it read otherwise.
+  over: every SessionStart, SubagentStart, PostToolUse and Stop injection, with nothing owed, something owed at the start, and something introduced during the session, over a journal holding a defect and no dead end
   via: no hook injection carries a total: orient names the ranked terms or says nothing
   because: a number nobody can act on trains an agent to skip the line it sits in, and the vocabulary line had become the one every session skipped; a short named list is something to do, and silence when nothing is owed keeps the line worth reading
   crossing: project-source -> reading
-  refuted: put the old Lexicon coverage totals line back at the head of orient's vocabulary signal -> "no hook injection carries a total: orient names the ranked terms or says nothing" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  refuted: put the old Lexicon coverage totals line back at the head of orient's vocabulary signal -> "no hook injection carries a total: orient names the ranked terms or says nothing" went red in vocabulary-signal.test.ts; restored, green (2026-09-23); later, put back orient's dead-end totals line with no dead end -> red at the SessionStart injection over a journal holding a defect; restored (cmp), green batched and alone (2026-10-27)
   kinds: output
   checklist: destination-confinement dismissed: one destination, the host's additionalContext or systemMessage, and no redirect
   checklist: redaction dismissed: only terms and component names are printed, never a use's text

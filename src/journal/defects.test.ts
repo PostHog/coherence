@@ -17,12 +17,12 @@ import { defectStates } from "./defects.ts";
 import { convergence, convergenceText } from "./convergence.ts";
 import type { Decision, Defect, Resolution } from "./record.ts";
 import { loadJournal, loadJournalAcrossWorktrees } from "./store.ts";
-import { loadSpecModel } from "../spec/model.ts";
+import { componentHolding, loadSpecModel } from "../spec/model.ts";
 import { specCommand } from "../spec/cli.ts";
 import { firedBy, parsePractices } from "../spec/practice.ts";
 import { toolUseOf } from "../lifecycle/practice-delivery.ts";
 import { escalationBlock, specBlock } from "../lifecycle/hook.ts";
-import { deadEndLine, deadEnds, readDeadEnds } from "./dead-ends.ts";
+import { deadEndLine, deadEnds, placeDefect, readDeadEnds } from "./dead-ends.ts";
 
 // Every fixture folder this file makes is removed when the file is done; the leak guard fails a file that leaves one.
 const madeFolders: string[] = [];
@@ -102,9 +102,9 @@ test("a defect carries a declared class, where it came in and what caught it, an
   const root = project({ "lexicon.json": JSON.stringify({ concepts: [{ name: "defect", definition: "d", properties: { "class widget-spin": "a widget spins forever" } }] }) });
   const sha = commitAll(root, "first", "2026-10-01T10:00:00Z");
   const j = journal(root, clock("2026-10-03T00:00:00Z"));
-  const full = idOf(j("defect", "the knob stuck", "--evidence", "turned it", "--class", "path-identity", "--introduced", sha.slice(0, 7), "--caught", "review", ...WHO));
-  const own = idOf(j("defect", "the widget spun", "--evidence", "watched it", "--class", "widget-spin", "--introduced", "PR #12", "--caught", "adopter", ...WHO));
-  const bare = idOf(j("defect", "the dial was silent", "--evidence", "listened", ...WHO));
+  const full = idOf(j("defect", "the knob stuck", "--evidence", "turned it", "--class", "path-identity", "--introduced", sha.slice(0, 7), "--caught", "review", "--file", "widget/knob.ts", ...WHO));
+  const own = idOf(j("defect", "the widget spun", "--evidence", "watched it", "--class", "widget-spin", "--introduced", "PR #12", "--caught", "adopter", "--file", "widget/knob.ts", ...WHO));
+  const bare = idOf(j("defect", "the dial was silent", "--evidence", "listened", "--file", "widget/knob.ts", ...WHO));
   const records = loadJournal(root).records;
   const read = (id: string): Defect => records.find((r) => r.id === id) as Defect;
   assert.deepEqual([read(full).class, read(full).introduced, read(full).caught], ["path-identity", sha.slice(0, 7), "review"]);
@@ -112,11 +112,11 @@ test("a defect carries a declared class, where it came in and what caught it, an
   assert.ok(!("class" in read(bare)) && !("introduced" in read(bare)) && !("caught" in read(bare)), "a defect without them is written as before");
   const before = loadJournal(root).records.length;
   const refused = [
-    j("defect", "x", "--evidence", "y", "--class", "made-up-class", ...WHO),
-    j("defect", "x", "--evidence", "y", "--class", "Not Kebab", ...WHO),
-    j("defect", "x", "--evidence", "y", "--introduced", "yesterday", ...WHO),
-    j("defect", "x", "--evidence", "y", "--introduced", "abcdef1234", ...WHO),
-    j("defect", "x", "--evidence", "y", "--caught", "luck", ...WHO),
+    j("defect", "x", "--evidence", "y", "--class", "made-up-class", "--file", "widget/knob.ts", ...WHO),
+    j("defect", "x", "--evidence", "y", "--class", "Not Kebab", "--file", "widget/knob.ts", ...WHO),
+    j("defect", "x", "--evidence", "y", "--introduced", "yesterday", "--file", "widget/knob.ts", ...WHO),
+    j("defect", "x", "--evidence", "y", "--introduced", "abcdef1234", "--file", "widget/knob.ts", ...WHO),
+    j("defect", "x", "--evidence", "y", "--caught", "luck", "--file", "widget/knob.ts", ...WHO),
   ];
   for (const run of refused) assert.equal(run.code, 1, run.out.join("\n"));
   assert.match(refused[0]!.err.join("\n"), /declared nowhere; declare it once as the property "class made-up-class" of defect/);
@@ -139,7 +139,7 @@ describe("a shallow clone refuses only an --introduced git can tell is no commit
       const blob = execFileSync("git", ["rev-parse", "HEAD:knob.ts"], { cwd: origin, encoding: "utf8" }).trim();
       const root = made(mkdtempSync(join(tmpdir(), "coherence-defects-shallow-")));
       execFileSync("git", ["clone", "-q", "--depth", "1", `file://${origin}`, root]);
-      const run = journal(root, clock("2026-10-03T00:00:00Z"))("defect", "the knob stuck", "--evidence", "turned it", "--introduced", refused ? blob : older, ...WHO);
+      const run = journal(root, clock("2026-10-03T00:00:00Z"))("defect", "the knob stuck", "--evidence", "turned it", "--introduced", refused ? blob : older, "--file", "widget/knob.ts", ...WHO);
       assert.equal(run.code, refused ? 1 : 0, run.err.join("\n"));
     });
   }
@@ -148,7 +148,7 @@ describe("a shallow clone refuses only an --introduced git can tell is no commit
 test("classify folds into the defect without editing it: a later classification overrides, a retracted one gives nothing, and a field nobody gave stays unknown", () => {
   const root = project();
   const j = journal(root, clock("2026-10-03T00:00:00Z"));
-  const d = idOf(j("defect", "the knob stuck", "--evidence", "turned it", "--caught", "self", ...WHO));
+  const d = idOf(j("defect", "the knob stuck", "--evidence", "turned it", "--caught", "self", "--file", "widget/knob.ts", ...WHO));
   const line = sessionText(join(root, ".coherence", "journal"), "s1");
   const first = idOf(j("classify", d, "--class", "cost", "--introduced", "pre-existing", "--because", "the first reading", ...WHO));
   const second = idOf(j("classify", d, "--class", "silent-skip", "--because", "a closer reading", ...WHO));
@@ -163,7 +163,7 @@ test("classify folds into the defect without editing it: a later classification 
   assert.ok(second !== first);
   const state = defectStates(records).find((s) => s.id === d)!;
   assert.deepEqual([state.class, state.introduced, state.caught], ["silent-skip", "pre-existing", "self"], "the later class wins, the retracted catch gives nothing, the defect's own catch stands");
-  const other = idOf(j("defect", "the dial was silent", "--evidence", "listened", ...WHO));
+  const other = idOf(j("defect", "the dial was silent", "--evidence", "listened", "--file", "widget/knob.ts", ...WHO));
   const blank = defectStates(loadJournal(root).records).find((s) => s.id === other)!;
   assert.deepEqual([blank.class, blank.introduced, blank.caught], [undefined, undefined, undefined], "nothing is inferred");
   assert.equal(j("classify", d, "--because", "nothing given", ...WHO).code, 1, "a classification gives at least one field");
@@ -173,7 +173,7 @@ test("classify folds into the defect without editing it: a later classification 
 test("resolved closes a defect with a guard a spec declares or a decision, refuses a guard or decision that names nothing, and a retracted close can be closed again", () => {
   const root = project();
   const j = journal(root, clock("2026-10-03T00:00:00Z"));
-  const d = idOf(j("defect", "the knob stuck", "--evidence", "turned it", ...WHO));
+  const d = idOf(j("defect", "the knob stuck", "--evidence", "turned it", "--file", "widget/knob.ts", ...WHO));
   const c = idOf(j("conjecture", "the knob is cold", "--discriminated-by", "warm it", ...WHO));
   const why = idOf(j("decide", "fix the one knob", "--over", "none", "--because", "no other knob has the shape", ...WHO));
   assert.match(j("resolved", d, "--because", "oiled", "--guard", "widget/no such bullet", ...WHO).err.join("\n"), /declares no invariant named "no such bullet"/);
@@ -198,15 +198,15 @@ test("spec --check names a defect closed with neither a guard nor a decision and
   const j = journal(root, clock("2026-10-03T00:00:00Z"));
   witness(root, "widget", "knob turns", "2026-10-02T00:00:00.000Z");
   const why = idOf(j("decide", "fix the one dial", "--over", "none", "--because", "no sibling has the shape", ...WHO));
-  const first = idOf(j("defect", "the knob stuck", "--evidence", "turned it", "--class", "path-identity", ...WHO));
+  const first = idOf(j("defect", "the knob stuck", "--evidence", "turned it", "--class", "path-identity", "--file", "widget/knob.ts", ...WHO));
   const guard = idOf(j("resolved", first, "--because", "oiled", "--guard", "widget/knob turns", ...WHO));
-  const repeat = idOf(j("defect", "another knob stuck", "--evidence", "turned it", ...WHO));
+  const repeat = idOf(j("defect", "another knob stuck", "--evidence", "turned it", "--file", "widget/knob.ts", ...WHO));
   idOf(j("classify", repeat, "--class", "path-identity", "--because", "the same shape", ...WHO));
-  const neither = idOf(j("defect", "a lever stuck", "--evidence", "pulled it", ...WHO));
+  const neither = idOf(j("defect", "a lever stuck", "--evidence", "pulled it", "--file", "widget/knob.ts", ...WHO));
   const neitherClose = idOf(j("resolved", neither, "--because", "greased", ...WHO));
-  const unwitnessed = idOf(j("defect", "the dial was silent", "--evidence", "listened", ...WHO));
+  const unwitnessed = idOf(j("defect", "the dial was silent", "--evidence", "listened", "--file", "widget/knob.ts", ...WHO));
   idOf(j("resolved", unwitnessed, "--because", "tightened", "--guard", "widget/dial clicks", ...WHO));
-  const decided = idOf(j("defect", "a dial rattled", "--evidence", "shook it", ...WHO));
+  const decided = idOf(j("defect", "a dial rattled", "--evidence", "shook it", "--file", "widget/knob.ts", ...WHO));
   idOf(j("resolved", decided, "--because", "tightened", "--decision", why, ...WHO));
   const out: string[] = [];
   const code = specCommand([root], { cwd: root, out: (l) => out.push(l), err: (l) => out.push(l) });
@@ -231,13 +231,13 @@ test("query convergence counts arrivals by origin and catch, escapes per release
   execFileSync("git", ["tag", "v0.2.0"], { cwd: root });
   witness(root, "widget", "knob turns", "2026-10-02T12:00:00.000Z");
   const j = journal(root, clock("2026-10-03T00:00:00Z"));
-  const byCommit = idOf(j("defect", "the dial skipped", "--evidence", "e", "--class", "overmatch", "--introduced", feature.slice(0, 9), "--caught", "review", ...WHO));
-  const byPull = idOf(j("defect", "the dial stuck", "--evidence", "e", "--introduced", "PR #7", "--caught", "test", ...WHO));
-  idOf(j("defect", "the knob was always loose", "--evidence", "e", "--introduced", "pre-existing", "--caught", "adopter", ...WHO));
-  const bare = idOf(j("defect", "something rattled", "--evidence", "e", ...WHO));
+  const byCommit = idOf(j("defect", "the dial skipped", "--evidence", "e", "--class", "overmatch", "--introduced", feature.slice(0, 9), "--caught", "review", "--file", "widget/knob.ts", ...WHO));
+  const byPull = idOf(j("defect", "the dial stuck", "--evidence", "e", "--introduced", "PR #7", "--caught", "test", "--file", "widget/knob.ts", ...WHO));
+  idOf(j("defect", "the knob was always loose", "--evidence", "e", "--introduced", "pre-existing", "--caught", "adopter", "--file", "widget/knob.ts", ...WHO));
+  const bare = idOf(j("defect", "something rattled", "--evidence", "e", "--file", "widget/knob.ts", ...WHO));
   idOf(j("resolved", byCommit, "--because", "fixed, every dial checked", "--guard", "widget/knob turns", ...WHO));
   idOf(j("resolved", bare, "--because", "tightened", ...WHO));
-  const repeat = idOf(j("defect", "another dial skipped", "--evidence", "e", "--class", "overmatch", ...WHO));
+  const repeat = idOf(j("defect", "another dial skipped", "--evidence", "e", "--class", "overmatch", "--file", "widget/knob.ts", ...WHO));
   mkdirSync(join(root, ".coherence", "hook-times"), { recursive: true });
   writeFileSync(
     join(root, ".coherence", "hook-times", "s.jsonl"),
@@ -297,13 +297,13 @@ test("a family's guard answers only for its own defect, so a later defect in the
   const j = journal(root, clock("2026-10-03T00:00:00Z"));
   witness(root, "widget", "knob turns", "2026-10-02T00:00:00.000Z");
   // audience is a family in Coherence's lexicon: too broad for one guard.
-  const first = idOf(j("defect", "the label named the wrong knob", "--evidence", "read it", "--class", "audience", ...WHO));
+  const first = idOf(j("defect", "the label named the wrong knob", "--evidence", "read it", "--class", "audience", "--file", "widget/knob.ts", ...WHO));
   idOf(j("resolved", first, "--because", "renamed", "--guard", "widget/knob turns", ...WHO));
-  const later = idOf(j("defect", "the manual omits the dial", "--evidence", "read it", "--class", "audience", ...WHO));
+  const later = idOf(j("defect", "the manual omits the dial", "--evidence", "read it", "--class", "audience", "--file", "widget/knob.ts", ...WHO));
   // The same sequence in a class is still a guard failure.
-  const classFirst = idOf(j("defect", "the knob stuck", "--evidence", "turned it", "--class", "path-identity", ...WHO));
+  const classFirst = idOf(j("defect", "the knob stuck", "--evidence", "turned it", "--class", "path-identity", "--file", "widget/knob.ts", ...WHO));
   idOf(j("resolved", classFirst, "--because", "oiled", "--guard", "widget/knob turns", ...WHO));
-  const classRepeat = idOf(j("defect", "another knob stuck", "--evidence", "turned it", "--class", "path-identity", ...WHO));
+  const classRepeat = idOf(j("defect", "another knob stuck", "--evidence", "turned it", "--class", "path-identity", "--file", "widget/knob.ts", ...WHO));
   const model = loadSpecModel(root);
   assert.deepEqual(model.defects!.guardFailures.map((g) => g.id), [classRepeat], `a later audience defect (${later}) is no guard failure; a later path-identity one is`);
 });
@@ -321,6 +321,7 @@ test("spec --check and orient name a subsystem whose defects keep arriving after
   const defect = (what: string, cls: string | undefined, ...more: string[]) => idOf(j("defect", what, "--evidence", "seen", ...(cls === undefined ? [] : ["--class", cls]), ...more, ...WHO));
   const close = (id: string, guard: string) => idOf(j("resolved", id, "--because", "a check at the site", "--guard", guard, ...WHO));
   const FILE = ["--file", "widget/knob.ts"];
+  const HERE = ["--component", "widget"];
   // Another component guarded first: its guard and its defect are no part of widget's count.
   const elsewhere = defect("the gadget hummed off key", "cost", "--file", "gadget/hum.ts");
   close(elsewhere, "gadget/knob turns");
@@ -329,16 +330,16 @@ test("spec --check and orient name a subsystem whose defects keep arriving after
   const firstClose = close(first, "widget/knob turns");
   commitAll(root, "round 1", RECENT);
   // Round 1: a class closed by the guard the knob already had, and a family left open.
-  const r1 = [defect("the knob cost a second a turn", "cost"), defect("the knob's label named the dial", "audience", ...FILE)];
+  const r1 = [defect("the knob cost a second a turn", "cost", ...HERE), defect("the knob's label named the dial", "audience", ...FILE)];
   close(r1[0]!, "widget/knob turns");
   commitAll(root, "round 2", RECENT);
   // Round 2: each closed under a guard the subsystem never named before, or left open: none of it comes back through an old guard.
-  const r2 = [defect("the knob's check claimed every knob", "over-claim"), defect("the dial cost a second", "cost"), defect("a linked knob slipped", "path-identity", ...FILE)];
+  const r2 = [defect("the knob's check claimed every knob", "over-claim", ...HERE), defect("the dial cost a second", "cost", ...HERE), defect("a linked knob slipped", "path-identity", ...FILE)];
   close(r2[0]!, "widget/dial clicks");
   close(r2[1]!, "widget/dial clicks");
   commitAll(root, "round 3", RECENT);
   // Round 3: still more, one with no class at all and two left open.
-  const r3 = [defect("the manual omits the knob", "audience"), defect("the dial's check claimed every dial", undefined, ...FILE), defect("the knob read a half turn", "parse-gap", ...FILE)];
+  const r3 = [defect("the manual omits the knob", "audience", ...HERE), defect("the dial's check claimed every dial", undefined, ...FILE), defect("the knob read a half turn", "parse-gap", ...FILE)];
   close(r3[0]!, "widget/dial clicks");
   const counted = [...r1, ...r2, ...r3];
 
@@ -362,7 +363,7 @@ test("spec --check and orient name a subsystem whose defects keep arriving after
   const reading = readDeadEnds(root, model.components);
   assert.deepEqual(reading.deadEnds.map((d) => d.subsystem), ["widget"], "gadget has one defect, closed by its first guard");
   assert.deepEqual(reading.deadEnds[0]!.trend, { earlier: 2, later: 3 });
-  assert.deepEqual(reading.placement, { recorded: 6, files: 0, guard: 4, unplaced: 0 }, "a defect written with a file names its component; the closed rest are placed by their guard, and counted so");
+  assert.deepEqual(reading.placement, { recorded: 10, files: 0, guard: 0, unplaced: 0 }, "a defect written with a file or a component names its component");
   assert.deepEqual(reading.unclassified, [r3[1]], "the reading names the defect that carries no class");
   // The unclassified count as a class of their own: at a threshold of six classes it is the sixth.
   assert.deepEqual(readDeadEnds(root, model.components, new Date(), { classes: 6 }).deadEnds.map((d) => d.subsystem), ["widget"], "the unclassified defect is the sixth class");
@@ -372,7 +373,13 @@ test("spec --check and orient name a subsystem whose defects keep arriving after
   const bare = defectStates(unlabelled).map(({ class: _class, ...rest }) => rest);
   const options = { folders: ["widget", "gadget"], holding: (f: string) => f.split("/")[0], root, standing: () => "witnessed" as const, now: new Date() };
   assert.deepEqual(deadEnds(unlabelled, bare, options).map((d) => [d.subsystem, d.classes.length, d.unclassified]), [["widget", 0, 8]]);
-  assert.match(text, new RegExp(`^dead ends: 1; read the journals of 1 worktree; defects placed by the component their record names 6, derived from their files 0, from their guard 4, unplaced 0; unclassified in the 14 days from ${window.from} to ${window.to} 1 \\(${r3[1]}\\): each counts toward a dead end as a class of its own`, "m"));
+  assert.match(text, new RegExp(`^dead ends: 1; read the journals of 1 worktree; defects placed by the component their record names 10, derived from their files 0, from their guard 0, unplaced 0; unclassified in the 14 days from ${window.from} to ${window.to} 1 \\(${r3[1]}\\): each counts toward a dead end as a class of its own`, "m"));
+  // A withdrawn report is no fault: with the last round retracted, the rest fall below every threshold.
+  const records0 = loadJournal(root).records;
+  const withdrawn = [...records0, ...r3.map((of, i) => ({ id: `r-0000000${i}`, kind: "retraction" as const, at: new Date(Date.now() - 1000).toISOString(), session: "s1", agent: "alpha", commit: null, dirty: false, of, because: "not a defect: the reviewer misread the knob" }))];
+  const placedBy = { folders: ["widget", "gadget"], holding: (f: string) => f.split("/")[0], root, standing: () => "witnessed" as const, now: new Date() };
+  assert.deepEqual(deadEnds(records0, defectStates(records0), placedBy).map((d) => d.defects.length), [8]);
+  assert.deepEqual(deadEnds(withdrawn, defectStates(withdrawn), placedBy), [], "a retracted defect counts toward no dead end");
   const orient = specBlock(root);
   assert.match(orient, /^Dead ends \(1\): /m);
   assert.match(orient, /^⚠ widget: 8 defects across 6 classes/m);
@@ -403,6 +410,7 @@ test("spec --check and orient name a subsystem whose defects keep arriving after
   const again = idOf(j("escalate", "widget is still at a dead end: redesign it?", "--because", "an agent answered the first", "--cite", r3[2]!, ...WHO));
   idOf(j("acknowledge", again, "--human", "redesign the knob", "--because", "the owner chose a redesign", ...WHO));
   assert.deepEqual(readDeadEnds(root, model.components).deadEnds, []);
+  assert.doesNotMatch(specBlock(root), /Dead ends|read the journals/, "with no dead end, orient says nothing of the reading");
   // Outside the window it is no dead end either: the pure reading, a month on.
   const records = loadJournal(root).records;
   const later = deadEnds(records, defectStates(records), { folders: ["widget", "gadget"], holding: (f) => f.split("/")[0], root, standing: () => "witnessed", now: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) });
@@ -438,8 +446,9 @@ test("converging work is no dead end: defects across classes, families and round
   specCommand([root], { cwd: root, out: (l) => out.push(l), err: (l) => out.push(l) });
   assert.doesNotMatch(out.join("\n"), /DEAD END/);
   assert.match(out.join("\n"), /^dead ends: 0; read the journals of 1 worktree;/m);
-  // Orient still says what it read, and the defect with no class, when nothing is at a dead end.
-  assert.match(specBlock(root), /^Dead ends: none; the reading read the journals of 1 worktree; .*unclassified in the 14 days from \S+ to \S+ 1 \(df-[0-9a-f]{8}\)/m);
+  // spec --check says what it read and names the defect with no class; orient, with no dead end, says nothing of it.
+  assert.match(out.join("\n"), /^dead ends: 0; read the journals of 1 worktree; .*unclassified in the 14 days from \S+ to \S+ 1 \(df-[0-9a-f]{8}\)/m);
+  assert.doesNotMatch(specBlock(root), /Dead ends|read the journals/, "orient injects no total when nothing is at a dead end");
   // The other thresholds are crossed: it is the falling arrivals that tell converging work from a dead end.
   const records = loadJournal(root).records;
   const options = { folders: ["gear"], holding: (f: string) => (f.startsWith("gear/") ? "gear" : undefined), root, standing: () => "witnessed" as const, now: new Date() };
@@ -459,8 +468,16 @@ test("a defect names its component: --component, or the one component holding it
   const split = j("defect", "two parts rattled", "--evidence", "shook", "--file", "widget/knob.ts", "--file", "gadget/hum.ts", ...WHO);
   assert.equal(record(idOf(split)).component, undefined, "files in two components name neither");
   assert.match(split.out.join("\n"), /no component: its files lie in gadget and widget, so it counts toward each/);
+  // A defect that says nothing of where it lies is refused, and told what to pass: placed nowhere, it would count toward no dead end.
   const bare = j("defect", "something rattled", "--evidence", "shook", ...WHO);
-  assert.match(bare.out.join("\n"), /no component: it names no file/);
+  assert.equal(bare.code, 1);
+  assert.match(bare.err.join("\n"), /say where the fault lies, or the dead-end reading counts it nowhere: --file <path> for each file of the fault \(repeatable\), or --component <folder> \(components: gadget, widget\); when no file or component of the project holds it, --unplaced "<why>"/);
+  const nowhere = j("defect", "the host dropped a hook", "--evidence", "its log", "--unplaced", "the fault is the host's, in no file of this project", ...WHO);
+  assert.equal(record(idOf(nowhere)).unplaced, "the fault is the host's, in no file of this project", "--unplaced says why, and is written");
+  assert.equal(record(idOf(nowhere)).component, undefined);
+  assert.match(nowhere.out.join("\n"), /unplaced: it counts toward no subsystem's dead end/);
+  assert.equal(j("defect", "both", "--evidence", "e", "--unplaced", "why", "--file", "widget/knob.ts", ...WHO).code, 1, "--unplaced and a file contradict each other");
+  assert.equal(j("defect", "blank", "--evidence", "e", "--unplaced", " ", ...WHO).code, 1, "--unplaced needs its why");
   const refused = j("defect", "a ghost rattled", "--evidence", "shook", "--component", "nowhere", ...WHO);
   assert.equal(refused.code, 1);
   assert.match(refused.err.join("\n"), /--component nowhere names no component \(a folder holding a spec\); components: gadget, widget/);
@@ -475,7 +492,12 @@ test("a defect names its component: --component, or the one component holding it
   const loose = j("defect", "the knob and the notes", "--evidence", "read", "--component", "widget", "--file", "widget/knob.ts", "--file", "NOTES.md", ...WHO);
   assert.equal(loose.code, 1, "a file in no component is owned by none");
   assert.match(loose.err.join("\n"), /NOTES\.md \(in no component\)/);
+  // A path is read with its ".." resolved before its owner is decided: gadget/../widget/knob.ts is widget's.
+  const dotted = j("defect", "the knob slipped by a dotted path", "--evidence", "seen", "--file", "gadget/../widget/knob.ts", "--component", "gadget", ...WHO);
+  assert.equal(dotted.code, 1, "a .. segment does not let gadget own widget's file");
+  assert.match(dotted.err.join("\n"), /gadget\/\.\.\/widget\/knob\.ts \(in widget\)/);
   assert.equal(loadJournal(root).records.length, before, "nothing was written");
+  assert.equal(record(idOf(j("defect", "the knob slipped by a dotted path", "--evidence", "seen", "--file", "./gadget/../widget/knob.ts", ...WHO))).component, "widget", "without --component the dotted path names widget");
   assert.equal(record(idOf(j("defect", "the axle bent", "--evidence", "seen", "--component", "widget", "--file", "widget/deep/axle.ts", ...WHO))).component, "widget", "a component that owns every file is written");
   // Without --component a file outside every component, or outside the project, leaves the record with none: the one component must own every file.
   const outside = j("defect", "the knob and the notes", "--evidence", "read", "--file", "widget/knob.ts", "--file", "NOTES.md", ...WHO);
@@ -483,11 +505,21 @@ test("a defect names its component: --component, or the one component holding it
   assert.match(outside.out.join("\n"), /no component: NOTES\.md lies in no component/);
   assert.equal(record(idOf(j("defect", "the knob and a sibling", "--evidence", "read", "--file", "widget/knob.ts", "--file", "../elsewhere/x.ts", ...WHO))).component, undefined);
   // A record written before the field: the store is append-only, so it is read as written and placed by derivation, and counted as derived.
-  const old = { id: "df-01d01d00", kind: "defect", at: RECENT, session: "old", agent: "old", commit: null, dirty: false, what: "an old slip", evidence: "e", files: ["widget/knob.ts"] };
-  writeFileSync(join(root, ".coherence", "journal", "old.jsonl"), JSON.stringify(old) + "\n");
+  const oldDefect = (id: string, files: string[]) => ({ id, kind: "defect", at: RECENT, session: "old", agent: "old", commit: null, dirty: false, what: "an old slip", evidence: "e", files });
+  const old = oldDefect("df-01d01d00", ["widget/knob.ts"]);
+  const olds = [old, oldDefect("df-01d01d01", []), oldDefect("df-01d01d02", ["gadget/../widget/knob.ts"]), oldDefect("df-01d01d03", ["widget/knob.ts"]), oldDefect("df-01d01d04", ["NOTES.md"])];
+  writeFileSync(join(root, ".coherence", "journal", "old.jsonl"), olds.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  // Closed under a guard: one that names no file is placed by it; one whose file names widget stays widget's, whatever component its guard is declared in.
+  idOf(j("resolved", "df-01d01d01", "--because", "a check", "--guard", "widget/knob turns", ...WHO));
+  idOf(j("resolved", "df-01d01d03", "--because", "a check", "--guard", "gadget/knob turns", ...WHO));
   const model = loadSpecModel(root);
   const reading = readDeadEnds(root, model.components);
-  assert.deepEqual(reading.placement, { recorded: 3, files: 4, guard: 0, unplaced: 1 }, "three named; the split, the two with a file in no component and the old one derived from their files; the bare one unplaced");
+  assert.deepEqual(reading.placement, { recorded: 4, files: 6, guard: 1, unplaced: 2 }, "four named; the split, the two with a file in no or outside a component and three old ones derived from their files; one old one from its guard; the --unplaced one and the old one in no component unplaced");
+  const placed = new Map(defectStates(loadJournal(root).records).map((st) => [st.id, placeDefect(st, { folders: ["widget", "gadget"], holding: (f) => componentHolding(model.components, f)?.folder, root })]));
+  assert.deepEqual(placed.get("df-01d01d01"), { subsystems: ["widget"], by: "guard" }, "no file: its guard");
+  assert.deepEqual(placed.get("df-01d01d02"), { subsystems: ["widget"], by: "files" }, "the dotted path is widget's");
+  assert.deepEqual(placed.get("df-01d01d03"), { subsystems: ["widget"], by: "files" }, "its files, else its guard: gadget's guard adds nothing to a defect whose file is widget's");
+  assert.deepEqual(placed.get("df-01d01d04"), { subsystems: [], by: "unplaced" });
   assert.equal(loadJournal(root).records.find((r) => r.id === old.id)!.kind, "defect", "the old record is read as written");
 });
 
@@ -553,8 +585,44 @@ test("the journal is read from every worktree of the repository, each record onc
   const out: string[] = [];
   specCommand([root], { cwd: root, out: (l) => out.push(l), err: (l) => out.push(l) });
   assert.match(out.join("\n"), /^dead ends: 0; read the journals of 3 worktrees, records only in .*coherence-worktree-[^ ]+ \(3\), 1 unreadable line or file;/m);
-  // Orient says what it read even with no dead end.
-  assert.match(specBlock(root), /^Dead ends: none; the reading read the journals of 3 worktrees, records only in /m);
+  // Orient, with no dead end, injects nothing of the reading.
+  assert.doesNotMatch(specBlock(root), /Dead ends|read the journals/);
+
+  // What the reading parsed is kept in the user's cache, never in a worktree, filed by each file's identity: an append to another worktree's file is read at once, and an index that will not parse is read as none.
+  const indexes = join(process.env["XDG_CACHE_HOME"]!, "coherence", "journal-index");
+  assert.ok(readdirSync(indexes).some((n) => n.endsWith(".json")), "the index is in the user's cache");
+  const otherFile = join(other, ".coherence", "journal", readdirSync(join(other, ".coherence", "journal")).find((n) => n !== "legacy.jsonl" && n !== "stuck.jsonl")!);
+  appendFileSync(otherFile, legacy("d-ffffffff", "appended after the last reading"));
+  assert.ok(loadJournalAcrossWorktrees(root).records.some((r) => r.id === "d-ffffffff"), "a file whose identity changed is read again");
+  for (const name of readdirSync(indexes)) writeFileSync(join(indexes, name), "{ not an index");
+  assert.deepEqual(new Set(loadJournalAcrossWorktrees(root).records.map((r) => r.id)), new Set([...ids, "d-ffffffff"]), "an index that will not parse is read as none");
+
+  // The remedy the reading prints works from the checkout it speaks in, whichever worktree holds the record it names.
+  const here = journal(root, clock(RECENT));
+  const there = journal(other, clock(RECENT));
+  const cited = here("escalate", "widget is at a dead end: redesign it or keep guarding?", "--because", "its defect lies in another checkout", "--cite", elsewhere, ...WHO);
+  idOf(cited);
+  assert.match(cited.out.join("\n"), new RegExp(`cites ${elsewhere} \\(in another worktree's journal, not in this checkout\\)`));
+  idOf(here("classify", elsewhere, "--class", "path-identity", "--because", "the knob's path", ...WHO));
+  const asked = idOf(there("escalate", "widget again: redesign it?", "--because", "asked in the other checkout", "--cite", elsewhere, ...WHO));
+  idOf(here("acknowledge", asked, "--human", "redesign it", "--because", "the owner chose a redesign", ...WHO));
+  const answeredThere = idOf(there("escalate", "widget a third time?", "--because", "asked and answered there", "--cite", elsewhere, ...WHO));
+  idOf(there("acknowledge", answeredThere, "--human", "keep it", "--because", "the owner kept it", ...WHO));
+  const twice = here("acknowledge", answeredThere, "--human", "keep it", "--because", "answered again", ...WHO);
+  assert.equal(twice.code, 1, "an answer in another worktree answers the escalation here too");
+  assert.match(twice.err.join("\n"), new RegExp(`${answeredThere} was already answered`));
+
+  // A store file of the checkout's own that cannot be read is reported as damaged by the reading, never thrown; a verb that answers a record refuses, since the file may hold the answer.
+  mkdirSync(join(root, ".coherence", "journal", "stuck.jsonl"));
+  const refusedWrite = here("classify", elsewhere, "--class", "cost", "--because", "a second look", ...WHO);
+  assert.equal(refusedWrite.code, 1);
+  assert.match(refusedWrite.err.join("\n"), /the journal cannot be read: \.coherence\/journal\/stuck\.jsonl not read/);
+  assert.ok(loadJournalAcrossWorktrees(root).damaged.some((d) => d.file === join(".coherence", "journal", "stuck.jsonl") && d.line === 0 && /not read/.test(d.reason)));
+  const damagedOut: string[] = [];
+  specCommand([root], { cwd: root, out: (l) => damagedOut.push(l), err: (l) => damagedOut.push(l) });
+  assert.match(damagedOut.join("\n"), /^dead ends: 0; read the journals of 3 worktrees, .*2 unreadable lines or files;/m);
+  assert.equal(typeof specBlock(root), "string", "orient reads on");
+  rmSync(join(root, ".coherence", "journal", "stuck.jsonl"), { recursive: true });
   execFileSync("git", ["worktree", "unlock", missing], { cwd: root });
   for (const folder of [other, third]) execFileSync("git", ["worktree", "remove", "--force", folder], { cwd: root });
   execFileSync("git", ["worktree", "prune"], { cwd: root });
@@ -568,4 +636,22 @@ test("the journal is read from every worktree of the repository, each record onc
   const fromBare = loadJournalAcrossWorktrees(join(bare, "checkout"));
   assert.deepEqual(fromBare.worktrees.map((w) => w.self), [true], "the bare entry is left out");
   assert.ok(!fromBare.records.some((r) => r.id === "d-eeeeeeee"));
+
+  // A project nested inside its repository: each other worktree is read at the project's own folder in it, never at that worktree's top.
+  const repo = made(mkdtempSync(join(tmpdir(), "coherence-nested-")));
+  mkdirSync(join(repo, "app"), { recursive: true });
+  writeFileSync(join(repo, "app", "App.spec.md"), SPEC.replace("# Widget", "# App"));
+  execFileSync("git", ["init", "-q"], { cwd: repo });
+  commitAll(repo, "first", RECENT);
+  const nested = made(mkdtempSync(join(tmpdir(), "coherence-nested-worktree-")));
+  rmSync(nested, { recursive: true });
+  execFileSync("git", ["worktree", "add", "-q", "--detach", nested], { cwd: repo });
+  for (const [folder, id] of [[join(nested, "app"), "d-a0000001"], [nested, "d-a0000002"]] as const) {
+    mkdirSync(join(folder, ".coherence", "journal"), { recursive: true });
+    writeFileSync(join(folder, ".coherence", "journal", "n.jsonl"), legacy(id, "made in the nested worktree"));
+  }
+  const fromNested = loadJournalAcrossWorktrees(join(repo, "app"));
+  assert.deepEqual(fromNested.worktrees.map((w) => realpathSync(w.path)), [realpathSync(join(repo, "app")), realpathSync(join(nested, "app"))]);
+  assert.deepEqual(fromNested.records.map((r) => r.id), ["d-a0000001"], "the project's folder in the other worktree is read, and that worktree's top is not");
+  execFileSync("git", ["worktree", "remove", "--force", nested], { cwd: repo });
 });

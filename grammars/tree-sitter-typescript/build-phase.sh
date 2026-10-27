@@ -10,15 +10,18 @@
 #      be the tree inputs.sh pins, so no ref, replace object or graft in the clone has a say in what is built.
 #   2. coherence.patch is applied to a copy of that tree, and refused unless all it changes is common/define-grammar.js
 #      and common/scanner.h, each a regular file still. The patched grammar is the clean tree with those two files alone
-#      taken from it, so a patch has no way to reach the corpus, upstream's or Coherence's, or anything else the checks read.
+#      taken from it, so no file of a patch's is the corpus, upstream's or Coherence's. The patch's code still runs here:
+#      define-grammar.js under node when the grammar is generated, scanner.h compiled into the corpus run, each with this
+#      phase's working folder open to it, and nothing checks what it does there.
 #   3. The stock grammar (upstream, unpatched) and the patched one are each generated and built, in both dialects, with
 #      the pinned tree-sitter CLI, wasi-sdk clang and binaryen wasm-opt.
 #   4. Upstream's corpus, read from the clean tree, and Coherence's (corpus/coherence*.txt, in this folder, which the
 #      patch cannot write) pass against the patched grammar in both dialects, each case with its whole expected tree.
 #   5. compare.mjs parses upstream's corpus, Coherence's, corpus/limits.txt, TypeScript 5.9.3's lib .d.ts files and this
 #      repository's src and mods with the stock and the patched parsers, fails on any difference intended-differences.json
-#      does not allow, holds every intended difference to each case it names, one region in each, and holds the patched
-#      parsers to every expected tree the corpus declares.
+#      does not allow, holds every intended difference to each case it names, one region in each, fails on any region
+#      in a corpus case no entry names (limits.txt's forms among them), whatever an entry's query overlaps, and holds the
+#      patched parsers to every expected tree the corpus declares.
 #   6. Each patched parser is byte for byte the digest parsers.sha256 records.
 # Needs node, git, tar, gzip and a C compiler (the corpus runs natively); the CLI's binaries need macOS, or Linux with
 # glibc 2.39 or newer, arm64 or x86-64.

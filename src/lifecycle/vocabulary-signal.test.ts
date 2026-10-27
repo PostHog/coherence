@@ -206,9 +206,9 @@ test("a Coherence name an adopter's code declares is the project's own sense eve
   }
 });
 
-/** Whether a text carries a count of the population rather than names. */
+/** Whether a text carries a count of the population rather than names: the vocabulary's, or the dead-end reading's line of what it read. */
 function carriesTotal(text: string): boolean {
-  return /\b\d+ (?:unresolved|unsettled|new\/changed|observed|contexts?|candidate)/i.test(text) || /Lexicon coverage:/.test(text);
+  return /\b\d+ (?:unresolved|unsettled|new\/changed|observed|contexts?|candidate|worktree)/i.test(text) || /Lexicon coverage:|Dead ends: none|defects placed by/.test(text);
 }
 
 function injected(stdout: string): string {
@@ -220,6 +220,9 @@ function injected(stdout: string): string {
 test("no hook injection carries a total: orient names the ranked terms or says nothing", async () => {
   const root = project();
   try {
+    // A journal holding a defect and no dead end: the dead-end reading has read something, and orient says nothing of it.
+    mkdirSync(join(root, ".coherence", "journal"), { recursive: true });
+    writeFileSync(join(root, ".coherence", "journal", "earlier.jsonl"), JSON.stringify({ id: "df-0rient00", kind: "defect", at: new Date(Date.now() - 60_000).toISOString(), session: "earlier", agent: "a", commit: null, dirty: false, what: "the sum rounded", evidence: "a report", files: ["books/sums.ts"], component: "books" }) + "\n");
     const input = { session_id: "orient-test", cwd: root };
     const quiet = await runHook("SessionStart", input, root);
     assert.ok(!carriesTotal(injected(quiet.stdout)), injected(quiet.stdout));

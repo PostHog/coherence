@@ -7,8 +7,8 @@
  * detached, so no hook waits on it.
  */
 
-import { closeSync, constants, fstatSync, openSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { closeSync, constants, fstatSync, openSync, readFileSync, realpathSync } from "node:fs";
+import { resolve, sep } from "node:path";
 import { configIgnore } from "../adapters/project-files.ts";
 import { registryForLeaf } from "../adapters/project-config.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
@@ -39,9 +39,10 @@ function warmRoot(root: string): { language: string; read: number; parsed: numbe
       // In an order of this warm-up's own, so two warm-ups of one project at once (a session start and the prompt after it) mostly parse
       // different files, each reading what the other has kept by then, where in one order they would parse every file twice.
       const files = shuffled(sourceFiles(root, language, ignore));
+      const within = realRoot(root);
       const texts = (function* () {
         for (const file of files) {
-          const text = warmText(resolve(root, file));
+          const text = warmText(resolve(root, file), within);
           if (text !== undefined) yield text;
         }
       })();
@@ -55,12 +56,19 @@ const WARM_MAX_BYTES = 16 * 1024 * 1024;
 
 /**
  * A source file's text as the warm-up reads it, unasked at a session start:
- * only a regular file, never through a link (one that leads out of the
- * project, or to a pipe or a device), never blocking, and none larger than
+ * only a regular file whose real path is inside the project, never through
+ * a link (one that leads out of the project, or to a pipe or a device), never blocking, and none larger than
  * WARM_MAX_BYTES. Undefined for anything else, or a file gone since the walk
  * listed it.
  */
-function warmText(path: string): string | undefined {
+function warmText(path: string, within: string): string | undefined {
+  // A file whose folder is a link out of the project (lib a link elsewhere, lib/x.py still listed) is no file of the project's.
+  try {
+    const real = realpathSync(path);
+    if (real !== within && !real.startsWith(within + sep)) return undefined;
+  } catch {
+    return undefined;
+  }
   let fd: number;
   try {
     fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
@@ -85,4 +93,13 @@ function shuffled<T>(items: readonly T[]): T[] {
     [out[i], out[j]] = [out[j]!, out[i]!];
   }
   return out;
+}
+
+/** A project's root as the file system names it, every link followed. */
+function realRoot(root: string): string {
+  try {
+    return realpathSync(root);
+  } catch {
+    return root;
+  }
 }

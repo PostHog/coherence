@@ -20,6 +20,7 @@ import { writeParserPlugin } from "./fixtures/parser-plugin.ts";
 import { BUNDLED_DIR, readManifest, readPlugins } from "./registry.ts";
 import { fingerprintOf, importShapes, KEPT_FROM, keptParseOf, staleParsesNotice, treeReaderOf, warmParses } from "./syntax-trees.ts";
 import { warmProjectParses } from "../economy/warm-parses.ts";
+import { budget } from "../enforcement/test-budgets.ts";
 import { Parser, Tree } from "web-tree-sitter";
 
 const fixtures: string[] = [];
@@ -55,7 +56,7 @@ function keptFile(store: string, text: string): string {
 
 /** Run a script in a fresh process with the parser runtime started, the store's module and the Python plugin in scope; its stdout. */
 function inProcess(body: string, env: NodeJS.ProcessEnv = process.env): string {
-  const probe = `import { startParsers, treeReaderOf, warmParses, staleParsesNotice } from ${JSON.stringify(resolve("src/plugins/syntax-trees.ts"))};
+  const probe = `import { startParsers, treeReaderOf, warmParses, staleParsesNotice, parserNotice } from ${JSON.stringify(resolve("src/plugins/syntax-trees.ts"))};
     await startParsers();
     const plugin = ${JSON.stringify(PY_PLUGIN)};
     ${body}`;
@@ -415,7 +416,29 @@ test("a kept parse is filed under every input it depends on: each treeSitter inp
   // a runtime import of another of Coherence's modules is one whose edit would change a kept parse under an unchanged fingerprint.
   const source = readFileSync(resolve("src/plugins/syntax-trees.ts"), "utf8");
   const own = [...source.matchAll(/^(?:import|export) (?!type )[^;]*?from ["'](\.[^"']+)["'];|\bimport\(\s*["'`](\.[^"'`]+)/gm)].map((m) => m[1] ?? m[2]);
-  assert.deepEqual(own, ["../lifecycle/user-dir.ts"], "syntax-trees.ts imports at run time only the machine key's folder from the rest of Coherence");
+  assert.deepEqual(own, ["../lifecycle/user-dir.ts"], "syntax-trees.ts imports at run time only the user's cache folder from the rest of Coherence");
+  // And it digests that source and the web-tree-sitter release: a copy of the module, as is, edited, and beside a runtime of another release.
+  const copy = mkdtempSync(join(tmpdir(), "coherence-fingerprint-"));
+  fixtures.push(copy);
+  for (const file of ["src/plugins/syntax-trees.ts", "src/lifecycle/user-dir.ts"]) {
+    mkdirSync(dirname(join(copy, file)), { recursive: true });
+    copyFileSync(resolve(file), join(copy, file));
+  }
+  const runtime = dirname(realpathSync(resolve("node_modules/web-tree-sitter/package.json")));
+  // A copy, not links: the resolver follows a link to the real package, whose release it would read.
+  cpSync(runtime, join(copy, "node_modules", "web-tree-sitter"), { recursive: true, dereference: true });
+  const manifest = JSON.parse(readFileSync(join(runtime, "package.json"), "utf8")) as { version: string };
+  const printOf = (module: string): string =>
+    execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", `import { fingerprintOf } from ${JSON.stringify(module)}; process.stdout.write(fingerprintOf(${JSON.stringify(PYTHON)}, ${JSON.stringify(PY_PLUGIN.manifest.treeSitter)}));`], { encoding: "utf8" });
+  const copied = join(copy, "src/plugins/syntax-trees.ts");
+  writeFileSync(join(copy, "node_modules", "web-tree-sitter", "package.json"), JSON.stringify(manifest));
+  const same = printOf(copied);
+  assert.equal(same, fingerprintOf(PYTHON, PY_PLUGIN.manifest.treeSitter!), "the module's copy, as is, beside the same runtime, files parses alike");
+  writeFileSync(join(copy, "node_modules", "web-tree-sitter", "package.json"), JSON.stringify({ ...manifest, version: `${manifest.version}-other` }));
+  assert.notEqual(printOf(copied), same, "a web-tree-sitter of another release changes the fingerprint");
+  writeFileSync(join(copy, "node_modules", "web-tree-sitter", "package.json"), JSON.stringify(manifest));
+  writeFileSync(copied, `${readFileSync(copied, "utf8")}\n// an edit to the code that reads a tree\n`);
+  assert.notEqual(printOf(copied), same, "an edit to the module changes the fingerprint");
 });
 
 test("a warm-up holds a sample of its kept parses to a fresh parse of the same text: a store that differs is removed whole, the readings after it read fresh, and orient says so for a week", () => {
@@ -438,6 +461,12 @@ test("a warm-up holds a sample of its kept parses to a fresh parse of the same t
   assert.match(notice(Date.now()), /plugin python's kept parses differed from a fresh parse of the same text on 8 of the 8/);
   assert.equal(notice(Date.now() + 8 * 86_400_000), "", "orient says it for a week");
   assert.deepEqual(pick(pass(), ["stale", "imports"]), { stale: 0, imports: ["a <- audited39", "b <- audited39"] }, "the next warm-up keeps fresh parses again");
+  // The sample is drawn over the whole pass, not its first texts: only the texts after the eighth made stale, and the audit still finds them.
+  for (let i = 8; i < 40; i++) {
+    const file = keptFile(store, `from audited${i} import (\n    a,\n    b,\n)\n`);
+    writeFileSync(file, readFileSync(file, "utf8").replaceAll('"a"', '"stale"'));
+  }
+  assert.ok(pass().stale > 0, "a sample chosen over the whole pass meets the texts after its first eight");
 });
 
 /** Some of an object's keys. */
@@ -555,6 +584,22 @@ test("the parse store lives outside every project and is used only where the use
   }
 });
 
+test("a parse store inside the repository a project is read from is never used for it, however the cache is set, the repository's top or a leaf below it read", () => {
+  const top = realpathSync(mkdtempSync(join(tmpdir(), "coherence-cache-inside-")));
+  fixtures.push(top);
+  execFileSync("git", ["init", "-q"], { cwd: top });
+  mkdirSync(join(top, "leaf"));
+  const text = "from payments import charge\n";
+  // A store the repository commits, under the cache folder CI points inside the checkout, holding a parse of its own making.
+  const file = keptFile(join(top, ".cache", "coherence", "parses", fingerprintOf(PYTHON, PY_PLUGIN.manifest.treeSitter!)), text);
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  writeFileSync(file, JSON.stringify([[["import.from", "forged", 1], ["import.name", "made_up", 1]]]), { mode: 0o600 });
+  for (const root of [top, join(top, "leaf")]) {
+    const read = inProcess(`console.log(JSON.stringify(treeReaderOf(plugin, ${JSON.stringify(root)}).imports(${JSON.stringify(text)}).map((i) => i.name + " <- " + i.specifier)));`, { ...process.env, XDG_CACHE_HOME: join(top, ".cache") });
+    assert.deepEqual(JSON.parse(read), ["charge <- payments"], `the store inside the repository is not read for ${root === top ? "its top" : "a leaf"}`);
+  }
+});
+
 test("a repository's own files cannot stop a warm-up: a source file nested deep around an error is read, and a source file that links out of the project, to a pipe, or past 16 MB is never read by the warm-up, which finishes", () => {
   // A file nested ten thousand deep around an error, which a reading that recurses over the tree overflows its stack on: read, and the next one too.
   const deep = mkdtempSync(join(tmpdir(), "coherence-hostile-deep-"));
@@ -573,7 +618,15 @@ test("a repository's own files cannot stop a warm-up: a source file nested deep 
   symlinkSync(join(secret, "secret.py"), join(linking, "outside.py"));
   execFileSync("mkfifo", [join(secret, "pipe.py")]);
   symlinkSync(join(secret, "pipe.py"), join(linking, "pipe.py"));
+  // And a folder git still lists files under, made a link out of the project after they were committed.
+  mkdirSync(join(linking, "lib"));
+  writeFileSync(join(linking, "lib", "x.py"), "LIB = 1\n");
   execFileSync("git", ["init", "-q"], { cwd: linking });
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "add", "lib/x.py"], { cwd: linking });
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "lib"], { cwd: linking });
+  rmSync(join(linking, "lib"), { recursive: true });
+  writeFileSync(join(secret, "x.py"), "OUTSIDE_SECRET_TOKEN_TOO = 1\n");
+  symlinkSync(secret, join(linking, "lib"));
   const warmed = execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", `import { startParsers } from ${JSON.stringify(resolve("src/plugins/syntax-trees.ts"))}; import { warmProjectParses } from ${JSON.stringify(resolve("src/economy/warm-parses.ts"))}; await startParsers(); console.log(JSON.stringify(warmProjectParses(${JSON.stringify(linking)}).map((w) => w.read)));`], { encoding: "utf8", timeout: 20_000 });
   assert.deepEqual(JSON.parse(warmed), [1], "the warm-up reads the project's own regular file alone, never one past 16 MB, and finishes");
   assert.ok(!keptIn(pythonStore()).some((file) => readFileSync(file, "utf8").includes("OUTSIDE_SECRET_TOKEN")), "nothing of a file outside the project is kept");
@@ -609,11 +662,86 @@ test("a kept parse is read only where it is the user's alone: a store folder, or
   const shared = mkdtempSync(join(tmpdir(), "coherence-shared-"));
   fixtures.push(shared);
   assert.deepEqual(reading((cache) => chmodSync(dirname(cache), 0o777), shared), ["charge <- payments"], "a folder on the way others may write");
+  assert.match(inProcess(`process.stdout.write(parserNotice());`, { ...process.env, XDG_CACHE_HOME: join(shared, "cache") }), /Kept parses: none are kept, since the user's cache is not the user's alone \(others may write [^)]*coherence-shared-/, "and orient says the store is off, and why");
+  // A link others could replace, in a folder others may write, though it leads to a folder of the user's own: judged as written, not only as followed.
+  const own = mkdtempSync(join(tmpdir(), "coherence-own-target-"));
+  fixtures.push(own);
+  const open = mkdtempSync(join(tmpdir(), "coherence-open-"));
+  fixtures.push(open);
+  const planted = keptFile(join(own, "coherence", "parses", fingerprint), text);
+  mkdirSync(dirname(planted), { recursive: true, mode: 0o700 });
+  writeFileSync(planted, forged, { mode: 0o600 });
+  symlinkSync(own, join(open, "cache"));
+  chmodSync(open, 0o777);
+  const linked = inProcess(`console.log(JSON.stringify(treeReaderOf(plugin, "/p").imports(${JSON.stringify(text)}).map((i) => i.name + " <- " + i.specifier)));`, { ...process.env, XDG_CACHE_HOME: join(open, "cache") });
+  assert.deepEqual(JSON.parse(linked), ["charge <- payments"], "a cache reached through a link in a folder others may write");
+  // A kept parse larger than the store reads, of a parse's shape, is passed over.
+  assert.deepEqual(reading((_c, _s, file) => writeFileSync(file, JSON.stringify([[["import.from", "forged", 1], ["import.name", "made_up", 1], ["name", "x".repeat(33 * 1024 * 1024), 1]]]))), ["charge <- payments"], "a kept parse past 32 MB");
+});
+
+test("a reading spends a bounded amount of work on one text, the same on every machine: a text past it reads as matching nothing, is kept nowhere and is said at orient, and every text after it in the process is read", (t) => {
+  budget(t, 20, "d-aeacd05b");
+  const cache = mkdtempSync(join(tmpdir(), "coherence-work-"));
+  fixtures.push(cache);
+  // Two texts, each past one bound alone: 900,000 lines of 1 make some 108,000 of the parser's progress calls and 49,000 of the query's,
+  // past the parse's bound alone; 480,000 imports make some 82,000 and 63,000, past the query's alone. Both far below what aborts the runtime.
+  const result = JSON.parse(inProcess(`const parseHeavy = "1\\n".repeat(900000);
+    const queryHeavy = "from m import a\\n".repeat(480000);
+    const counts = warmParses(plugin, "/p", [parseHeavy, queryHeavy, "from after import x\\n"]);
+    const reader = treeReaderOf(plugin, "/p");
+    console.log(JSON.stringify({ counts, query: reader.imports(queryHeavy).length, after: reader.imports("from later import y\\n").map((i) => i.name + " <- " + i.specifier), notice: parserNotice() }));`, { ...process.env, XDG_CACHE_HOME: cache })) as { counts: { read: number; parsed: number }; query: number; after: string[]; notice: string };
+  assert.deepEqual(pick(result.counts, ["read", "parsed"]), { read: 3, parsed: 1 }, "each text past a bound is read as nothing, and the one after them parsed");
+  assert.equal(result.query, 0, "the text past the query's bound reads no import, not the part the query reached");
+  assert.deepEqual(result.after, ["y <- later"], "and a reading after them reads");
+  assert.match(result.notice, /Unread: plugin python's parser stopped reading a text of \d+ bytes that begins "(1|from m import a)"/, "orient says it");
+  const store = join(cache, "coherence", "parses", fingerprintOf(PYTHON, PY_PLUGIN.manifest.treeSitter!));
+  assert.ok(![ "1\n".repeat(900_000), "from m import a\n".repeat(480_000)].some((text) => existsSync(keptFile(store, text))), "neither is kept");
+});
+
+test("spelling an import's prefixes costs what its nesting does, not how many prefixes the file holds: sixteen thousand grouped uses read in a few seconds", () => {
+  const rust = treeReaderOf(sourceProvider("rust")!)!;
+  const text = Array.from({ length: 16_000 }, (_, i) => `use crate::m${i}::{a, b};\n`).join("");
+  const started = performance.now();
+  const imports = rust.imports(text);
+  const ms = performance.now() - started;
+  assert.equal(imports.length, 64_000, "every grouped use read: each name from its module, and its whole path");
+  assert.deepEqual(imports.slice(-2).map((i) => `${i.name ?? "*"} ${i.specifier} ${i.line}`), ["b crate::m15999 16000", "* crate::m15999::b 16000"], "each whole, its prefix joined to it");
+  assert.ok(ms < 4_000, `16,000 grouped uses read in ${Math.round(ms)} ms; spelled by a scan of every prefix per specifier they took 15 s`);
+});
+
+test("a word a plugin's queries capture as @misread, read from a tree with no error and outside the parents they exempt, is said at orient with its line; one in an erring tree or under an exempt parent is not, and a predicate nothing evaluates is refused by name", () => {
+  const misread = `\n((identifier) @misread (#eq? @misread "boom") (#not-parent-type? @misread keyword_argument))\n`;
+  const plugin = parserPlugin({}, { "zz.scm": readFileSync(join(PYTHON, "python.scm"), "utf8") + misread });
+  const said = (text: string): string => {
+    const cache = mkdtempSync(join(tmpdir(), "coherence-misread-"));
+    fixtures.push(cache);
+    const probe = `import { startParsers, treeReaderOf, parserNotice } from ${JSON.stringify(resolve("src/plugins/syntax-trees.ts"))};
+      await startParsers();
+      treeReaderOf(${JSON.stringify(plugin)}, "/p").imports(${JSON.stringify(text)});
+      process.stdout.write(parserNotice());`;
+    return execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", probe], { encoding: "utf8", env: { ...process.env, XDG_CACHE_HOME: cache }, timeout: 60_000 });
+  };
+  assert.match(said("X = 1\nboom = 1\n"), /plugin zz's parser read "boom", which the language never binds, as a name on line 2 of a file it read \(\d{4}-\d\d-\d\d\): "boom = 1"/, "a misread in a tree with no error is said, with its line");
+  assert.equal(said("f(boom=1)\n"), "", "under a parent the queries exempt it is not");
+  assert.equal(said("boom = (\n"), "", "in a tree with an error it is not");
+  const unknown = parserPlugin({}, { "zz.scm": readFileSync(join(PYTHON, "python.scm"), "utf8") + `\n((identifier) @misread (#has-parent? @misread call))\n` });
+  assert.throws(() => treeReaderOf(unknown, "/p")!.imports("x = 1\n"), /queries use #has-parent\?, which nothing evaluates/, "a predicate nothing evaluates is refused, never passed over");
+});
+
+test("the TypeScript plugin's queries capture no misread where valid TypeScript binds a reserved word or uses one as an operator: an import's or an export's name, export * as, and in, instanceof, typeof, labels and members across lines", () => {
+  const typescript = sourceProvider("typescript")!;
+  const texts = [
+    "export { x as default }\nexport { _function as function, _null as null }\nexport * as default from './m'\nimport { default as y, in as z } from './n'\n",
+    "const has = key\n  in record\nconst is = value\n  instanceof Date\nfor (const k in o) {}\nconst t = typeof o\nouter: for (;;) { break outer }\n",
+    "class K { in = 1\n  instanceof = 2\n  in_progress() {}\n  default() {} }\ninterface M { in?: string; delete(): void }\nconst o = { in: 1, new: 2, class: 3 }\no.delete()\n",
+    ...Object.values((JSON.parse(readFileSync(join(BUNDLED_DIR, "typescript", "check.json"), "utf8")) as { files: Record<string, string> }).files),
+  ];
+  for (const text of texts) assert.ok(!keptParseOf(typescript, text).includes('"misread"'), `no misread in ${JSON.stringify(text.slice(0, 60))}`);
 });
 
 test("syntax-trees.ts gives out no way to the store: its exports are the readings, the warm-up, the fingerprint and the notice, never the store, its folder or a path", async () => {
   const exported = Object.keys(await import("./syntax-trees.ts")).sort();
-  assert.deepEqual(exported, ["CAPTURES", "IMPORT_SHAPES", "KEPT_FROM", "capturesStatements", "fingerprintOf", "importShapes", "keptParseOf", "staleParsesNotice", "startParsers", "treeReaderOf", "warmParses"]);
+  assert.deepEqual(exported, ["CAPTURES", "IMPORT_SHAPES", "KEPT_FROM", "capturesStatements", "fingerprintOf", "importShapes", "keptParseOf", "parserNotice", "staleParsesNotice", "startParsers", "treeReaderOf", "warmParses"]);
 });
 
 test("a reading holds no kept parse past its last few texts and reads each from its own file: one another process keeps is read at once, one another removes answers no more, and each parse is kept as it is made", () => {
@@ -663,16 +791,41 @@ test("a kept parse no process has read in fourteen days is swept by a warm-up, a
   age(join(other, "c".repeat(30)), 20 * 86_400_000);
   const discarded = join(parses, `${"e".repeat(24)}.stale-${"0".repeat(16)}`);
   mkdirSync(discarded);
+  // And beside the swept file and among the audits, where the store also writes whole.
+  mkdirSync(join(parses, "audits"), { recursive: true });
+  for (const left of [join(parses, "swept.1.cccccccccccc.tmp"), join(parses, "audits", "python.json.1.dddddddddddd.tmp")]) {
+    writeFileSync(left, "");
+    age(left, 2 * 3_600_000);
+  }
   age(join(parses, "swept"), 2 * 86_400_000);
   inProcess(`warmParses(plugin, "/p", ["from fresh import a\\n"]);`, env);
   assert.ok(unread.every((text) => !existsSync(keptFile(store, text))), "a kept parse no process read in fourteen days is swept");
   assert.ok([...reread, "from fresh import a\n"].every((text) => existsSync(keptFile(store, text))), "one read since is kept, and the warm-up's own");
   assert.deepEqual(readdirSync(shard).filter((name) => name.endsWith(".tmp")), ["1".repeat(30) + ".2.bbbbbbbbbbbb.tmp"], "a write's temporary file is swept an hour on, never sooner");
   assert.ok(!existsSync(join(parses, "f".repeat(24))) && !existsSync(discarded), "another fingerprint's folder empties and goes, and a discarded store goes");
+  assert.ok(!existsSync(join(parses, "swept.1.cccccccccccc.tmp")) && !existsSync(join(parses, "audits", "python.json.1.dddddddddddd.tmp")), "and the temporary files beside the swept file and among the audits");
   // Swept within the day: nothing more is swept, however old.
   for (const file of keptIn(store)) age(file, 30 * 86_400_000);
   inProcess(`warmParses(plugin, "/p", []);`, env);
   assert.ok(reread.every((text) => existsSync(keptFile(store, text))), "a warm-up within a day of a sweep sweeps nothing");
+  // A sweep dated ahead of now, as a clock that ran fast leaves it, is no sweep: the next warm-up sweeps.
+  const ahead = new Date(Date.now() + 365 * 86_400_000);
+  utimesSync(join(parses, "swept"), ahead, ahead);
+  inProcess(`warmParses(plugin, "/p", []);`, env);
+  assert.ok(reread.every((text) => !existsSync(keptFile(store, text))), "a warm-up after a sweep dated ahead sweeps");
+  // A kept parse whose time cannot be stamped (immutable, as chflags makes it on macOS) is read all the same.
+  if (process.platform === "darwin") {
+    const fixed = "from fixed import a\n";
+    inProcess(`warmParses(plugin, "/p", [${JSON.stringify(fixed)}]);`, env);
+    age(keptFile(store, fixed), 2 * 86_400_000);
+    execFileSync("chflags", ["uchg", keptFile(store, fixed)]);
+    try {
+      const parsed = inProcess(`const reader = treeReaderOf(plugin, "/p"); reader.imports(${JSON.stringify(fixed)}); console.log(reader.store.parsed);`, env);
+      assert.equal(parsed.trim(), "0", "a kept parse that cannot be stamped is read, not parsed again");
+    } finally {
+      execFileSync("chflags", ["nouchg", keptFile(store, fixed)]);
+    }
+  }
 });
 
 test("two warm-ups of one project at once both read every text, need no lock, and keep each text's parse once, whole and as a fresh parse reads it", async () => {

@@ -7,25 +7,31 @@
  * narrower door in a representation that is wrong, and the next round finds
  * a fault in the guard itself.
  *
- * Nothing it counts is what the agents under watch choose to report about a
- * defect's fate (d-a5c35add): every defect placed in the subsystem after its
- * first guard counts, open or closed, closed under a guard it already had or
- * a fresh one, or by a decision. A defect with no class counts too, and each
- * as a class of its own, since nothing says it shares one: leaving --class
- * off adds to the alarm rather than silencing it; the reading names every
- * unclassified defect in its window whether or not any subsystem is at a dead
- * end. What tells a dead end from converging work is the arrivals: converging
- * work brings fewer defects each round, while at a dead end each round's fixes
- * bring more, so the later half of the rounds brings more than the earlier.
+ * The alarm serves an agent that wants to work helpfully (d-9d919dd8): it
+ * reads the records such an agent writes in the course of its work, and
+ * guards against what that agent does by accident, never against an agent
+ * choosing its records to silence it. So how a defect was closed decides
+ * nothing: every defect placed in the subsystem after its first guard
+ * counts, open or closed, closed under a guard it already had or a fresh
+ * one, or by a decision, since an agent closes each in whatever way fits it.
+ * A defect with no class counts too, and each as a class of its own, since
+ * nothing says it shares one: leaving --class off by accident adds to the
+ * alarm rather than hiding a dead end; spec --check names every unclassified
+ * defect in its window. A retracted defect counts nowhere: a withdrawn report
+ * is no fault. What tells a dead end from converging work is the arrivals:
+ * converging work brings fewer defects each round, while at a dead end each
+ * round's fixes bring more, so the later half of the rounds brings more than
+ * the earlier.
  *
  * A defect's subsystem is the component its record names (the defect verb
- * settles it at the write, and refuses a component that does not own every
- * file the defect names). A record older than that field, or written with
- * files in several components, is placed by derivation, and the reading says
- * how many it derived: each component holding a file it names, else the
- * component its close's guard names, the root only when nothing deeper is
- * named. One that names neither is placed nowhere and counted as such;
- * nothing is inferred from its prose.
+ * settles it at the write, refuses a component that does not own every file
+ * the defect names, and refuses a defect that says nothing of where it lies).
+ * A record older than that field, or written with files in several
+ * components, is placed by derivation, and the reading says how many it
+ * derived: each component holding a file it names, else the component its
+ * close's guard names, the root only when nothing deeper is named. One that
+ * names neither is placed nowhere and counted as such; nothing is inferred
+ * from its prose.
  *
  * The journal is read across every worktree of the repository
  * (loadJournalAcrossWorktrees), each record once: an agent at a dead end
@@ -47,11 +53,10 @@
  * that keeps failing after the human chose trips it again.
  */
 
-import { isAbsolute, relative } from "node:path";
 import { citesOf, type Acknowledgement, type JournalRecord } from "./record.ts";
 import { defectStates, type DefectState, type GuardStanding } from "./defects.ts";
 import { loadJournalAcrossWorktrees, type WorktreeRead } from "./store.ts";
-import { componentHolding, guardStanding, type Component } from "../spec/model.ts";
+import { componentHolding, guardStanding, projectFile, type Component } from "../spec/model.ts";
 
 /**
  * The thresholds a dead end must cross, tuned on Coherence's own journal by
@@ -122,26 +127,32 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** How a defect was placed: by the component its record names, derived from its files or its guard, or nowhere. */
 export type Placement = "recorded" | "files" | "guard" | "unplaced";
 
-/** The subsystems a defect belongs to and how they were found: the component its record names, else derived from its files, else from its guard. */
+/**
+ * The subsystems a defect belongs to and how they were found: the component
+ * its record names; else each component below the root holding a file it
+ * names (each path read with its "." and ".." resolved, projectFile); else
+ * the component below the root its close's guard names; else the root, when
+ * a file or the guard named it; else nowhere. Its files, else its guard: a
+ * guard closes a defect from wherever its invariant is declared, so it names
+ * where the defect lies only when the defect names no file that does.
+ */
 export function placeDefect(state: DefectState, options: Pick<DeadEndOptions, "folders" | "holding" | "root">): { subsystems: string[]; by: Placement } {
   if (state.component !== undefined) return { subsystems: [state.component], by: "recorded" };
-  const found = new Set<string>();
+  const files = new Set<string>();
   for (const named of state.files ?? []) {
-    const file = (isAbsolute(named) ? relative(options.root, named) : named).split("\\").join("/").replace(/^\.\//, "");
-    if (file === "" || file === ".." || file.startsWith("../") || isAbsolute(file)) continue;
-    const folder = options.holding(file);
-    if (folder !== undefined) found.add(folder);
+    const file = projectFile(options.root, named);
+    const folder = file === undefined ? undefined : options.holding(file);
+    if (folder !== undefined) files.add(folder);
   }
-  if (found.size > 1) found.delete(".");
-  const byFiles = found.size > 0 && !(found.size === 1 && found.has("."));
+  const deeper = [...files].filter((f) => f !== ".").sort();
+  if (deeper.length > 0) return { subsystems: deeper, by: "files" };
   const guard = state.resolution?.guard;
-  if (guard !== undefined) {
-    const folder = guard.slice(0, Math.max(0, guard.lastIndexOf("/")));
-    if (options.folders.includes(folder)) found.add(folder);
-  }
-  if (found.size > 1) found.delete(".");
-  if (found.size === 0) return { subsystems: [], by: "unplaced" };
-  return { subsystems: [...found].sort(), by: byFiles ? "files" : "guard" };
+  const guarded = guard === undefined ? undefined : guard.slice(0, Math.max(0, guard.lastIndexOf("/")));
+  const byGuard = guarded !== undefined && options.folders.includes(guarded) ? guarded : undefined;
+  if (byGuard !== undefined && byGuard !== ".") return { subsystems: [byGuard], by: "guard" };
+  if (files.has(".")) return { subsystems: ["."], by: "files" };
+  if (byGuard === ".") return { subsystems: ["."], by: "guard" };
+  return { subsystems: [], by: "unplaced" };
 }
 
 const byTime = <T extends { at: string }>(a: T, b: T): number => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
@@ -318,16 +329,13 @@ export function deadEndLines(r: DeadEndReading): string[] {
 
 /**
  * The dead ends as orient shows them, under a heading, never shortened: the
- * human must see the ids whole. With none, one line of what was read, so a
- * reading that found nothing still says which journals it read and which
- * defects carry no class; nothing only when no worktree's journal holds a
- * defect.
+ * human must see the ids whole. With none, nothing: orient injects no total
+ * (src/lifecycle/no totals are injected), so what the reading read and which
+ * defects carry no class are spec --check's and the convergence reading's to
+ * say, and orient speaks only with an alarm, with the counts it rests on.
  */
 export function deadEndBlock(r: DeadEndReading): string[] {
-  if (r.deadEnds.length === 0) {
-    const any = Object.values(r.placement).some((n) => n > 0);
-    return any ? [`Dead ends: none; the reading ${readingScope(r)}.`] : [];
-  }
+  if (r.deadEnds.length === 0) return [];
   return [
     `Dead ends (${r.deadEnds.length}): a subsystem keeps collecting defects after it was guarded, across classes and rounds, and its arrivals rise round over round; more guards there are narrower doors in a design that is wrong. The reading ${readingScope(r)}.`,
     ...r.deadEnds.map((d) => `⚠ ${d.subsystem}: ${counted(d)}: ${d.defects.map((x) => x.id).join(", ")}. ${remedy(d)}`),

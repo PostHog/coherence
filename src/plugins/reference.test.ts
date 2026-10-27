@@ -83,9 +83,12 @@ test("a plugin written for an older interface version is told a duty newer than 
   const manifest = join(root, "zz", "plugin.json");
   writeFileSync(manifest, readFileSync(manifest, "utf8").replace('"pluginApi":3', '"pluginApi":2'));
   const duties = (await checkPlugin(root, "./zz")).duties;
-  for (const name of ["reference reading", "server agrees"] as const) {
+  // Each names what it asks of that version, never another change the version brought.
+  for (const [name, asks] of [["reference reading", /which brought what it asks: check\.json's map of the reference project \(reference\)/], ["server agrees", /which brought what it asks: the adapter's topLevelSymbols/]] as const) {
     const duty = duties.find((d) => d.name === name)!;
     assert.equal(duty.verdict, "pass", `${name}: ${duty.reason}`);
     assert.match(duty.reason, new RegExp(`not held: plugin zz is written for pluginApi 2, and ${name} holds from pluginApi 3`));
+    assert.match(duty.reason, asks);
+    assert.doesNotMatch(duty.reason, /tree-sitter parser/, `${name} quotes no change it does not ask`);
   }
 });

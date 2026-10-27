@@ -81,7 +81,7 @@ import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { syntaxOf } from "../plugins/languages.ts";
-import { staleParsesNotice } from "../plugins/syntax-trees.ts";
+import { parserNotice, staleParsesNotice } from "../plugins/syntax-trees.ts";
 import { enforcedLanguageOf, readEnforcementConfig } from "../enforcement/config.ts";
 import { viaForm } from "../plugins/verify.ts";
 import { readPlugins } from "../plugins/registry.ts";
@@ -476,7 +476,7 @@ export function languageNoticeBlock(root: string): string {
   } catch {
     return "";
   }
-  return languages.map((language) => syntaxOf(language, "notice")?.(root) ?? "").filter((notice) => notice !== "").map((notice) => `${notice}\n\n`).join("") + staleParsesNotice();
+  return languages.map((language) => syntaxOf(language, "notice")?.(root) ?? "").filter((notice) => notice !== "").map((notice) => `${notice}\n\n`).join("") + staleParsesNotice() + parserNotice();
 }
 
 export function specBlock(root: string, now: number = Date.now()): string {
