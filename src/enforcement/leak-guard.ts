@@ -29,6 +29,9 @@
  * a test that asks a reading of a language read through a parser finds it
  * started (syntax-trees.ts).
  *
+ * It points XDG_CONFIG_HOME at a folder of the file's own, removed with it,
+ * so no test writes into the developer's Coherence folder.
+ *
  * Inert in the runner's parent process (no NODE_TEST_CONTEXT), and in any
  * process a test spawns that does not itself load this module.
  */
@@ -154,6 +157,10 @@ function pause(ms: number): void {
 }
 
 async function install(): Promise<void> {
+  // The user's Coherence folder (userConfigDir) is the file's own too, made beside its temp folder: a test that keeps parses
+  // never writes the parse store's key, or anything else, into the developer's real one.
+  const config = mkdtempSync(join(tmpdir(), "cg-config-"));
+  process.env["XDG_CONFIG_HOME"] = config;
   const folder = mkdtempSync(join(tmpdir(), "cg-"));
   process.env["TMPDIR"] = folder;
   process.env["COHERENCE_LEAK_GUARD"] = folder;
@@ -178,6 +185,7 @@ async function install(): Promise<void> {
       process.exitCode = 1;
     }
     rmSync(folder, { recursive: true, force: true });
+    rmSync(config, { recursive: true, force: true });
   });
   await installBudgets(file);
 }

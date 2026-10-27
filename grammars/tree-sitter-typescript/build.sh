@@ -2,13 +2,18 @@
 # Builds plugins/typescript's two parsers, tree-sitter-typescript.wasm and tree-sitter-tsx.wasm, from
 # tree-sitter-typescript v0.23.2 with coherence.patch applied. Upstream has merged no grammar change since
 # v0.23.2 (2024-11), and each of these parse errors hides the declarations after it:
-#   - an import type with type arguments, or as an array's element, an indexed type's object or keyof's
-#     operand: import('x').T<U>, import('x').T[], keyof import('x').T;
-#   - a member named in, or one whose name begins with in or instanceof (in_progress), on the line after
-#     another member;
-#   - a bare & in JSX text or a JSX string: Billing & Usage, to="?a=1&b=2".
-# Needs git, node and Emscripten's emcc (built with 6.0.13); writes both parsers over the bundled ones.
+#   - an import type with type arguments, or as an array's element, an indexed type's object, keyof's operand
+#     or a type argument: import('x').T<U>, import('x').T[], keyof import('x').T;
+#   - a member named in or instanceof (in: T, in?: T, in = 2), or one whose name begins with in (in_progress),
+#     on the line after another member;
+#   - a bare & in JSX text or a JSX string: Billing & Usage, to="?a=1&b=2", title='Q&'.
+# Needs git, node and Emscripten's emcc 6.0.13: another emcc, or the Docker image tree-sitter falls back to
+# without one, builds other bytes. Writes both parsers over the bundled ones, and fails unless each is the
+# bundled one byte for byte; a change to the patch updates the digests below with it.
 set -eu
+expected_typescript=314d255fcf035dccff13108feb79a0193551240870b994777cf4eebad5d0b86b
+expected_tsx=9838eccbe30e93f202a95be62e450c8a67a60e692a73be25982e18fba981f176
+emcc --version | head -1 | grep -q ' 6\.0\.13' || { echo "build.sh: needs emcc 6.0.13, found: $(emcc --version 2>/dev/null | head -1)" >&2; exit 1; }
 here=$(cd "$(dirname "$0")" && pwd)
 out=$(cd "$here/../../plugins/typescript" && pwd)
 work=$(mktemp -d)
@@ -24,4 +29,10 @@ for dialect in typescript tsx; do
     npm exec --yes --package=tree-sitter-cli@0.27.1 -- tree-sitter generate &&
     npm exec --yes --package=tree-sitter-cli@0.27.1 -- tree-sitter build --wasm --output "$out/tree-sitter-$dialect.wasm")
 done
-shasum -a 256 "$out/tree-sitter-typescript.wasm" "$out/tree-sitter-tsx.wasm"
+for dialect in typescript tsx; do
+  chmod 644 "$out/tree-sitter-$dialect.wasm"
+  got=$(shasum -a 256 "$out/tree-sitter-$dialect.wasm" | cut -d' ' -f1)
+  eval "want=\$expected_$dialect"
+  [ "$got" = "$want" ] || { echo "build.sh: tree-sitter-$dialect.wasm is $got, not $want" >&2; exit 1; }
+done
+echo "both parsers rebuilt byte for byte"

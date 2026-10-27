@@ -20,7 +20,7 @@
  */
 
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import { closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync, writeSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, linkSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { userConfigDir } from "../lifecycle/user-dir.ts";
@@ -314,7 +314,19 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
     }
   };
   const { language, query } = load(declared.parser, "parser");
-  const alternate = declared.alternate === undefined ? undefined : load(declared.alternate, "alternate parser");
+  // The alternate is compiled the first time a tree errs (215 of PostHog's 21,160 TypeScript files), so a process that never needs it,
+  // a hook's among them, never pays for it; queries that do not compile against it are refused by name then.
+  let alternate: { language: Language; query: Query; parser: Parser } | undefined;
+  const second = (): { language: Language; query: Query; parser: Parser } | undefined => {
+    if (declared.alternate === undefined) return undefined;
+    if (alternate === undefined) {
+      const loaded = load(declared.alternate, "alternate parser");
+      const parser = new Parser();
+      parser.setLanguage(loaded.language);
+      alternate = { ...loaded, parser };
+    }
+    return alternate;
+  };
   const unknown = query.captureNames.filter((name) => !(CAPTURES as readonly string[]).includes(name) && !ownCapture(name));
   if (unknown.length > 0) throw new Error(`plugin ${plugin.name}'s queries capture ${unknown.map((n) => `@${n}`).join(", ")}, which Coherence reads nothing by; the captures are ${CAPTURES.map((c) => `@${c}`).join(", ")}`);
   // A language whose queries mark what is exported says it by @exported; one with no such mark exports by name, unless its privateName says otherwise.
@@ -325,17 +337,16 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
   const spell = speller(declared.separator ?? "");
   const parser = new Parser();
   parser.setLanguage(language);
-  const second = alternate === undefined ? undefined : new Parser();
-  if (alternate !== undefined) second!.setLanguage(alternate.language);
-  // The text's tree and the queries compiled for its parser: the parser's, unless it errs and the alternate's tree errs less
+  // The text's tree and the queries compiled for its parser: the parser's, unless it errs and the alternate's errors cover less of the text
   // (TypeScript's TSX grammar reads an old-style cast, <any>x, as a JSX tag that swallows the rest of the file; its TypeScript grammar reads it whole).
+  // Measured in what the errors cover, not how many there are: one error that swallows the file loses more than two that hold a token each.
   const treeOf = (text: string): { tree: Tree; query: Query } => {
     const tree = parser.parse(text);
     if (tree === null) throw new Error(`plugin ${plugin.name}'s parser returned no tree`);
-    if (second === undefined || !tree.rootNode.hasError) return { tree, query };
-    const other = second.parse(text);
+    if (declared.alternate === undefined || !tree.rootNode.hasError) return { tree, query };
+    const other = second()!.parser.parse(text);
     if (other === null) return { tree, query };
-    if (errorsIn(other.rootNode) < errorsIn(tree.rootNode)) {
+    if (errorSpan(other.rootNode) < errorSpan(tree.rootNode)) {
       tree.delete();
       return { tree: other, query: alternate!.query };
     }
@@ -392,10 +403,11 @@ function compile(plugin: LoadedPlugin, declared: TreeSitterManifest): Compiled {
   };
 }
 
-/** How many error and missing nodes a tree holds, descending only into what holds one. */
-function errorsIn(node: Node): number {
-  if (node.isError || node.isMissing) return 1 + node.children.reduce((n, child) => n + (child !== null && child.hasError ? errorsIn(child) : 0), 0);
-  return node.children.reduce((n, child) => n + (child !== null && (child.hasError || child.isMissing) ? errorsIn(child) : 0), 0);
+/** How much of the text a tree's errors cover, in bytes: an error node its whole span, a missing node one; descending only into what holds one. */
+function errorSpan(node: Node): number {
+  if (node.isError) return Math.max(1, node.endIndex - node.startIndex);
+  if (node.isMissing) return 1;
+  return node.children.reduce((n, child) => n + (child !== null && (child.hasError || child.isMissing) ? errorSpan(child) : 0), 0);
 }
 
 /**
@@ -607,12 +619,48 @@ class ParseStore {
     return true;
   }
 
-  /** A file of the store's own, its lines, read only when it is a regular file. */
+  /** A file of the store's own, its lines, read only when it is a regular file no larger than STORE_MAX_BYTES. */
   private lines(path: string): string[] {
     try {
-      return lstatSync(path).isFile() ? readFileSync(path, "utf8").split("\n") : [];
+      const stat = lstatSync(path);
+      return stat.isFile() && stat.size <= STORE_MAX_BYTES ? readFileSync(path, "utf8").split("\n") : [];
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * The log's lines, read a chunk at a time from a regular file no larger than
+   * STORE_MAX_BYTES, so a reader that stops early (a log no machine of ours
+   * wrote) reads no further than it got. Never through a link, never blocking
+   * on a pipe.
+   */
+  private *logLines(): Generator<string> {
+    let fd: number;
+    try {
+      fd = openSync(this.log, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    } catch {
+      return;
+    }
+    try {
+      const stat = fstatSync(fd);
+      if (!stat.isFile() || stat.size > STORE_MAX_BYTES) return;
+      const chunk = Buffer.alloc(1 << 20);
+      let pending = Buffer.alloc(0);
+      for (;;) {
+        const got = readSync(fd, chunk, 0, chunk.length, null);
+        if (got === 0) break;
+        let text = Buffer.concat([pending, chunk.subarray(0, got)]);
+        // A newline byte is never inside a character's bytes, so each line decodes whole.
+        for (let end = text.indexOf(10); end >= 0; end = text.indexOf(10)) {
+          yield text.subarray(0, end).toString("utf8");
+          text = text.subarray(end + 1);
+        }
+        pending = Buffer.from(text);
+      }
+      if (pending.length > 0) yield pending.toString("utf8");
+    } finally {
+      closeSync(fd);
     }
   }
 
@@ -636,12 +684,18 @@ class ParseStore {
         } catch {
           // What a warm-up kept is unreadable: every text is parsed, and the next warm-up writes it again.
         }
-        // Each line of the log signs itself: "<signature> <entry>".
-        for (const signed of this.lines(this.log)) {
+        // Each line of the log signs itself: "<signature> <entry>". A log this machine wrote fails only where a killed process tore a
+        // line, so one that fails more than LOG_TORN_MAX times is no log of ours and is read no further: a repository's log of a
+        // million short lines costs a few signatures, not a million.
+        let torn = 0;
+        for (const signed of this.logLines()) {
+          if (signed === "") continue;
           const space = signed.indexOf(" ");
-          if (space < 0) continue;
           const line = signed.slice(space + 1);
-          if (signed.slice(0, space) !== this.sign(line)) continue;
+          if (space !== SIGNATURE_LENGTH || signed.slice(0, space) !== this.sign(line)) {
+            if (++torn > LOG_TORN_MAX) break;
+            continue;
+          }
           try {
             const entry = JSON.parse(line) as unknown;
             if (Array.isArray(entry) && entry.length === 3 && typeof entry[0] === "string" && isFound(entry[1]) && typeof entry[2] === "number") entries.set(entry[0], { found: entry[1], day: entry[2] });
@@ -674,14 +728,18 @@ class ParseStore {
     try {
       mkdirSync(this.dir, { recursive: true });
       if (!this.safe()) return;
-      const fd = openSync(this.log, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
+      // Whether another process rewrote or discarded the store since this one loaded it, asked before this append changes the stamp.
+      const changed = this.entries !== undefined && this.stamp() !== this.seen;
+      // Never blocking on a pipe the project put at the log's path, and appending only to a regular file.
+      const fd = openSync(this.log, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
       try {
-        writeSync(fd, lines);
+        if (fstatSync(fd).isFile()) writeSync(fd, lines);
       } finally {
         closeSync(fd);
       }
-      // What this process wrote is no other's change.
-      if (this.entries !== undefined) this.seen = this.stamp();
+      // What this process wrote is no other's change; what another did is read again on the next get.
+      if (changed) this.entries = undefined;
+      else if (this.entries !== undefined) this.seen = this.stamp();
     } catch {
       // A store that cannot be written only means the next process parses again.
     }
@@ -719,7 +777,9 @@ class ParseStore {
         } catch {
           continue;
         }
-        if (held === undefined) return false;
+        // A folder or a link the project put at the lock's path is no warm-up's: the warm-up goes on without the lock, as one with
+        // no .coherence folder would never go on at all; two warm-ups at once parse twice and each rewrite is whole.
+        if (held === undefined) return true;
         // A lock stamped in the future is no warm-up's: a committed one would otherwise hold every warm-up off for good.
         const age = Date.now() - held.at;
         if (alive(held.pid) && age >= 0 && age < WARM_LOCK_MS) return false;
@@ -838,6 +898,15 @@ function auditText(plugin: string, audit: { at: number; sampled: number; stale: 
   return JSON.stringify({ ...audit, signature: createHmac("sha256", machineKey()).update(`audit\u0000${counts}`).digest("base64url") });
 }
 
+/** A signature's length: an HMAC-SHA256 in base64url. */
+const SIGNATURE_LENGTH = 43;
+
+/** How many lines of a log may fail their signature (a line a killed process tore) before the log is read no further. */
+const LOG_TORN_MAX = 8;
+
+/** The largest store or log file read: PostHog's whole frontend and Python keep about 41 MB. */
+const STORE_MAX_BYTES = 256 * 1024 * 1024;
+
 /** How often, at most, a long-lived process looks whether another rewrote the store it loaded. */
 const RELOAD_MS = 1000;
 
@@ -893,18 +962,28 @@ function machineKey(): Buffer {
     // Made below.
   }
   const made = randomBytes(32);
+  // Written whole under a name of this process's, then linked into place, which fails where another process's key got there first:
+  // a reader never sees a key half written, and a key file too short to be one (an empty file) is replaced, never kept as is.
+  const temporary = `${path}.${process.pid}`;
   try {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, made, { flag: "wx", mode: 0o600 });
-    return (key = made);
-  } catch {
-    // Another process made it first, or the folder will not take it.
+    rmSync(temporary, { force: true });
+    writeFileSync(temporary, made, { flag: "wx", mode: 0o600 });
     try {
-      const read = readFileSync(path);
-      if (read.length >= 32) return (key = read);
+      linkSync(temporary, path);
     } catch {
-      // Unkeepable: this process's key is its own.
+      if (readFileSync(path).length < 32) renameSync(temporary, path);
     }
-    return (key = made);
+  } catch {
+    // The folder will not take it.
+  } finally {
+    rmSync(temporary, { force: true });
   }
+  try {
+    const read = readFileSync(path);
+    if (read.length >= 32) return (key = read);
+  } catch {
+    // Unkeepable: this process's key is its own.
+  }
+  return (key = made);
 }

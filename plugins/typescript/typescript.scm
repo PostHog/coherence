@@ -1,8 +1,8 @@
 ; TypeScript's and JavaScript's imports and top-level declarations, as the capture names Coherence reads (docs/plugins.md).
-; The parsers beside it are the two grammars the tree-sitter-typescript 0.23.2 npm package ships, copied as is (language ABI 14):
+; The parsers beside it are tree-sitter-typescript 0.23.2's two grammars built with a patch (grammars/tree-sitter-typescript, language ABI 15):
 ; tree-sitter-tsx.wasm reads every file the plugin's pattern takes (.ts, .tsx, .mts, .cts, .js, .jsx, .mjs, .cjs), since it reads JSX,
 ; which the TypeScript grammar refuses (3,196 of PostHog's 3,510 .tsx files); tree-sitter-typescript.wasm is its alternate, read where the
-; TSX tree errs and the TypeScript tree errs less: an old-style cast (<any>row) is a JSX tag to TSX, one that swallows every declaration
+; TSX tree errs and the TypeScript tree's errors cover less: an old-style cast (<any>row) is a JSX tag to TSX, one that swallows every declaration
 ; after it, and a cast to TypeScript. Both compile these queries, so they name no JSX node: a constant whose value is JSX declares unknown.
 
 ; import x from "m" -- the module's default export, under a name of the file's own

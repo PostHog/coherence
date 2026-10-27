@@ -310,7 +310,7 @@ language plugin reads this way (`plugins/python`, `plugins/go`,
 | Key | Meaning |
 |---|---|
 | `parser` | The language's parser compiled to WebAssembly, beside the manifest. Many grammars' npm packages ship one (`tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-java`, `tree-sitter-c`): copy the `.wasm` out of the package. For a grammar whose npm package ships none, look on the grammar's GitHub releases first: `tree-sitter-swift` attaches `tree-sitter-swift.wasm` to each release. Failing that, run `tree-sitter build --wasm` in the grammar's repository; the tree-sitter CLI compiles it with Emscripten, or with Docker or Podman when Emscripten is not installed. Coherence runs web-tree-sitter 0.27, which loads parsers built for language ABI 13 to 15. |
-| `alternate` | Optional: a second parser of the same language, beside the manifest, read with the same queries where the `parser`'s tree holds an error and its own holds fewer (TypeScript's TypeScript grammar beside its TSX grammar). The queries must compile against both. |
+| `alternate` | Optional: a second parser of the same language, beside the manifest, read with the same queries where the `parser`'s tree holds an error and its own errors cover less of the text (TypeScript's TypeScript grammar beside its TSX grammar). It is compiled the first time a text needs it, and queries that do not compile against it are refused then. |
 | `queries` | A file of tree-sitter queries, beside the manifest, whose captures are the names below. A query that does not compile against the parser, or a capture Coherence reads nothing by, is refused naming the plugin. |
 | `resolve` | `"<module>#<export>"`: a `ModuleResolution`, `{ resolveModule(root, from, specifier, vanished), modulePaths(from, specifier), boundName?(specifier) }`. Where an import leads is the language's rule, not its syntax, so it stays code: `resolveModule` names the project file a specifier leads to, or, where the language's module is several files (a Go package, a SwiftPM target), the module as `{ module: "<folder>", files: ["<every file of it>"] }`, or `undefined` outside the project. `modulePaths` gives every spelling of the files a glob import names. `boundName`, optional, gives the name a whole-module import binds when it gives none (a Go package's name, from its path); absent, the specifier's last path element. |
 | `privateName` | For a language that exports by name rather than by a keyword: a regular expression a name it keeps private matches (Python's `^_`, Go's `^\\P{Lu}`), read with Unicode's character classes (the `u` flag). A language that exports by keyword captures `@exported` instead. |
@@ -367,17 +367,23 @@ carry its own build of it. The TypeScript plugin's two grammars are
 tree-sitter-typescript 0.23.2 with a patch, since upstream has merged no
 grammar change since that release: they read an import type with type
 arguments or as an array's element (`import('x').T<U>`, `import('x').T[]`),
-a member named `in` or beginning with it (`in_progress`) on the line after
-another, and a bare `&` in JSX text or a JSX string, each of which hid the
-declarations after it in PostHog's frontend. The patch and the script that
-rebuilds both parsers byte for byte are in `grammars/tree-sitter-typescript`;
-an optional destructured parameter in a function type (`({ a }?: T) => U`)
-and a parenthesized import type are still errors.
+a member named `in` or `instanceof` (`in?: T`, `in = 2`) or beginning with
+`in` (`in_progress`) on the line after another, and a bare `&` in JSX text
+or a JSX string, each of which hid the declarations after it in PostHog's
+frontend. The patch and the script that rebuilds both parsers byte for byte
+are in `grammars/tree-sitter-typescript` in Coherence's repository. Still
+errors: an optional destructured parameter in a function type
+(`({ a }?: T) => U`), a parenthesized import type, `typeof import('x')` as
+a call's type argument (`importOriginal<typeof import('x')>()`), a method
+named `in` after another member, and a comparison whose `<` begins the line
+after `as import('x').T`.
 
 A language with two grammars names the second as its `alternate`: a text
 whose tree from `parser` holds an error is parsed again with it, and the
-tree with fewer errors is read, through the same queries, which must
-compile against both. TypeScript reads every `.ts`, `.tsx` and `.js` file
+tree whose errors cover less of the text is read (one error that swallows
+the rest of a file loses more than two that hold a token each), through
+the same queries, which must compile against both; the alternate is
+compiled the first time a text needs it. TypeScript reads every `.ts`, `.tsx` and `.js` file
 with the TSX grammar, since it reads JSX, and names the TypeScript grammar
 as its alternate: to TSX an old-style cast (`<any>value`) opens a JSX tag
 that swallows the rest of the file, and the TypeScript grammar reads it as
@@ -408,7 +414,11 @@ read; `privateName` and `resolve` are read after the store and change no
 kept parse. Each warm-up also parses a sample of the files it found kept
 and compares; a store that differs from a fresh parse is discarded, and the
 next session start says so. A store is read only where this machine's key
-signs its contents, so a store a repository commits feeds no reading.
+signs its contents, and a line of its log only where the line signs
+itself, so a store or log a repository commits feeds no reading; a log
+whose lines fail more than a killed process's torn line would is read no
+further, so however many lines a repository commits it costs a few
+signatures.
 `plugin eject` copies a plugin's parser byte for byte with its queries, so
 an ejected copy reads as the bundled plugin read.
 
