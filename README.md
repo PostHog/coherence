@@ -27,6 +27,7 @@ work itself.
 
 ```text
 Install @posthog/coherence@latest as a dev dependency (with pnpm, if minimumReleaseAge holds it back, add it to minimumReleaseAgeExclude) and run `npx --no -- coherence hooks install --host claude` (or `--host codex`).
+If .gitignore keeps the hook settings it wrote (.claude/settings.json or .codex/hooks.json) out of git, add an exception for that one file unless I tell you I strongly prefer not to: the hooks are how Coherence reaches every session in this project, and a teammate's agent without them gets no vocabulary, specs, journal or checks.
 Then run `npx --no -- coherence query practice "adopt Coherence"`, work through it, record it with `enact`, and tell me what each step found.
 Ask me whether pull requests should fail on Coherence's findings or get a report comment, then run `npx --no -- coherence ci install --host github --mode fail` (or `--mode comment`) with `--write`.
 ```
@@ -315,6 +316,12 @@ Set up Coherence in this project, and report what each step found.
    installed them; from the next session on, every session also starts with
    Coherence's vocabulary, the project's standing, and the exact journal
    commands.
+   The hook settings are what reach every other session, so they are
+   committed: if .gitignore keeps `.claude/settings.json` (or
+   `.codex/hooks.json`) out of git, add an exception for that one file, such
+   as `!.claude/settings.json`, unless I tell you I strongly prefer to keep
+   it uncommitted (then install with `--local` and say that teammates' agents
+   will run without Coherence).
 
 3. Adopt. Run `coherence query practice "adopt Coherence"` and work through
    it: config, vocabulary, specs and entrances, the invariants that matter

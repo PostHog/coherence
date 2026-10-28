@@ -54,7 +54,7 @@
   step: find the methods the project already has (the practice harvest practices)
   step: ask the user how Coherence should run on pull requests, presenting both modes: fail (the check fails on a spec problem or a structural defect) or comment (one report comment on the pull request, updated on each push, and the check fails only when Coherence itself breaks); then run coherence ci install --host github --mode <their choice> --write, or record with decide that they declined
     leaves: .github/workflows/coherence.yml, or the decision's id
-  step: commit coherence.config.json (and the registry's change, when adopt wrote one), the lexicon, the specs and practice files, the hook settings unless they were installed --local, the CI workflow, .coherence/.gitignore (hooks install wrote it so git sees nothing Coherence regenerates), and .coherence/journal, .coherence/runs and .coherence/work
+  step: commit coherence.config.json (and the registry's change, when adopt wrote one), the lexicon, the specs and practice files, the hook settings unless they were installed --local (when .gitignore keeps them out of git, add an exception for that one file, such as !.claude/settings.json, unless the user strongly prefers otherwise: the hooks are how Coherence reaches every session in the project, and a teammate's agent without them gets no vocabulary, specs, journal or checks), the CI workflow, .coherence/.gitignore (hooks install wrote it so git sees nothing Coherence regenerates), and .coherence/journal, .coherence/runs and .coherence/work
     leaves: the commit
   step: from the project's own folder (the adopted folder in a monorepo), run coherence scope and report what the reading shows: health, broken chokepoints, entrances with no traced control, how many detected entrances stay undeclared (a count, no finding), and components no enforcement covers
   pitfall: both outside adopters' checks were red on arrival from Coherence's rejected names in their own prose, and npm link broke a pnpm build; install as a dev dependency and baseline what was already there (d-127ab8e4)
@@ -63,6 +63,7 @@
   pitfall: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2)
   pitfall: an adoption declared every detected entrance, 280 with trust assigned by rule, and its first reading led with 263 gaps no one had judged (d-a37af46f)
   pitfall: an adoption declared one spec per top-level folder and stopped, and a human had to ask for the nested units (df-9750aee2)
+  pitfall: three trial adoptions of umami, whose .gitignore excludes .claude, each stopped at the commit to ask whether the hook settings should be committed (d-58daa53f)
   pitfall: an adoption recorded seven decisions for the 69 folders that belonged to the component above, and mass, which reads no decision, still named all 69 (d-8ebb2e2e)
   pitfall: a fresh adoption found its first requirements already false and its tests unable to run unattended, and had to improvise what to record (df-8ac95c4d)
   pitfall: in a monorepo, a session started at the repository root took the whole repository as the project: another team's specs reached orient, their practices fired, and .coherence was written at the root (df-0b68c987)
