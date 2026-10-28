@@ -58,7 +58,7 @@ const ACTIONS = {
   setupBun: "oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0",
 } as const;
 
-/** The pnpm major the workflow installs when package.json names no packageManager; lockfile 9.0 is what pnpm 9 and 10 write. */
+/** The pnpm major the workflow installs when package.json names no pnpm; lockfile 9.0 is what pnpm 9 and 10 write. */
 const PNPM_DEFAULT = "10";
 
 /** The package managers the workflow sets up, in the order a refusal names them. */
@@ -72,10 +72,10 @@ const COMMANDS: Record<PackageManager, { install: string; cli: string; add: stri
   bun: { install: "bun install --frozen-lockfile", cli: "npx --no -- coherence", add: "bun add -d" },
 };
 
-/** The step a manager Node.js does not bring needs: its action, the input that reads packageManager from a package.json below the top, and the version it installs when packageManager does not name one. */
-const MANAGER_SETUP: Partial<Record<PackageManager, { action: string; packageJsonInput: string; fallback: string }>> = {
-  pnpm: { action: ACTIONS.setupPnpm, packageJsonInput: "package_json_file", fallback: `version: ${PNPM_DEFAULT}` },
-  bun: { action: ACTIONS.setupBun, packageJsonInput: "bun-version-file", fallback: "bun-version: latest" },
+/** The step a manager Node.js does not bring needs: its action, the input that reads packageManager from a package.json below the top, the input that names a version, and the version it installs when package.json names none. */
+const MANAGER_SETUP: Partial<Record<PackageManager, { action: string; packageJsonInput: string; versionInput: string; fallback: string }>> = {
+  pnpm: { action: ACTIONS.setupPnpm, packageJsonInput: "package_json_file", versionInput: "version", fallback: PNPM_DEFAULT },
+  bun: { action: ACTIONS.setupBun, packageJsonInput: "bun-version-file", versionInput: "bun-version", fallback: "latest" },
 };
 
 function setUp(manager: AnyManager): manager is PackageManager {
@@ -117,6 +117,8 @@ export interface CiPlan {
   installDir: string;
   /** Whether the package.json at the install folder names the manager's version where its setup action reads one. */
   versionDeclared: boolean;
+  /** The pnpm engines.pnpm names in the package.json at the install folder, which the workflow writes because its setup action does not read it. */
+  enginesVersion: string | undefined;
   /** The Node.js version file at the install folder (.nvmrc or .node-version), relative to the top, when there is one. */
   nodeVersionFile: string | undefined;
   /** What the workflow says for the languages the projects read: each a language plugin's note (a Python checker the workflow does not install). */
@@ -155,12 +157,27 @@ function declares(manifest: Record<string, unknown> | undefined, name: string): 
   });
 }
 
-/** Whether a package.json names the manager's version where its setup action reads one: packageManager, and for Bun engines.bun too. */
+/** The value at `key` in the object a package.json holds at `field`. */
+function within(manifest: Record<string, unknown> | undefined, field: string, key: string): unknown {
+  const held = manifest?.[field];
+  return typeof held === "object" && held !== null ? (held as Record<string, unknown>)[key] : undefined;
+}
+
+/** Whether a package.json names the manager's version where its setup action reads one: packageManager, for pnpm devEngines.packageManager too, and for Bun engines.bun. */
 function declaresVersion(manifest: Record<string, unknown> | undefined, manager: PackageManager): boolean {
   const packageManager = manifest?.["packageManager"];
   if (typeof packageManager === "string" && packageManager.startsWith(`${manager}@`)) return true;
-  const engines = manifest?.["engines"];
-  return manager === "bun" && typeof engines === "object" && engines !== null && typeof (engines as Record<string, unknown>)["bun"] === "string";
+  const dev = within(manifest, "devEngines", "packageManager");
+  const devNamed = typeof dev === "object" && dev !== null ? (dev as Record<string, unknown>) : undefined;
+  if (manager === "pnpm" && devNamed?.["name"] === "pnpm" && typeof devNamed["version"] === "string") return true;
+  return manager === "bun" && typeof within(manifest, "engines", "bun") === "string";
+}
+
+/** The pnpm engines.pnpm names when it holds one major line (12.3.4, 10, ^10.2.0, ~10.2.0), which pnpm/action-setup does not read; a range open above, as >=9, names no one pnpm to set up. */
+function enginesVersion(manifest: Record<string, unknown> | undefined, manager: PackageManager): string | undefined {
+  const named = within(manifest, "engines", manager);
+  if (manager !== "pnpm" || typeof named !== "string") return undefined;
+  return /^[\^~]?\d+(\.\d+){0,2}(-[0-9A-Za-z.-]+)?$/.test(named.trim()) ? named.trim() : undefined;
 }
 
 /** The folders from `from` up to `top`, both included, nearest first. */
@@ -215,7 +232,8 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
   if (!manifests.some((m) => declares(m, PACKAGE_NAME))) {
     throw new CiError(`ci install: no package.json from ${workdir} up to ${slash(relative(top, lock.dir))} lists ${PACKAGE_NAME}; add it as a dev dependency so the workflow runs the installed package`);
   }
-  const versionDeclared = declaresVersion(readJson(join(lock.dir, "package.json")), lock.manager);
+  const lockManifest = readJson(join(lock.dir, "package.json"));
+  const versionDeclared = declaresVersion(lockManifest, lock.manager);
   const versionFile = [".nvmrc", ".node-version"].find((name) => existsSync(join(lock.dir, name)));
   const projects = registry === undefined ? undefined : registry.leaves.map((leaf) => slash(relative(top, leaf)));
   // Each project's plugins are registered by reading its config, so a language a plugin adds says what it needs as a bundled one does.
@@ -238,6 +256,7 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
     manager: lock.manager,
     installDir: slash(relative(top, lock.dir)),
     versionDeclared,
+    enginesVersion: versionDeclared ? undefined : enginesVersion(lockManifest, lock.manager),
     nodeVersionFile: versionFile === undefined ? undefined : slash(relative(top, join(lock.dir, versionFile))),
     notes,
     steps,
@@ -251,11 +270,12 @@ function stepLines(step: CiStep): string[] {
   return [...head, ...body].map((line, i) => `${i === 0 ? "      - " : "        "}${line}`);
 }
 
-/** The step that sets up a manager Node.js does not bring: the version packageManager names, read where the lockfile is, else the fallback. */
+/** The step that sets up a manager Node.js does not bring: the version packageManager names, read where the lockfile is, else the one engines.pnpm names, quoted so YAML keeps 10.10 a version and not a number, else the fallback. */
 function managerSetup(plan: CiPlan): string[] {
   const setup = MANAGER_SETUP[plan.manager];
   if (setup === undefined) return [];
-  const withs = !plan.versionDeclared ? [setup.fallback] : plan.installDir === "." ? [] : [`${setup.packageJsonInput}: ${plan.installDir}/package.json`];
+  const version = plan.enginesVersion === undefined ? setup.fallback : JSON.stringify(plan.enginesVersion);
+  const withs = !plan.versionDeclared ? [`${setup.versionInput}: ${version}`] :plan.installDir === "." ? [] : [`${setup.packageJsonInput}: ${plan.installDir}/package.json`];
   return [`      - uses: ${setup.action}`, ...(withs.length > 0 ? ["        with:", ...withs.map((w) => `          ${w}`)] : []), ""];
 }
 
