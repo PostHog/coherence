@@ -126,6 +126,24 @@ test("ci install writes the comment mode for pnpm: findings never fail the job, 
   assert.doesNotMatch(workflowText(planWorkflow(declared, "github", "comment")), /version: 10/, "packageManager names the pnpm, so the workflow does not");
 });
 
+test("ci install sets up the pnpm the project names: packageManager and devEngines read by the action, engines.pnpm written, else pnpm 10", () => {
+  const pnpmRepo = (manifest: Record<string, unknown>, dir = ".") =>
+    repository({ [`${dir}/package.json`]: JSON.stringify({ name: "x", ...manifest, devDependencies: { "@posthog/coherence": "^1.11.0" } }), [`${dir}/pnpm-lock.yaml`]: "lockfileVersion: '9.0'\n", [`${dir}/coherence.config.json`]: "{}\n" });
+  const setup = (top: string, dir = ".") => {
+    const text = workflowText(planWorkflow(join(top, dir), "github", "fail"));
+    assertWellFormed(text);
+    return /- uses: pnpm\/action-setup@[0-9a-f]{40} # v\d[^\n]*\n((?: {8}[^\n]*\n)*)/.exec(text)![1];
+  };
+  assert.equal(setup(pnpmRepo({ engines: { pnpm: "12.3.4" } })), '        with:\n          version: "12.3.4"\n', "engines.pnpm, which the action does not read, is the pnpm written");
+  assert.equal(setup(pnpmRepo({ engines: { pnpm: "10.10" } })), '        with:\n          version: "10.10"\n', "quoted, so YAML keeps 10.10 and not 10.1");
+  assert.equal(setup(pnpmRepo({ engines: { pnpm: "^9.15.0" } })), '        with:\n          version: "^9.15.0"\n', "a range inside one major line is a pnpm self-update installs");
+  assert.equal(setup(pnpmRepo({ engines: { pnpm: ">=9" } })), "        with:\n          version: 10\n", "a range open above names no one pnpm: the default");
+  assert.equal(setup(pnpmRepo({ packageManager: "pnpm@12.3.4+sha512.abc", engines: { pnpm: "12.3.4" } })), "", "packageManager at the top: the action reads it, and a version beside it would conflict");
+  assert.equal(setup(pnpmRepo({ devEngines: { packageManager: { name: "pnpm", version: "12.3.4" } } })), "", "devEngines.packageManager: the action reads it, and a version would override it");
+  assert.equal(setup(pnpmRepo({ engines: { pnpm: "12.3.4" } }, "apps/web"), "apps/web"), '        with:\n          version: "12.3.4"\n', "engines.pnpm beside a lockfile below the top");
+  assert.equal(setup(pnpmRepo({ packageManager: "pnpm@12.3.4" }, "apps/web"), "apps/web"), "        with:\n          package_json_file: apps/web/package.json\n", "packageManager below the top, read there");
+});
+
 test("ci install sets up Bun for a bun lockfile: Bun beside the Node.js the CLI needs, a frozen install, and the installed Coherence only", () => {
   const top = repository({ "package.json": ADOPTER_PACKAGE, "bun.lock": "{}\n" });
   const text = workflowText(planWorkflow(top, "github", "fail"));
