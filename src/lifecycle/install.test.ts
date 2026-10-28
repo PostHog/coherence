@@ -12,7 +12,7 @@ import { PACKAGE_NAME } from "./project.ts";
 import { CLAUDE_WRITER_MATCHER } from "./host-tools.ts";
 import { modInstalled, ownModLinked } from "./mod-install.ts";
 import { cli as inProcess } from "./cli-fixture.ts";
-import { driftOf, EARLIER_SEARCH, earlierHookLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
+import { driftOf, EARLIER_LAUNCHER, EARLIER_SEARCH, earlierHookLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, isLauncherHook, LOCATED_PREFIX, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -629,6 +629,54 @@ test("hooks an earlier Coherence wrote, which look beside the project first, are
     assert.ok(checked.endsWith(`  these hooks were ${EARLIER_SEARCH}; reinstall them\nconverge with: hooks install --host claude\n`), checked);
     await install({ root: project, host: "claude", command: LOCATED_PREFIX });
     assert.deepEqual(earlierHookLines(project), [], "a reinstall clears it");
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+const LAUNCHER = {
+  claude: (event: string) => `"$CLAUDE_PROJECT_DIR/.claude/coherence-hook" ${event}`,
+  codex: (event: string) => `codex_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd -P); "$codex_root/.codex/coherence-hook" ${event}`,
+};
+
+type Settings = { hooks: Record<string, { hooks: { type?: string; command: string; timeout?: number }[] }[]> };
+
+test("hooks Coherence 0.x wrote through its launcher are replaced by install and named by the check and at the session start", async () => {
+  const project = await mkdtemp(join(tmpdir(), "coherence-launcher-"));
+  try {
+    assert.equal(isLauncherHook(LAUNCHER.claude("Stop")), true);
+    assert.equal(isLauncherHook(LAUNCHER.codex("Stop")), true);
+    assert.equal(isLauncherHook(`${LOCATED_PREFIX} hook Stop`), false, "what install writes now is not the launcher");
+    assert.equal(isLauncherHook('"$CLAUDE_PROJECT_DIR/tools/my-coherence-hook" Stop'), false, "a stranger's script with a similar name is not ours");
+    for (const host of ["claude", "codex"] as const) {
+      const path = join(project, host === "claude" ? ".claude/settings.json" : ".codex/hooks.json");
+      await mkdir(dirname(path), { recursive: true });
+      const hooks: Settings["hooks"] = {};
+      for (const event of ["SessionStart", "SubagentStart", "SubagentStop", "Stop", "PostToolUse"]) hooks[event] = [{ hooks: [{ type: "command", command: LAUNCHER[host](event), timeout: 60 }] }];
+      hooks["Stop"]!.push({ hooks: [{ type: "command", command: "./lint.sh" }] });
+      await writeFile(path, JSON.stringify({ hooks }, null, 2) + "\n");
+    }
+    assert.deepEqual(earlierHookLines(project), [
+      `Coherence hooks in .claude/settings.json: ${EARLIER_LAUNCHER}. Reinstall them: npx --no -- coherence hooks install --host claude`,
+      `Coherence hooks in .codex/hooks.json: ${EARLIER_LAUNCHER}. Reinstall them: npx --no -- coherence hooks install --host codex`,
+    ]);
+    const path = join(project, ".claude", "settings.json");
+    const old = JSON.parse(await readFile(path, "utf8")) as Settings;
+    const checked = formatCheck({ host: "claude", path, present: true, drift: driftOf(old, { command: LOCATED_PREFIX, host: "claude" }) });
+    assert.ok(checked.includes(`  these hooks were ${EARLIER_LAUNCHER}; reinstall them\n`), checked);
+
+    for (const host of ["claude", "codex"] as const) await install({ root: project, host, command: LOCATED_PREFIX });
+    assert.deepEqual(earlierHookLines(project), [], "a reinstall clears it");
+    const settings = JSON.parse(await readFile(path, "utf8")) as Settings;
+    const commands = Object.values(settings.hooks).flat().flatMap((entry) => entry.hooks.map((h) => h.command));
+    assert.deepEqual(commands.filter((c) => isLauncherHook(c)), [], "install replaces every launcher hook");
+    assert.ok(commands.includes("./lint.sh"), "another tool's hook stays");
+    assert.deepEqual(driftOf(settings, { command: LOCATED_PREFIX, host: "claude" }), []);
+
+    settings.hooks["Stop"]!.push({ hooks: [{ type: "command", command: LAUNCHER.claude("Stop"), timeout: 60 }] });
+    const beside = formatCheck({ host: "claude", path, present: true, drift: driftOf(settings, { command: LOCATED_PREFIX, host: "claude" }) });
+    assert.match(beside, /Stop: extra Coherence entry \(a second entry of ours for this event\)/);
+    assert.ok(beside.includes(`  these hooks were ${EARLIER_LAUNCHER}; reinstall them\n`), beside);
   } finally {
     await rm(project, { recursive: true, force: true });
   }
