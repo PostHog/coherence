@@ -518,6 +518,13 @@ export interface EntranceResolution {
   guards?: EntranceGuard[];
   /** Why a declared guard did not count, when it did not: no registration of the handler spells it. */
   guardUnconfirmed?: string;
+  /**
+   * The chokepoints the handler calls only with the option their bullet's
+   * unless: line names passed as true (parseRequest with skipAuth: true),
+   * which switches the check off: by invariant, with the option, and never
+   * among its guards.
+   */
+  switchedOff?: (Omit<EntranceGuard, "how"> & { unless: string })[];
 }
 
 /** One chokepoint an entrance's handler passes, by its invariant, and how the reading traced it. */

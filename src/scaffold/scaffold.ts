@@ -120,6 +120,7 @@ const PLACEHOLDERS: Record<Key, string> = {
   protects: "<the symbol or module every reference reaches only through the chokepoint>",
   chokepoint: "<the one symbol every reference to the protected thing passes through>",
   from: "<anywhere | outside the component | outside a folder: which references the chokepoint governs; a placeholder takes the config default>",
+  unless: "<the option a call passes as true to switch the check off>",
   over: "<the whole set the detector checks; a spot check is not enforcement>",
   via: "<the test that fails when the invariant is broken>",
   because: "<why this exists; what it protects against>",
@@ -144,6 +145,8 @@ export function renderInvariant(seed: Seed, options: InvariantOptions): Invarian
   const lines: string[] = [`- ${options.name ?? "<name>"}: ${sentence}`];
   const formKeys: readonly Key[] = options.form === "chokepoint" ? ["protects", "chokepoint", "from"] : ["over", "via"];
   for (const key of KEYS) {
+    // An option that switches the check off is rare and named by hand where callers have one; no slot is printed for it.
+    if (key === "unless") continue;
     if (key === "protects" || key === "chokepoint" || key === "from" || key === "over" || key === "via") {
       if (!formKeys.includes(key)) continue;
       lines.push(`  ${key}: ${PLACEHOLDERS[key]}`);

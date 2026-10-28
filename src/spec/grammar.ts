@@ -27,6 +27,7 @@
  *     protects: <symbol or module>            chokepoint form, with
  *     chokepoint: <symbol>
  *     from: anywhere | outside the component | outside <folder>   optional; which references the chokepoint governs
+ *     unless: <option>                        optional; a call passing <option>: true switches the check off and earns no credit
  *     over: <the set the detector is total over>   totality oracle form, with
  *     via: <the test>
  *     because: <why it exists, what it protects against>
@@ -72,7 +73,7 @@ export const INVARIANTS_SECTION = "invariants";
 const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances, ## mirrors and ## invariants";
 
 /** The keys an invariant bullet may carry, in the order the scaffold prints them. */
-export const KEYS = ["protects", "chokepoint", "from", "over", "via", "because", "crossing", "entrances", "refuted", "kinds", "checklist"] as const;
+export const KEYS = ["protects", "chokepoint", "from", "unless", "over", "via", "because", "crossing", "entrances", "refuted", "kinds", "checklist"] as const;
 export type Key = (typeof KEYS)[number];
 const MANY: ReadonlySet<Key> = new Set<Key>(["refuted", "checklist"]);
 
@@ -229,7 +230,7 @@ export function fromText(from: ChokepointFrom): string {
 }
 
 export type Enforcement =
-  | { form: "chokepoint"; protects: string; chokepoint: string; line: number; from?: ChokepointFrom }
+  | { form: "chokepoint"; protects: string; chokepoint: string; line: number; from?: ChokepointFrom; unless?: string }
   | { form: "totality oracle"; over: string; via: string; line: number };
 
 export interface Refutation {
@@ -727,6 +728,16 @@ function buildInvariant(bullet: RawBullet, problem: (line: number, message: stri
       if (from === undefined) problem(fromField.line, `from: on ${bullet.name} reads ${FROM_FORM}; "${value}" is none of them`);
       else if (chokepoint !== undefined && chokepoint.form === "chokepoint") chokepoint.from = from;
     }
+  }
+
+  // The option a call passes as true to switch the chokepoint's check off (parseRequest's skipAuth): such a call earns no credit.
+  const unlessField = single.get("unless");
+  if (unlessField !== undefined) {
+    const value = filled("unless");
+    const chokepoint = enforcements.find((e) => e.form === "chokepoint");
+    if (!single.has("protects") && !single.has("chokepoint")) problem(unlessField.line, `unless: on ${bullet.name} belongs to the chokepoint form (protects: and chokepoint:); it names the option a call passes as true to switch the check off`);
+    else if (value !== undefined && !/^[A-Za-z_$][\w$]*$/.test(value)) problem(unlessField.line, `unless: on ${bullet.name} names one option, the property a call passes as true to switch the check off; "${value}" is no property name`);
+    else if (value !== undefined && chokepoint !== undefined && chokepoint.form === "chokepoint") chokepoint.unless = value;
   }
 
   const because = filled("because");

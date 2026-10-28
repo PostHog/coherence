@@ -29,10 +29,11 @@ import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
 import { proposeClosures, renderProposal, type Proposal } from "../../scaffold/control.ts";
-import { readComponentInterfaces } from "./component-interfaces.ts";
+import { callArguments, readComponentInterfaces, switchesOff } from "./component-interfaces.ts";
 import { predictClosure } from "../../economy/closure.ts";
 import { readInterfaceMap } from "../../observation/interfaces.ts";
 import { loadSpecModel } from "../../spec/model.ts";
+import { parseSpec } from "../../spec/grammar.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { adapterCode, keptLine } from "./kept-answers.ts";
 import { lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
@@ -356,6 +357,69 @@ test("a scoped reading proposes for its entrances what the whole reading propose
     unread.scoped = { ...unread.scoped!, components: ["src/api", "src/service"], maybe: [...unread.scoped!.maybe, { from: "src/service", to: "src/store" }] };
     const unreadState = checked(structureState(root, unread));
     assert.match(scopedUnsettled(unreadState, flowOf(unreadState)) ?? "", /src\/store/);
+  } finally {
+    remove();
+  }
+});
+
+test("a chokepoint whose every call in a handler passes the option its unless: line names as true credits that handler nothing, and is named switched off; a call with the check on, or the option not a literal true, keeps the credit", async () => {
+  const { root, remove } = routedProject();
+  try {
+    const write = (path: string, text: string): void => writeFileSync(join(root, path), text);
+    write("src/service/check.ts", "export function check(v: string, options?: { skip: boolean }): string {\n  if (!options?.skip) inner();\n  return v;\n}\nfunction inner(): void {}\n");
+    write(
+      "src/api/api.ts",
+      [
+        'import { serve } from "../service/serve.ts";',
+        'import { check } from "../service/check.ts";',
+        "export function look(): string {",
+        '  return check(serve("l"));',
+        "}",
+        "export function peek(): string {",
+        '  return check(serve("p"), { skip: true });',
+        "}",
+        "export function poke(): string {",
+        "  const skip = Math.random() > 2;",
+        '  return check(serve("k"), { skip });',
+        "}",
+        "export function grab(): string {",
+        '  return serve("g");',
+        "}",
+        "",
+      ].join("\n"),
+    );
+    const spec = (unless: boolean): void => {
+      write("src/api/Api.spec.md", ["# Api", "", "Takes requests.", "", "## entrances", ...["look", "peek", "poke", "grab"].flatMap((n) => [`- ${n}: a caller ${n}s`, `  handler: ${n} in src/api/api.ts`, "  trust: public"]), "", "## invariants", ""].join("\n"));
+      write("src/service/Service.spec.md", ["# Service", "", "Does the work.", "", "## invariants", "- one check: Every look is checked before its work runs.", "  protects: inner", "  chokepoint: check", ...(unless ? ["  unless: skip"] : []), "  because: the check is where a look is let in", "  kinds: none", ""].join("\n"));
+    };
+    const read = async (): Promise<Map<string, { guards: string[]; off: string[] }>> => {
+      const reading = await readComponentInterfaces(root, new TextServer(root));
+      assert.equal(reading.kind, "read");
+      if (reading.kind !== "read") return new Map();
+      return new Map(reading.entrances.filter((e) => e.component === "src/api").map((e) => [e.name, { guards: (e.guards ?? []).map((g) => `${g.name} ${g.how}`), off: (e.switchedOff ?? []).map((o) => `${o.name} ${o.unless}`) }]));
+    };
+    spec(false);
+    const without = await read();
+    assert.deepEqual(without.get("peek"), { guards: ["one check wrapper"], off: [] }, "with no unless: line, a call that switches the check off is credited as one that runs it: the reading cannot tell them apart");
+    spec(true);
+    const declared = await read();
+    assert.deepEqual(declared.get("look"), { guards: ["one check wrapper"], off: [] }, "a call with the check on keeps its credit");
+    assert.deepEqual(declared.get("peek"), { guards: [], off: ["one check skip"] }, "every call passing skip: true: no credit, and named switched off");
+    assert.deepEqual(declared.get("poke"), { guards: ["one check wrapper"], off: [] }, "the option passed as a variable proves nothing switched off, so the credit stands");
+    assert.deepEqual(declared.get("grab"), { guards: [], off: [] });
+    const state = checked(structureState(root, await readComponentInterfaces(root, new TextServer(root))));
+    const model = flowOf(state);
+    assert.deepEqual(model.entrances.find((e) => e.name === "peek")?.switchedOff?.map((o) => o.name), ["one check"], "Structure carries it");
+    assert.match(answerStructure(state).text, /switched off: one check \(src\/service\), called with skip: true/, "and the query names it on the route");
+    assert.deepEqual(callArguments('a(check(x, { y: ")" }), z); check(q)', "check"), ['x, { y: ")" }', "q"], "arguments read with brackets and strings balanced");
+    assert.equal(switchesOff("check(a, { skip: true }); check(b)", "check", "skip"), false, "one call with the check on is enough to keep it");
+    assert.equal(switchesOff("check(a, { skip: trueish })", "check", "skip"), false);
+    assert.equal(switchesOff("lib.check(a, { skip: true })", "check", "skip"), true, "a qualified call is a call");
+    const parsed = (lines: string[]): ReturnType<typeof parseSpec> => parseSpec(["# S", "", "Does.", "", "## invariants", ...lines, ""].join("\n"), "S.spec.md");
+    const chokepoint = parsed(["- c: C holds.", "  protects: inner", "  chokepoint: check", "  unless: skip", "  because: b", "  kinds: none"]);
+    assert.deepEqual([chokepoint.problems, chokepoint.invariants[0]!.enforcements[0]], [[], { form: "chokepoint", protects: "inner", chokepoint: "check", line: 7, unless: "skip" }], "the chokepoint form carries the option");
+    assert.match(parsed(["- t: T holds.", "  over: all", "  via: a test", "  unless: skip", "  because: b", "  kinds: none"]).problems.map((x) => x.message).join("\n"), /unless: on t belongs to the chokepoint form/, "a totality oracle has no option to switch off");
+    assert.match(parsed(["- c: C holds.", "  protects: inner", "  chokepoint: check", "  unless: skip: true", "  because: b", "  kinds: none"]).problems.map((x) => x.message).join("\n"), /unless: on c names one option/, "one property name, never an expression");
   } finally {
     remove();
   }

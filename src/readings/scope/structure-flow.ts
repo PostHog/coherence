@@ -348,6 +348,8 @@ export interface FlowEntrance {
   guards: EntranceGuard[] | undefined;
   /** Why its declared guard does not count, when the reading could not confirm it. */
   guardUnconfirmed: string | undefined;
+  /** The chokepoints its handler calls only with the option their unless: line names passed as true, which switches the check off. */
+  switchedOff: { component: string; name: string; unless: string }[] | undefined;
   /** Why it needs no control, when its spec says so (control: none — <reason>). */
   noControl: string | undefined;
   /** The invariants whose entrances: line names it, in declaration order: the only ones a test-backed control is credited from (covers.ts). */
@@ -726,7 +728,7 @@ export function flowOf(state: ShellState): FlowModel {
       // Said only where the loss can leave a gap: work carried in from outside the system's control, needing a control.
       const fromOutside = state.spec.trustLevels.some((level) => level.outside === true && trust.includes(level.name));
       const unnamed = entrance.noControl !== undefined || !fromOutside ? [] : invariants.filter((invariant) => creditedByCrossingAlone(invariant, owners, trust) && verdictOf(invariant.component, invariant.name).state === "verified").map((invariant) => ({ component: invariant.component, name: invariant.name }));
-      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, owners, handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, trustSource, reach: resolution?.reach, passes, module, guard: entrance.guard, guards: resolution?.guards, guardUnconfirmed: resolution?.guardUnconfirmed, noControl: entrance.noControl, coveredBy, unnamed };
+      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, owners, handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, trustSource, reach: resolution?.reach, passes, module, guard: entrance.guard, guards: resolution?.guards, guardUnconfirmed: resolution?.guardUnconfirmed, switchedOff: resolution?.switchedOff, noControl: entrance.noControl, coveredBy, unnamed };
     }),
   );
 
