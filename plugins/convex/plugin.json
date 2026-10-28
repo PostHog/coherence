@@ -12,12 +12,14 @@
       {
         "rule": "Convex function",
         "plural": "Convex functions",
-        "detects": "an exported query, mutation or action built by what a file inside the Convex functions folder imports from _generated/server; an internal function is not one"
+        "detects": "an exported query, mutation or action built by what a file inside the Convex functions folder imports from _generated/server; an internal function is not one",
+        "remote": true
       },
       {
         "rule": "Convex HTTP route",
         "plural": "Convex HTTP routes",
-        "detects": "a route a convex/server httpRouter registers with .route({ path or pathPrefix, method, handler }), its handler named or inline"
+        "detects": "a route a convex/server httpRouter registers with .route({ path or pathPrefix, method, handler }), its handler named or inline",
+        "remote": true
       },
       {
         "rule": "Convex cron",

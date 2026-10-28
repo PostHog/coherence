@@ -903,7 +903,7 @@ function coverageLine(text: string): string | undefined {
   return text.split("\n").find((l) => l.startsWith("Entrance coverage"));
 }
 
-test("orient names the undeclared entrances in one bounded line: the count against what is detected now, the folder holding the most, and the scaffold command that proposes their bullets, with no reading and no gap needed", async () => {
+test("orient counts the undeclared entrances in one bounded line, as the normal state of a detected entrance and never a gap: the count against what is detected now, the folder holding the most, and the scaffold command that ranks them, with no reading and no gap needed", async () => {
   // Every declared entrance carries an inside level: nothing could be a gap, and no reading was ever kept.
   const { root: project, remove } = track(undeclaredProject({ trust: "operator" }));
   try {
@@ -913,7 +913,7 @@ test("orient names the undeclared entrances in one bounded line: the count again
     assert.equal(started.length, 0, "and no reading is started for one");
     const line = coverageLine(text);
     assert.ok(line !== undefined, text);
-    assert.match(line, /^Entrance coverage: 1 declared entrance covers 1 of 7 detected; 6 undeclared, which the gap count says nothing of; most in src\/server \(4 server functions\)\. node \S+ scaffold entrances src\/server proposes their ## entrances bullets; declare each in the spec that owns it\.$/);
+    assert.match(line, /^Entrance coverage: 1 declared entrance covers 1 of 7 detected; 6 undeclared, the normal state of a detected entrance, never a gap; most in src\/server \(4 server functions\)\. node \S+ scaffold entrances ranks them and proposes their bullets; declare those that matter\.$/);
     const spec = readFileSync(join(project, "Shelf.spec.md"), "utf8");
     writeFileSync(join(project, "Shelf.spec.md"), spec.replace("\n## invariants", "- write thing: a visitor writes a thing\n  handler: writeThing in src/server/fns.ts\n  trust: operator\n\n## invariants"));
     assert.match(coverageLine(await start()) ?? "", /cover 2 of 7 detected; 5 undeclared/, "detected now: a declaration counts at the next start");
@@ -925,7 +925,7 @@ test("orient names the undeclared entrances in one bounded line: the count again
   try {
     const text = await gapStarter(crowded, "cov-crowded").start();
     const line = coverageLine(text)!;
-    assert.match(line, /covers 1 of 402 detected; 401 undeclared, [^]*most in src\/server \(399 server functions\)/);
+    assert.match(line, /covers 1 of 402 detected; 401 undeclared, [^]*most in src\/server \(399 server functions\)[^]*proposes bullets for the first 15;/);
     const own = line.length - /node \S+/.exec(line)![0].length;
     assert.ok(own < 300, `one bounded line whatever the count (${own} characters besides the command's path)`);
     assert.doesNotMatch(line, /extraThing/, "a folder, never a list");
@@ -935,20 +935,25 @@ test("orient names the undeclared entrances in one bounded line: the count again
   }
 });
 
-test("regulate names the undeclared entrances in the files a session changed, by file, and never refuses a subagent stop for them", async () => {
+test("regulate names the one undeclared entrance that ranks first in the files a session changed, with what ranks it and how many more those files hold, never a list, and never refuses a subagent stop for it", async () => {
   const { root: project, remove } = track(undeclaredProject());
   try {
     const opened = await runHook("SessionStart", { session_id: "cov-stop", cwd: project }, project);
     opened.commit?.();
-    assert.doesNotMatch((await runHook("Stop", { session_id: "cov-stop", cwd: project }, project)).stdout, /Undeclared entrances/, "nothing changed: nothing named");
+    assert.doesNotMatch((await runHook("Stop", { session_id: "cov-stop", cwd: project }, project)).stdout, /Undeclared entrance/, "nothing changed: nothing named");
     const fns = readFileSync(join(project, "src", "server", "fns.ts"), "utf8");
     writeFileSync(join(project, "src", "server", "fns.ts"), `${fns}export const hideThing = createServerFn({ method: 'POST' })\n  .handler(async () => null)\n`);
+    // A package script is run on the machine; the server functions a browser calls rank above it, so the script the session also touched is never the one named.
+    writeFileSync(join(project, "scripts", "seed.ts"), "console.log('seeded twice')\n");
     const message = systemMessageOf(await runHook("Stop", { session_id: "cov-stop", cwd: project }, project));
-    assert.match(message, /Undeclared entrances in files this session changed; advisory, never a reason to refuse the stop:\n  src\/server\/fns\.ts \(5 server functions\): writeThing, deleteThing, listThings and 2 more\n  node \S+ scaffold entrances src\/server\/fns\.ts proposes their ## entrances bullets/);
-    assert.doesNotMatch(message, /users\.\$id|seed\.ts/, "an unchanged file's entrances are orient's, not regulate's");
+    const block = message.split("\n").filter((l, i, all) => l.startsWith("Undeclared entrance") || all[i - 1]?.startsWith("Undeclared entrance"));
+    assert.equal(block.length, 2, `one heading and one line, never a list: ${message}`);
+    assert.match(block[0]!, /^Undeclared entrance this session touched; advisory, never a reason to refuse the stop:$/);
+    assert.match(block[1]!, /^  writeThing \(src\/server\/fns\.ts:\d+\), a server function, ranks first of the 6 undeclared entrances in the files this session changed: from off the machine, imports reach 1 component\. If it matters, declare it: node \S+ scaffold entrances src\/server\/fns\.ts proposes its bullet, and the rest can stay undeclared\.$/);
+    assert.doesNotMatch(message, /users\.\$id/, "an unchanged file's entrances are orient's, not regulate's");
     const sub = await runHook("SubagentStop", { agent_id: "cov-stop", hook_event_name: "SubagentStop", cwd: project }, project);
     assert.equal(sub.exit, 0, "advisory: an undeclared entrance never refuses a subagent stop");
-    assert.match(systemMessageOf(sub), /Undeclared entrances in files this session changed/);
+    assert.match(systemMessageOf(sub), /Undeclared entrance this session touched/);
   } finally {
     remove();
   }

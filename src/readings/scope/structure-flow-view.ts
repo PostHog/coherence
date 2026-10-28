@@ -2074,7 +2074,8 @@ function renderHealthStrip(model: FlowModel, selected: string | undefined): Mark
 /**
  * Entrance coverage beneath the trust key (c-3760638e): one line, how many
  * entrances are declared and how much of the detected surface they cover,
- * the undeclared count in attention, and, opened, each grouped entrance with
+ * the undeclared count, neutral (undeclared is the normal state of a
+ * detected entrance, never a spec gap), and, opened, each grouped entrance with
  * what it stands for, every undeclared detected entrance with why it was
  * detected, and what the rules do not see. Nothing when the reading detected
  * nothing to measure against.
@@ -2087,7 +2088,7 @@ function renderCoverage(model: FlowModel): Markup {
   const languages = model.languages?.read ?? [model.language ?? ""];
   const rules = languages.flatMap((language) => candidateRulesOf(language));
   return html`<details class="flow-coverage" data-field="entrance-coverage" data-detected="${String(coverage.detected)}" data-covered="${String(covered)}" data-undeclared="${String(coverage.uncovered.length)}">
-    <summary><span class="flow-coverage-title">Entrances</span> ${String(coverage.declared)} declared, covering ${String(covered)} of ${plural(coverage.detected, "detected entrance", "detected entrances")}${coverage.groups.length === 0 ? "" : `, ${coverage.grouped} of them through ${plural(coverage.groups.length, "grouped entrance", "grouped entrances")}`}; <span class="${coverage.uncovered.length === 0 ? "flow-meta" : "flow-attention"}" data-field="undeclared">${String(coverage.uncovered.length)} undeclared</span></summary>
+    <summary><span class="flow-coverage-title">Entrances</span> ${String(coverage.declared)} declared, covering ${String(covered)} of ${plural(coverage.detected, "detected entrance", "detected entrances")}${coverage.groups.length === 0 ? "" : `, ${coverage.grouped} of them through ${plural(coverage.groups.length, "grouped entrance", "grouped entrances")}`}; <span class="flow-meta" data-field="undeclared" title="the normal state of a detected entrance, never a spec gap; scaffold entrances ranks them">${String(coverage.uncovered.length)} of ${String(coverage.detected)} undeclared</span></summary>
     ${coverage.groups.length === 0 ? null : html`<ul class="flow-rows" data-field="coverage-groups">${coverage.groups.map((g) => html`<li class="flow-row" data-entrance="${g.name}" data-covers="${String(g.covers)}"><span>${groupLine(g)}</span></li>`)}</ul>`}
     ${coverage.uncovered.length === 0 ? null : html`<ul class="flow-rows" data-field="coverage-undeclared">${coverage.uncovered.map((c) => html`<li class="flow-row" data-rule="${c.rule}"><code>${c.file}:${String(c.line)}</code>${c.symbol === "" ? null : html` <span>${c.symbol}</span>`}<span class="flow-meta">${c.rule}: ${c.why}</span></li>`)}</ul>`}
     <p class="flow-meta" data-field="coverage-rules">${coverage.beyond === 0 ? "" : `${plural(coverage.beyond, "declared entrance covers", "declared entrances cover")} nothing detected: declared where the rules do not reach, or finer than they detect. `}Detected by ${rules.length === 0 ? "no rule for this language" : rules.map((r) => r.rule).join(", ")}; ${languages.map((l) => notDetectedOf(l) ?? "").filter((t) => t !== "").join("; ")}.</p>
@@ -2201,6 +2202,7 @@ function renderEntranceInspector(state: ShellState, model: FlowModel, entrance: 
       ["Handler", entrance.handler === undefined ? "none" : html`<code>${entrance.handler}</code>${entrance.module ? html` <span class="flow-meta" data-field="module">the module's top-level script</span>` : null}`],
       entrance.start === undefined ? null : ["Starts in", html`<code>${entrance.start}</code>`],
       entrance.noControl === undefined ? null : ["Control", html`<span data-field="no-control">${NO_CONTROL_NEEDED}</span> <span class="flow-meta" data-field="no-control-reason">control: none — ${entrance.noControl}</span>`],
+      entrance.switchedOff === undefined ? null : ["Switched off", html`${entrance.switchedOff.map((o) => html`<code>${o.name}</code> <span class="flow-meta" data-field="switched-off">its handler calls the chokepoint with ${o.unless}: true, which switches the check off, so it is no control here</span> `)}`],
       entrance.guard === undefined ? null : ["Guard", html`<code>${entrance.guard}</code> <span class="flow-meta" data-field="guard">${entrance.guardUnconfirmed === undefined ? (entrance.guards?.some((g) => g.how === "declared" || g.how === "wrapper") ? "declared, and its registration confirmed" : "declared; the reading did not confirm it") : `declared, not counted: ${entrance.guardUnconfirmed}`}</span>`],
     ])}
     ${entrance.reachable ? (route === undefined ? html`<p class="flow-note">Its route is not drawn.</p>` : renderRouteBody(state, model, route, true)) : html`<p class="empty" data-field="unreachable">${entrance.resolved ? "Unreachable" : "Unresolved"}: ${entrance.reason}</p>`}

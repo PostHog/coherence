@@ -147,6 +147,14 @@ export function coverageLine(coverage: EntranceCoverage): string {
 /** Each rule's plural, read off the rules themselves, so a rule added there is never counted as "<rule>s" (df-5c6288f3). */
 export const RULE_PLURALS: Readonly<Record<string, string>> = derived((data) => Object.fromEntries(Object.values(data).flatMap((said) => said.rules.map((r) => [r.rule, r.plural]))));
 
+/** The rules a request from off the machine reaches, read off the rules themselves (their plugin marks each remote). */
+const REMOTE_RULES: Readonly<Record<string, true>> = derived((data) => Object.fromEntries(Object.values(data).flatMap((said) => said.rules.flatMap((r) => (r.remote === true ? [[r.rule, true as const]] : [])))));
+
+/** Whether a request from off the machine reaches what the rule detects: what the rank of undeclared entrances reads as outside trust. */
+export function ruleIsRemote(rule: string): boolean {
+  return REMOTE_RULES[rule] === true;
+}
+
 /** A count of entrances detected by one rule, in words: "1 request proxy", "3 request proxies". */
 export function ruleCount(n: number, rule: string): string {
   return `${n} ${n === 1 ? rule : (RULE_PLURALS[rule] ?? "detected entrances")}`;

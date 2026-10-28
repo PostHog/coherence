@@ -78,7 +78,7 @@ import { execFile } from "../../lifecycle/work-meter.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite, type ResolveHint, type Resolved } from "../../adapters/adapter.ts";
-import { detectEntranceCandidates, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
+import { detectEntranceCandidates, escape, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
 import { configRecord } from "../../adapters/project-config.ts";
 import { instrumentFor, type Language } from "../../adapters/index.ts";
@@ -201,22 +201,24 @@ function nodeIs(node: ReachNode, named: { symbol?: string; file?: string }, fold
   return named.symbol === undefined ? inFile && node.name !== "" : node.name === named.symbol && inFile;
 }
 
-interface ChokepointTarget {
+export interface ChokepointTarget {
   component: string;
   name: string;
   chokepoint: { symbol?: string; file?: string };
   protects: { symbol?: string; file?: string };
+  /** The option a call passes as true to switch the check off, from the bullet's unless: line. */
+  unless?: string;
 }
 
 /** Every chokepoint an invariant declares, with its protected thing, as reach nodes can be matched against. */
-function chokepointTargets(model: SpecModel): ChokepointTarget[] {
+export function chokepointTargets(model: Pick<SpecModel, "components">): ChokepointTarget[] {
   return model.components.flatMap((component) =>
     component.invariants.flatMap((invariant) =>
       invariant.enforcements.flatMap((e): ChokepointTarget[] => {
         if (e.form !== "chokepoint") return [];
         const chokepoint = namedValue(e.chokepoint);
         const protects = namedValue(e.protects);
-        return chokepoint === undefined || protects === undefined ? [] : [{ component: component.folder, name: invariant.name, chokepoint, protects }];
+        return chokepoint === undefined || protects === undefined ? [] : [{ component: component.folder, name: invariant.name, chokepoint, protects, ...(e.unless === undefined ? {} : { unless: e.unless }) }];
       }),
     ),
   );
@@ -237,6 +239,72 @@ export function guardsOf(start: string, nodes: ReadonlyMap<string, ReachNode>, c
     guards.push({ component: target.component, name: target.name, how: wrapped ? "wrapper" : "reach" });
   }
   return guards;
+}
+
+/** The argument text of every call to `symbol` in the text (`symbol(...)` or `x.symbol(...)`), brackets and strings balanced. */
+export function callArguments(text: string, symbol: string): string[] {
+  const out: string[] = [];
+  const call = new RegExp(`(^|[^\\w$])${escape(symbol)}\\s*\\(`, "g");
+  for (let m = call.exec(text); m !== null; m = call.exec(text)) {
+    const open = m.index + m[0].length - 1;
+    let depth = 0;
+    let quote: string | undefined;
+    let end = open;
+    for (let i = open; i < text.length; i++) {
+      const c = text[i]!;
+      if (quote !== undefined) {
+        if (c === "\\") i++;
+        else if (c === quote) quote = undefined;
+        continue;
+      }
+      if (c === "'" || c === '"' || c === "`") quote = c;
+      else if (c === "(" || c === "[" || c === "{") depth++;
+      else if (c === ")" || c === "]" || c === "}") {
+        depth--;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    out.push(text.slice(open + 1, end));
+  }
+  return out;
+}
+
+/**
+ * A declaration's text: its range when the server gave one past its first
+ * line, else from that line until the brackets it opens close again (a server
+ * that names only the declaration's line), at most 2,000 lines.
+ */
+export function declarationText(lines: readonly string[], start: number, end: number): string {
+  if (end > start) return lines.slice(start, end + 1).join("\n");
+  let depth = 0;
+  let opened = false;
+  let at = start;
+  for (; at < lines.length && at < start + 2000; at++) {
+    for (const c of lines[at]!) {
+      if (c === "(" || c === "[" || c === "{") {
+        depth++;
+        opened = true;
+      } else if (c === ")" || c === "]" || c === "}") depth--;
+    }
+    if (opened && depth <= 0) break;
+  }
+  return lines.slice(start, at + 1).join("\n");
+}
+
+/**
+ * Whether a handler's own text switches a chokepoint's check off: it calls the
+ * chokepoint, and every call passes the option the bullet's unless: line names
+ * as a literal true (`{ skipAuth: true }`). A call that passes it any other way,
+ * or a handler that reaches the chokepoint only through another function, keeps
+ * the credit: only what the text proves switches it off.
+ */
+export function switchesOff(text: string, symbol: string, option: string): boolean {
+  const calls = callArguments(text, symbol);
+  const off = new RegExp(`(^|[^\\w$])${escape(option)}\\s*:\\s*true(?![\\w$])`);
+  return calls.length > 0 && calls.every((args) => off.test(args));
 }
 
 /* ------------------------------------------------------------ the bounds */
@@ -1128,7 +1196,20 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
         else if (typeof confirmed === "string") resolution.guardUnconfirmed = confirmed;
         else for (const target of confirmed) if (!guards.some((g) => g.component === target.component && g.name === target.name && g.how === "wrapper")) guards.push({ component: target.component, name: target.name, how: "declared" });
       }
-      if (guards.length > 0) resolution.guards = guards;
+      // A chokepoint whose every call here passes the option its unless: line names as true checks nothing for this handler.
+      const switchable = guards.flatMap((g) => targets.filter((t) => t.component === g.component && t.name === g.name && t.unless !== undefined && t.chokepoint.symbol !== undefined));
+      let kept = guards;
+      if (switchable.length > 0) {
+        const startFile = start.slice(0, start.lastIndexOf("#"));
+        const lines = readFileSync(join(root, startFile), "utf8").split("\n");
+        const own = definition === undefined ? lines.join("\n") : declarationText(lines, definition.range.start.line, definition.range.end.line);
+        const off = switchable.filter((t) => switchesOff(own, t.chokepoint.symbol!, t.unless!));
+        if (off.length > 0) {
+          kept = guards.filter((g) => !off.some((t) => t.component === g.component && t.name === g.name));
+          resolution.switchedOff = off.map((t) => ({ component: t.component, name: t.name, unless: t.unless! }));
+        }
+      }
+      if (kept.length > 0) resolution.guards = kept;
     }
 
     const symbols = [...tally.values()].sort(

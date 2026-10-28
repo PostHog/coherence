@@ -85,8 +85,9 @@ test("scaffold invariant prints every slot and only the applicable checklist sha
   assert.deepEqual(shapes, expected);
   assert.ok(expected.length > 0 && expected.length < seed.shapes.length);
   for (const key of KEYS) {
-    if (key === "over" || key === "via" || key === "entrances") {
-      assert.doesNotMatch(bullet, new RegExp(`^  ${key}:`, "m"), `the chokepoint form has no ${key}`);
+    if (key === "over" || key === "via" || key === "entrances" || key === "unless") {
+      // unless: is named by hand only where a chokepoint's callers can switch its check off.
+      assert.doesNotMatch(bullet, new RegExp(`^  ${key}:`, "m"), `the chokepoint form prints no ${key}`);
     } else {
       assert.match(bullet, new RegExp(`^  ${key}:`, "m"), `slot ${key} is present`);
     }

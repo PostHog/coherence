@@ -16,6 +16,7 @@ import { renderFlowSection } from "./structure-flow-view.ts";
 import { flowOf } from "./structure-flow.ts";
 import { makeFixture } from "./check-fixture.ts";
 import { buildScopePage } from "./build.ts";
+import { renderMasthead } from "./shell.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 
 function entrance(name: string, handler: string, file: string | undefined): SpecEntrance {
@@ -97,5 +98,30 @@ describe("entrance coverage", () => {
     const orient = orientUndeclaredText({ declared: coverage.declared, detected: coverage.detected, covered: coverage.individually + coverage.grouped, undeclared: coverage.uncovered }, "coherence");
     assert.match(orient, new RegExp(`^Entrance coverage: ${coverage.declared} declared entrances cover ${coverage.individually + coverage.grouped} of ${coverage.detected} detected; ${coverage.uncovered.length} undeclared`), "orient says the same counts");
     assert.ok(orient.includes("scaffold entrances"), "and names the command that proposes them");
+  });
+
+  test("undeclared entrances are a neutral count: the masthead and the health strip give how many of the detected are undeclared, in quiet ink, never in the attention color nor as a gap", async (t) => {
+    const fixture = makeFixture();
+    t.after(() => fixture.remove());
+    const { state } = await buildScopePage({ root: fixture.root, lexiconPath: COHERENCE_LEXICON, project: "Coverage" });
+    const reading = state.componentInterfaces as InterfaceReading;
+    const base: InterfaceReading = reading.kind === "read" ? reading : { kind: "read", language: "typescript", declarations: 0, symbols: [], entrances: [], unowned: { files: 0, lines: 0 } };
+    const candidates: EntranceCandidate[] = [
+      { file: "scripts/forgotten.ts", line: 1, symbol: "", rule: "script", why: "a script directly under scripts/ that no project file imports" },
+      { file: "src/routes/api/health.ts", line: 4, symbol: "Route", rule: "server route", why: "createFileRoute with server handlers" },
+    ];
+    const withCoverage = { ...state, componentInterfaces: { ...base, candidates } } as ShellState;
+    const coverage = flowOf(withCoverage).coverage!;
+    const n = coverage.uncovered.length;
+    assert.ok(n >= 2, "the fixture holds undeclared entrances");
+    const masthead = String(renderMasthead(withCoverage));
+    assert.match(masthead, new RegExp(`data-field="verdict-detail">[^<]*${n} of ${coverage.detected} entrances undeclared`), "the masthead counts them beneath the verdict");
+    const strip = String(renderFlowSection(withCoverage));
+    const count = /<span class="([^"]*)" data-field="undeclared"[^>]*>([^<]*)<\/span>/.exec(strip);
+    assert.ok(count !== null, "the health strip carries the count");
+    assert.deepEqual([count[1], count[2]], ["flow-meta", `${n} of ${coverage.detected} undeclared`], "neutral, against what is detected");
+    assert.doesNotMatch(strip, /flow-attention[^>]*data-field="undeclared"/, "never in the attention color");
+    const none = { ...state, componentInterfaces: { ...base, candidates: [] } } as ShellState;
+    assert.doesNotMatch(String(renderMasthead(none)), /entrances undeclared/, "nothing to count, nothing said");
   });
 });

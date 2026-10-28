@@ -298,6 +298,22 @@ automatic refutation also stages a use of the protected thing from an unsaved
 document outside that folder. The check must call it a bypass. Any other value
 is a problem, and so is a `from:` on a bullet with no chokepoint form.
 
+A chokepoint whose callers can switch its check off names the option with
+an `unless:` line:
+
+```markdown
+  chokepoint: parseRequest in src/lib/request.ts
+  unless: skipAuth
+```
+
+An entrance whose handler calls the chokepoint only with that option passed
+as a literal `true` (`parseRequest(request, schema, { skipAuth: true })`)
+earns no credit from it. Structure names the chokepoint as switched off on
+that entrance, and the entrance is a spec gap unless something else controls
+it. A call that passes the option any other way keeps the credit, because
+nothing in the text proves the check is off. The value is one property name,
+and an `unless:` on a bullet with no chokepoint form is a problem.
+
 `because` says why the invariant exists and what it protects against.
 `crossing` is the security marker: two trust levels the entry spec declares.
 `entrances` names the entrances whose work the invariant checks; see below.

@@ -5,7 +5,7 @@
  *   node src/cli.ts scaffold invariant <componentFolder> "<sentence>" [--name "<name>"] --kinds a,b [--chokepoint|--totality-oracle] [--crossing "a -> b"] [--preview] [--write]
  *   node src/cli.ts scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--as name|guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write]
  *   node src/cli.ts scaffold control --baseline --session <id> --agent <name>
- *   node src/cli.ts scaffold entrances [<folder or file>]
+ *   node src/cli.ts scaffold entrances [<folder or file>] [--all | --first <n>]
  *   node src/cli.ts scaffold import tach [<module>...] | --all [--write]
  *
  * The control verb proposes the closure for an entrance with no traced
@@ -49,7 +49,8 @@ import { freshReading, gapsOf, readAndRecord, recordGapBaseline, structureState 
 import { keptLine } from "../readings/scope/kept-answers.ts";
 import { flowOf, flowPartialText } from "../readings/scope/structure-flow.ts";
 import { proposeClosures, renderAll, renderProposal, writeClosure, type Closure, type Proposal } from "./control.ts";
-import { proposeEntrances, renderEntrances, under } from "./entrances.ts";
+import { renderEntrances, under } from "./entrances.ts";
+import { FIRST_RANKED, rankEntrances } from "../readings/scope/entrance-rank.ts";
 import { undeclaredOf } from "../readings/scope/undeclared.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { existsSync } from "node:fs";
@@ -62,7 +63,7 @@ export const SCAFFOLD_USAGE = [
   `  scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--as name|guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write] ${BUDGET_FLAGS}   the closure for an entrance with no traced control: an entrances: line naming it on an invariant, a guard: line, an invariant, or control: none; with no recorded reading of the tree, an entrance or a component reads only the components its routes enter, unrecorded (--whole reads and records every one)`,
   "  scaffold control --baseline --session <id> --agent <name>   record the entrances with no traced control at adoption, so orient names only new ones",
   '  scaffold practice <componentFolder> "<name>" "<sentence>" [--when "<trigger>"] [--write]   a practice bullet with every slot to fill; --write appends it to the practice file beside the spec',
-  "  scaffold entrances [<folder or file>]   the ## entrances bullets for the detected entrances no spec declares, by the component that owns each; printed, never written",
+  "  scaffold entrances [<folder or file>] [--all | --first <n>]   the detected entrances no spec declares, ranked (outside trust, then writes, then a chokepoint's protected thing reached, then components reached), and the ## entrances bullets for the first 15 (or n, or --all), by the component that owns each; printed, never written",
   IMPORT_USAGE,
 ].join("\n");
 
@@ -323,9 +324,13 @@ async function controlVerb(argv: string[], io: Io): Promise<void> {
 }
 
 async function entrancesVerb(argv: string[], io: Io): Promise<void> {
-  const parsed = parseFlags(argv, {});
+  const parsed = parseFlags(argv, { all: "switch", first: "one" });
   const [target, ...rest] = parsed.positionals;
   if (rest.length > 0) usage(`unexpected argument "${rest[0]}"; scaffold entrances takes one folder or file`);
+  const firstFlag = parsed.one.get("first");
+  if (firstFlag !== undefined && !/^[1-9][0-9]*$/.test(firstFlag)) usage(`--first takes a count of entrances, not "${firstFlag}"`);
+  if (firstFlag !== undefined && parsed.switches.has("all")) usage("scaffold entrances takes --all or --first, not both");
+  const first = parsed.switches.has("all") ? undefined : firstFlag === undefined ? FIRST_RANKED : Number(firstFlag);
   const root = io.cwd;
   let within: string | undefined;
   if (target !== undefined) {
@@ -337,9 +342,10 @@ async function entrancesVerb(argv: string[], io: Io): Promise<void> {
   if (model.components.length === 0) throw new ScaffoldError(`no component has a spec yet; scaffold component . "<intent>" first`);
   const measured = undeclaredOf(root, model);
   const undeclared = (measured?.undeclared ?? []).filter((c) => under(c.file, within));
-  const groups = proposeEntrances(undeclared, model.components);
-  const languages = measured?.languages ?? scannedLanguagesRead(readEnforcementConfig(root));
-  io.out(renderEntrances({ groups, detected: measured?.detected ?? 0, declared: measured?.declared ?? 0, target: within, levels: model.trustLevels, cli: await cliName(root), languages }));
+  const config = readEnforcementConfig(root);
+  const ranked = rankEntrances(root, model, undeclared, config.languages, measured?.all ?? undeclared);
+  const languages = measured?.languages ?? scannedLanguagesRead(config);
+  io.out(renderEntrances({ ranked, components: model.components, first, detected: measured?.detected ?? 0, declared: measured?.declared ?? 0, target: within, levels: model.trustLevels, cli: await cliName(root), languages }));
 }
 
 function scaffoldFailure(error: unknown, io: Io): number {

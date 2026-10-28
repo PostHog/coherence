@@ -100,8 +100,8 @@ function dataProblems(raw: Record<string, unknown>, who: string, name: string): 
   const members = raw["members"];
   if (members !== undefined && (!isRecord(members) || !(["opens", "closes", "field"] as const).every((k) => compiles(members[k])))) problems.push(`${who}'s members is { "opens", "closes", "field" }, each a regular expression`);
   const entrances = raw["entrances"];
-  const rule = (r: unknown): boolean => isRecord(r) && (["rule", "plural", "detects"] as const).every((k) => typeof r[k] === "string" && r[k] !== "");
-  if (entrances !== undefined && (!isRecord(entrances) || !Array.isArray(entrances["rules"]) || !entrances["rules"].every(rule) || typeof entrances["notDetected"] !== "string")) problems.push(`${who}'s entrances is { "rules": [{ "rule", "plural", "detects" }], "notDetected": "<what the rules do not see>" }`);
+  const rule = (r: unknown): boolean => isRecord(r) && (["rule", "plural", "detects"] as const).every((k) => typeof r[k] === "string" && r[k] !== "") && (r["remote"] === undefined || typeof r["remote"] === "boolean");
+  if (entrances !== undefined && (!isRecord(entrances) || !Array.isArray(entrances["rules"]) || !entrances["rules"].every(rule) || typeof entrances["notDetected"] !== "string")) problems.push(`${who}'s entrances is { "rules": [{ "rule", "plural", "detects", "remote"? }], "notDetected": "<what the rules do not see>" }`);
   if (raw["notScanned"] !== undefined && (typeof raw["notScanned"] !== "string" || raw["notScanned"] === "")) problems.push(`${who}'s notScanned is the reason the text scans do not read the language`);
   const marked = raw["markedFolders"];
   const mark = (m: unknown): boolean => isRecord(m) && typeof m["reason"] === "string" && m["reason"] !== "" && (typeof m["marker"] === "string" || (typeof m["name"] === "string" && typeof m["beside"] === "string"));

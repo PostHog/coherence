@@ -40,17 +40,20 @@
       {
         "rule": "url pattern",
         "plural": "URL patterns",
-        "detects": "a path(), re_path() or url() in a urls.py that routes to a view (include() is delegation, not an entrance)"
+        "detects": "a path(), re_path() or url() in a urls.py that routes to a view (include() is delegation, not an entrance)",
+        "remote": true
       },
       {
         "rule": "viewset",
         "plural": "viewsets",
-        "detects": "a router.register('prefix', ViewSet) registration"
+        "detects": "a router.register('prefix', ViewSet) registration",
+        "remote": true
       },
       {
         "rule": "route decorator",
         "plural": "decorated routes",
-        "detects": "a function decorated @x.get/post/put/patch/delete/route/api_route/websocket('/path')"
+        "detects": "a function decorated @x.get/post/put/patch/delete/route/api_route/websocket('/path')",
+        "remote": true
       },
       {
         "rule": "management command",

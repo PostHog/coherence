@@ -8,11 +8,12 @@
  * that reads a language loads first.
  */
 
-/** One entrance detection rule: its name, its plural, and what it detects. */
+/** One entrance detection rule: its name, its plural, what it detects, and whether a request from off the machine reaches what it detects. */
 export interface CandidateRule {
   rule: string;
   plural: string;
   detects: string;
+  remote?: boolean;
 }
 
 /** What a reading says of one language. */

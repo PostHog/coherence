@@ -1,7 +1,9 @@
 /**
  * Undeclared entrances at hook time: the detected entrances no declared
- * entrance covers (entrance-coverage.ts, c-3760638e), as orient and regulate
- * name them, and what `scaffold entrances` proposes for them.
+ * entrance covers (entrance-coverage.ts, c-3760638e), as orient counts them
+ * and regulate names the first-ranked one a session touched, and what
+ * `scaffold entrances` proposes for them. Undeclared is the normal state of
+ * a detected entrance, never a spec gap: only a declared entrance can be one.
  *
  * Detection is a plain scan of the tree that asks the language server
  * nothing, so unlike the spec gaps it needs no recorded Structure reading:
@@ -24,6 +26,7 @@ import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import { detectedEntrances } from "./component-interfaces.ts";
 import { coverageOf, ruleCount } from "./entrance-coverage.ts";
+import { FIRST_RANKED, familiesOf, rankEntrances, rankWords, skippedBy, type RankedEntrance, type SkippedGroup } from "./entrance-rank.ts";
 
 /** The declared entrances against what the rules detect now, and the detected entrances none covers. */
 export interface Undeclared {
@@ -32,6 +35,10 @@ export interface Undeclared {
   covered: number;
   /** In file order. */
   undeclared: EntranceCandidate[];
+  /** Every detected entrance, declared or not, in file order: what the families declared with one bullet are read from. */
+  all?: EntranceCandidate[];
+  /** The undeclared entrances that skip the handler of a family declared with one bullet, with the largest such family; absent when none does. */
+  skipping?: { count: number; family: SkippedGroup };
   /** Which of the project's languages detection read, each by its own rules, and each with no rules yet named as not read. */
   languages: LanguagesRead;
 }
@@ -43,7 +50,10 @@ export function undeclaredOf(root: string, model: Pick<SpecModel, "components">)
   const candidates = detectedEntrances(root, model, languages.read, config.testFolders);
   const coverage = coverageOf(model.components, candidates);
   if (coverage === undefined || coverage.detected === 0) return undefined;
-  return { declared: coverage.declared, detected: coverage.detected, covered: coverage.individually + coverage.grouped, undeclared: coverage.uncovered, languages };
+  const families = familiesOf(model, candidates);
+  const skipped = coverage.uncovered.flatMap((c) => skippedBy(c, families) ?? []);
+  const skipping = skipped.length === 0 ? undefined : { count: skipped.length, family: skipped.sort((a, b) => b.members - a.members)[0]! };
+  return { declared: coverage.declared, detected: coverage.detected, covered: coverage.individually + coverage.grouped, undeclared: coverage.uncovered, all: candidates, ...(skipping === undefined ? {} : { skipping }), languages };
 }
 
 /**
@@ -97,51 +107,60 @@ function quotedPath(path: string): string {
 
 /**
  * Orient's coverage line: how many detected entrances the declared ones
- * cover, how many are undeclared, the folder holding the most with their
- * rules, and the command that proposes their bullets. Nothing when every
- * detected entrance is covered. Bounded: one line, one folder, never a list.
+ * cover, how many are undeclared (the normal state of a detected entrance,
+ * never a spec gap, but kept in view at every start, d-a1095ef2), the folder
+ * holding the most with their rules, how many skip the handler a family
+ * declared with one bullet goes through, and the command that ranks them
+ * and proposes the first bullets. Nothing when every detected entrance is
+ * covered. Bounded: one line, one folder, one family, never a list.
  */
 export function orientUndeclaredText(state: Omit<Undeclared, "languages"> | undefined, cli: string): string {
   if (state === undefined || state.undeclared.length === 0) return "";
   const busiest = busiestFolder(state.undeclared)!;
   const n = state.undeclared.length;
   const scope = busiest.candidates.length === n ? "all" : "most";
-  return `Entrance coverage: ${state.declared} declared ${state.declared === 1 ? "entrance covers" : "entrances cover"} ${state.covered} of ${state.detected} detected; ${n} undeclared, which the gap count says nothing of; ${scope} in ${shortPath(busiest.folder)} (${rulesText(busiest.candidates)}). ${cli} scaffold entrances ${quotedPath(busiest.folder)} proposes their ## entrances bullets; declare each in the spec that owns it.`;
+  return `Entrance coverage: ${state.declared} declared ${state.declared === 1 ? "entrance covers" : "entrances cover"} ${state.covered} of ${state.detected} detected; ${n} undeclared, the normal state of a detected entrance, never a gap; ${scope} in ${shortPath(busiest.folder)} (${rulesText(busiest.candidates)})${skipText(state.skipping)}. ${cli} scaffold entrances ranks them and proposes ${n > FIRST_RANKED ? `bullets for the first ${FIRST_RANKED}` : n === 1 ? "its bullet" : "their bullets"}; declare those that matter.`;
 }
 
-/** The most files regulate names; the rest are counted. */
-const REGULATE_FILES = 8;
+/** The clause naming how many undeclared entrances skip a family's handler, or nothing. */
+function skipText(skipping: Undeclared["skipping"]): string {
+  if (skipping === undefined) return "";
+  const f = skipping.family;
+  return `; ${skipping.count} ${skipping.count === 1 ? "skips" : "skip"} ${f.handler}, which ${f.members} under ${shortPath(f.folder)} go through, and rank first`;
+}
 
 /**
- * Regulate's lines: the undeclared entrances in the files this session
- * changed, by file, three names each at most. Advisory: an undeclared
- * entrance is never owed, so the caller never counts it toward a refusal.
- * Empty when the session changed no file holding one.
+ * Regulate's line: the one undeclared entrance in the files this session
+ * changed that ranks first (entrance-rank.ts), with what ranks it, how many
+ * more those files hold, and the command that proposes its bullet. One
+ * nudge, never a list: undeclared is the normal state of a detected
+ * entrance, and the session that wrote one is the one that knows whether it
+ * matters (d-a1095ef2: what the loop never names stays open). Advisory: an
+ * undeclared entrance is never owed, so the caller never counts it toward a
+ * refusal. Empty when the session changed no file holding one.
  */
-export function regulateUndeclaredText(changed: readonly string[], state: Omit<Undeclared, "languages"> | undefined, cli: string): string {
+export function regulateUndeclaredText(changed: readonly string[], state: Omit<Undeclared, "languages"> | undefined, cli: string, rank: (candidates: readonly EntranceCandidate[], detected: readonly EntranceCandidate[]) => readonly RankedEntrance[]): string {
   if (state === undefined) return "";
   const files = new Set(changed);
-  const byFile = new Map<string, EntranceCandidate[]>();
-  for (const c of state.undeclared) if (files.has(c.file)) byFile.set(c.file, [...(byFile.get(c.file) ?? []), c]);
-  if (byFile.size === 0) return "";
-  const lines = ["Undeclared entrances in files this session changed; advisory, never a reason to refuse the stop:"];
-  const entries = [...byFile.entries()];
-  for (const [file, found] of entries.slice(0, REGULATE_FILES)) {
-    const names = found.map((c) => (c.symbol === "" ? "the file itself" : c.symbol));
-    const shown = names.slice(0, 3).join(", ") + (names.length > 3 ? ` and ${names.length - 3} more` : "");
-    lines.push(`  ${file} (${rulesText(found)}): ${shown}`);
-  }
-  if (entries.length > REGULATE_FILES) lines.push(`  and ${entries.length - REGULATE_FILES} more files`);
-  const target = entries.length === 1 ? entries[0]![0] : commonFolder(entries.map(([f]) => f));
-  lines.push(`  ${cli} scaffold entrances ${quotedPath(target)} proposes their ## entrances bullets; declare each in the spec that owns it, or record why one is not an entrance.`);
-  return lines.join("\n");
+  const touched = state.undeclared.filter((c) => files.has(c.file));
+  if (touched.length === 0) return "";
+  const top = rank(touched, state.all ?? state.undeclared)[0];
+  if (top === undefined) return "";
+  const c = top.candidate;
+  const what = c.symbol === "" ? `${c.file}:${c.line}` : `${c.symbol} (${c.file}:${c.line})`;
+  const others = touched.length - 1;
+  const among = others === 0 ? "the one undeclared entrance in the files this session changed" : `first of the ${touched.length} undeclared entrances in the files this session changed`;
+  return [
+    "Undeclared entrance this session touched; advisory, never a reason to refuse the stop:",
+    `  ${what}, a ${c.rule}, ranks ${among}: ${rankWords(top)}. If it matters, declare it: ${cli} scaffold entrances ${quotedPath(c.file)} proposes its bullet${others === 0 ? "" : ", and the rest can stay undeclared"}.`,
+  ].join("\n");
 }
 
-/** The deepest folder holding every one of the files, "." when they share none. */
-function commonFolder(files: readonly string[]): string {
-  const parts = files.map((f) => f.split("/").slice(0, -1));
-  const first = parts[0] ?? [];
-  let depth = 0;
-  while (depth < first.length && parts.every((p) => p[depth] === first[depth])) depth += 1;
-  return depth === 0 ? "." : first.slice(0, depth).join("/");
+/** Rank detected entrances now, against the current spec, for a hook; none when the spec is unreadable. */
+export function rankNow(root: string, candidates: readonly EntranceCandidate[], detected: readonly EntranceCandidate[] = candidates): RankedEntrance[] {
+  try {
+    return rankEntrances(root, loadSpecModel(root, { runs: false }), candidates, readEnforcementConfig(root).languages, detected);
+  } catch {
+    return [];
+  }
 }

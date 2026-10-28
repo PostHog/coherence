@@ -157,8 +157,9 @@ export function gapsOf(state: Pick<ShellState, "spec">, model: FlowModel): GapSt
 /**
  * What of the specs a reading depends on: which folders are components, each
  * entrance's handler and guard (the reading resolves and confirms them), and
- * each chokepoint with what it protects (the reading traces a handler past
- * them). Nothing else a spec says reaches the reading, so a control: none,
+ * each chokepoint with what it protects and the option its unless: line
+ * names (the reading traces a handler past them, and a call that switches
+ * the check off earns none). Nothing else a spec says reaches the reading, so a control: none,
  * a trust: line, a crossing or a totality oracle leaves it standing, and the
  * gaps derived from it show the change at once.
  */
@@ -167,7 +168,8 @@ function specShape(root: string, model = loadSpecModel(root, { runs: false })): 
     model.components.map((c) => [
       c.folder,
       c.entrances.map((e) => [e.name, e.handler ?? "", e.guard ?? "", e.file ?? ""]),
-      c.invariants.flatMap((i) => i.enforcements.flatMap((e) => (e.form === "chokepoint" ? [[i.name, e.chokepoint, e.protects]] : []))),
+      // The option that switches a chokepoint's check off decides which handlers it credits; appended only where declared, so a reading of a spec without one keeps its fingerprint.
+      c.invariants.flatMap((i) => i.enforcements.flatMap((e) => (e.form === "chokepoint" ? [e.unless === undefined ? [i.name, e.chokepoint, e.protects] : [i.name, e.chokepoint, e.protects, e.unless]] : []))),
     ]),
   );
 }

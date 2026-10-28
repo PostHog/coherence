@@ -43,7 +43,7 @@
   step: to settle one part of the project first, name its folders or files: coherence lexicon coverage src/billing docs, and coherence lexicon draft src/billing for its unsettled candidates; each path is relative to the root or absolute inside it, and the config's ignore list still holds inside it
   step: where the repository already declares its module boundaries in a file coherence scaffold import reads (tach.toml today), draft the component specs from it first: coherence scaffold import tach --all prints one draft per module with its dependencies and exposed paths as bullets, and --write creates only the specs that do not exist; fill each placeholder (where tach enforces a drafted facade, the chokepoint is graded checker-choked by tach itself, so its own check is the enforcement), and place the via: tests it prints where the project's tests run
     leaves: the drafted specs, listed by --write as wrote or skipped
-  step: declare the components and where work enters them: the entry spec with its trust levels, one spec per component folder, then every entrance (the practice declare entrances); the grammar is in docs/spec.md in the installed package
+  step: declare the components and where work enters them: the entry spec with its trust levels, one spec per component folder, then the entrances coherence scaffold entrances ranks first, 10 to 20 of them and every one carrying outside trust in whose handler writes, a family that goes through one helper as one grouped entrance, and the rest left undeclared (the practice declare entrances); the grammar is in docs/spec.md in the installed package
   step: give each real unit its own spec at whatever depth it sits, not one per top-level folder: run coherence mass, and for each folder it names as having no spec of its own, write its spec or declare it under ## folded in the spec of the component above, with why it belongs there (docs/spec.md, Folded folders); repeat until mass names none
     leaves: mass names no folder with no spec of its own
   step: declare the few invariants that matter most (security, tenant isolation, data integrity), each through the practice declare a requirement; for a module boundary whose own code may use its internals, say which references the chokepoint governs (from: outside the component), and in a folder of a larger repository, where the boundary's callers live outside it, choose the references horizon in the config (a list of folders, or repository)
@@ -56,18 +56,19 @@
     leaves: .github/workflows/coherence.yml, or the decision's id
   step: commit coherence.config.json (and the registry's change, when adopt wrote one), the lexicon, the specs and practice files, the hook settings unless they were installed --local, the CI workflow, .coherence/.gitignore (hooks install wrote it so git sees nothing Coherence regenerates), and .coherence/journal, .coherence/runs and .coherence/work
     leaves: the commit
-  step: from the project's own folder (the adopted folder in a monorepo), run coherence scope and report what the reading shows: health, broken chokepoints, entrances with no traced control, and components no enforcement covers
+  step: from the project's own folder (the adopted folder in a monorepo), run coherence scope and report what the reading shows: health, broken chokepoints, entrances with no traced control, how many detected entrances stay undeclared (a count, no finding), and components no enforcement covers
   pitfall: both outside adopters' checks were red on arrival from Coherence's rejected names in their own prose, and npm link broke a pnpm build; install as a dev dependency and baseline what was already there (d-127ab8e4)
   pitfall: Scope failed when run from an adopter's own folder, because every page until then had been built from Coherence's checkout with --root (d-01976691)
   pitfall: a coverage report redirected into the adopter's root was read back as its source and grew on every run (df-79ac2d4e)
   pitfall: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2)
+  pitfall: an adoption declared every detected entrance, 280 with trust assigned by rule, and its first reading led with 263 gaps no one had judged (d-a37af46f)
   pitfall: an adoption declared one spec per top-level folder and stopped, and a human had to ask for the nested units (df-9750aee2)
   pitfall: an adoption recorded seven decisions for the 69 folders that belonged to the component above, and mass, which reads no decision, still named all 69 (d-8ebb2e2e)
   pitfall: a fresh adoption found its first requirements already false and its tests unable to run unattended, and had to improvise what to record (df-8ac95c4d)
   pitfall: in a monorepo, a session started at the repository root took the whole repository as the project: another team's specs reached orient, their practices fired, and .coherence was written at the root (df-0b68c987)
   pitfall: a chokepoint in a project nested below the repository top passed without searching the rest of the repository, where a product boundary's bypasses live; choose its references horizon (df-0d235229)
   pitfall: a bullet inserted between another bullet and its refuted:, kinds: or checklist: lines took them, so that invariant fell back to a requirement while spec --check reported 0 problems; append a whole bullet after another's last line (df-f3826eaa)
-  learned: d-96eb6814, d-127ab8e4, d-a1095ef2, f658594
+  learned: d-96eb6814, d-127ab8e4, d-a1095ef2, d-a37af46f, f658594
   reach: kernel
   because: the setup prompt was a method kept in prose, carried out once and reported in a chat reply that no later session reads; as a practice each step is delivered where its commands run, and the enactment is the durable record of how the project was adopted
 - settle a domain term: A term enters the project's lexicon as the right kind of thing (a concept, an alias, a property, or ordinary code) with the reason recorded, before code or specs use it.

@@ -1244,11 +1244,13 @@
       "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler (a symbol, or a module file whose top-level script receives the work) must resolve and be reachable, so a declared entrance cannot rot unseen. It declares the trust level it carries in with a trust: line; without one, its trust is derived from the crossings on its handler. A guard: line names the chokepoint its handler is registered through, counted once the reading confirms the registration. A control: none line with its reason says it needs no control: a stated claim Scope shows for a human to challenge, never beside a guard:.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-0db9b17b)",
-        "owner_words": "Declared and checked for entrypoints is good."
+        "owner_words": "Declared and checked for entrypoints is good.",
+        "rank_defined_by": "agent entrances (session a7848c2f8d980a77f), 2026-10-28, on the direction the owner approved for first adoptions (journal d-a37af46f, d-2fe050e9)"
       },
       "properties": {
-        "entrance coverage": "How much of the surface the reading detects the declared entrances cover: each detected entrance is covered individually (an entrance's handler names it and nothing else), through a grouped entrance (one entrance stands for every detected entrance registered through its handler or detected in its module), or undeclared. A spec-gap count speaks only for the covered part.",
-        "detected entrance": "An entrance the reading finds by one of the rules its language lists (a server function, a server route, a URL pattern, a package script, a top-level script), with the rule and why it matched; never a guess presented as fact."
+        "entrance coverage": "How much of the surface the reading detects the declared entrances cover: each detected entrance is covered individually (an entrance's handler names it and nothing else), through a grouped entrance (one entrance stands for every detected entrance registered through its handler or detected in its module), or undeclared. Undeclared is the normal state of a detected entrance and never a spec gap: orient, Scope and the CI report count it neutrally against what is detected. A spec-gap count speaks only for the covered part.",
+        "detected entrance": "An entrance the reading finds by one of the rules its language lists (a server function, a server route, a URL pattern, a package script, a top-level script), with the rule and why it matched; never a guess presented as fact.",
+        "rank": "The order scaffold entrances lists the undeclared entrances in, and by which the Stop hook names the first one a session touched, so the few whose declaration pays most are declared first: one that skips the handler of a grouped entrance standing for its siblings, then outside trust (its rule is one a request from off the machine reaches), then a handler that writes, then the things a chokepoint protects that its file reaches by static import, then the components those imports reach."
       }
     },
     {
@@ -1348,7 +1350,7 @@
     },
     {
       "name": "spec gap",
-      "definition": "An untrusted entrance with no traced control. Its trust is a level from outside the system's control, or unknown, no control is traced on its structural route, and it declares no control: none. It closes three ways: a guard: line, an invariant whose crossing enters from its trust and whose entrances: line names it, or control: none with a reason. Orient names the gaps beyond the adoption baseline, and how many lost a control an invariant gave by its crossing alone; regulate names the ones a session touched; neither is a demonstrated bypass.",
+      "definition": "An untrusted declared entrance with no traced control. Its trust is a level from outside the system's control, or unknown, no control is traced on its structural route, and it declares no control: none. Only a declared entrance can be one: a detected entrance no spec declares is undeclared, the normal state of a detected entrance, which entrance coverage counts and the gap count says nothing of. It closes three ways: a guard: line, an invariant whose crossing enters from its trust and whose entrances: line names it, or control: none with a reason. Orient names the gaps beyond the adoption baseline, and how many lost a control an invariant gave by its crossing alone; regulate names the ones a session touched; neither is a demonstrated bypass.",
       "provenance": {
         "defined_by": "agent gaps (session a3238ebe9efd46ba5), 2026-09-25 (journal d-a1095ef2)",
         "owner_words": "let's do 1-3, and then test the results on a pre-Coherence commit from both of those projects to see if the behavior change is effective"

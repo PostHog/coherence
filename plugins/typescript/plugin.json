@@ -41,7 +41,8 @@
       {
         "rule": "server function",
         "plural": "server functions",
-        "detects": "an exported const created by createServerFn (TanStack Start)"
+        "detects": "an exported const created by createServerFn (TanStack Start)",
+        "remote": true
       },
       {
         "rule": "wrapped export",
@@ -51,37 +52,44 @@
       {
         "rule": "server route",
         "plural": "server routes",
-        "detects": "an exported route created by createFileRoute with server handlers, createServerFileRoute or createAPIFileRoute"
+        "detects": "an exported route created by createFileRoute with server handlers, createServerFileRoute or createAPIFileRoute",
+        "remote": true
       },
       {
         "rule": "route handler",
         "plural": "route handlers",
-        "detects": "a GET, POST, PUT, PATCH, DELETE, HEAD or OPTIONS a Next.js app/**/route file exports, declared there, in an export list or re-export, or destructured; a default export under pages/api; or an exported loader or action under app/routes"
+        "detects": "a GET, POST, PUT, PATCH, DELETE, HEAD or OPTIONS a Next.js app/**/route file exports, declared there, in an export list or re-export, or destructured; a default export under pages/api; or an exported loader or action under app/routes",
+        "remote": true
       },
       {
         "rule": "request proxy",
         "plural": "request proxies",
-        "detects": "the proxy a Next.js proxy.ts exports, or the middleware a middleware.ts exports, at the root or under src/: declared, in an export list or re-export, or as the default export"
+        "detects": "the proxy a Next.js proxy.ts exports, or the middleware a middleware.ts exports, at the root or under src/: declared, in an export list or re-export, or as the default export",
+        "remote": true
       },
       {
         "rule": "page route",
         "plural": "page routes",
-        "detects": "the default export of a Next.js app/**/page file, the page as a whole"
+        "detects": "the default export of a Next.js app/**/page file, the page as a whole",
+        "remote": true
       },
       {
         "rule": "server action",
         "plural": "server actions",
-        "detects": "an exported function of a file that opens with 'use server'"
+        "detects": "an exported function of a file that opens with 'use server'",
+        "remote": true
       },
       {
         "rule": "route table",
         "plural": "route table entries",
-        "detects": "an object literal naming a path or pattern that starts with / and a handler, on one line"
+        "detects": "an object literal naming a path or pattern that starts with / and a handler, on one line",
+        "remote": true
       },
       {
         "rule": "route method",
         "plural": "registered routes",
-        "detects": "a call like app.get('/path', handler) whose first argument is a path starting with /"
+        "detects": "a call like app.get('/path', handler) whose first argument is a path starting with /",
+        "remote": true
       },
       {
         "rule": "package bin",
