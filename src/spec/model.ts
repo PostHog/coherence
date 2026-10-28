@@ -190,8 +190,8 @@ function readConfig(root: string): Config {
 
 /**
  * The project's own ignore entries that name nothing: no file or folder at
- * that path from the root, for a bare name no folder of that name on any
- * project file's way down, and nothing git ignores by it. Such an entry
+ * that path from the root, for a bare name no folder or file of that name
+ * on any project file's path, and nothing git ignores by it. Such an entry
  * leaves nothing out, so a typo or a path that moved would bound nothing and
  * say nothing. An entry git ignores (dist, build: output absent from a fresh
  * checkout, or present only in a package) bounds that output whenever it
@@ -203,15 +203,18 @@ function ignoreProblems(root: string, walked: Walked): Problem[] {
   const path = join(root, CONFIG_FILE);
   const own = readConfigFile(path)?.["ignore"];
   if (!Array.isArray(own)) return [];
+  const all = (): string[] => [...walked.files, ...walked.excluded.map((e) => e.file)];
   let folders: Set<string> | undefined;
-  const folderSet = (): Set<string> =>
-    (folders ??= new Set([...walked.files, ...walked.excluded.map((e) => e.file)].flatMap((rel) => rel.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/")))));
+  const folderSet = (): Set<string> => (folders ??= new Set(all().flatMap((rel) => rel.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/")))));
+  // Every name on every project file's path, the file's own among them: a bare entry names something when it is one of them.
+  let names: Set<string> | undefined;
+  const nameSet = (): Set<string> => (names ??= new Set(all().flatMap((rel) => rel.split("/"))));
   const missing: { entry: string; key: string }[] = [];
   for (const entry of own) {
     if (typeof entry !== "string") continue;
     const key = entry.split(sep).join("/").replace(/^(\.\/)+/, "").replace(/\/+$/, "");
     if (key === "" || existsSync(join(root, key))) continue;
-    if (!key.includes("/") && [...folderSet()].some((folder) => folder === key || folder.endsWith("/" + key))) continue;
+    if (!key.includes("/") && nameSet().has(key)) continue;
     missing.push({ entry, key });
   }
   if (missing.length === 0) return [];
@@ -222,14 +225,14 @@ function ignoreProblems(root: string, walked: Walked): Problem[] {
     .map(({ entry }) => ({
       file: CONFIG_FILE,
       line: Math.max(text.findIndex((line) => line.includes(JSON.stringify(entry))) + 1, 1),
-      message: `ignore entry "${entry}" names no file or folder in the project and nothing git ignores, so it leaves nothing out: a typo, or a path that moved? A folder is named by its name or its path from the root, a file by its path from the root`,
+      message: `ignore entry "${entry}" names no file or folder in the project and nothing git ignores, so it leaves nothing out: a typo, or a path that moved? A folder or a file is named by its name, which matches it anywhere, or by its path from the root`,
     }));
 }
 
 /**
  * The entries git ignores, asked in one git check-ignore: a path entry as a
- * file and as a folder at its path, a bare name as a folder at the root and
- * under every folder the project holds (a package's own .gitignore). Outside
+ * file and as a folder at its path, a bare name as a file and as a folder at
+ * the root and under every folder the project holds (a package's own .gitignore). Outside
  * a repository nothing is ignored.
  */
 function gitIgnoredEntries(root: string, keys: readonly string[], folders: ReadonlySet<string>): Set<string> {

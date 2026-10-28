@@ -247,8 +247,8 @@ function folderKey(folder: string): string {
 }
 
 /**
- * The config's ignore list: the folders, by name or by project-relative
- * path, and the files, by project-relative path, the adoption bounds the
+ * The config's ignore list: the folders and the files, each by its name
+ * anywhere or by its project-relative path, the adoption bounds the
  * project away from. An absent or unreadable
  * config ignores nothing here; the spec walker is the reader that refuses a
  * malformed config.
@@ -264,18 +264,19 @@ export function configIgnore(root: string): string[] {
 }
 
 /**
- * Whether a project-relative path is one the list names: the path itself, a
- * file by its path from the root ("CHANGELOG.md", "src/generated.ts"), or
- * some folder on its way down, by its own name ("node_modules", anywhere) or
- * by its path from the root ("posthog/api"). A file is named by its path
- * alone, never by its name anywhere; pass a folder with a trailing "/" to ask
- * about the folder itself. The one rule every walk applies to the config's
- * ignore list.
+ * Whether a project-relative path is one the list names: the path itself, by
+ * its path from the root ("src/generated.ts"), the file by its own name
+ * ("CHANGELOG.md", anywhere), or some folder on its way down, by its own
+ * name ("node_modules", anywhere) or by its path from the root
+ * ("posthog/api"). A name is one path segment; an entry holding a "/" is a
+ * path from the root. Pass a folder with a trailing "/" to ask about the
+ * folder itself. The one rule every walk applies to the config's ignore
+ * list.
  */
 export function underIgnored(rel: string, ignore: Iterable<string>): boolean {
   const skip = ignore instanceof Set ? (ignore as Set<string>) : new Set([...ignore].map(folderKey));
   if (skip.size === 0) return false;
-  if (skip.has(rel)) return true;
+  if (skip.has(rel) || skip.has(rel.slice(rel.lastIndexOf("/") + 1))) return true;
   const folders = rel.split("/").slice(0, -1);
   return folders.some((name, i) => skip.has(name) || skip.has(folders.slice(0, i + 1).join("/")));
 }
@@ -366,7 +367,7 @@ function folderReason(bounds: Bounds, folder: string): string {
  * Why a project-relative path lies outside the walk, or undefined when the
  * walk reads it: the first folder on its way down that a rule leaves out,
  * named with the rule, else the file itself when the config's ignore list
- * names its path. The one place any walk of the project leaves a file out; a
+ * names its path or its name. The one place any walk of the project leaves a file out; a
  * walker may narrow what it reads by kind (an extension, a test), but a
  * folder or a named file is left out here or not at all.
  */
@@ -376,7 +377,9 @@ export function exclusionOf(rel: string, bounds: Bounds): string | undefined {
     const reason = folderReason(bounds, folders.slice(0, i + 1).join("/"));
     if (reason !== "") return reason;
   }
-  return bounds.ignore.has(rel) ? `config ignore: ${rel}` : undefined;
+  if (bounds.ignore.has(rel)) return `config ignore: ${rel}`;
+  const name = rel.slice(rel.lastIndexOf("/") + 1);
+  return bounds.ignore.has(name) ? `config ignore: ${name}` : undefined;
 }
 
 /** Every project file a walk reads, and every one it leaves out with its reason. */

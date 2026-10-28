@@ -97,7 +97,7 @@ To opt in several folders and state their shared settings once, put a
   | Key | Rule |
   |---|---|
   | `name`, `entryDir`, `lexicon`, `projects`, `plugins` | Never inherited. Each belongs to the leaf; a plugin's path is the writer's. |
-  | `ignore` | Combined. A folder name from the registry applies anywhere. A path from the registry is kept only if it lies inside the leaf, and is rewritten relative to it. |
+  | `ignore` | Combined. A name from the registry, a folder's or a file's, applies anywhere in the leaf. A path from the registry is kept only if it lies inside the leaf, and is rewritten relative to it. |
   | `wellKnown` | Combined. |
   | `tests`, `test`, `testJson`, `testMatch`, `testFilterForm`, `testDir`, `testDirs` | One group. A leaf that sets any of them replaces the registry's whole group. An inherited setup's `cwd` is rewritten from the registry's folder to the leaf, so the registry's `"cwd": "."` runs the tests from the repository root. A setup without `cwd` runs in the leaf. |
   | everything else (`language`, `references`, `latencyBudget`, `interfaceBudget`, ...) | Replaced whole. |
@@ -133,7 +133,7 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 | `languages` | none | Languages Coherence has no adapter for, each read through its own language server; see [A language Coherence has no adapter for](#a-language-coherence-has-no-adapter-for). Each must also be named in `language`. |
 | `plugins` | none | The plugins the project runs, each name mapped to `"bundled"` or a path to its folder: a language adapter (new, or wrapping a built-in), syntax tables, a verifier for `via: [form] name`, a lexicon layer. The project's own key, never inherited from a registry. See [plugins.md](plugins.md). |
 | `entryDir` | `.` | The folder holding the entry spec, the one that declares the trust levels. |
-| `ignore` | none | Folders and files that are not this project's code or prose: vendored code, generated output, fixtures, promo material, notes kept beside the project. A name matches that folder or file anywhere; a path matches from the root. Every walk (the spec, the lexicon check, the reading) leaves them out. |
+| `ignore` | none | Folders and files that are not this project's code or prose: vendored code, generated output, fixtures, promo material, notes kept beside the project. A name with no `/` (`dist`, `CHANGELOG.md`, `schema.generated.ts`) matches every folder or file of that name anywhere in the project; an entry with a `/` (`src/generated`, `packages/web/CHANGELOG.md`) is a path from the root. Every walk (the spec, the lexicon check, the readings, mass) leaves them out, and an entry that names nothing is a spec problem. |
 | `lexicon` | `lexicon.json` | The project's lexicon file, relative to the root. |
 | `wellKnown` | none | Names the project vouches for as well known (its vendors, its own product names), so the lexicon check does not nominate them as nouns to declare. |
 | `references` | `"project"` | Where a chokepoint check searches for references: `"project"` (the project alone), `"repository"` (the whole repository), or a list of folders relative to the repository top (`["posthog/api", "ee"]`), searched beside the project. A verdict over less than the whole repository names every folder it searched. Each folder adds to the language server's work: on PostHog, `products/notebooks` with `["posthog", "ee"]` took 15.5 s and 1.1 GB for one check, against 4.8 s and 380 MB for the project alone. |
