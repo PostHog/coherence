@@ -3,8 +3,8 @@
 A component is any folder with a spec file, `<Name>.spec.md`. Folders without
 one are transparent; a super folder becomes a component when a relationship
 invariant about its children needs a home. The spec holds a title, a one-line
-intent, `## trust levels` in the entry spec only, `## entrances`, `## mirrors`, and
-`## invariants`. No other section: the parser refuses the reference's sections
+intent, `## trust levels` in the entry spec only, `## entrances`, `## mirrors`,
+`## folded`, and `## invariants`. No other section: the parser refuses the reference's sections
 by name and says what replaced each.
 
 The header may also declare who owns the component, on one line beside the
@@ -173,6 +173,29 @@ Mirror: src/readings/scope/structure-flow.ts now imports src/readings/scope/lang
 A literal the reader cannot read whole (a spread, a computed key, an element
 that is not a string) is said, and nothing is compared.
 
+## Folded folders
+
+`coherence mass` names every folder inside a component that holds three or
+more code files and has no spec of its own: each may be a unit that deserves
+a spec. When one is not a unit (page folders, a UI kit, one folder per report
+query), the component that holds it says so, one bullet each, with why:
+
+```markdown
+## folded
+- input: the form controls every view shares
+- hooks/**: one data hook per query, read through this component's interface
+```
+
+A bullet names a folder relative to the spec. `<folder>/**` folds the
+folder and every folder under it, at any depth; a folder folded alone does
+not fold the folders under it. Mass stops naming a folded folder and counts
+the folded folders and their weight on one line of their own.
+
+The model checks that each bullet still names a folder of its component: a
+folder outside it, one that no longer exists, and one that has since got a
+spec of its own are problems, so a fold cannot outlive its folder or hide a
+component. A bullet with no reason is a problem too.
+
 ## The bullet
 
 Every bullet is an invariant. Its first line is the name and the sentence,
@@ -198,6 +221,7 @@ module) and the chokepoint every reference passes through:
 
 ```markdown
 ## trust levels
+- visitor (outside): what anyone on the network sends
 - storage: the rows beneath everything
 - public-egress: what leaves in the clear
 
@@ -212,6 +236,12 @@ module) and the chokepoint every reference passes through:
   checklist: redaction declared as digest-only egress
   checklist: encrypted-storage dismissed: the digest is the stored form; nothing is decrypted
 ```
+
+A trust level is one bullet, `- <name>: <one-line meaning>`. A level whose
+data or caller comes from outside the system's control wears `(outside)`
+right after its name, before the colon, as `visitor` does above. Written
+anywhere else, in the meaning or before the name, the marker marks nothing
+and the level would read as inside, so the check refuses it.
 
 `protects` and `chokepoint` (and an entrance's `handler`) each name one thing,
 in one of three forms: a bare symbol (`seal`), a symbol in its file

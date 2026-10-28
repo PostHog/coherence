@@ -63,12 +63,13 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: disabled the duplicate-name problem in loadSpecModel -> "the model: names are unique within a component, declared-as names must exist, and one spec per folder" went red in spec.test.ts; restored, green (2026-09-17)
   kinds: none
-- entrance trust names a declared level: An entrance's trust: line names a trust level the entry spec declares, and a level's one marker is (outside); an unknown level, another marker, or an empty or second trust line is a problem, and a placeholder counts as absent.
-  over: every trust: line on every entrance and every marked trust level line
+- entrance trust names a declared level: An entrance's trust: line names a trust level the entry spec declares, and a level's one marker is (outside), written after its name; an unknown level, another marker, (outside) anywhere else on a trust level, entrance or invariant, a key in another case, or an empty or second trust line is a problem, and a placeholder counts as absent.
+  over: every trust: line on every entrance, every trust level line wherever it carries a marker, every entrance and invariant name, and every indented line under an invariant
   via: the model: an entrance's trust names a declared trust level, and a trust level's one marker is (outside)
   because: the ruling d-ba18b0fd: a level nobody declared is a trust nobody defined
   crossing: project-source -> reading
   refuted: dropped the unknown-level problem from entranceTrustProblems, so a trust: line naming no declared level passed -> the totality oracle went red; restored, green (2026-09-23)
+  refuted: dropped the check for (outside) in a trust level's meaning, so - visitor: (outside) ... read as inside with no problem, as the umami adoption wrote it -> the totality oracle went red; restored, green (2026-10-28)
   kinds: none
 - declared trust agrees with the handler's crossing: A declared entrance trust that differs from the entering side of a crossing whose chokepoint is its handler, in the component holding the handler, is a problem naming both.
   over: every entrance with a trust: line against every crossing-bearing invariant whose chokepoint is its handler, bare or with its file
@@ -286,6 +287,13 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   because: a declared mirror whose list was derived away, or whose file moved, would watch nothing and say nothing; the model checks it as it checks an entrance's handler, so a declaration cannot rot unseen (d-376efb60)
   crossing: project-source -> reading
   refuted: made modelMirror accept a name its file no longer declares -> "the model: a mirror names a list and what it mirrors that are both declared, and one whose name or file is gone is a problem" went red in spec.test.ts on its own assertion; restored byte for byte, green (2026-10-12)
+  kinds: none
+- a folded folder names a folder of its component: A ## folded bullet reads <folder>: <reason> or <folder>/**: <reason>, the folder written relative to its spec; a folder outside the component, one that is not a folder on disk, one with a spec of its own, a bullet with no reason, one declared twice, a head that is not one path, and a line under a bullet are problems, and a folder, a subtree, a ./ lead and a trailing slash are not.
+  over: valid folded bullets of each form, and a gone folder, a file, a folder outside the component, a component's folder, a bullet with no reason, a duplicate, a head of several words, and a key line under a bullet
+  via: the model: a folded folder names a folder of its component with no spec of its own, and one gone, outside it, or with its own spec is a problem
+  because: a fold silences mass for its folder; one that outlived its folder, reached outside its component, or covered a folder that has since become a component would hide a unit and say nothing, so the model checks it as it checks a mirror
+  crossing: project-source -> reading
+  refuted: made foldedHolds accept a folder that has a spec of its own -> "the model: a folded folder names a folder of its component with no spec of its own, and one gone, outside it, or with its own spec is a problem" went red in spec.test.ts on its own assertion; restored byte for byte, green (2026-10-28)
   kinds: none
 - a lost refutation names the check its run could not make: When a bullet the run store graded an invariant has lost what it was graded with and its latest run entry is not run, the floor problem names that entry's reason as the cause and offers making it checkable again before the demotion decision.
   over: a chokepoint bullet graded an invariant by a passing run, then a later run that could not check it because its protected name became ambiguous

@@ -359,6 +359,25 @@ test("the model: an entrance's trust names a declared trust level, and a trust l
   const marked = parseSpec("# A\n\nAn a.\n\n## trust levels\n- public (untrusted): anyone\n- owner (outside): the owner\n", "A.spec.md");
   assert.deepEqual(marked.trustLevels?.map((level) => [level.name, level.outside]), [["public", false], ["owner", true]]);
   assert.deepEqual(marked.problems.map((p) => p.message), ["trust level public is marked (untrusted); the one marker is (outside), for a level from outside the system's control"]);
+  // The marker anywhere but after the name marks nothing, and the level would read as inside: refused, as the umami adoption wrote it.
+  const misplaced = parseSpec("# A\n\nAn a.\n\n## trust levels\n- visitor: (outside) a browser with no credential\n- caller: an API caller (outside)\n- (outside) viewer: a share link holder\n", "A.spec.md");
+  assert.deepEqual(misplaced.trustLevels?.map((level) => [level.name, level.outside]), [["visitor", false], ["caller", false], ["viewer", false]]);
+  assert.deepEqual(misplaced.problems.map((p) => `${p.line} ${p.message}`), [
+    "6 trust level visitor carries (outside) where it marks nothing, so it reads as inside; the marker follows the name: - visitor (outside): <one-line meaning>",
+    "7 trust level caller carries (outside) where it marks nothing, so it reads as inside; the marker follows the name: - caller (outside): <one-line meaning>",
+    "8 trust level viewer carries (outside) where it marks nothing, so it reads as inside; the marker follows the name: - viewer (outside): <one-line meaning>",
+  ]);
+  // On an entrance or an invariant the marker marks nothing either; a key in another case would fold into the line above.
+  const elsewhere = parseSpec("# A\n\nAn a.\n\n## entrances\n- send (outside): a post\n  handler: send in a.ts\n\n## invariants\n- sealed (outside): A row leaves sealed.\n  over: every row\n  Via: sealed rows\n", "A.spec.md");
+  assert.deepEqual(elsewhere.problems.map((p) => `${p.line} ${p.message}`).filter((m) => !m.includes("names both over: and via:")), [
+    "6 entrance send (outside) carries (outside), which marks a trust level, never an entrance: name the level it carries in with trust: <a level the entry spec marks (outside)>",
+    "10 invariant sealed (outside) carries (outside), which marks a trust level, never an invariant: name the levels it checks with crossing: <trust level> -> <trust level>",
+    "12 key \"Via\" is written via:; a key in another case would read as the line above continuing",
+  ]);
+  // Valid inputs the check must not flag: the word outside and other parentheses in a meaning, a Next.js route group in an entrance's name, and prose wrapping under a key.
+  const valid = parseSpec("# A\n\nAn a.\n\n## trust levels\n- public (outside): what comes from outside the system's control (a browser, a cron)\n- storage: the rows beneath everything\n\n## entrances\n- page (outside)/dashboard: a page in a route group\n  handler: Page in src/app/(outside)/dashboard/page.tsx\n  trust: public\n\n## invariants\n- sealed: A row leaves sealed.\n  over: every row\n  via: sealed rows\n  because: a leak would disclose\n  Note: what it discloses is a bearer\n", "A.spec.md");
+  assert.deepEqual(valid.problems, []);
+  assert.deepEqual(valid.trustLevels?.map((level) => [level.name, level.outside]), [["public", true], ["storage", false]]);
 });
 
 test("the model: an entrance's declared trust contradicting a crossing on its handler is a problem", () => {
@@ -602,6 +621,39 @@ test("the model: a mirror names a list and what it mirrors that are both declare
   assert.deepEqual(problems("- EVENTS in build.ts: the events\n  mirrors: whatever events.ts says\n"), ["7 mirrors: on EVENTS reads closure of <file>, <file>, keys of <NAME> in <file>, or <NAME> in <file>"]);
   assert.deepEqual(problems("- EVENTS in build.ts: the events\n  mirrors: HOOK_EVENTS in src/hooks/events.ts\n  because: why\n"), ['8 unknown key "because": a mirror carries mirrors']);
   assert.deepEqual(problems("- EVENTS: the events\n  mirrors: HOOK_EVENTS in src/hooks/events.ts\n"), ["6 a mirror is one bullet: - <NAME> in <file>: <meaning>, with an indented mirrors: closure of <file>, <file> | keys of <NAME> in <file> | <NAME> in <file> line"]);
+});
+
+test("the model: a folded folder names a folder of its component with no spec of its own, and one gone, outside it, or with its own spec is a problem", () => {
+  const folding = (folded: string): Record<string, string> => ({
+    "Widgetry.spec.md": "# Widgetry\n\nA store of widgets.\n\n## invariants\n",
+    "src/app/App.spec.md": `# App\n\nThe app.\n\n## folded\n${folded}\n## invariants\n`,
+    "src/app/pages/home/page.ts": "export const home = 1;\n",
+    "src/app/ui/button.ts": "export const button = 1;\n",
+    "src/app/billed/Billed.spec.md": "# Billed\n\nA unit of its own.\n",
+    "src/app/billed/bill.ts": "export const bill = 1;\n",
+    "src/other/x.ts": "export const x = 1;\n",
+  });
+  // What adopters write correctly: a folder, a subtree, a ./ lead and a trailing slash.
+  withModel(folding("- ui: the app's own controls\n- pages/**: one folder per route\n- ./pages/home/: the landing route\n"), (model) => {
+    assert.deepEqual(model.problems, []);
+    assert.deepEqual(
+      model.components.find((c) => c.folder === "src/app")!.folded.map((f) => [f.folder, f.subtree]),
+      [["ui", false], ["pages", true], ["pages/home", false]],
+    );
+  });
+  const problems = (folded: string): string[] => {
+    let found: string[] = [];
+    withModel(folding(folded), (model) => (found = model.problems.map((p) => `${p.line} ${p.message}`)));
+    return found;
+  };
+  assert.deepEqual(problems("- gone: a folder since removed\n"), ["6 folded folder gone: src/app/gone is not a folder; remove the bullet, or name the folder as it is now"]);
+  assert.deepEqual(problems("- ui/button.ts: a file\n"), ["6 folded folder ui/button.ts: src/app/ui/button.ts is not a folder; remove the bullet, or name the folder as it is now"]);
+  assert.deepEqual(problems("- ../other: another component's folder\n"), ["6 folded folder ../other: not a folder inside src/app; a folded folder is written relative to its spec"]);
+  assert.deepEqual(problems("- billed/**: a unit with its own spec\n"), ["6 folded folder billed/**: src/app/billed has a spec of its own, so it is a component, not folded; remove the bullet"]);
+  assert.deepEqual(problems("- ui:\n"), ["6 folded folder ui needs its reason: why it belongs to this component"]);
+  assert.deepEqual(problems("- ui: controls\n- ui: again\n"), ["7 folded folder ui declared twice"]);
+  assert.deepEqual(problems("- the ui folder: controls\n"), ["6 a folded folder is one bullet, with no lines under it: - <folder, relative to this spec>: <why it belongs to this component>, or - <folder>/**: <why its whole subtree does>"]);
+  assert.deepEqual(problems("- ui: controls\n  because: why\n"), ["7 a folded folder is one bullet, with no lines under it: - <folder, relative to this spec>: <why it belongs to this component>, or - <folder>/**: <why its whole subtree does>"]);
 });
 
 test("the model: a handler is declared as its file's language declares one: a Rust item, a Python def, a TypeScript export, each read by its language's plugin", () => {

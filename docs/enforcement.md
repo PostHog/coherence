@@ -371,3 +371,10 @@ invariant, the bypass site, and the two honest options, route the reference
 through the chokepoint or escalate a retirement for a human. At Stop the
 regulation message carries the structural defects the latest run left; at
 SubagentStop one refuses the stop.
+
+When the tool wrote a spec or practice file, the hook parses that file alone
+and prints each of its problems, with its file and line, in the same turn. A
+file is named again only when its problems change, and once it is clean it is
+forgotten. Problems only the whole model can see, such as a crossing that
+names a trust level the entry spec lacks, still come from `spec --check` and
+the stop.

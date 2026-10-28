@@ -113,6 +113,7 @@ import { baselinePath, coverageChanges, deliverCandidates, heldCandidates, holdC
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 import { namesWrittenFiles, writtenNames } from "./host-tools.ts";
 import { keepMirrorIndex, mirrorAlarm } from "./mirrors.ts";
+import { specAlarm } from "./spec-at-edit.ts";
 import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
 
 const run = promisify(execFile);
@@ -1429,6 +1430,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host }) : "";
         // A hand list declared as a mirror, read again only when this edit wrote a file it watches: one lookup otherwise.
         const mirror = event === "PostToolUse" ? mirrorAlarm(root, written, session) : { text: "", commit: () => {} };
+        // A spec or practice file this edit wrote is parsed again, alone, and its problems said now: never the whole model at an edit.
+        const specAtEdit = event === "PostToolUse" ? specAlarm(root, written, session, await cliName(root)) : { text: "", commit: () => {} };
         // The full reading walks the whole corpus (seconds on a real project), so it runs only at a prompt when the tree moved since this
         // session's last reading, and it keeps the vocabulary state an edit reads (vocabulary-state.ts). An edit reads the files it wrote
         // against that state, never the corpus; with no state valid for this code and lexicon, it takes the full reading once, which keeps one.
@@ -1486,14 +1489,15 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         // What the last stop said reached only the user; the prompt that follows it is where the agent reads it.
         const fromStop = event === "UserPromptSubmit" && session ? carried(root, session) : undefined;
         const lastStop = fromStop === undefined ? "" : `At your last stop (shown to the user, not to you), ${fromStop.replace(/^Regulate \(Stop\):\n/, "regulate said:\n")}`;
-        const context = await voiced(root, input, [lastStop,feed.text,edit,mirror.text,vocabularyNote,vocabulary].filter(Boolean).join("\n"), voice);
+        const context = await voiced(root, input, [lastStop,feed.text,edit,specAtEdit.text,mirror.text,vocabularyNote,vocabulary].filter(Boolean).join("\n"), voice);
         // A mirror that agrees again is forgotten at once: nothing was said that must first reach the host.
         if (mirror.text === "") mirror.commit();
+        if (specAtEdit.text === "") specAtEdit.commit();
         if (context === "") return { stdout: "", stderr: "", exit: 0 };
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
         // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
-        const delivered = voice.override === undefined && (feed.text !== "" || mirror.text !== "" || changes.length > 0 || pending.length > 0 || lastStop !== "");
-        const commit=()=> { if(feed.text) feed.commit(); if(mirror.text) mirror.commit(); if(changes.length && session) { if (reading) saveBaseline(root,session,reading); else keep(); } if(pending.length && session) deliverCandidates(root,session,pending); if(lastStop && session) dropCarry(root,session); };
+        const delivered = voice.override === undefined && (feed.text !== "" || mirror.text !== "" || specAtEdit.text !== "" || changes.length > 0 || pending.length > 0 || lastStop !== "");
+        const commit=()=> { if(feed.text) feed.commit(); if(mirror.text) mirror.commit(); if(specAtEdit.text) specAtEdit.commit(); if(changes.length && session) { if (reading) saveBaseline(root,session,reading); else keep(); } if(pending.length && session) deliverCandidates(root,session,pending); if(lastStop && session) dropCarry(root,session); };
         return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
       }
       case "Stop":
