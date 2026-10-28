@@ -1546,6 +1546,19 @@
         "defined_by": "owner, 2026-10-23",
         "owner_words": "broad reading is fine"
       }
+    },
+    {
+      "name": "folded folder",
+      "definition": "A folder inside a component, with no spec of its own, that the component's spec declares under ## folded as belonging to it, so mass stops naming it as a unit still to decide.",
+      "related": [
+        "mass",
+        "component",
+        "spec"
+      ],
+      "provenance": {
+        "defined_by": "owner, 2026-10-28 (session 51c38ab9, d-8ebb2e2e)",
+        "owner_words": "do 7"
+      }
     }
   ],
   "metaphors": {

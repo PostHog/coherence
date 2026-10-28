@@ -288,6 +288,13 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: made modelMirror accept a name its file no longer declares -> "the model: a mirror names a list and what it mirrors that are both declared, and one whose name or file is gone is a problem" went red in spec.test.ts on its own assertion; restored byte for byte, green (2026-10-12)
   kinds: none
+- a folded folder names a folder of its component: A ## folded bullet reads <folder>: <reason> or <folder>/**: <reason>, the folder written relative to its spec; a folder outside the component, one that is not a folder on disk, one with a spec of its own, a bullet with no reason, one declared twice, a head that is not one path, and a line under a bullet are problems, and a folder, a subtree, a ./ lead and a trailing slash are not.
+  over: valid folded bullets of each form, and a gone folder, a file, a folder outside the component, a component's folder, a bullet with no reason, a duplicate, a head of several words, and a key line under a bullet
+  via: the model: a folded folder names a folder of its component with no spec of its own, and one gone, outside it, or with its own spec is a problem
+  because: a fold silences mass for its folder; one that outlived its folder, reached outside its component, or covered a folder that has since become a component would hide a unit and say nothing, so the model checks it as it checks a mirror
+  crossing: project-source -> reading
+  refuted: made foldedHolds accept a folder that has a spec of its own -> "the model: a folded folder names a folder of its component with no spec of its own, and one gone, outside it, or with its own spec is a problem" went red in spec.test.ts on its own assertion; restored byte for byte, green (2026-10-28)
+  kinds: none
 - a lost refutation names the check its run could not make: When a bullet the run store graded an invariant has lost what it was graded with and its latest run entry is not run, the floor problem names that entry's reason as the cause and offers making it checkable again before the demotion decision.
   over: a chokepoint bullet graded an invariant by a passing run, then a later run that could not check it because its protected name became ambiguous
   via: an invariant whose latest run could not check it names that cause before the demotion it offers
