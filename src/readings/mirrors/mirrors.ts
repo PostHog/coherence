@@ -29,6 +29,7 @@ import { basename, dirname, extname, posix } from "node:path";
 import type * as TS from "typescript";
 import { declaredLanguageOf, type DeclaredLanguage } from "../../adapters/declared-config.ts";
 import { languageOfFile } from "../../adapters/language-files.ts";
+import { underIgnored } from "../../adapters/project-files.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { DERIVED, DOC_FORMS, type Finding, type Form, type Group, type MirrorHistory, type MirrorReading, type SetRef, type Verdict } from "./model.ts";
 
@@ -109,7 +110,7 @@ function readAll(root: string, rev: string, files: readonly string[]): Map<strin
   return out;
 }
 
-/** The folders the config at the revision ignores, as project-relative prefixes. */
+/** The ignore entries of the config at the revision, each a name or a project-relative path, as underIgnored compares them. */
 function ignoredAt(root: string, rev: string): string[] {
   const text = readAll(root, rev, ["coherence.config.json"]).get("coherence.config.json");
   let ignore: unknown;
@@ -741,7 +742,8 @@ interface Commit {
 /** One `git log -p --unified=0` pass over the code and Markdown the reading reads, up to the revision, paths relative to the root. */
 function readCommits(root: string, rev: string, ignored: readonly string[]): Commit[] {
   const specs = ["*.ts", "*.mts", "*.cts", "*.js", "*.mjs", "*.cjs", "*.md"].map((g) => `:(glob)**/${g}`);
-  const excludes = ignored.map((f) => `:(exclude)${f}`);
+  // As underIgnored reads an entry: a bare name is a folder or a file of that name anywhere, a path is from the root.
+  const excludes = ignored.flatMap((f) => (f.includes("/") ? [`:(exclude)${f}`] : [`:(exclude,glob)**/${f}`, `:(exclude,glob)**/${f}/**`]));
   const log = git(root, ["log", "-p", "--unified=0", "--no-merges", "--no-renames", "--relative", "--no-color", "--format=@@@%H%x09%s", rev, "--", ...specs, ...excludes]).toString("utf8");
   const commits: Commit[] = [];
   let commit: Commit | undefined;
@@ -942,8 +944,9 @@ export async function readMirrors(root: string, options: MirrorOptions = {}): Pr
   }
   phase("load");
 
-  const ignored = [...ALWAYS_IGNORED, ...ignoredAt(root, commit)];
-  const isIgnored = (p: string): boolean => ignored.some((f) => p === f || p.startsWith(`${f}/`) || p.includes(`/${f}/`) && !f.includes("/"));
+  // The one rule every walk applies to the ignore list (underIgnored), over the config as it stood at the revision.
+  const ignored = new Set([...ALWAYS_IGNORED, ...ignoredAt(root, commit)]);
+  const isIgnored = (p: string): boolean => underIgnored(p, ignored);
   const paths = git(root, ["ls-tree", "-r", "-z", "--name-only", commit]).toString("utf8").split("\0").filter((p) => p !== "" && !isIgnored(p));
   const wanted = paths.filter((p) => (CODE_FILE.test(p) && !p.endsWith(".d.ts")) || (DOC_FILE.test(p) && READ_DOC.test(p)));
   // No silent skip: a file in a language the reading does not parse is counted, so a Python project learns its code went unread.
@@ -970,7 +973,7 @@ export async function readMirrors(root: string, options: MirrorOptions = {}): Pr
   const { findings, find } = match(ctx, u, options.all === true);
   phase("matching");
   if (options.history !== false) {
-    history(findings, readCommits(root, commit, ignored), u);
+    history(findings, readCommits(root, commit, [...ignored]), u);
     phase("history");
   }
   const ranked = rank(findings, find);
