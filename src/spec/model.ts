@@ -17,7 +17,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { countWork, readProjectText, spawnSync } from "../lifecycle/work-meter.ts";
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
-import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Mirror, type Problem, type TrustLevel } from "./grammar.ts";
+import { isModuleHandler, parseSpec, type Entrance, type FoldedFolder, type Invariant, type Mirror, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { creditedByCrossingAlone, crossingChecksTrust, resolveCovered } from "./covers.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
@@ -92,6 +92,8 @@ export interface Component {
   entrances: ModelEntrance[];
   /** The hand lists this component declares as mirrors, each with the files it was found in. */
   mirrors: ModelMirror[];
+  /** The folders its spec declares folded into it, each still a folder of this component. */
+  folded: FoldedFolder[];
   invariants: ModelInvariant[];
   /** The practice file paired with the spec, when there is one. */
   practicePath: string | undefined;
@@ -552,6 +554,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       return { ...entrance, component: folder, file: found };
     });
     const mirrors = (parsed.mirrors ?? []).map((mirror) => modelMirror(root, folder, specPath, mirror, problems));
+    const folded = (parsed.folded ?? []).filter((f) => foldedHolds(root, folder, specPath, f, folders, problems));
     const paired = practiceFiles.get(folder);
     const practices = (paired?.parsed.practices ?? []).map((practice) => modelPractice(practice, `${folder}/${practice.name}`, folder, paired!.file, enactments));
     components.push({
@@ -563,6 +566,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       trustLevels: parsed.trustLevels,
       entrances,
       mirrors,
+      folded,
       invariants,
       practicePath: paired?.file,
       practices,
@@ -862,6 +866,29 @@ function specNamedFile(root: string, folder: string, file: string): string | und
  * found, and a problem for each name or file that is gone, so a declaration
  * cannot rot unseen (the edit-time alarm reports it at the edit too).
  */
+/**
+ * Whether a folded bullet still names a folder of this component: inside its
+ * folder, on disk, and with no spec of its own. Each way it fails is a
+ * problem, so a fold cannot outlive the folder it named or hide a component.
+ */
+function foldedHolds(root: string, folder: string, specPath: string, folded: FoldedFolder, components: ReadonlySet<string>, problems: Problem[]): boolean {
+  const written = `${folded.folder}${folded.subtree ? "/**" : ""}`;
+  const at = posix.normalize(folder === "." ? folded.folder : `${folder}/${folded.folder}`);
+  const inside = folded.folder !== "" && !isAbsolute(folded.folder) && at !== folder && !at.startsWith("../") && at !== ".." && (folder === "." || at.startsWith(folder + "/"));
+  const fail = (message: string): false => {
+    problems.push({ file: specPath, line: folded.line, message: `folded folder ${written}: ${message}` });
+    return false;
+  };
+  if (!inside) return fail(`not a folder inside ${folder}; a folded folder is written relative to its spec`);
+  let isFolder = false;
+  try {
+    isFolder = statSync(resolve(root, at)).isDirectory();
+  } catch {}
+  if (!isFolder) return fail(`${at} is not a folder; remove the bullet, or name the folder as it is now`);
+  if (components.has(at)) return fail(`${at} has a spec of its own, so it is a component, not folded; remove the bullet`);
+  return true;
+}
+
 export function modelMirror(root: string, folder: string, specPath: string, mirror: Mirror, problems: Problem[] = []): ModelMirror {
   const declared = (name: string, file: string, role: string): string | undefined => {
     const found = specNamedFile(root, folder, file);

@@ -44,8 +44,8 @@
   step: where the repository already declares its module boundaries in a file coherence scaffold import reads (tach.toml today), draft the component specs from it first: coherence scaffold import tach --all prints one draft per module with its dependencies and exposed paths as bullets, and --write creates only the specs that do not exist; fill each placeholder (where tach enforces a drafted facade, the chokepoint is graded checker-choked by tach itself, so its own check is the enforcement), and place the via: tests it prints where the project's tests run
     leaves: the drafted specs, listed by --write as wrote or skipped
   step: declare the components and where work enters them: the entry spec with its trust levels, one spec per component folder, then every entrance (the practice declare entrances); the grammar is in docs/spec.md in the installed package
-  step: give each real unit its own spec at whatever depth it sits, not one per top-level folder: run coherence mass, and for each folder it names as having no spec of its own, write its spec or record with decide why it belongs to the component above; repeat until mass names none you have not decided
-    leaves: mass names no folder without a spec or a decision
+  step: give each real unit its own spec at whatever depth it sits, not one per top-level folder: run coherence mass, and for each folder it names as having no spec of its own, write its spec or declare it under ## folded in the spec of the component above, with why it belongs there (docs/spec.md, Folded folders); repeat until mass names none
+    leaves: mass names no folder with no spec of its own
   step: declare the few invariants that matter most (security, tenant isolation, data integrity), each through the practice declare a requirement; for a module boundary whose own code may use its internals, say which references the chokepoint governs (from: outside the component), and in a folder of a larger repository, where the boundary's callers live outside it, choose the references horizon in the config (a list of folders, or repository)
   step: run, then witness each refutation (the practice witness a refutation); a broken chokepoint is a finding to report with its bypass sites, not a failure to hide; a requirement the code already breaks stays a requirement, with a defect per site and an escalation, and a test that cannot run here is recorded as unable
     leaves: spec --check with 0 problems
@@ -62,6 +62,7 @@
   pitfall: a coverage report redirected into the adopter's root was read back as its source and grew on every run (df-79ac2d4e)
   pitfall: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2)
   pitfall: an adoption declared one spec per top-level folder and stopped, and a human had to ask for the nested units (df-9750aee2)
+  pitfall: an adoption recorded seven decisions for the 69 folders that belonged to the component above, and mass, which reads no decision, still named all 69 (d-8ebb2e2e)
   pitfall: a fresh adoption found its first requirements already false and its tests unable to run unattended, and had to improvise what to record (df-8ac95c4d)
   pitfall: in a monorepo, a session started at the repository root took the whole repository as the project: another team's specs reached orient, their practices fired, and .coherence was written at the root (df-0b68c987)
   pitfall: a chokepoint in a project nested below the repository top passed without searching the rest of the repository, where a product boundary's bypasses live; choose its references horizon (df-0d235229)

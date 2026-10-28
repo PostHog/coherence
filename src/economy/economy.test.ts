@@ -398,3 +398,32 @@ test("mass names each folder of three or more code files that a component above 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("mass never names a folder its component's spec declares folded, and counts what it set aside", () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-mass-folded-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text, "utf8");
+  };
+  const code = (name: string): string => `export function ${name}(): number {\n  return 1;\n}\n`;
+  try {
+    put("coherence.config.json", CONFIG);
+    put("src/app/App.spec.md", "# App\n\nThe whole app, declared at the top.\n\n## folded\n- accounts: the app's account screens\n- pages/**: one folder per route\n");
+    put("src/app/main.ts", code("main"));
+    for (const name of ["post", "replay", "balance"]) put(`src/app/accounts/${name}.ts`, code(name));
+    for (const name of ["a", "b", "c"]) put(`src/app/pages/home/${name}.ts`, code(name));
+    for (const name of ["d", "e", "f"]) put(`src/app/pages/settings/team/${name}.ts`, code(name));
+    for (const name of ["g", "h", "i"]) put(`src/app/accounts/export/${name}.ts`, code(name));
+
+    const report = computeMass(dir);
+    const app = report.components.find((c) => c.folder === "src/app");
+    assert.ok(app !== undefined);
+    assert.deepEqual(app.unspecced.map((u) => u.folder), ["src/app/accounts/export"], "a folder folded alone does not fold the folders under it");
+    assert.deepEqual(app.folded.map((u) => u.folder).sort(), ["src/app/accounts", "src/app/pages/home", "src/app/pages/settings/team"], "a subtree folds every folder under it, at any depth");
+    const printed = formatMass(report);
+    assert.match(printed, /folders with no spec of their own, folded into a component above them .*: 1\n/);
+    assert.match(printed, /\nfolders their component's spec declares folded into it \(## folded\): 3, 27 lines, 9 files, 9 symbols\n/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

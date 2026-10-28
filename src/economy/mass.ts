@@ -52,6 +52,8 @@ export interface ComponentMass {
    * folded into this component only because no spec sits there.
    */
   unspecced: { folder: string; total: Numbers }[];
+  /** Folders of the same weight that the component's spec declares folded into it (## folded): decided, so never named as possible units. */
+  folded: { folder: string; total: Numbers }[];
 }
 
 /** Code files a folder must hold directly before mass names it as a possible component of its own. */
@@ -177,11 +179,18 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
         if (folder === component.folder) continue;
         byFolder.set(folder, [...(byFolder.get(folder) ?? []), f]);
       }
-      const unspecced = [...byFolder]
+      const weighty = [...byFolder]
         .filter(([, held]) => held.length >= UNIT_FILES)
         .map(([folder, held]) => ({ folder, total: sum(held) }))
         .sort((a, b) => b.total.lines - a.total.lines || a.folder.localeCompare(b.folder));
-      return { folder: component.folder, total: sum(mine), unreached: sum(unreached), unreachedFiles: unreached.map((f) => f.file).sort(), unspecced };
+      const isFolded = (folder: string): boolean =>
+        component.folded.some((f) => {
+          const at = component.folder === "." ? f.folder : `${component.folder}/${f.folder}`;
+          return folder === at || (f.subtree && folder.startsWith(at + "/"));
+        });
+      const unspecced = weighty.filter((u) => !isFolded(u.folder));
+      const folded = weighty.filter((u) => isFolded(u.folder));
+      return { folder: component.folder, total: sum(mine), unreached: sum(unreached), unreachedFiles: unreached.map((f) => f.file).sort(), unspecced, folded };
     })
     .sort((a, b) => a.folder.localeCompare(b.folder));
 
@@ -229,6 +238,11 @@ export function formatMass(report: MassReport): string {
     lines.push(`folders with no spec of their own, folded into a component above them (${UNIT_FILES} or more code files each; give each that is a unit its own spec): ${unspecced.length}`);
     for (const u of unspecced.slice(0, SHOWN)) lines.push(`  ${u.folder}: ${numbers(u.total)}, inside ${u.within}`);
     if (unspecced.length > SHOWN) lines.push(`  and ${unspecced.length - SHOWN} more`);
+  }
+  const folded = report.components.flatMap((c) => c.folded);
+  if (folded.length > 0) {
+    const weight = folded.reduce((acc, f) => add(acc, f.total), ZERO);
+    lines.push(`folders their component's spec declares folded into it (## folded): ${folded.length}, ${numbers(weight)}`);
   }
   lines.push(`total mass: ${numbers(report.total)}`);
   for (const c of report.components) lines.push(`  ${c.folder}: ${numbers(c.total)}; unreached ${numbers(c.unreached)}`);

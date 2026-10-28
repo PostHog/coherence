@@ -22,6 +22,10 @@
  *   - <NAME> in <file>: <one-line meaning: what the hand list lists>
  *     mirrors: closure of <file>, <file> | keys of <NAME> in <file> | <NAME> in <file>
  *
+ *   ## folded                  (any spec)
+ *   - <folder, relative to the spec>: <why it belongs to this component>
+ *   - <folder>/**: <why its whole subtree does>
+ *
  *   ## invariants
  *   - <name>: <sentence>
  *     protects: <symbol or module>            chokepoint form, with
@@ -66,10 +70,11 @@ export const RETIRED_SECTIONS: readonly RetiredSection[] = (
 export const TRUST_LEVELS_SECTION = "trust levels";
 export const ENTRANCES_SECTION = "entrances";
 export const MIRRORS_SECTION = "mirrors";
+export const FOLDED_SECTION = "folded";
 export const INVARIANTS_SECTION = "invariants";
 
 /** What a spec may hold, for the problems that name it. */
-const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances, ## mirrors and ## invariants";
+const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances, ## mirrors, ## folded and ## invariants";
 
 /** The keys an invariant bullet may carry, in the order the scaffold prints them. */
 export const KEYS = ["protects", "chokepoint", "from", "over", "via", "because", "crossing", "entrances", "refuted", "kinds", "checklist"] as const;
@@ -155,6 +160,24 @@ export interface Mirror {
   /** The mirrors: line, or the bullet's own line when there is none. */
   recipeLine: number;
 }
+
+/**
+ * A folded folder: a folder inside the component, with no spec of its own,
+ * that the spec declares belongs to it, so mass stops naming it as a unit
+ * still to decide. The model checks that it is still a folder of this
+ * component, so a declaration cannot rot unseen.
+ */
+export interface FoldedFolder {
+  /** Relative to the spec's folder, as written, without the trailing /**. */
+  folder: string;
+  /** Whether the bullet folds the folder's whole subtree (written <folder>/**). */
+  subtree: boolean;
+  reason: string;
+  line: number;
+}
+
+/** How a folded bullet is written, for the problems that name it. */
+export const FOLDED_FORM = "- <folder, relative to this spec>: <why it belongs to this component>, or - <folder>/**: <why its whole subtree does>";
 
 /** How a mirror bullet is written, for the problems that name it. */
 export const MIRROR_FORM = "- <NAME> in <file>: <meaning>, with an indented mirrors: closure of <file>, <file> | keys of <NAME> in <file> | <NAME> in <file> line";
@@ -292,6 +315,8 @@ export interface ParsedSpec {
   entrances: Entrance[];
   /** Empty when the spec has no mirrors section. */
   mirrors: Mirror[];
+  /** Empty when the spec has no folded section. */
+  folded: FoldedFolder[];
   invariants: Invariant[];
   problems: Problem[];
 }
@@ -361,9 +386,11 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
   let mirrorsSeen = false;
   const mirrors: Mirror[] = [];
   const misread = new Set<Mirror>();
+  let foldedSeen = false;
+  const folded: FoldedFolder[] = [];
   const bullets: RawBullet[] = [];
 
-  type Section = "head" | "trust levels" | "entrances" | "mirrors" | "invariants" | "skip";
+  type Section = "head" | "trust levels" | "entrances" | "mirrors" | "folded" | "invariants" | "skip";
   let section: Section = "head";
   let paragraph: string[] = [];
   let paragraphLine = 0;
@@ -428,6 +455,12 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         if (mirrorsSeen) problem(line, "## mirrors given twice");
         mirrorsSeen = true;
         section = "mirrors";
+        return;
+      }
+      if (key === FOLDED_SECTION) {
+        if (foldedSeen) problem(line, "## folded given twice");
+        foldedSeen = true;
+        section = "folded";
         return;
       }
       if (key === INVARIANTS_SECTION) {
@@ -596,6 +629,23 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         else current.recipe = recipe;
         return;
       }
+      case "folded": {
+        if (raw.trim() === "") return;
+        const bullet = /^[-*]\s+(.*)$/.exec(raw);
+        const colon = bullet === null ? -1 : bullet[1]!.indexOf(":");
+        const written = colon <= 0 ? "" : bullet![1]!.slice(0, colon).trim();
+        if (written === "" || /\s/.test(written)) {
+          problem(line, `a folded folder is one bullet, with no lines under it: ${FOLDED_FORM}`);
+          return;
+        }
+        const subtree = written.endsWith("/**");
+        const folder = (subtree ? written.slice(0, -3) : written).replace(/^\.\//, "").replace(/\/+$/, "");
+        const reason = bullet![1]!.slice(colon + 1).trim();
+        if (reason === "") problem(line, `folded folder ${written} needs its reason: why it belongs to this component`);
+        if (folded.some((f) => f.folder === folder && f.subtree === subtree)) problem(line, `folded folder ${written} declared twice`);
+        folded.push({ folder, subtree, reason, line });
+        return;
+      }
       case "invariants": {
         if (raw.trim() === "") return;
         const bullet = /^[-*]\s+(.*)$/.exec(raw);
@@ -658,7 +708,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
     if (mirror.recipe === undefined && !misread.has(mirror)) problem(mirror.line, `mirror ${mirror.name} names nothing it mirrors: add mirrors: closure of <file>, keys of <NAME> in <file>, or <NAME> in <file>`);
   }
   const invariants = bullets.map((bullet) => buildInvariant(bullet, problem, options.seed));
-  return { file, title, intent, ...(owners === undefined ? {} : { owners }), trustLevels, trustLevelsLine, entrances, mirrors: named, invariants, problems };
+  return { file, title, intent, ...(owners === undefined ? {} : { owners }), trustLevels, trustLevelsLine, entrances, mirrors: named, folded, invariants, problems };
 }
 
 function buildInvariant(bullet: RawBullet, problem: (line: number, message: string) => void, seed: Seed | undefined): Invariant {

@@ -604,6 +604,39 @@ test("the model: a mirror names a list and what it mirrors that are both declare
   assert.deepEqual(problems("- EVENTS: the events\n  mirrors: HOOK_EVENTS in src/hooks/events.ts\n"), ["6 a mirror is one bullet: - <NAME> in <file>: <meaning>, with an indented mirrors: closure of <file>, <file> | keys of <NAME> in <file> | <NAME> in <file> line"]);
 });
 
+test("the model: a folded folder names a folder of its component with no spec of its own, and one gone, outside it, or with its own spec is a problem", () => {
+  const folding = (folded: string): Record<string, string> => ({
+    "Widgetry.spec.md": "# Widgetry\n\nA store of widgets.\n\n## invariants\n",
+    "src/app/App.spec.md": `# App\n\nThe app.\n\n## folded\n${folded}\n## invariants\n`,
+    "src/app/pages/home/page.ts": "export const home = 1;\n",
+    "src/app/ui/button.ts": "export const button = 1;\n",
+    "src/app/billed/Billed.spec.md": "# Billed\n\nA unit of its own.\n",
+    "src/app/billed/bill.ts": "export const bill = 1;\n",
+    "src/other/x.ts": "export const x = 1;\n",
+  });
+  // What adopters write correctly: a folder, a subtree, a ./ lead and a trailing slash.
+  withModel(folding("- ui: the app's own controls\n- pages/**: one folder per route\n- ./pages/home/: the landing route\n"), (model) => {
+    assert.deepEqual(model.problems, []);
+    assert.deepEqual(
+      model.components.find((c) => c.folder === "src/app")!.folded.map((f) => [f.folder, f.subtree]),
+      [["ui", false], ["pages", true], ["pages/home", false]],
+    );
+  });
+  const problems = (folded: string): string[] => {
+    let found: string[] = [];
+    withModel(folding(folded), (model) => (found = model.problems.map((p) => `${p.line} ${p.message}`)));
+    return found;
+  };
+  assert.deepEqual(problems("- gone: a folder since removed\n"), ["6 folded folder gone: src/app/gone is not a folder; remove the bullet, or name the folder as it is now"]);
+  assert.deepEqual(problems("- ui/button.ts: a file\n"), ["6 folded folder ui/button.ts: src/app/ui/button.ts is not a folder; remove the bullet, or name the folder as it is now"]);
+  assert.deepEqual(problems("- ../other: another component's folder\n"), ["6 folded folder ../other: not a folder inside src/app; a folded folder is written relative to its spec"]);
+  assert.deepEqual(problems("- billed/**: a unit with its own spec\n"), ["6 folded folder billed/**: src/app/billed has a spec of its own, so it is a component, not folded; remove the bullet"]);
+  assert.deepEqual(problems("- ui:\n"), ["6 folded folder ui needs its reason: why it belongs to this component"]);
+  assert.deepEqual(problems("- ui: controls\n- ui: again\n"), ["7 folded folder ui declared twice"]);
+  assert.deepEqual(problems("- the ui folder: controls\n"), ["6 a folded folder is one bullet, with no lines under it: - <folder, relative to this spec>: <why it belongs to this component>, or - <folder>/**: <why its whole subtree does>"]);
+  assert.deepEqual(problems("- ui: controls\n  because: why\n"), ["7 a folded folder is one bullet, with no lines under it: - <folder, relative to this spec>: <why it belongs to this component>, or - <folder>/**: <why its whole subtree does>"]);
+});
+
 test("the model: a handler is declared as its file's language declares one: a Rust item, a Python def, a TypeScript export, each read by its language's plugin", () => {
   const spec = (handlers: string): Record<string, string> => ({
     "Core.spec.md": `# Core\n\nA document core.\n\n## trust levels\n- public (outside): anyone on the network\n\n## entrances\n${handlers}\n## invariants\n`,
