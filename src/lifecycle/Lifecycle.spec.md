@@ -12,7 +12,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
 - UserPromptSubmit: a human sends a prompt; the peer feed injects what peers recorded since the last look
   handler: runHook in hook.ts
   trust: harness
-- PostToolUse: a tool finished; the edit is checked, the read trace recorded, and the peer feed and vocabulary changes injected
+- PostToolUse: a tool finished; the edit is checked, a written spec's problems said, the read trace recorded, and the peer feed and vocabulary changes injected
   handler: runHook in hook.ts
   trust: harness
 - Stop: the session is about to stop; regulate reports what it owes
@@ -315,6 +315,18 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects dismissed: the run is appended before the text is printed, and printing is not irreversible
   checklist: circuit-breaker-policy dismissed: an unavailable instrument is reported as such, never routed around
   checklist: declared-target-coverage dismissed: one file per event, not a registry of targets
+- a spec problem is said at the edit that writes it: After a file-writing tool writes a spec or practice file the model reads, that file alone is parsed again and each of its problems is added to the edit's context by file and line, as advice; a file is named again only when its problems change, lines aside, and one whose problems are gone is forgotten, so a problem that returns is said again.
+  over: an entry spec written with the umami adoption's misplaced (outside) marker, the same problems with their lines moved, a second problem added, the fix, the problem returning, and another session
+  via: an edit that writes a spec problem names it by file and line in the same turn, and again only when the file's problems change
+  because: the umami adoption wrote - visitor: (outside) ... and an edit to that spec said nothing; orient said only a count, and the stop named the problems to the user, not the agent, so the agent learned of them from a reading that looked wrong; one file's parse is milliseconds, where the whole model at an edit would spend the tool hook's budget
+  crossing: project-source -> reading
+  refuted: left the spec alarm's text out of PostToolUse's context, so an edit writing - visitor: (outside) ... said nothing, as before the fix -> the totality oracle went red in spec-at-edit.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-28)
+  kinds: output
+  checklist: destination-confinement dismissed: one destination, the host's additionalContext, and no redirect
+  checklist: redaction dismissed: a problem is the spec's own text, by file and line, and the spec is the adopter's to read
+  checklist: commit-ordered-effects dismissed: what was said is kept only after the text reached the host, and saying it again is the failure direction
+  checklist: circuit-breaker-policy dismissed: no dependency is sampled; a file that cannot be parsed is said as unchecked
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
 - install keeps other hooks: Installing the hook merges one Coherence entry per event into the host's settings, keeps every hook that is not ours, owns only a command that names this tool's binary or its own cli path, and replaces that command on a second pass.
   protects: mergeHooks
   chokepoint: install
