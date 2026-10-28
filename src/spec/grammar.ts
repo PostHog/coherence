@@ -93,6 +93,11 @@ export interface TrustLevel {
 /** The marker a trust level wears when it comes from outside the system's control. */
 export const OUTSIDE_MARKER = "(outside)";
 
+/** The marker written where it marks nothing: in a meaning, or on a bullet that is not a trust level. */
+const STRAY_OUTSIDE = /\(outside\)/i;
+/** The marker ending an entrance's or an invariant's name, as on a trust level; a route group such as (outside)/page is a path, not a marker. */
+const STRAY_OUTSIDE_NAME = /\s\(outside\)$/i;
+
 /**
  * Where work enters the system from outside: a command, a host event, a
  * route, a tool. The handler is the code that receives it, named as a symbol,
@@ -489,6 +494,13 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
           else problem(line, `trust level ${marked[1]} is marked ${marked[2]}; the one marker is ${OUTSIDE_MARKER}, for a level from outside the system's control`);
           name = marked[1]!;
         }
+        // A marker anywhere but after the name marks nothing, and the level would read as inside: refused, never ignored.
+        const stray = /\([^()]*\)/.exec(name)?.[0] ?? (STRAY_OUTSIDE.test(meaning) ? OUTSIDE_MARKER : undefined);
+        if (stray !== undefined) {
+          const bare = name.replace(/\s*\([^()]*\)\s*/g, " ").trim();
+          problem(line, `trust level ${bare} carries ${stray} where it marks nothing, so it reads as inside; the marker follows the name: - ${bare} ${OUTSIDE_MARKER}: <one-line meaning>`);
+          name = bare;
+        }
         if (meaning === "") problem(line, `trust level ${name} needs a one-line meaning`);
         if (trustLevels!.some((level) => level.name === name)) problem(line, `trust level ${name} declared twice`);
         trustLevels!.push({ name, meaning, outside, line });
@@ -505,6 +517,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
           }
           const name = bullet[1]!.slice(0, colon).trim();
           const meaning = bullet[1]!.slice(colon + 1).trim();
+          if (STRAY_OUTSIDE_NAME.test(name)) problem(line, `entrance ${name} carries ${OUTSIDE_MARKER}, which marks a trust level, never an entrance: name the level it carries in with trust: <a level the entry spec marks ${OUTSIDE_MARKER}>`);
           if (meaning === "") problem(line, `entrance ${name} needs a one-line meaning`);
           if (entrances.some((entrance) => entrance.name === name)) problem(line, `entrance ${name} declared twice`);
           entrances.push({ name, meaning, handler: undefined, line, handlerLine: line, trust: undefined, trustLine: undefined });
@@ -610,6 +623,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
           }
           const name = head.slice(0, colon).trim();
           const sentence = head.slice(colon + 1).trim();
+          if (STRAY_OUTSIDE_NAME.test(name)) problem(line, `invariant ${name} carries ${OUTSIDE_MARKER}, which marks a trust level, never an invariant: name the levels it checks with crossing: <trust level> -> <trust level>`);
           if (sentence === "") problem(line, `invariant ${name} needs its sentence: the abstract behavioral requirement`);
           current = { name, sentence, line, fields: [] };
           return;
@@ -627,6 +641,12 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
             return;
           }
           current.fields.push({ key: key as Key, value: field[2]!.trim(), line });
+          return;
+        }
+        // A key written in another case would fold into the value above it as prose: refused, never absorbed.
+        const miscased = /^([A-Za-z]+):/.exec(body)?.[1];
+        if (miscased !== undefined && (KEYS as readonly string[]).includes(miscased.toLowerCase())) {
+          problem(line, `key "${miscased}" is written ${miscased.toLowerCase()}:; a key in another case would read as the line above continuing`);
           return;
         }
         // A wrapped line continues the value above it, or the sentence.

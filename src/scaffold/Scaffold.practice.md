@@ -1,6 +1,6 @@
 - declare entrances: Every place work enters the project from outside is declared in the spec of the component that owns its handler, with the trust it carries in, and each untrusted one is closed or says why it needs no control.
   when: command scaffold entrances | command scaffold control
-  step: declare the trust levels in the entry spec first, marking (outside) a level whose data or caller comes from outside the system's control
+  step: declare the trust levels in the entry spec first, marking (outside) after the name a level whose data or caller comes from outside the system's control: - visitor (outside): <meaning>
   step: run coherence scaffold entrances, and declare each bullet it prints in the spec of the component that owns the handler, with its meaning and trust; or record with decide why a detected one is not an entrance
   step: name each handler as a symbol, a symbol in a file, or a module file for a script, so spec --check can resolve it
   step: close each untrusted entrance with no traced control: guard: where a verified chokepoint wraps its handler, an invariant whose crossing enters from its trust and whose entrances: line names it, or control: none with the reason; coherence scaffold control proposes which

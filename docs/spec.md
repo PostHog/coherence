@@ -198,6 +198,7 @@ module) and the chokepoint every reference passes through:
 
 ```markdown
 ## trust levels
+- visitor (outside): what anyone on the network sends
 - storage: the rows beneath everything
 - public-egress: what leaves in the clear
 
@@ -212,6 +213,12 @@ module) and the chokepoint every reference passes through:
   checklist: redaction declared as digest-only egress
   checklist: encrypted-storage dismissed: the digest is the stored form; nothing is decrypted
 ```
+
+A trust level is one bullet, `- <name>: <one-line meaning>`. A level whose
+data or caller comes from outside the system's control wears `(outside)`
+right after its name, before the colon, as `visitor` does above. Written
+anywhere else, in the meaning or before the name, the marker marks nothing
+and the level would read as inside, so the check refuses it.
 
 `protects` and `chokepoint` (and an entrance's `handler`) each name one thing,
 in one of three forms: a bare symbol (`seal`), a symbol in its file

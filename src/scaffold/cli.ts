@@ -78,7 +78,7 @@ function componentVerb(argv: string[], io: Io): void {
   const result = scaffoldComponent(io.cwd, folder, intent);
   io.out(`wrote ${result.path}`);
   if (resolve(io.cwd, folder) === resolve(io.cwd)) {
-    io.err("this is the entry spec: add ## trust levels (one bullet per level, name: meaning) before the invariants so crossings can name them");
+    io.err("this is the entry spec: add ## trust levels (one bullet per level, - <name>: <meaning>, or - <name> (outside): <meaning> for a level from outside the system's control) before the invariants so crossings can name them");
   }
 }
 
