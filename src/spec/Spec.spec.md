@@ -63,12 +63,13 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: disabled the duplicate-name problem in loadSpecModel -> "the model: names are unique within a component, declared-as names must exist, and one spec per folder" went red in spec.test.ts; restored, green (2026-09-17)
   kinds: none
-- entrance trust names a declared level: An entrance's trust: line names a trust level the entry spec declares, and a level's one marker is (outside); an unknown level, another marker, or an empty or second trust line is a problem, and a placeholder counts as absent.
-  over: every trust: line on every entrance and every marked trust level line
+- entrance trust names a declared level: An entrance's trust: line names a trust level the entry spec declares, and a level's one marker is (outside), written after its name; an unknown level, another marker, (outside) anywhere else on a trust level, entrance or invariant, a key in another case, or an empty or second trust line is a problem, and a placeholder counts as absent.
+  over: every trust: line on every entrance, every trust level line wherever it carries a marker, every entrance and invariant name, and every indented line under an invariant
   via: the model: an entrance's trust names a declared trust level, and a trust level's one marker is (outside)
   because: the ruling d-ba18b0fd: a level nobody declared is a trust nobody defined
   crossing: project-source -> reading
   refuted: dropped the unknown-level problem from entranceTrustProblems, so a trust: line naming no declared level passed -> the totality oracle went red; restored, green (2026-09-23)
+  refuted: dropped the check for (outside) in a trust level's meaning, so - visitor: (outside) ... read as inside with no problem, as the umami adoption wrote it -> the totality oracle went red; restored, green (2026-10-28)
   kinds: none
 - declared trust agrees with the handler's crossing: A declared entrance trust that differs from the entering side of a crossing whose chokepoint is its handler, in the component holding the handler, is a problem naming both.
   over: every entrance with a trust: line against every crossing-bearing invariant whose chokepoint is its handler, bare or with its file

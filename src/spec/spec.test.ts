@@ -359,6 +359,25 @@ test("the model: an entrance's trust names a declared trust level, and a trust l
   const marked = parseSpec("# A\n\nAn a.\n\n## trust levels\n- public (untrusted): anyone\n- owner (outside): the owner\n", "A.spec.md");
   assert.deepEqual(marked.trustLevels?.map((level) => [level.name, level.outside]), [["public", false], ["owner", true]]);
   assert.deepEqual(marked.problems.map((p) => p.message), ["trust level public is marked (untrusted); the one marker is (outside), for a level from outside the system's control"]);
+  // The marker anywhere but after the name marks nothing, and the level would read as inside: refused, as the umami adoption wrote it.
+  const misplaced = parseSpec("# A\n\nAn a.\n\n## trust levels\n- visitor: (outside) a browser with no credential\n- caller: an API caller (outside)\n- (outside) viewer: a share link holder\n", "A.spec.md");
+  assert.deepEqual(misplaced.trustLevels?.map((level) => [level.name, level.outside]), [["visitor", false], ["caller", false], ["viewer", false]]);
+  assert.deepEqual(misplaced.problems.map((p) => `${p.line} ${p.message}`), [
+    "6 trust level visitor carries (outside) where it marks nothing, so it reads as inside; the marker follows the name: - visitor (outside): <one-line meaning>",
+    "7 trust level caller carries (outside) where it marks nothing, so it reads as inside; the marker follows the name: - caller (outside): <one-line meaning>",
+    "8 trust level viewer carries (outside) where it marks nothing, so it reads as inside; the marker follows the name: - viewer (outside): <one-line meaning>",
+  ]);
+  // On an entrance or an invariant the marker marks nothing either; a key in another case would fold into the line above.
+  const elsewhere = parseSpec("# A\n\nAn a.\n\n## entrances\n- send (outside): a post\n  handler: send in a.ts\n\n## invariants\n- sealed (outside): A row leaves sealed.\n  over: every row\n  Via: sealed rows\n", "A.spec.md");
+  assert.deepEqual(elsewhere.problems.map((p) => `${p.line} ${p.message}`).filter((m) => !m.includes("names both over: and via:")), [
+    "6 entrance send (outside) carries (outside), which marks a trust level, never an entrance: name the level it carries in with trust: <a level the entry spec marks (outside)>",
+    "10 invariant sealed (outside) carries (outside), which marks a trust level, never an invariant: name the levels it checks with crossing: <trust level> -> <trust level>",
+    "12 key \"Via\" is written via:; a key in another case would read as the line above continuing",
+  ]);
+  // Valid inputs the check must not flag: the word outside and other parentheses in a meaning, a Next.js route group in an entrance's name, and prose wrapping under a key.
+  const valid = parseSpec("# A\n\nAn a.\n\n## trust levels\n- public (outside): what comes from outside the system's control (a browser, a cron)\n- storage: the rows beneath everything\n\n## entrances\n- page (outside)/dashboard: a page in a route group\n  handler: Page in src/app/(outside)/dashboard/page.tsx\n  trust: public\n\n## invariants\n- sealed: A row leaves sealed.\n  over: every row\n  via: sealed rows\n  because: a leak would disclose\n  Note: what it discloses is a bearer\n", "A.spec.md");
+  assert.deepEqual(valid.problems, []);
+  assert.deepEqual(valid.trustLevels?.map((level) => [level.name, level.outside]), [["public", true], ["storage", false]]);
 });
 
 test("the model: an entrance's declared trust contradicting a crossing on its handler is a problem", () => {
