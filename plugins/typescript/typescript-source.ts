@@ -69,7 +69,7 @@ export function aliasedSpecifiers(aliases: readonly PathAlias[], specifier: stri
   matching.sort((a, b) => b.prefix.length - a.prefix.length);
   return matching.flatMap((a) => {
     const middle = a.suffix === undefined ? "" : specifier.slice(a.prefix.length, specifier.length - a.suffix.length);
-    return a.targets.map((t) => (a.suffix === undefined ? t : t.replace("*", middle)));
+    return a.targets.map((t) => (a.suffix === undefined ? t : t.replace(/\*/g, () => middle)));
   });
 }
 

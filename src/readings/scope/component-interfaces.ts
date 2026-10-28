@@ -78,7 +78,7 @@ import { execFile } from "../../lifecycle/work-meter.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite, type ResolveHint, type Resolved } from "../../adapters/adapter.ts";
-import { detectEntranceCandidates, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
+import { detectEntranceCandidates, escape, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
 import { configRecord } from "../../adapters/project-config.ts";
 import { instrumentFor, type Language } from "../../adapters/index.ts";
@@ -244,7 +244,7 @@ export function guardsOf(start: string, nodes: ReadonlyMap<string, ReachNode>, c
 /** The argument text of every call to `symbol` in the text (`symbol(...)` or `x.symbol(...)`), brackets and strings balanced. */
 export function callArguments(text: string, symbol: string): string[] {
   const out: string[] = [];
-  const call = new RegExp(`(^|[^\\w$])${symbol.replace(/\$/g, "\\$")}\\s*\\(`, "g");
+  const call = new RegExp(`(^|[^\\w$])${escape(symbol)}\\s*\\(`, "g");
   for (let m = call.exec(text); m !== null; m = call.exec(text)) {
     const open = m.index + m[0].length - 1;
     let depth = 0;
@@ -303,7 +303,7 @@ export function declarationText(lines: readonly string[], start: number, end: nu
  */
 export function switchesOff(text: string, symbol: string, option: string): boolean {
   const calls = callArguments(text, symbol);
-  const off = new RegExp(`(^|[^\\w$])${option.replace(/\$/g, "\\$")}\\s*:\\s*true(?![\\w$])`);
+  const off = new RegExp(`(^|[^\\w$])${escape(option)}\\s*:\\s*true(?![\\w$])`);
   return calls.length > 0 && calls.every((args) => off.test(args));
 }
 
