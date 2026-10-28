@@ -72,7 +72,8 @@ export function renderConnection(state: ShellState): Markup | null {
 /**
  * The masthead leads with health: one verdict in large type, the link to its
  * set on the Structure map (the broken component's mark when one component
- * holds everything broken), and what else the verdict leaves out beneath it.
+ * holds everything broken), and what else the verdict leaves out beneath it,
+ * the undeclared entrances among it as a neutral count.
  * The lexicon and the record counts are demoted to one small line.
  */
 export function renderMasthead(state: ShellState): Markup {
@@ -89,6 +90,8 @@ export function renderMasthead(state: ShellState): Markup {
     verdict.kind === "broken" && requirements > 0 ? `${requirements} ${requirements === 1 ? "requirement" : "requirements"} not enforced yet` : "",
     verdict.kind === "nothing" ? `${requirements} ${requirements === 1 ? "requirement" : "requirements"} declared, none enforced` : "",
     model.health.uncovered.length > 0 ? plural(model.health.uncovered.length, "component not covered", "components not covered") : "",
+    // Undeclared is the normal state of a detected entrance, never a gap: a neutral count, kept in view so it is never a quiet place to leave routes (d-a1095ef2).
+    model.coverage !== undefined && model.coverage.uncovered.length > 0 ? `${model.coverage.uncovered.length} of ${plural(model.coverage.detected, "entrance", "entrances")} undeclared` : "",
   ].filter(Boolean).join(" · ");
   return html`<div class="masthead">
     <p class="reading-name">Scope</p>

@@ -6,7 +6,9 @@
  * the chokepoint verdicts of the CI session's run, the spec gaps (entrances
  * with outside or unknown trust and no traced control, from the Structure
  * reading, taken when none describes the tree), and the guard failures of
- * the defect floor. Findings never make it fail; it fails only when
+ * the defect floor; and, as a neutral count beneath the findings, how many
+ * detected entrances no spec declares, the normal state of a detected
+ * entrance and never a finding. Findings never make it fail; it fails only when
  * Coherence did not finish: a project with no run in the session, or a
  * chokepoint the run could not check. Either way the document says so.
  */
@@ -19,6 +21,7 @@ import type { Io } from "../journal/cli.ts";
 import { readComponentInterfaces } from "../readings/scope/component-interfaces.ts";
 import { CLOSE_STEPS, currentGaps, gapsOf, readAndRecord, readGapBaseline, structureState, type Gap } from "../readings/scope/gaps.ts";
 import { flowOf } from "../readings/scope/structure-flow.ts";
+import { undeclaredOf } from "../readings/scope/undeclared.ts";
 import { changedSince } from "../observation/observed.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { CI_USAGE, REPORT_MARKER } from "./ci.ts";
@@ -62,6 +65,8 @@ export interface ProjectReport {
   baselined: Set<string>;
   /** Undefined when the report was given no base to diff against. */
   changed?: ChangedRead | undefined;
+  /** The detected entrances and how many of them no spec declares; undefined when nothing was detected. */
+  entrances?: { detected: number; undeclared: number } | undefined;
 }
 
 export interface Report {
@@ -294,9 +299,14 @@ export function renderReport(
   const read = `This check read ${plural(components, "part of the code", "parts of the code")} and ${plural(rules, "rule")}.`;
   const ran = checked === 0 ? "" : ` It checked ${plural(checked, "rule")}. ${plural(passing, "rule")} ${passing === 1 ? "passes" : "pass"}.`;
   const head = [REPORT_MARKER, "## Coherence", ""];
+  const detected = projects.reduce((n, p) => n + (p.entrances?.detected ?? 0), 0);
+  const undeclared = projects.reduce((n, p) => n + (p.entrances?.undeclared ?? 0), 0);
+  // Undeclared is the normal state of a detected entrance, never a finding: a plain count beneath the findings, no icon and no alert, so it stays in view without reading as a fault.
+  const surface = undeclared === 0 ? [] : [`Specs describe ${detected - undeclared} of the ${plural(detected, "place")} where work comes into the code. The other ${undeclared} ${undeclared === 1 ? "is" : "are"} not described yet. That is normal, and ${undeclared === 1 ? "it is" : "they are"} not counted above.`, ""];
   head.push(
     `**📄 ${plural(problems, "spec file error")} · ⛔ ${plural(fails, "broken rule")} · 🚪 ${plural(gaps, "unchecked input")} · 🐛 ${plural(guards, "bug that came back", "bugs that came back")}**${projects.length > 1 ? ` in ${plural(projects.length, "project")}` : ""}`,
     "",
+    ...surface,
     ...folded("What is Coherence?", ABOUT, read + ran),
   );
   const reads: ChangedWhere[] = projects.map((p) => ({ where: p.name === "." ? "" : ` in ${cell(p.name)}`, changed: p.changed }));
@@ -335,9 +345,20 @@ export async function buildReport(given: string, session: string, readGapsOf: Ga
       gaps: await readGapsOf(project, model),
       baselined: baseline?.entrances ?? new Set(),
       changed: base === undefined ? undefined : changedRead(changedSince(project, base)),
+      entrances: entrancesOf(project, model),
     });
   }
   return renderReport(projects, session, atTop ? { problems: registryProblems(registry.top), changed: base === undefined ? undefined : changedRead(changedSince(root, base)) } : undefined);
+}
+
+/** How many entrances the rules detect in a project and how many of them no spec declares; undefined when nothing is detected or detection fails. */
+function entrancesOf(root: string, model: SpecModel): { detected: number; undeclared: number } | undefined {
+  try {
+    const state = undeclaredOf(root, model);
+    return state === undefined ? undefined : { detected: state.detected, undeclared: state.undeclared.length };
+  } catch {
+    return undefined;
+  }
 }
 
 function changedRead(files: string[] | string): ChangedRead {

@@ -201,7 +201,7 @@ function nodeIs(node: ReachNode, named: { symbol?: string; file?: string }, fold
   return named.symbol === undefined ? inFile && node.name !== "" : node.name === named.symbol && inFile;
 }
 
-interface ChokepointTarget {
+export interface ChokepointTarget {
   component: string;
   name: string;
   chokepoint: { symbol?: string; file?: string };
@@ -209,7 +209,7 @@ interface ChokepointTarget {
 }
 
 /** Every chokepoint an invariant declares, with its protected thing, as reach nodes can be matched against. */
-function chokepointTargets(model: SpecModel): ChokepointTarget[] {
+export function chokepointTargets(model: Pick<SpecModel, "components">): ChokepointTarget[] {
   return model.components.flatMap((component) =>
     component.invariants.flatMap((invariant) =>
       invariant.enforcements.flatMap((e): ChokepointTarget[] => {

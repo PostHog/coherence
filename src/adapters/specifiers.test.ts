@@ -6,7 +6,11 @@
  */
 
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { importsOf, resolveModule } from "../economy/source.ts";
 import { projectSources, resolveSpecifier, seedFile, specifierCandidates } from "../../plugins/typescript/typescript.ts";
 
 test("a NodeNext specifier written with .js names the TypeScript source first, and the JavaScript file only where that is what exists", () => {
@@ -37,4 +41,33 @@ test("compiled JavaScript a repository tracks beside its TypeScript is not a sou
   assert.equal(seedFile(tracked), "src/bar.ts", "the seed is a TypeScript file, never the compiled copy that sorts first");
   assert.deepEqual(projectSources(["src/a.mjs", "src/b.js", "README.md"]), ["src/a.mjs", "src/b.js"], "a project with no TypeScript is written in JavaScript");
   assert.equal(seedFile(["lib/types.d.ts", "src/a.mjs"]), "src/a.mjs", "a declaration file is neither language's source");
+});
+
+test("a specifier the project's tsconfig paths alias names the project file it aliases, longest pattern first, an exact pattern only when written whole, and a package never", () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-alias-"));
+  try {
+    const files: Record<string, string> = {
+      "tsconfig.json": `{\n  // Next.js writes comments and trailing commas\n  "compilerOptions": {\n    "baseUrl": ".",\n    "paths": { "@/*": ["./src/*"], "@/lib/*": ["./packages/lib/*"], "config": ["./config/index.ts"], },\n  },\n}\n`,
+      "src/app/page.ts": "import { load } from '@/lib/load'\nimport { x } from '@/util'\nimport conf from 'config'\nimport react from 'react'\nimport { y } from '@/missing'\n",
+      "src/util.ts": "export const x = 1\n",
+      "packages/lib/load.ts": "export function load() {}\n",
+      "src/lib/load.ts": "export function load() {}\n",
+      "config/index.ts": "export default {}\n",
+    };
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(join(root, dirname(file)), { recursive: true });
+      writeFileSync(join(root, file), text);
+    }
+    assert.equal(resolveModule(root, "src/app/page.ts", "@/util", "typescript"), "src/util.ts", "@/* to ./src/*");
+    assert.equal(resolveModule(root, "src/app/page.ts", "@/lib/load", "typescript"), "packages/lib/load.ts", "the longer pattern wins, as the compiler picks it");
+    assert.equal(resolveModule(root, "src/app/page.ts", "config", "typescript"), "config/index.ts", "an exact pattern");
+    assert.equal(resolveModule(root, "src/app/page.ts", "config/other", "typescript"), undefined, "an exact pattern matches only when written whole");
+    assert.equal(resolveModule(root, "src/app/page.ts", "react", "typescript"), undefined, "a package no pattern names is never a project file");
+    assert.equal(resolveModule(root, "src/app/page.ts", "@/missing", "typescript"), undefined, "an alias to a file that is not there resolves to nothing, never a guess");
+    assert.deepEqual(importsOf(root, "src/app/page.ts", files["src/app/page.ts"]!, "typescript").map((i) => i.module).sort(), ["config/index.ts", "packages/lib/load.ts", "src/util.ts"], "the import scan reads through them");
+    writeFileSync(join(root, "tsconfig.json"), "{ not json");
+    assert.equal(resolveModule(root, "src/app/page.ts", "@/util", "typescript"), undefined, "an unreadable tsconfig aliases nothing");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -89,11 +89,12 @@ export interface VerifierForm {
   match?: string;
 }
 
-/** One entrance detection rule as the readings print it: its name, its plural, and what it detects. */
+/** One entrance detection rule as the readings print it: its name, its plural, what it detects, and whether a request from off the machine reaches it (what the rank of undeclared entrances reads as outside). */
 export interface EntranceRule {
   rule: string;
   plural: string;
   detects: string;
+  remote?: boolean;
 }
 
 /** A folder the walks leave out because the language's tools made it: by a marker file inside it, or by its name beside a marker file. */

@@ -58,12 +58,14 @@
       {
         "rule": "http route",
         "plural": "http routes",
-        "detects": "a handler registered on a net/http ServeMux with a pattern: http.HandleFunc(\"/path\", handler), mux.Handle(\"GET /rows/{id}\", h), or a router of the same shape (gorilla/mux's HandleFunc)"
+        "detects": "a handler registered on a net/http ServeMux with a pattern: http.HandleFunc(\"/path\", handler), mux.Handle(\"GET /rows/{id}\", h), or a router of the same shape (gorilla/mux's HandleFunc)",
+        "remote": true
       },
       {
         "rule": "router route",
         "plural": "router routes",
-        "detects": "a handler a router's method route names, r.GET(\"/path\", handler) (gin, echo) or r.Get(\"/path\", handler) (chi, fiber), in a file that imports that router"
+        "detects": "a handler a router's method route names, r.GET(\"/path\", handler) (gin, echo) or r.Get(\"/path\", handler) (chi, fiber), in a file that imports that router",
+        "remote": true
       },
       {
         "rule": "cgo export",

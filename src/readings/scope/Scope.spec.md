@@ -411,6 +411,13 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   crossing: project-source -> reading
   refuted: counted every covered detected entrance as covered individually, ignoring how many its entrance stands for, in coverageOf -> the totality oracle went red; restored, green (2026-09-28)
   kinds: none
+- undeclared entrances are a neutral count: Scope's masthead gives how many of the detected entrances are undeclared beneath the verdict, in its quiet ink, and the health strip's coverage line gives the same count against what is detected, never in the attention color nor as a gap; nothing when none is detected or every one is declared.
+  over: the check fixture with two undeclared detected entrances, and the same with none detected
+  via: undeclared entrances are a neutral count: the masthead and the health strip give how many of the detected are undeclared, in quiet ink, never in the attention color nor as a gap
+  because: d-a37af46f: undeclared is the normal state of a detected entrance, and the strip showed the count in amber, the color of no traced control, so a first adoption read its whole undeclared surface as findings; kept in the masthead so it is never a quiet place to leave routes (d-a1095ef2)
+  crossing: project-source -> reading
+  refuted: put the attention color back on the health strip's undeclared count, in renderCoverage -> "undeclared entrances are a neutral count: the masthead and the health strip give how many of the detected are undeclared, in quiet ink, never in the attention color nor as a gap" went red in entrance-coverage.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-28)
+  kinds: none
 - a component selection shows direction: Selecting a component draws its callers and its callees apart (solid and dashed, as stations and as lines, with or without motion), and its inspector gives its verdict, then who depends on it, then what it uses, then its invariants, the first few shown and the rest folded.
   over: the callers, callees and lines of a selected component in the flow and broken fixtures, and the order of its inspector for a component with more invariants than it shows
   via: a selected component shows direction: its callers and callees are drawn apart, and its inspector gives its verdict, then who depends on it and what it uses, then its invariants, the first few shown and the rest folded

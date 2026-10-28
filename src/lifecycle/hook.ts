@@ -108,7 +108,7 @@ import { currentReading, editVocabulary, headCommit, keptReading } from "./vocab
 import { mirrorBlock, refreshMirrorsInBackground } from "../readings/mirrors/recorded.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
-import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
+import { orientUndeclaredText, rankNow, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
 import { baselinePath, coverageChanges, deliverCandidates, heldCandidates, holdCandidates, introducedCandidates, pendingCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 import { namesWrittenFiles, writtenNames } from "./host-tools.ts";
@@ -1130,10 +1130,10 @@ export async function gapStopText(root: string, input: HookInput, changed: reado
   }
 }
 
-/** Regulate's coverage lines: the undeclared entrances in the files this session changed, advisory, or nothing. */
+/** Regulate's coverage line: the first-ranked undeclared entrance in the files this session changed, advisory, or nothing. */
 export async function undeclaredStopText(root: string, changed: readonly string[]): Promise<string> {
   if (changed.length === 0) return "";
-  return regulateUndeclaredText(changed, undeclaredNow(root), await cliName(root));
+  return regulateUndeclaredText(changed, undeclaredNow(root), await cliName(root), (candidates, detected) => rankNow(root, candidates, detected));
 }
 
 /** Where a project keeps its hook voice: `<Event>.override.md` and `<Event>.append.md` under the root. */

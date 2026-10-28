@@ -20,6 +20,7 @@ import type { Gap } from "../readings/scope/gaps.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { buildReport, ciReportCommand, renderReport, type GapReader, type ProjectReport } from "./ci-report.ts";
 import { cli } from "./cli-fixture.ts";
+import { undeclaredProject } from "../readings/scope/undeclared-fixture.ts";
 import { ciInstallCommand, ciSuggestion, CiError, planWorkflow, REPORT_MARKER, WORKFLOW_PATH, workflowText } from "./ci.ts";
 
 
@@ -552,5 +553,21 @@ test("run at a registry's top runs each listed project from its own folder, its 
     assert.match(report.markdown, /1 broken rule/);
   } finally {
     await stopWarmServers(top);
+  }
+});
+
+test("ci report counts the undeclared entrances beneath the findings as the normal state of a detected entrance, never as a finding, and says nothing when every detected entrance is declared", async () => {
+  const { root, remove } = undeclaredProject();
+  try {
+    const report = await buildReport(root, "ci-u", async () => ({ gaps: [] }));
+    assert.match(report.markdown, /\n\nSpecs describe 1 of the 7 places where work comes into the code\. The other 6 are not described yet\. That is normal, and they are not counted above\.\n/, "the count, from the tree as it stands");
+    assert.match(report.markdown, /🚪 0 unchecked inputs/, "and never among the findings");
+    const line = report.markdown.split("\n").find((l) => l.startsWith("Specs describe"))!;
+    assert.doesNotMatch(line, /[🚪⛔📄🐛]|\[!/u, "no icon and no alert: nothing to fix");
+    const model = loadSpecModel(root);
+    const all = renderReport([{ name: ".", model, runs: [], gaps: { gaps: [] }, baselined: new Set(), entrances: { detected: 7, undeclared: 0 } }], "ci-u", undefined);
+    assert.doesNotMatch(all.markdown, /Specs describe/, "every detected entrance declared: nothing said");
+  } finally {
+    remove();
   }
 });

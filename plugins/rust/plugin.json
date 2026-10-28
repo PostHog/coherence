@@ -44,12 +44,14 @@
       {
         "rule": "route attribute",
         "plural": "route attributes",
-        "detects": "a function carrying #[get(\"/path\")], #[post], #[put], #[patch], #[delete], #[head], #[options] or #[route] (actix-web, Rocket)"
+        "detects": "a function carrying #[get(\"/path\")], #[post], #[put], #[patch], #[delete], #[head], #[options] or #[route] (actix-web, Rocket)",
+        "remote": true
       },
       {
         "rule": "route registration",
         "plural": "route registrations",
-        "detects": "a handler a router's .route(\"/path\", …) names: get(handler), post(handler) and the rest (axum), or .to(handler) (actix-web)"
+        "detects": "a handler a router's .route(\"/path\", …) names: get(handler), post(handler) and the rest (axum), or .to(handler) (actix-web)",
+        "remote": true
       },
       {
         "rule": "foreign export",

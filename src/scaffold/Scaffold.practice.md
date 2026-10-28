@@ -1,7 +1,10 @@
-- declare entrances: Every place work enters the project from outside is declared in the spec of the component that owns its handler, with the trust it carries in, and each untrusted one is closed or says why it needs no control.
+- declare entrances: The entrances whose declaration pays most are declared in the spec of the component that owns each handler, with the trust it carries in, and each untrusted one is closed or says why it needs no control; the rest stay undeclared, the normal state of a detected entrance, counted and never a gap.
   when: command scaffold entrances | command scaffold control
   step: declare the trust levels in the entry spec first, marking (outside) a level whose data or caller comes from outside the system's control
-  step: run coherence scaffold entrances, and declare each bullet it prints in the spec of the component that owns the handler, with its meaning and trust; or record with decide why a detected one is not an entrance
+  step: where many entrances go through one helper their handlers call (every API route calling one request-and-auth function), declare them as one grouped entrance whose handler is that helper, with the trust they carry in; then run coherence scaffold entrances again, and the entrances that skip the helper rank first
+  step: run coherence scaffold entrances: it ranks the undeclared entrances (those that skip a grouped entrance's helper, then outside trust, then a handler that writes, then a thing a chokepoint protects that its imports reach, then the components they reach) and proposes bullets for the first 15
+  step: declare the first 10 to 20 it ranks, and every one after them that carries outside trust in and writes (--all lists them in the same order), each in the spec of the component that owns its handler, with its meaning and the trust you judged it carries; or record with decide why a detected one is not an entrance
+  step: leave the rest undeclared; never declare an entrance whose trust no one judged, assigned by rule from its route family, since a declared untrusted entrance is a spec gap until it is closed
   step: name each handler as a symbol, a symbol in a file, or a module file for a script, so spec --check can resolve it
   step: close each untrusted entrance with no traced control: guard: where a verified chokepoint wraps its handler, an invariant whose crossing enters from its trust and whose entrances: line names it, or control: none with the reason; coherence scaffold control proposes which
   step: record the adoption baseline once, so orient names only gaps opened after it: coherence scaffold control --baseline
@@ -11,10 +14,12 @@
   pitfall: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2)
   pitfall: no control read as a demonstrated bypass; it means only that no control was traced (d-127ab8e4)
   pitfall: thirteen HTTP entrances reached no other component by static reference, so their routes showed nothing past routing (c-67ae21bd)
-  learned: d-6022598c, d-ba18b0fd, d-a1095ef2
-  invariants: src/spec/entrance trust names a declared level, src/spec/control none carries its reason
+  pitfall: an adoption of umami declared all 280 detected entrances with trust assigned by route family and no one judging any, and the 263 gaps that followed buried its first reading (d-a37af46f)
+  pitfall: 181 API routes that all call one request-and-auth helper were declared one by one, and no chokepoint fit the helper, which has other callers; one grouped entrance whose handler is the helper stands for them (d-34480e8d)
+  learned: d-6022598c, d-ba18b0fd, d-a1095ef2, d-a37af46f, d-34480e8d
+  invariants: src/spec/entrance trust names a declared level, src/spec/control none carries its reason, src/scaffold/undeclared entrances are ranked by what declaring them pays, src/scaffold/a family's skipped members rank first
   reach: kernel
-  because: an entrance is where untrusted work arrives, and a session sees only what is declared; an undeclared one is a route nobody checks, and an unclosed one reads as safe until someone asks
+  because: an entrance is where untrusted work arrives, and a session sees only what is declared; an unclosed one reads as safe until someone asks. Declaring is a judgment of who calls it and what it carries, so a declaration made by rule carries none, and the ranked few a session can judge are worth more than a whole surface declared by pattern
 - declare a requirement: A requirement is written as behavior that must hold, with an enforcement the instrument can resolve, an honest checklist, and its because, so that the refutation that follows has something real to break.
   when: command scaffold invariant
   step: write the sentence as behavior that must hold whatever the implementation, not as the mechanism that holds it today

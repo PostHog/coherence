@@ -401,6 +401,13 @@ The language adapter seam: how to ask a language's server for definitions, refer
   because: reach follows these imports; ripgrep's binary lives at crates/core/main.rs outside any src folder, axum's crates import each other by package name, and a case-insensitive disk found flags/HiArgs.rs for hiargs.rs
   refuted: resolved no path into another crate of the workspace (rust-source.ts) -> "a Rust path resolves by its crate's folder layout: crate, self, super and a module of the file's own, a.rs or a/mod.rs, a crate of the workspace by its package name, a [[bin]] root's modules beside it, and only under the file's exact spelling" went red in rust-source.test.ts; restored from a copy, byte for byte, green (2026-10-23)
   kinds: none
+- a TypeScript path alias resolves to the file it aliases: A non-relative specifier that a pattern of the project tsconfig.json's compilerOptions.paths matches (against its baseUrl, comments and trailing commas allowed) resolves as the file its target names would, the longest pattern first, an exact pattern only when written whole; a specifier no pattern matches, an alias to no file and an unreadable tsconfig resolve to nothing.
+  over: @/* and @/lib/* over two folders, an exact pattern and a path under it, a package, an alias to a missing file, the import scan of a file using them, and a tsconfig that does not parse
+  via: a specifier the project's tsconfig paths alias names the project file it aliases, longest pattern first, an exact pattern only when written whole, and a package never
+  because: d-2fe050e9: every umami route imports through @/*, so the static reach the rank of undeclared entrances, economy and mass follow stopped at the route's own file and every route reached one component
+  crossing: project-source -> reading
+  refuted: made the TypeScript resolver ignore tsconfig paths again, resolving only a relative specifier, in TYPESCRIPT_RESOLVE -> "a specifier the project's tsconfig paths alias names the project file it aliases, longest pattern first, an exact pattern only when written whole, and a package never" went red in specifiers.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-28)
+  kinds: none
 - mass reads Rust: Mass reads a Rust project as it reads the other languages: its files counted, its reach followed through use trees and mod declarations, and Rust never named not read.
   over: a crate with a spec'd component, a reached and an unreached module
   via: mass reads a Rust project as it reads the other languages: its files counted, reach followed through its use trees and mod declarations, and no language named not read

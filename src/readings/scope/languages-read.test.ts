@@ -79,7 +79,7 @@ test("no reading takes the primary language alone without naming the languages i
     const model = loadSpecModel(root, { runs: false });
     const rendered: Record<string, string> = {
       mass: formatMass({ ...computeMass(root), languages: unread }),
-      "scaffold entrances": renderEntrances({ groups: [], detected: 0, declared: 0, target: undefined, levels: [], cli: "coherence", languages: unread }),
+      "scaffold entrances": renderEntrances({ ranked: [], components: [], first: undefined, detected: 0, declared: 0, target: undefined, levels: [], cli: "coherence", languages: unread }),
       observation: formatObservationSummary(
         buildObservation({ root, realRoot: root, capture: { runner: "pytest", attribution: "per test", note: "n", tests: [] }, map: { symbols: [], entrances: [] }, model, config, vias: [], at: "", session: "s", agent: "a", binding: {}, commit: null, dirty: false, latency: { pass: 0, map: 0 }, languages: unread }),
       ),
