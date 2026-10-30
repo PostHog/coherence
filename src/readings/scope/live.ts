@@ -261,6 +261,8 @@ class LiveReading implements HttpApp {
   private reliefAgain = false;
   /** A commit, checkout or fetch settling before the relief is read again: git rewrites several refs for one. */
   private reliefTimer: NodeJS.Timeout | undefined;
+  /** In a checkout, a save to a page source settling before the page is rebuilt: cleared by close, so no build starts after it. */
+  private shellTimer: NodeJS.Timeout | undefined;
   /** Where git records what moves the relief, located when the watch starts; undefined outside a repository. */
   private git: GitRecords | undefined;
 
@@ -445,19 +447,20 @@ class LiveReading implements HttpApp {
     }
     // In a checkout the page is bundled from sources that can change under this server: a change to one rebuilds the page and reloads it.
     if (FROM_SOURCES) {
-      let pending: NodeJS.Timeout | undefined;
       try {
         const watcher = watch(SOURCE_FOLDER, { recursive: true }, (_event, name) => {
           // Only a file the page is built from rebuilds it: a server-side edit leaves open pages, and what they show, alone.
-          if (name === null || !isPageSource(resolve(SOURCE_FOLDER, String(name)))) return;
-          clearTimeout(pending);
+          if (this.closed || name === null || !isPageSource(resolve(SOURCE_FOLDER, String(name)))) return;
+          clearTimeout(this.shellTimer);
           // Open pages reload only onto a page that built; a broken save leaves them where they are.
-          pending = setTimeout(() => {
+          this.shellTimer = setTimeout(() => {
+            this.shellTimer = undefined;
+            if (this.closed) return;
             void this.shell.rebuild().then((replaced) => {
               if (replaced && !this.closed) this.send("shell", {});
             });
           }, 300);
-          pending.unref();
+          this.shellTimer.unref();
         });
         watcher.on("error", () => {});
         this.watchers.push(watcher);
@@ -783,6 +786,7 @@ class LiveReading implements HttpApp {
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
     clearTimeout(this.reliefTimer);
+    clearTimeout(this.shellTimer);
     for (const watcher of this.watchers) watcher.close();
     this.watchers.length = 0;
     this.traced.cancel();

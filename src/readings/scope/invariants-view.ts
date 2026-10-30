@@ -2,12 +2,14 @@
  * The Invariants view: every bullet with its lifecycle state, enforcement
  * form, chokepoint grade with the rung's enforcer, crossing, because,
  * refutation, checklist, and what it lacks. A structural defect shows its
- * bypass sites and the two honest options. Filtered by state and component,
- * searched by text. A pure function from the shell state to markup.
+ * bypass sites and the two honest options. A chokepoint invariant carries its
+ * reliance listing, folded: every recorded reference site to the chokepoint
+ * or the protected thing. Filtered by state and component, searched by text.
+ * A pure function from the shell state to markup.
  */
 
-import { allInvariants, componentId, defectsOf, invariantId, isKept, latestOf, latestRun, plural, relianceId, stamp, textMatches } from "./derive.ts";
-import { html, type Markup } from "./html.ts";
+import { allInvariants, componentId, defectsOf, invariantId, isKept, latestOf, latestRun, plural, relianceId, relianceOf, stamp, textMatches, type Reliance, type RelianceSite } from "./derive.ts";
+import { html, join, type Markup } from "./html.ts";
 import type { LatestEntry, LifecycleState, RunRecord, ShellState, SpecEnforcement, SpecInvariant, TrustLevel } from "./model.ts";
 
 const STATES: readonly LifecycleState[] = ["requirement", "invariant", "structural defect"];
@@ -160,6 +162,59 @@ function renderDefect(invariant: SpecInvariant, runs: readonly RunRecord[]): Mar
   </section>`;
 }
 
+/**
+ * The sites the page's window counted and did not list, said with where they
+ * are: the live page loads them from its server, and a snapshot names the
+ * query that lists every one.
+ */
+function renderSitesLeft(state: ShellState, entry: LatestEntry, chokepoint: string, left: number): Markup {
+  const by = new Map<string, number>();
+  for (const tally of entry.sitesLeft ?? []) by.set(tally.component ?? "", (by.get(tally.component ?? "") ?? 0) + tally.count);
+  const where = [...by.entries()].map(([folder, count]) => `${count} in ${folder === "" ? "no declared component" : folder === "." ? "the root" : folder}`).join(", ");
+  const said = `${plural(left, "more site is", "more sites are")} counted and not listed (${where})`;
+  return state.connection?.mode === "live"
+    ? html`<p class="quiet" data-field="sites-left" data-left="${left}">${said}. <button type="button" class="history-load" data-load-sites="${entry.at}~${entry.session}" data-component="${entry.component}" data-name="${entry.name}">Load the other ${left}</button></p>`
+    : html`<p class="quiet" data-field="sites-left" data-left="${left}">${said}: <code>query relies-on ${chokepoint}</code> lists every one, from the run under <code>.coherence/runs</code>.</p>`;
+}
+
+/** One reference site: where it is, what it references, how it is classified, and whether it is the owner's or a test's. */
+function renderSite(site: RelianceSite): Markup {
+  const role = site.target === "protected" && site.siteClass === "bypass"
+    ? "protected thing · bypass (not a legal chokepoint reference)"
+    : site.target === "chokepoint" && site.siteClass === "chokepoint-reference"
+      ? "chokepoint · reference (runtime call not established)"
+      : site.siteClass === "exempt"
+        ? "protected thing · exempt (from where the chokepoint does not govern; never a bypass)"
+        : site.siteClass === "inside"
+          ? `${site.target === "protected" ? "protected thing" : "chokepoint"} · inside chokepoint`
+          : `${site.target === "protected" ? "protected thing" : "chokepoint"} · ${site.siteClass}`;
+  return html`<li data-class="${site.siteClass}" data-target="${site.target}" data-test="${site.test ? "true" : "false"}" data-owner="${site.owner ? "true" : "false"}"><code>${site.file}:${site.line}</code> in <code>${site.symbol}</code> <span class="quiet">${site.component?.folder ?? "outside declared components"}</span> <span class="site-role">${role}</span>${site.form === undefined ? null : html` <span class="label">${site.form}</span>`}${site.owner ? html` <span class="label">owner</span>` : null}${site.test ? html` <span class="label">test</span>` : null}</li>`;
+}
+
+/** One chokepoint's reliance: unknown said as unknown, a complete empty list as zero, else the sites the page carries and where the rest are. */
+function renderRelianceOf(state: ShellState, reliance: Reliance): Markup {
+  const evidence = reliance.evidence;
+  if (evidence.status === "unknown") return html`<p class="quiet" data-reliance="unknown">${evidence.reason}</p>`;
+  if (evidence.sites.length === 0 && evidence.left === 0) return html`<p class="quiet" data-reliance="complete">Complete run site evidence records 0 references to the chokepoint or protected thing.</p>`;
+  return html`<p class="quiet" data-reliance="complete">${plural(evidence.sites.length + evidence.left, "recorded reference site", "recorded reference sites")} to the chokepoint or protected thing; owner component first.${evidence.left === 0 ? "" : ` This page lists ${evidence.sites.length} of them.`}</p>${evidence.left === 0 || reliance.entry === undefined ? null : renderSitesLeft(state, reliance.entry, reliance.chokepoint, evidence.left)}<ul class="site-list">${evidence.sites.map(renderSite)}</ul>`;
+}
+
+/**
+ * Who references the chokepoint: the reliance listing a human reads before
+ * acknowledging a retirement. Folded beneath the card, and open when a link
+ * landed on it or the reader opened it, which the state keeps across renders.
+ */
+function renderReliance(state: ShellState, invariant: SpecInvariant): Markup | null {
+  const readings = relianceOf(invariant, state.spec.components, state.runs.records);
+  if (readings.length === 0) return null;
+  const id = relianceId(invariant.component, invariant.name);
+  const counted = readings.map((r) => (r.evidence.status === "unknown" ? "unknown" : plural(r.evidence.sites.length + r.evidence.left, "site", "sites")));
+  return html`<details class="record reliance" id="${id}" data-field="reliance" ${state.invariants.reliance === id ? "open" : ""}>
+    <summary data-reliance-toggle="${id}"><span class="label">Reliance</span> who references this chokepoint <span class="quiet">${counted.join(", ")}</span></summary>
+    ${join(readings.map((r) => html`<section data-reliance-of="${r.chokepoint}">${readings.length > 1 ? html`<h5><code>${r.chokepoint}</code> <span class="label">protects</span> <code>${r.protects}</code></h5>` : null}${renderRelianceOf(state, r)}</section>`))}
+  </details>`;
+}
+
 function renderInvariant(state: ShellState, invariant: SpecInvariant): Markup {
   const id = invariantId(invariant.component, invariant.name);
   const component = state.spec.components.find((c) => c.folder === invariant.component);
@@ -185,9 +240,7 @@ function renderInvariant(state: ShellState, invariant: SpecInvariant): Markup {
       ${renderRefutation(invariant, state.runs.records)}
       ${renderChecklist(invariant)}
       ${renderLacks(invariant)}
-      ${invariant.enforcements.some((e) => e.form === "chokepoint")
-        ? html`<p class="related"><span class="label">Reliance</span> <a class="related-link" href="#${relianceId(invariant.component, invariant.name)}">who references this chokepoint</a></p>`
-        : null}
+      ${renderReliance(state, invariant)}
     </div>
   </article>`;
 }

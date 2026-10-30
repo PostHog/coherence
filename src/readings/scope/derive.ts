@@ -111,6 +111,7 @@ export const CONNECTIONS_PREFIX = `${CONNECTIONS_ID}--`;
 const ID_PREFIXES: [string, string][] = [
   ["component-", "components"],
   ["invariant-", "invariants"],
+  ["reliance-", "invariants"],
   ["practice-", "practices"],
   ["run-", "runs"],
   ["journal-", "journal"],
@@ -132,9 +133,10 @@ export function resolveHash(state: ShellState, hash: string): HashTarget | undef
   const text = hash.startsWith("#") ? hash.slice(1) : hash;
   if (text === "") return undefined;
   if (state.views.some((v) => v.id === text)) return { view: text, id: undefined };
-  // The relief has no cards: a link into the retired map, its Reliance view or its security spine (the masthead's
-  // verdict and an invariant's reliance link among them) opens Structure, where reliance is the Leaned on footprint.
-  if (text === "reliance" || text.startsWith("reliance-") || text.startsWith("structure-")) return { view: "structure", id: undefined };
+  // A reliance listing is on its invariant's card (its id leads with reliance-, below), so the retired Reliance view's own link opens Invariants.
+  if (text === "reliance") return { view: "invariants", id: undefined };
+  // The relief has no cards: a link into the retired map or its security spine opens Structure.
+  if (text.startsWith("structure-")) return { view: "structure", id: undefined };
   for (const [prefix, view] of ID_PREFIXES) {
     if (text.startsWith(prefix)) return { view, id: text };
   }
@@ -619,8 +621,9 @@ export function windowRuns(
 
 /**
  * The journal records a page embeds: the latest `keep`, every open
- * escalation and open defect (and the resolution of every defect kept, so
- * none reads as open that is closed), up to `cap` older records that a kept
+ * escalation and open defect (and the resolution of every defect kept and
+ * the retraction of every record kept, so none reads as open that is closed
+ * or withdrawn), up to `cap` older records that a kept
  * record or a work order cites (so a citation lands on a card; the latest
  * citers are served first), and every record one of those points at (so a
  * retraction or a close can name what it answers), in their original order. `orders` supplies the
@@ -672,6 +675,8 @@ export function windowJournal(
   }
   // A defect kept for a citation would read as open without the resolution that closed it.
   for (const defect of defects) if (defect.resolution !== undefined && kept.has(defect.id)) kept.add(defect.resolution.id);
+  // Nor may a kept record read as standing without the retraction that withdrew it: a retracted defect kept for a citation is no open defect.
+  for (const record of records) if (record.kind === "retraction" && kept.has(record.of)) kept.add(record.id);
   const window = records.filter((record) => kept.has(record.id));
   return { records: window, omitted: records.length - window.length };
 }

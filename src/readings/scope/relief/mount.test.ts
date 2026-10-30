@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ReliefReading } from "../../relief/relief.ts";
 import type { JournalRecord, ShellState } from "../model.ts";
-import { mergeSnapshot } from "../updates.ts";
+import { mergeJournal, mergeSnapshot } from "../updates.ts";
 import { reliefData, type ReliefData } from "./data.ts";
 import { filesCache, mountRelief, reliefStep } from "./mount.ts";
 import { WebGLUnavailable, type Relief, type ReliefView } from "./scene.ts";
@@ -113,6 +113,30 @@ test("the relief is built again only when what it draws changed, the old scene d
   assert.equal(made[1]!.disposed, 1, "the scene is disposed when there is nothing to draw");
 });
 
+test("a journal append that opens or closes no defect joins nothing: the relief is kept as it was built, and one that opens a defect builds it again", () => {
+  const page = stateOf(reading(), [defect("df-1", "2026-10-01T00:00:00.000Z", ["src/store/store.ts"])]);
+  const first = reliefStep(undefined, page);
+  assert.equal(first.kind, "build");
+  if (first.kind !== "build") return;
+
+  // A decision appended: the journal's records are a new array, its open defects the same.
+  assert.equal(mergeJournal(page, [{ ...head("d-1", "2026-10-02T00:00:00.000Z"), kind: "decision", chose: "c", over: [], because: "b" }]), 1);
+  const kept = reliefStep(first.built, page);
+  assert.equal(kept.kind, "keep");
+  assert.equal(kept.kind === "keep" ? kept.built : undefined, first.built, "the inputs are the ones it was built from, so the data is not joined again");
+
+  // A defect opened on a file the relief draws moves its count: the data is joined and the scene built again.
+  mergeJournal(page, [defect("df-2", "2026-10-03T00:00:00.000Z", ["src/store/store.ts"])]);
+  const opened = reliefStep(first.built, page);
+  assert.equal(opened.kind, "build", "an opened defect changes what the relief draws");
+  assert.equal(opened.kind === "build" ? opened.data.components.find((c) => c.folder === "src/store")?.v.defects : undefined, 2);
+
+  // Its resolution closes it: the drawing is the first one again, so against that build the data is joined and the scene kept.
+  mergeJournal(page, [{ ...head("rs-2", "2026-10-04T00:00:00.000Z"), kind: "resolution", of: "df-2", because: "fixed" }]);
+  assert.equal(reliefStep(opened.kind === "build" ? opened.built : first.built, page).kind, "build", "the drawing changed back from the one last built");
+  assert.equal(reliefStep(first.built, page).kind, "keep", "and against the first build it is the same drawing");
+});
+
 test("the page fetches a folder's files once per reading, again after a reread changed the reading, and again after a fetch failed", async () => {
   const asked: string[][] = [];
   let stamp = "one";
@@ -195,6 +219,15 @@ test("a relief that cannot be built gets a line in its place saying why, blaming
   assert.doesNotMatch(said.at(-1)!.textContent, /WebGL|in this browser/, "a failure of the relief's own is never put on the browser");
   mergeSnapshot(page, stateOf({ kind: "unread", because: "mass could not be read" }));
   mountRelief(root, page, {}, failing);
+});
+
+test("landings git could not read are said in the relief's notes, never passed off as flat history", () => {
+  const timedOut: ReliefReading = { ...(reading() as Extract<ReliefReading, { kind: "read" }>), head: "", landings: [], landingsUnread: "git log timed out after 60 s" };
+  const data = reliefData(stateOf(timedOut));
+  assert.ok(!("absent" in data));
+  assert.deepEqual(data.notes, ["Landings not read: git log timed out after 60 s; the heights are flat for that, not because nothing landed."]);
+  const quiet = reliefData(stateOf({ ...(reading() as Extract<ReliefReading, { kind: "read" }>), head: "", landings: [] }));
+  assert.deepEqual("absent" in quiet ? undefined : quiet.notes, [], "no history to read says nothing");
 });
 
 test("a project with no commits has a relief to draw: every component's footprint, no landing, and the snapshot empty", () => {

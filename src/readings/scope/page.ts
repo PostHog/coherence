@@ -184,6 +184,8 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
     if (target.id !== undefined) {
       const component = componentOfHash(state, target.id);
       if (component !== undefined) state.components.selected = component.folder;
+      // A link to a reliance listing lands on it open.
+      if (target.id.startsWith("reliance-")) state.invariants.reliance = target.id;
     }
     const changed = target.view !== state.activeView;
     state.activeView = target.view;
@@ -266,6 +268,17 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
       return;
     }
 
+
+    // A reliance listing opens and folds in the state, so a live update's render leaves it as the reader left it.
+    const reliance = target.closest<HTMLElement>("summary[data-reliance-toggle]");
+    if (reliance !== null) {
+      event.preventDefault();
+      const id = reliance.dataset["relianceToggle"];
+      if (id === undefined || state.invariants.reliance === id) delete state.invariants.reliance;
+      else state.invariants.reliance = id;
+      renderResults();
+      return;
+    }
 
     const select = target.closest<HTMLElement>("[data-select-component]");
     if (select !== null) {

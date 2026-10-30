@@ -126,12 +126,6 @@ export function flowRouteId(origin: { entrance: string } | { via: string }): str
   return "entrance" in origin ? origin.entrance.replace(/^structure--entrance-/, "structure--route-") : `structure--route-via-${flowSlug(origin.via)}`;
 }
 
-/** The one selection that asks what a change touches and what it weakened: the diff's place on the map. */
-export const FLOW_CHANGE_ID = "structure--change";
-
-/** The selection a reader makes by clearing: nothing lit, every route muted. An absent selection is the default story. */
-export const FLOW_NONE_ID = "structure--none";
-
 /* ---------------------------------------------------------------- types */
 
 /** Where the symbols of the component interfaces came from. */
@@ -455,11 +449,6 @@ export function flowBrokenId(folder: string): string {
   return `structure--broken-${flowSlug(folder)}`;
 }
 
-/** A component's boundary mark: selects the crossings standing inside it. */
-export function flowBoundaryId(folder: string): string {
-  return `structure--boundary-${flowSlug(folder)}`;
-}
-
 /** A multi-language project's languages as the reading read them, as a clause: each one read and each one not, with why; empty for one language. */
 export function unreadLanguagesText(model: Pick<FlowModel, "languages">): string {
   const line = languagesReadLine(model.languages);
@@ -580,9 +569,8 @@ function flowBypasses(state: ShellState, invariant: SpecInvariant): RecordedSite
 
 /* --------------------------------------------------------------- zoom */
 
-/** The folders open in place: as the state says, else every top-level component. */
+/** The folders open in place: every top-level component, so a component two levels down stands as its parent. No reader opens more since the map was retired; the zoom is query structure's. */
 export function flowExpanded(state: ShellState): Set<string> {
-  if (state.structure.expanded !== undefined) return new Set(state.structure.expanded);
   return new Set(state.spec.components.filter((component) => component.parent === undefined).map((component) => component.folder));
 }
 
@@ -1163,40 +1151,7 @@ export function flowPartialText(model: Pick<FlowModel, "partial" | "unanswered">
   return said.length === 0 ? undefined : said.join("; ");
 }
 
-/* ---------------------------------------------------------- selection */
-
-export interface FlowSelection {
-  kind: "none" | "entrance" | "route" | "level" | "component" | "edge" | "chokepoint" | "change" | "health" | "broken" | "boundary";
-  id: string | undefined;
-  /** Component folders on the story; every other component dims. */
-  nodes: Set<string>;
-  /** Interface ids on the story; every other interface dims. */
-  edges: Set<string>;
-  /** Routes on the story; every other route dims. */
-  routes: Set<string>;
-  /** Chokepoint ids whose interface identifiers light; every other identifier dims. */
-  chokepoints: Set<string>;
-  /** Component folders whose broken or boundary mark lights. */
-  marks: Set<string>;
-  /** For a component: the interfaces into it, whose callers depend on it (work travels in). */
-  into: Set<string>;
-  /** For a component: the interfaces out of it, to what it uses (work travels out). */
-  outOf: Set<string>;
-}
-
-function flowRouteLight(model: FlowModel, route: FlowRoute): Omit<FlowSelection, "kind" | "id"> {
-  const railStub = route.rail === undefined ? undefined : model.edges.find((edge) => edge.from === route.stops[route.stops.length - 1] && edge.to === route.rail);
-  const edges = new Set([...route.edges, ...(railStub === undefined ? [] : [railStub.id])]);
-  return {
-    nodes: new Set([...route.stops, ...(route.rail === undefined ? [] : [route.rail])]),
-    edges,
-    routes: new Set([route.id]),
-    chokepoints: new Set(model.identifiers.filter((i) => i.routes.includes(route.id) || i.edges.some((id) => edges.has(id))).map((i) => i.chokepoint)),
-    marks: new Set(),
-    into: new Set(),
-    outOf: new Set(),
-  };
-}
+/* ------------------------------------------------------------- health */
 
 /** The members of one health count: the invariants it counts; "broken" is the structural defects and the bypassed requirements together. */
 export function flowHealthMembers(model: FlowModel, kind: FlowHealthKind): FlowInvariantRef[] {
@@ -1231,103 +1186,10 @@ export function flowVerdict(model: FlowModel): { kind: "broken" | "nothing" | "v
   return { kind: "empty", text: "No invariant is declared", select: flowHealthId("verified") };
 }
 
-/**
- * What a selection lights. An entrance lights its structural route; a route
- * lights itself; a trust level lights every crossing that carries that class
- * of data, wherever it is drawn (its interfaces, an entrance line, a
- * component's boundary mark), and only those identifiers; a chokepoint lights
- * every interface it stands on (reliance); a component lights its direct
- * component interfaces and the components at their other ends, and keeps
- * the routes through it undimmed, never everything it transitively
- * reaches; an interface lights itself; a health count lights the components
- * and identifiers of the invariants it counts; a broken or boundary mark
- * lights its component. The change selection lights nothing until two
- * states are compared. An id that names nothing selects nothing.
- */
-export function flowSelection(model: FlowModel, selected: string | undefined): FlowSelection {
-  const none: FlowSelection = { kind: "none", id: undefined, nodes: new Set(), edges: new Set(), routes: new Set(), chokepoints: new Set(), marks: new Set(), into: new Set(), outOf: new Set() };
-  if (selected === undefined) return none;
-  if (selected === FLOW_CHANGE_ID) return { ...none, kind: "change", id: selected };
-  const identifiersOn = (edges: Set<string>): Set<string> => new Set(model.identifiers.filter((i) => i.edges.some((id) => edges.has(id))).map((i) => i.chokepoint));
-  const entrance = model.entrances.find((candidate) => candidate.id === selected);
-  if (entrance !== undefined) {
-    const route = model.routes.find((candidate) => candidate.entrances.includes(entrance.id));
-    if (route === undefined) return { ...none, kind: "entrance", id: selected, nodes: new Set([entrance.declaredBy]) };
-    return { kind: "entrance", id: selected, ...flowRouteLight(model, route) };
-  }
-  const route = model.routes.find((candidate) => candidate.id === selected);
-  if (route !== undefined) return { kind: "route", id: selected, ...flowRouteLight(model, route) };
-  const level = model.levels.find((candidate) => candidate.id === selected);
-  if (level !== undefined) {
-    const lit = model.edges.filter((edge) => level.edges.includes(edge.id));
-    const routes = model.routes.filter((r) => level.routes.includes(r.id));
-    const chokepoints = new Set(model.identifiers.filter((i) => i.crossing !== undefined && (i.crossing.from === level.name || i.crossing.to === level.name)).map((i) => i.chokepoint));
-    return {
-      ...none,
-      kind: "level",
-      id: selected,
-      nodes: new Set([...lit.flatMap((edge) => [edge.from, edge.to]), ...routes.map((r) => r.stops[0]!), ...level.components]),
-      edges: new Set(lit.map((edge) => edge.id)),
-      routes: new Set(routes.map((r) => r.id)),
-      chokepoints,
-      marks: new Set(level.components),
-    };
-  }
-  const chokepoint = model.chokepoints.find((candidate) => candidate.id === selected);
-  if (chokepoint !== undefined) {
-    const lit = model.edges.filter((edge) => edge.chokepoints.some((c) => c.id === chokepoint.id));
-    const entry = model.identifiers.find((i) => i.chokepoint === chokepoint.id)?.routes ?? [];
-    return { ...none, kind: "chokepoint", id: selected, nodes: new Set([chokepoint.component, ...lit.flatMap((edge) => [edge.from, edge.to])]), edges: new Set(lit.map((edge) => edge.id)), routes: new Set([...lit.flatMap((edge) => edge.routes), ...entry]), chokepoints: new Set([chokepoint.id]) };
-  }
-  const node = model.nodes.find((candidate) => candidate.id === selected);
-  if (node !== undefined) {
-    const direct = model.edges.filter((edge) => edge.from === node.folder || edge.to === node.folder);
-    const edges = new Set(direct.map((edge) => edge.id));
-    return {
-      kind: "component",
-      id: selected,
-      nodes: new Set([node.folder, ...direct.flatMap((edge) => [edge.from, edge.to])]),
-      edges,
-      routes: new Set(model.routes.filter((r) => r.stops.includes(node.folder) || r.rail === node.folder).map((r) => r.id)),
-      chokepoints: identifiersOn(edges),
-      marks: new Set([node.folder]),
-      into: new Set(direct.filter((edge) => edge.to === node.folder).map((edge) => edge.id)),
-      outOf: new Set(direct.filter((edge) => edge.from === node.folder).map((edge) => edge.id)),
-    };
-  }
-  const edge = model.edges.find((candidate) => candidate.id === selected);
-  if (edge !== undefined) return { ...none, kind: "edge", id: selected, nodes: new Set([edge.from, edge.to]), edges: new Set([edge.id]), routes: new Set(edge.routes), chokepoints: identifiersOn(new Set([edge.id])) };
-  const health = FLOW_HEALTH_KINDS.find((kind) => flowHealthId(kind) === selected);
-  if (health === "uncovered") {
-    const folders = new Set(model.health.uncovered);
-    return { ...none, kind: "health", id: selected, nodes: folders, marks: folders };
-  }
-  if (health !== undefined) {
-    const members = new Set(flowHealthMembers(model, health).map((m) => `${m.component}\u0000${m.name}`));
-    const holders = model.nodes.filter((n) => n.invariants.some((i) => members.has(`${i.component}\u0000${i.name}`)));
-    const chokepoints = new Set(model.identifiers.filter((i) => members.has(`${i.component}\u0000${i.name}`)).map((i) => i.chokepoint));
-    return { ...none, kind: "health", id: selected, nodes: new Set(holders.map((n) => n.folder)), chokepoints, marks: new Set(holders.filter((n) => n.boundary.some((c) => members.has(`${c.component}\u0000${c.name}`)) || (health !== "verified" && health !== "requirements" && n.defects.length > 0)).map((n) => n.folder)) };
-  }
-  const brokenAt = model.nodes.find((n) => flowBrokenId(n.folder) === selected && n.defects.length > 0);
-  if (brokenAt !== undefined) {
-    const edges = new Set(model.edges.filter((e) => e.to === brokenAt.folder && e.bypasses.length > 0).map((e) => e.id));
-    return { ...none, kind: "broken", id: selected, nodes: new Set([brokenAt.folder, ...model.edges.filter((e) => edges.has(e.id)).map((e) => e.from)]), edges, chokepoints: new Set(brokenAt.defects.map((d) => d.chokepoint)), marks: new Set([brokenAt.folder]) };
-  }
-  const boundaryAt = model.nodes.find((n) => flowBoundaryId(n.folder) === selected && n.boundary.length > 0);
-  if (boundaryAt !== undefined) return { ...none, kind: "boundary", id: selected, nodes: new Set([boundaryAt.folder]), marks: new Set([boundaryAt.folder]) };
-  return none;
-}
-
 /** What the map opens on when the reader has selected nothing (DEFAULT_RULE): nothing, the whole system, unless something is broken. */
 export function flowDefaultSelection(model: FlowModel): string | undefined {
   const broken = model.nodes.filter((node) => node.defects.length > 0);
   return [...broken].sort((a, b) => b.defects.length - a.defects.length || model.nodes.indexOf(a) - model.nodes.indexOf(b))[0]?.id;
-}
-
-/** What is selected: the reader's selection, else the default story; the cleared selection selects nothing. */
-export function flowSelected(model: FlowModel, selected: string | undefined): string | undefined {
-  if (selected === FLOW_NONE_ID) return undefined;
-  return selected ?? flowDefaultSelection(model);
 }
 
 /** One line of the label a component interface wears. */

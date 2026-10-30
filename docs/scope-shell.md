@@ -32,15 +32,18 @@ domain layer beneath Coherence's own.
 
 The page embeds a bounded window of the two stores that grow every session:
 the latest run records plus every run holding some enforcement's latest
-entry, and the latest journal records plus every open escalation and what
+entry, and the latest journal records plus every open escalation, every
+open defect, the resolution and the retraction of each record kept, and what
 those records point at. Every verdict derived from the window equals the one
 derived from every record, and the count left out is shown; the whole journal
 is one `journal` command away. The reference sites the latest chokepoint
 entries carry share one window of 500 (`SITE_WINDOW`), bypass sites always
 listed; each entry counts the rest by component, endpoint, class and test
 mark, so every count the views and `query structure` derive from sites is exact, and
-the reliance listing says how many it lists. The live page loads the rest
-from `/api/sites`; a snapshot names `query relies-on`. So neither the code
+the reliance listing on a chokepoint invariant's card in **Invariants** says
+how many there are and how many it lists. Its "Load the other N" button
+fetches the rest of that entry's sites from `/api/sites` on a live page; a
+snapshot names `query relies-on` instead. So neither the code
 nor the number of chokepoints grows the page. The relief's files are left
 out the same way: the first load counts each component's files, and the
 page loads them by folder when it needs them. The agent query builds without
@@ -193,14 +196,22 @@ The masthead's verdict reads the same model: one verdict in large type
 linking to Structure, with what it leaves out (requirements, uncovered
 components, undeclared entrances as a neutral count) beneath it. An
 invariant's enforcements, crossing, refutation and bypass sites are on its
-card in **Invariants**, and `query relies-on` lists its reliance.
+card in **Invariants**, with its reliance listing, which `query relies-on`
+also prints.
 
 **Invariants** shows every bullet: state, enforcement form with its latest
 verdict, the chokepoint grade with the rung's enforcer, crossing over the
 declared trust levels, because, refutation (witnessed, automatic from the
 run, or missing), checklist, and what it lacks. A structural defect shows
 its bypass sites and the two honest options: route through the chokepoint,
-or escalate a retirement. Filters by state and component.
+or escalate a retirement, whose human acknowledges it with the reliance
+listing in view. A chokepoint invariant's card folds its reliance listing
+beneath it: every recorded reference site to the chokepoint or the protected
+thing, owner component first, each with its file, line, symbol, endpoint,
+classification, syntax form when known and test mark; unknown evidence is
+said as unknown, and only a complete empty list says zero. The listing opens
+when a `#reliance-…` link lands on it or the reader opens it, and the state
+keeps it open across a live update's render. Filters by state and component.
 
 **Practices** tells the story of what the project practices before how each
 practice holds. It opens with a summary in words, then the project's working
@@ -241,10 +252,12 @@ Every card id carries its view as a prefix (`component-`, `invariant-`,
 `run-`, `journal-`, `work-`, the lexicon's `coherence-` and `domain-`, and
 `connections--` for a Connections origin, a structural route or a
 component, which the view opens on). A hash resolves to its view by that
-prefix, or names a view alone (`#runs`). The relief has no cards: a link
-into the retired Reliance view (`#reliance-…`), the retired security-spine
-section, or any of the retired map's `structure-` selections (the
-masthead's verdict among them) opens the Structure view. `resolveHash` in
+prefix, or names a view alone (`#runs`). A reliance id (`#reliance-…`)
+opens Invariants on that invariant's reliance listing, open, and the retired
+Reliance view's own `#reliance` opens Invariants. The relief has no cards: a
+link into the retired security-spine section or any of the retired map's
+`structure-` selections (the masthead's verdict among them) opens the
+Structure view. `resolveHash` in
 `derive.ts` is the one place this is decided.
 
 ## The agent query

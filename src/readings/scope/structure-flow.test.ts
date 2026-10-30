@@ -30,7 +30,7 @@ import { gapsOf, orientGapText, structureState } from "./gaps.ts";
 import { ADOPTER_ENTRANCES, APPLE, adopterFiles } from "../../spec/covers-fixture.ts";
 import { allInvariants, flowChokepointId, invariantVerdict, relianceId, resolveHash, structureId } from "./derive.ts";
 import type { EntranceGuard, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
-import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowLabelLines, flowNodeId, flowOf, flowSelected, flowVerdict, flowSelection, routeName, type FlowEntrance, type FlowModel, type FlowRoute } from "./structure-flow.ts";
+import { CORE_RULE, compareFlows, flowBrokenId, flowHealthId, flowDefaultSelection, flowEdgeId, flowEntranceId, flowLabelLines, flowNodeId, flowOf, flowVerdict, routeName, type FlowEntrance, type FlowModel, type FlowRoute } from "./structure-flow.ts";
 import { renderView } from "./shell.ts";
 
 let fixture: Fixture;
@@ -140,10 +140,6 @@ function projectState(options: { symbols?: InterfaceSymbol[]; unread?: boolean; 
   return state;
 }
 
-function pairs(state: ShellState): string[] {
-  return flowOf(state).edges.map((edge) => `${edge.from} -> ${edge.to}`);
-}
-
 
 test("a component interface is annotated from the invariants: its chokepoint, its crossing, the data that passes; a plain one by its most-referenced symbols, never a verb", () => {
   const model = flowOf(projectState());
@@ -162,10 +158,6 @@ test("a component interface is annotated from the invariants: its chokepoint, it
   }
 });
 
-/** Every selection the map offers: at rest, each entrance, route, trust level, chokepoint, component and interface. */
-function everySelection(model: FlowModel): (string | undefined)[] {
-  return [undefined, ...model.entrances.map((e) => e.id), ...model.routes.map((r) => r.id), ...model.levels.map((l) => l.id), ...model.chokepoints.map((c) => c.id), ...model.nodes.map((n) => n.id), ...model.edges.map((e) => e.id)];
-}
 
 /** A wider synthetic project: twelve components, long names, a hub most others call, and a dense web between them. */
 function crowdedState(): ShellState {
@@ -203,11 +195,6 @@ function crowdedState(): ShellState {
   state.runs.records = [{ at: "2026-09-20T10:00:00.000Z", session: "s-crowd", agent: "fixture", commit: "abc1234", dirty: false, instrument: { language: "typescript", server: "warm" }, latency: 1, invariants: broken.map(({ folder, caller }): RunEntry => ({ component: folder, name: `s1 guard ${folders.indexOf(folder) + 1}`, form: "chokepoint", verdict: "fail", grade: "broken", refutation: "automatic", bypasses: [{ file: `${caller}/bad.ts`, line: 3, symbol: "sneak" }, { file: `${folder}/inner.ts`, line: 9, symbol: "inside" }], testReferences: 0, files: [], latency: 1, reason: "fixture" })) }];
   return state;
 }
-
-
-
-
-
 
 
 /** What an added interface reaches: its callee and everything the callee reaches, and all its caller reaches when it stops the caller being a core dependency. */
@@ -299,45 +286,6 @@ function sharedState(): ShellState {
   return state;
 }
 
-/** The flow fixture with no entrance declared: every route is derived from the root's interfaces. */
-function derivedState(): ShellState {
-  const state = projectState();
-  for (const component of state.spec.components) component.entrances = [];
-  if (state.componentInterfaces.kind === "read") state.componentInterfaces.entrances = [];
-  return state;
-}
-
-/** The terminus of a route as drawn: the text lines inside its terminus group, top to bottom. */
-function terminusLines(svg: string, routeId: string): { text: string; y: number }[] {
-  const group = new RegExp(`<g class="flow-route-group[^"]*" id="${routeId}"[^>]*>([^]*?)</g>\\s*</g>`).exec(svg);
-  assert.ok(group !== null, `${routeId} is drawn`);
-  const terminus = /<g class="flow-terminus[^"]*"[^>]*>([^]*)/.exec(group[1]!);
-  assert.ok(terminus !== null, `${routeId} has a terminus`);
-  return [...terminus[1]!.matchAll(/<text[^>]*y="([\d.]+)"[^>]*>([^<]*)<\/text>/g)].map((m) => ({ y: Number(m[1]), text: m[2]!.replace(/&amp;/g, "&") }));
-}
-
-
-
-/** What the map should open on, by the rule's own words: nothing, unless a component is broken, then the one with the most broken chokepoints, then the first in folder order. */
-function opening(model: FlowModel): string | undefined {
-  const broken = model.nodes.filter((n) => n.defects.length > 0);
-  if (broken.length === 0) return undefined;
-  const most = Math.max(...broken.map((n) => n.defects.length));
-  return broken.find((n) => n.defects.length === most)!.id;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 test("an entrance is declared in its component's spec and checked: an unresolvable handler is a spec problem, and one no interface reaches is unreachable", () => {
   const root = mkdtempSync(join(tmpdir(), "coherence-entrance-"));
@@ -377,11 +325,15 @@ test("the comparison seam measures what a change did: entrance, interface added,
 });
 
 
-test("links into the retired map, its Reliance view and the security spine open the Structure view", () => {
+test("links into the retired map and the security spine open the Structure view, and its Reliance view's links open the listing on the Invariants view", () => {
   const state = projectState();
   // The relief has no cards to land on: each opens the view alone, the masthead verdict's link among them.
-  for (const link of [relianceId("src/store", "single writer"), structureId("src/store", "single writer"), "reliance", flowEntranceId(".", "run"), flowChokepointId("src/store", "single writer"), flowVerdict(flowOf(state)).select])
+  for (const link of [structureId("src/store", "single writer"), flowEntranceId(".", "run"), flowChokepointId("src/store", "single writer"), flowVerdict(flowOf(state)).select])
     assert.deepEqual(resolveHash(state, `#${link}`), { view: "structure", id: undefined }, link);
+  // Reliance is listed on its invariant's card: a reliance id lands there, and the retired view's own link opens Invariants.
+  const reliance = relianceId("src/store", "single writer");
+  assert.deepEqual(resolveHash(state, `#${reliance}`), { view: "invariants", id: reliance });
+  assert.deepEqual(resolveHash(state, "#reliance"), { view: "invariants", id: undefined });
 });
 
 
@@ -422,10 +374,6 @@ function healthState(): ShellState {
 }
 
 
-
-
-
-
 /** The flow fixture's hooks handler is itself a chokepoint with a crossing: entrances it handles carry that trust in; another handled beside it does not. */
 function trustState(): ShellState {
   const state = projectState({ symbols: [...SYMBOLS, sym(".", "src/hooks", "tickHooks", "src/hooks/run.ts", 1)] });
@@ -441,13 +389,6 @@ function trustState(): ShellState {
 }
 
 
-
-
-
-
-
-
-
 /* ------------------------------------------------ the clarity pass (the 2026-09-23 review) */
 
 /** The flow fixture with one more entrance, handled in the reader: its route (root, reader, store) has no identifier on it anywhere. */
@@ -459,74 +400,6 @@ function untracedState(): ShellState {
   return state;
 }
 
-/** The hue (0 to 360) and HSL saturation of a #rrggbb color. */
-function hueOf(hex: string): { hue: number; saturation: number } {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  const d = max - min;
-  if (d === 0) return { hue: 0, saturation: 0 };
-  const saturation = d / (1 - Math.abs(2 * l - 1));
-  const hue = max === r ? 60 * (((g - b) / d) % 6) : max === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
-  return { hue: (hue + 360) % 360, saturation };
-}
-
-
-
-/** The vertices of a path of absolute M and L commands. */
-function pointsOfPath(d: string): [number, number][] {
-  const n = [...d.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
-  return n.flatMap((_, i) => (i % 2 === 0 ? [[n[i]!, n[i + 1]!] as [number, number]] : []));
-}
-
-/** The box a path of absolute M and L commands spans: a cut-corner token's or station's outline. */
-function spanOfPath(d: string): { x: number; y: number; w: number; h: number } {
-  const pts = pointsOfPath(d);
-  const xs = pts.map((p) => p[0]);
-  const ys = pts.map((p) => p[1]);
-  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
-}
-
-/** An origin token's body: the box its front card spans without the tip of its point. */
-function bodyOfPath(d: string): { x: number; y: number; w: number; h: number } {
-  const pts = pointsOfPath(d);
-  const right = Math.max(...pts.map((p) => p[0]));
-  const xs = pts.map((p) => p[0]).filter((x) => x < right - 0.05);
-  const ys = pts.map((p) => p[1]);
-  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
-}
-
-/** Every card of a route group's origin token, back to front: the outlines of its back cards, then its front card's. */
-function cardsOf(group: string): string[] {
-  return [...group.matchAll(/<path class="flow-origin-(?:card flow-origin-card-\d|token)" d="([^"]+)"/g)].map((m) => m[1]!);
-}
-
-
-/** Routes whose tokens stand for one, two, three and six entrances, stacked at one station and at the next. */
-function stackState(): ShellState {
-  const state = trustState();
-  const entering = (folder: string, names: string[], handler: string, file: string): void => {
-    const component = state.spec.components.find((c) => c.folder === folder)!;
-    component.entrances = [...component.entrances, ...names.map((name, i): SpecEntrance => ({ name, meaning: `${name} enters`, handler, line: 40 + i, handlerLine: 41 + i, component: folder, file }))];
-    if (state.componentInterfaces.kind === "read") state.componentInterfaces.entrances = [...state.componentInterfaces.entrances, ...names.map((name) => ({ component: folder, name, file }))];
-  };
-  entering("src/hooks", ["tick slow"], "tickHooks in run.ts", "src/hooks/run.ts");
-  entering("src/hooks", ["drain", "drain fast", "drain slow", "drain idle", "drain burst", "drain all"], "drainHooks in run.ts", "src/hooks/run.ts");
-  entering("src/reader", ["read one", "read many", "read all"], "lookup in look.ts", "src/reader/look.ts");
-  return state;
-}
-
-
-
-/** Whether trust carried in is untrusted, by the ruling's own words (d-ba18b0fd, d-6df8d09a): unknown, undeclared, or from outside the system's control. */
-function untrustedByRule(state: ShellState, trust: readonly string[]): boolean {
-  if (trust.length === 0) return true;
-  return trust.some((name) => {
-    const level = state.spec.trustLevels.find((l) => l.name === name);
-    return level === undefined || level.outside === true;
-  });
-}
 
 /** The trust fixture with its entrances declaring trust: the hook event declares record against its handler's crossing from outside, the tick declares outside. */
 function declaredTrustState(): ShellState {
@@ -553,24 +426,6 @@ test("an entrance's declared trust level is its route's trust, even where a cros
   const ids = split.entrances.filter((e) => e.declaredBy === "src/hooks").map((e) => split.routes.find((r) => r.entrances.includes(e.id))!.id);
   assert.equal(new Set(ids).size, 2, "declared outside and derived outside take their own routes");
 });
-
-
-
-/** Whether a component is covered, by the rule's own words (decision d-a02f255c). */
-function coveredByRule(model: FlowModel, state: ShellState, folder: string): boolean {
-  const exposed = model.edges.some((e) => e.to === folder && e.chokepoints.length > 0);
-  const entered = model.identifiers.some((i) => i.routes.length > 0 && i.component === folder);
-  const verifiedTotality = allInvariants(state.spec.components).some((i) => i.component === folder && i.enforcements.some((e) => e.form === "totality oracle") && invariantVerdict(i, state.runs.records).state === "verified");
-  return exposed || entered || verifiedTotality;
-}
-
-
-
-
-/** Every selection of a model, as the motion check walks them. */
-function motionSelections(model: FlowModel): (string | undefined)[] {
-  return [undefined, ...model.routes.map((r) => r.id), ...model.entrances.map((e) => e.id), ...model.nodes.map((n) => n.id), ...model.levels.map((l) => l.id), ...model.chokepoints.map((c) => c.id), ...model.edges.map((e) => e.id)];
-}
 
 
 /* ------------------------------------------------ traced controls (d-127ab8e4) */
