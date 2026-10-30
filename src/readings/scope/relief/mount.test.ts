@@ -12,7 +12,7 @@ import type { JournalRecord, ShellState } from "../model.ts";
 import { mergeSnapshot } from "../updates.ts";
 import { reliefData, type ReliefData } from "./data.ts";
 import { filesCache, mountRelief, reliefStep } from "./mount.ts";
-import type { Relief, ReliefView } from "./scene.ts";
+import { WebGLUnavailable, type Relief, type ReliefView } from "./scene.ts";
 
 function reading(storeLines = 40): ReliefReading {
   return {
@@ -156,11 +156,11 @@ test("the page fetches a folder's files once per reading, again after a reread c
   assert.ok(batches.length > 1 && batches.every((b) => b.map((f) => `folder=${encodeURIComponent(f)}&`).join("").length <= 4000), `${batches.length} fetches, each short`);
 });
 
-test("a browser that cannot start WebGL gets a line saying the relief cannot be drawn, the page standing, and no second try until what it draws changes", () => {
+test("a relief that cannot be built gets a line in its place saying why, blaming WebGL only when the browser could not start it, the page standing, and no second try until what it draws changes", () => {
   let tries = 0;
   const create = (): Relief => {
     tries += 1;
-    throw new Error("Error creating WebGL context");
+    throw new WebGLUnavailable("Error creating WebGL context");
   };
   const said: { className: string; textContent: string }[] = [];
   const host = {
@@ -183,4 +183,25 @@ test("a browser that cannot start WebGL gets a line saying the relief cannot be 
   // Nothing to draw clears the failure with the scene.
   mergeSnapshot(page, stateOf({ kind: "unread", because: "mass could not be read" }));
   mountRelief(root, page, {}, create);
+
+  // A scene that fails on its data is the relief's failure, not the browser's: said with its error, WebGL never blamed.
+  const failing = (): Relief => {
+    throw new TypeError("Cannot read properties of undefined (reading 'date')");
+  };
+  mergeSnapshot(page, stateOf(reading(77)));
+  assert.doesNotThrow(() => mountRelief(root, page, {}, failing), "the failure stays in the relief's host");
+  assert.equal(said.at(-1)?.className, "absence");
+  assert.equal(said.at(-1)!.textContent, "The relief failed while it was built: Cannot read properties of undefined (reading 'date'). Every other view works without it, and Connections shows how the components connect.");
+  assert.doesNotMatch(said.at(-1)!.textContent, /WebGL|in this browser/, "a failure of the relief's own is never put on the browser");
+  mergeSnapshot(page, stateOf({ kind: "unread", because: "mass could not be read" }));
+  mountRelief(root, page, {}, failing);
+});
+
+test("a project with no commits has a relief to draw: every component's footprint, no landing, and the snapshot empty", () => {
+  const unborn: ReliefReading = { ...(reading() as Extract<ReliefReading, { kind: "read" }>), head: "", landings: [] };
+  const data = reliefData(stateOf(unborn));
+  assert.ok(!("absent" in data), "no commit is no reason to draw nothing: the footprints stand");
+  assert.deepEqual(data.landings, []);
+  assert.equal(data.snapshot, "");
+  assert.deepEqual(data.components.map((c) => c.v.lines), [10, 5, 7, 40]);
 });

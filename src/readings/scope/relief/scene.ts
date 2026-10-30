@@ -74,6 +74,30 @@ const MARKUP = `<div class="controls">
   <details><summary>Table view</summary><div data-r="table"></div></details>
   <div class="tip" data-r="tip"></div>`;
 
+/** The browser could not start WebGL: the one failure that is the browser's, not the relief's. */
+export class WebGLUnavailable extends Error {}
+
+/**
+ * The windows as dates: each starts so many days before the latest landing,
+ * or at the start of history. With no landing (no commit yet, or not a
+ * checkout) there is no latest, and every window starts at the start of
+ * history, which holds nothing.
+ */
+export function windowsOf(D: Pick<ReliefData, "windows" | "landings">): { latest: string | undefined; windows: { key: string; label: string; from: string }[] } {
+  const latest = D.landings[0]?.date;
+  const since = (days: number): string => new Date(Date.parse(latest!) - (days - 1) * 86400000).toISOString().slice(0, 10);
+  return { latest, windows: D.windows.map((w) => ({ key: w.key, label: w.label, from: w.days !== null && latest !== undefined ? since(w.days) : "0000" })) };
+}
+
+/** A turn per ask, of which only the latest is current: an answer to an earlier ask that lands after a later one was made is dropped. */
+export function turns(): () => () => boolean {
+  let latest = 0;
+  return () => {
+    const mine = ++latest;
+    return () => mine === latest;
+  };
+}
+
 export function createRelief(D: ReliefData, io: ReliefIO = {}, carried?: ReliefView): Relief {
 let disposed = false, raf = 0;
 // Timers the scene sets, so disposing clears what is still pending.
@@ -84,9 +108,8 @@ root.className = "relief";
 root.innerHTML = MARKUP;
 const $ = (name) => root.querySelector(`[data-r="${name}"]`);
 const C = D.components;
-const PROJECT = D.project ?? "Coherence";
 const poss = (name) => (name.endsWith("s") ? name + "'" : name + "'s"); // Products' own files, Core's own files
-const TRUNK = D.trunk ?? "main";
+const TRUNK = D.trunk;
 const fmt = (n) => n.toLocaleString("en-US");
 const pct = (x) => (Number.isFinite(x) ? (x * 100).toFixed(x < 0.1 ? 1 : 0) + "%" : "–");
 const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
@@ -105,17 +128,11 @@ const HEIGHT = [
   { key: "landings", label: "Landings", unit: "landings", how: `first-parent commits on ${TRUNK} touching the component` },
   { key: "volume", label: "Lines changed", unit: "lines changed", how: "lines added plus deleted in those landings" },
 ];
-const LATEST = D.landings[0].date;
-const dayMs = 86400000;
-const since = (days) => new Date(Date.parse(LATEST) - (days - 1) * dayMs).toISOString().slice(0, 10);
-const WIN = D.windows ? D.windows.map((w) => ({ key: w.key, label: w.label, from: w.days ? since(w.days) : "0000" })) : [
-  { key: "7", label: "7 days", from: since(7) },
-  { key: "30", label: "30 days", from: since(30) },
-  { key: "rebuild", label: "Since rebuild", from: "2026-09-17" },
-  { key: "all", label: "All", from: "0000" },
-];
+// With no landing every block stands flat, and the window and diff controls say why.
+const { latest: LATEST, windows: WIN } = windowsOf(D);
+const LANDED = LATEST !== undefined;
 const BIG = 200;
-const state = { foot: "lines", height: "landings", win: D.defaultWindow ?? "30", split: false, big: false, scope: null, own: false, preview: null, selected: null, file: null };
+const state = { foot: "lines", height: "landings", win: D.defaultWindow, split: false, big: false, scope: null, own: false, preview: null, selected: null, file: null };
 // Each component's files, null until the files view, a slice of it or a selection first needs them (need, below): the
 // data counts them and no more, so the first load never grows with the code. A component holding none has them already.
 const FL = C.map((c) => (c.files ? null : []));
@@ -247,14 +264,34 @@ function treemap(items, x, y, w, h) {
 
 // ---------- scene ----------
 const stage = $("stage");
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+// A browser without WebGL (no GPU, or one switched off) fails here, and says so as its own kind of failure.
+const renderer = (() => {
+  try { return new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); }
+  catch (error) { throw new WebGLUnavailable(error instanceof Error ? error.message : String(error)); }
+})();
+// What construction holds beyond the root (the GL context, the scene's buffers, listeners outside the root), undone in
+// reverse by dispose, or at once when construction throws before the scene is whole.
+const undo = [() => { renderer.dispose(); renderer.forceContextLoss(); }];
+function teardown() {
+  disposed = true;
+  cancelAnimationFrame(raf);
+  for (const t of timers) clearTimeout(t);
+  timers.clear();
+  // One release that fails never keeps the rest from running.
+  for (const u of undo.splice(0).reverse()) try { u(); } catch {}
+  root.remove();
+}
+try {
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 stage.prepend(renderer.domElement);
 const scene = new THREE.Scene();
+// Shared geometries and materials are met more than once; disposing one twice is harmless.
+undo.push(() => scene.traverse((o) => { o.geometry?.dispose(); for (const m of [o.material].flat()) m?.dispose(); if (o.isInstancedMesh) o.dispose(); }));
 // Everything the model draws stands in one group, so stepping into a slice can stretch the ground under it.
 const world = new THREE.Group(); scene.add(world);
 const camera = new THREE.PerspectiveCamera(32, 1, 1, 2000);
 const controls = new OrbitControls(camera, renderer.domElement);
+undo.push(() => controls.dispose());
 controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2 - 0.05; controls.minDistance = 60; controls.maxDistance = 700;
 state.own = false;
 state.scope = tops[0];
@@ -530,6 +567,7 @@ function paint() {
 function matchDark() { const t = document.documentElement.dataset.theme; return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; }
 const darkScheme = matchMedia("(prefers-color-scheme: dark)");
 darkScheme.addEventListener("change", paint);
+undo.push(() => darkScheme.removeEventListener("change", paint));
 
 let lastMax = 1, dScale = 1;
 function drawScale(max) {
@@ -608,6 +646,7 @@ function resize() {
 }
 const resizing = new ResizeObserver(resize);
 resizing.observe(stage);
+undo.push(() => resizing.disconnect());
 function frame() {
   if (disposed) return;
   // Freeze the start of each tween at the current values before targets change.
@@ -886,6 +925,7 @@ renderer.domElement.addEventListener("dblclick", (e) => {
 });
 const onKey = (e) => { if (e.key === "Escape" && root.isConnected && !(e.target instanceof HTMLInputElement)) stepOut(); };
 document.addEventListener("keydown", onKey);
+undo.push(() => document.removeEventListener("keydown", onKey));
 function drawCrumbs() {
   const b = $("crumbs"); b.innerHTML = "";
   const chain = []; for (let p = state.scope; p >= 0; p = parent[p]) chain.unshift(p);
@@ -910,7 +950,9 @@ function buttons(id, list, key, after) {
 }
 buttons("gFoot", FOOT, "foot", () => { if (state.split) state.split = false; sync(); retarget(); drawSide(); drawTable(); drawNote(); });
 buttons("gHeight", HEIGHT, "height", () => { retarget(); drawSide(); drawTable(); });
-buttons("gWin", WIN, "win", () => { retarget(); drawSide(); drawTable(); drawNote(); });
+// With no landing every window holds nothing, so none is offered: the group says why.
+if (LANDED) buttons("gWin", WIN, "win", () => { retarget(); drawSide(); drawTable(); drawNote(); });
+else $("gWin").append(el("span", null, D.snapshot ? "no landings yet" : "no commits yet"));
 buttons("gSplit", [{ key: false, label: "Components" }, { key: true, label: "Files" }], "split", () => { retarget(); drawSide(); drawNote(); });
 function sync() {
   for (const [id, key] of [["gFoot", "foot"], ["gHeight", "height"], ["gWin", "win"], ["gSplit", "split"]])
@@ -1011,16 +1053,16 @@ function drawNote() {
   const items = [
     ...D.notes,
     ...(DIFF ? [`Diff: ${DIFF.a.sha} (${DIFF.a.date}, ${DIFF.a.subject}) → ${DIFF.b.sha} (${DIFF.b.subject}), from git diff --numstat, standing on each block as two thin meters, green for lines added and red for lines deleted, on one scale for the whole view (the tallest meter is the biggest change in view) and the same width on every block, so only their height is read. The numbers ride in each component's callout. Height stays the window's churn and the diff adds nothing to it. Components count every path in their folder; files count only the files mass counts. ${DIFF.gone} deleted path${DIFF.gone === 1 ? "" : "s"} with no block here ${DIFF.gone === 1 ? "is" : "are"} left out.`] : []),
-    `One block is one component${state.split ? ", split into one block per file it owns; file footprints are lines" : ""}. Snapshot: ${D.snapshot}.`,
+    `One block is one component${state.split ? ", split into one block per file it owns; file footprints are lines" : ""}. Snapshot: ${D.snapshot || "no commit yet"}.`,
     ...(D.filesLeftOut ? [`Files: this snapshot embeds files only up to a fixed size and left out those of ${D.filesLeftOut} component${D.filesLeftOut === 1 ? "" : "s"} and folder${D.filesLeftOut === 1 ? "" : "s"}, which stand empty in the files view; the live page loads every one.`] : []),
     `Footprint: ${fm.label.toLowerCase()}, ${fm.how}. Every measure shares the same total area, so a footprint is that component's share; area, not side, is the quantity.`,
-    `Height and color: ${HEIGHT.map((m) => m.label.toLowerCase() + " = " + m.how).join("; ")}. ${inWin - (state.big ? 0 : bigIn.length)} landings count in this window (${w.from === "0000" ? "from " + (D.landings.at(-1)?.date ?? LATEST) : "from " + w.from} to ${LATEST}). In component view, a landing counts toward every component it touches, tests and specs included; in file view, only the files mass counts.`,
-    state.big ? `Landings over ${BIG} files are included (${bigIn.length} in this window). ${D.project ? "Bulk moves like these tower over everything else." : "The rebuild merge of 2026-09-23 alone changed 322,695 lines across 582 files, and it towers over everything else."}` : `Left out of heights: the ${bigIn.length} landing${bigIn.length === 1 ? "" : "s"} in this window that touch${bigIn.length === 1 ? "es" : ""} more than ${BIG} files${bigIn.length ? " (" + bigIn.slice(0, 3).map((l) => l.subject.slice(0, 48)).join("; ") + (bigIn.length > 3 ? "; …" : "") + ")" : ""}. Bulk moves like these touch every component at once and say nothing about any one of them; ordinary merged pull requests stay in.`,
+    `Height and color: ${HEIGHT.map((m) => m.label.toLowerCase() + " = " + m.how).join("; ")}. ${LANDED ? `${inWin - (state.big ? 0 : bigIn.length)} landings count in this window (${w.from === "0000" ? "from " + D.landings.at(-1).date : "from " + w.from} to ${LATEST}).` : `No landing was read: the project has no commits yet, none that touch a component, or no git history here, so every block stands flat and the footprints alone carry the view.`} In component view, a landing counts toward every component it touches, tests and specs included; in file view, only the files mass counts.`,
+    state.big ? `Landings over ${BIG} files are included (${bigIn.length} in this window). Bulk moves like these tower over everything else.` : `Left out of heights: the ${bigIn.length} landing${bigIn.length === 1 ? "" : "s"} in this window that touch${bigIn.length === 1 ? "es" : ""} more than ${BIG} files${bigIn.length ? " (" + bigIn.slice(0, 3).map((l) => l.subject.slice(0, 48)).join("; ") + (bigIn.length > 3 ? "; …" : "") + ")" : ""}. Bulk moves like these touch every component at once and say nothing about any one of them; ordinary merged pull requests stay in.`,
     `Position: components that land together sit closer. Distance comes from the co-change share (landings touching both ÷ landings touching either) over all ${D.landings.length} landings with 40 or fewer files, settled by a force layout and then spaced so no footprint overlaps at its largest. Read it as neighbourhoods, not measured distances; it doesn't change with the window or measure.`,
     ...(D.unrun ? [`No run has graded these specs yet, so no enforcement reaches any file: Unreached equals Lines, and Refutations and Defects are zero everywhere. Invariants and Crossings count the bullets the specs declare.`] : []),
     ...(C.some((c) => c.virtual) ? [`Folders with no spec: inside a component that holds other components, the code none of them claims is split by the folder that holds it (three code files or more), and each folder stands as a district with an italic name and a dashed survey line. A folder holding most of that code is opened into its subfolders. A district has no invariants, so on the Invariants footprint the unclaimed land disappears. Mass counts a district in its component's own files; files loose in the component's folder stay in its own block.`] : []),
     `Nesting: a component whose folder sits inside another component's folder stands on that component's platform. Platforms here: ${C.filter((_, ci) => kids[ci].length).map((c) => c.name).join(", ")}. The block marked as a component's own files holds what none of the components inside it claims. A platform spans what stands on it plus a ${MARGIN}-unit margin, so its size is not a measure.`,
-    `Left out: ${D.leaveOut.join(", ")}. The root component holds every path outside the other ${C.length - 1} component folders${D.project ? "" : " (docs/, plugins/, bench/, mods/, top-level files), so its height includes pre-rebuild history in the All window"}.`,
+    `Left out: ${D.leaveOut.join(", ")}. The root component holds every path outside the other ${C.length - 1} component folders.`,
   ];
   for (const s of items) ul.append(el("li", null, s));
   n.append(ul);
@@ -1035,12 +1077,15 @@ function diffFiles() {
   DIFF.file = FL.map((files) => (files ?? []).map((f) => DIFF.byPath.get(f.file) ?? [0, 0]));
   DIFF.gone = DIFF.goneAll.filter((p) => !fileIndex.has(p)).length;
 }
+// Each ask takes a turn: an answer to an earlier ask that arrives after a later one was made is stale, and dropped.
+const diffTurn = turns();
 async function loadDiff(a, b) {
+  const current = diffTurn();
   if (!a || !b || a === "none") { DIFF = null; retarget(); drawSide(); drawNote(); return; }
   let d;
-  try { d = await io.get(`/api/relief/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`); } catch { if (disposed) return; DIFF = null; retarget(); drawSide(); drawNote(); return; }
-  // An answer that arrives after the scene was disposed lands nowhere.
-  if (disposed) return;
+  try { d = await io.get(`/api/relief/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`); } catch { if (disposed || !current()) return; DIFF = null; retarget(); drawSide(); drawNote(); return; }
+  // An answer that arrives after the scene was disposed, or after a later ask, lands nowhere.
+  if (disposed || !current()) return;
   if (d.error) { DIFF = null; return; }
   // Per component and per file: [added, deleted]. The diff lists only the paths that changed; any other stays [0, 0].
   const comp = C.map(() => [0, 0]), byPath = new Map(), gone = [];
@@ -1056,11 +1101,20 @@ async function loadDiff(a, b) {
   for (const [id, end] of [["selA", d.a], ["selB", d.b]]) for (const o of $(id).options) if (o.dataset.linked && o.value === end.rev) o.textContent = `${end.date} ${end.sha} ${end.subject.slice(0, 52)}`;
   retarget(); drawSide(); drawNote();
 }
+// Whether the diff's selects are on offer: only once the commits arrived.
+let diffOffered = false;
 async function startDiff() {
   if (!io.get) return;
-  let cm; try { cm = await io.get("/api/relief/commits"); } catch { return; }
-  if (disposed || !cm || !cm.list) return;
-  const g = $("gDiff"); g.hidden = false;
+  let cm; try { cm = await io.get("/api/relief/commits"); } catch { cm = null; }
+  if (disposed) return;
+  const g = $("gDiff");
+  if (!cm || !cm.list || !cm.list.length) {
+    // With no landing and no commit to name, the diff says why it offers nothing; with landings, a failed ask leaves it hidden.
+    if (!LANDED) { for (const c of g.querySelectorAll("select, span:not(:first-child)")) c.hidden = true; g.append(el("span", null, "no commits yet")); g.hidden = false; }
+    return;
+  }
+  diffOffered = true;
+  g.hidden = false;
   const selA = $("selA"), selB = $("selB");
   const opt = (c) => { const o = el("option", null, c.rev === "WORKTREE" ? `working tree (${c.on})` : `${c.tag ? c.tag + " · " : ""}${c.date} ${c.sha} ${c.subject.slice(0, 52)}`); o.value = c.rev; return o; };
   const none = el("option", null, "no diff"); none.value = "none"; selA.append(none);
@@ -1096,24 +1150,18 @@ return {
       layout: LAYOUT, foot: state.foot, height: state.height, win: state.win, split: state.split, big: state.big,
       scope: C[state.scope].folder, own: state.own, selected: state.selected == null ? null : C[state.selected].folder, file,
       camera: { view: lastView, position: camera.position.toArray(), target: controls.target.toArray() },
-      diff: $("gDiff").hidden ? null : { a: $("selA").value, b: $("selB").value },
+      diff: diffOffered ? { a: $("selA").value, b: $("selB").value } : null,
     };
   },
   dispose() {
     if (disposed) return;
-    disposed = true; running = false;
-    cancelAnimationFrame(raf);
-    for (const t of timers) clearTimeout(t);
-    timers.clear();
-    resizing.disconnect();
-    darkScheme.removeEventListener("change", paint);
-    document.removeEventListener("keydown", onKey);
-    controls.dispose();
-    // Shared geometries and materials are met more than once; disposing one twice is harmless.
-    scene.traverse((o) => { o.geometry?.dispose(); for (const m of [o.material].flat()) m?.dispose(); if (o.isInstancedMesh) o.dispose(); });
-    renderer.dispose();
-    renderer.forceContextLoss();
-    root.remove();
+    running = false;
+    teardown();
   },
 };
+} catch (error) {
+  // Construction threw with the GL context open: release it and every listener added so far, and say why to the caller.
+  teardown();
+  throw error;
+}
 }

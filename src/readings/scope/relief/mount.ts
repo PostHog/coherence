@@ -10,7 +10,7 @@
 
 import type { ShellState } from "../model.ts";
 import { reliefData, reliefInputs, type ReliefData, type ReliefFileLanded } from "./data.ts";
-import { createRelief, type Relief, type ReliefIO, type ReliefView, type Touch } from "./scene.ts";
+import { createRelief, WebGLUnavailable, type Relief, type ReliefIO, type ReliefView, type Touch } from "./scene.ts";
 
 export type { Touch };
 
@@ -104,14 +104,21 @@ function filesFor(state: ShellState, data: ReliefData, io: ReliefIO): NonNullabl
 }
 
 let current: { relief: Relief; built: Built } | undefined;
-/** The data a scene could not be built from, and why: kept so a render does not try the browser's WebGL again until the data changes. */
-let failed: { built: Built; why: string } | undefined;
+/** The data a scene could not be built from, why, and whether the browser's WebGL was what failed: kept so a render does not try again until the data changes. */
+let failed: { built: Built; why: string; webgl: boolean } | undefined;
 
-/** Say in the host that the relief cannot be drawn here, leaving every other view as it is. */
-function sayUnbuilt(host: HTMLElement, why: string): void {
+/**
+ * Say in the host that the relief could not be drawn, leaving every other view
+ * as it is: WebGL is blamed only when the browser could not start it; any
+ * other failure is the relief's own, given with its error.
+ */
+function sayUnbuilt(host: HTMLElement, why: string, webgl: boolean): void {
   const line = host.ownerDocument.createElement("p");
   line.className = "absence";
-  line.textContent = `The relief could not be drawn in this browser: ${why.replace(/\.+$/, "")}. It needs WebGL; every other view works without it, and Connections shows how the components connect.`;
+  const said = why.replace(/\.+$/, "");
+  line.textContent = webgl
+    ? `The relief could not be drawn in this browser: ${said}. It needs WebGL; every other view works without it, and Connections shows how the components connect.`
+    : `The relief failed while it was built: ${said}. Every other view works without it, and Connections shows how the components connect.`;
   host.replaceChildren(line);
 }
 
@@ -130,17 +137,17 @@ export function mountRelief(root: HTMLElement, state: ShellState, io: ReliefIO, 
     const carried = current?.relief.view();
     current?.relief.dispose();
     current = undefined;
-    // A browser without WebGL (no GPU, or one switched off) throws here: the relief says so in its own host, and the page stands.
+    // A browser without WebGL (no GPU, or one switched off) throws here, and so does a scene that fails on its data: either is said in the relief's own host, and the page stands.
     try {
       current = { relief: create(step.data, { ...io, files: filesFor(state, step.data, io) }, carried), built: step.built };
       failed = undefined;
     } catch (error) {
-      failed = { built: step.built, why: error instanceof Error ? error.message : String(error) };
+      failed = { built: step.built, why: error instanceof Error ? error.message : String(error), webgl: error instanceof WebGLUnavailable };
     }
   } else if (current !== undefined) current.built = step.built;
   else if (failed !== undefined) failed.built = step.built;
   if (current === undefined) {
-    if (failed !== undefined) sayUnbuilt(host, failed.why);
+    if (failed !== undefined) sayUnbuilt(host, failed.why, failed.webgl);
     return;
   }
   if (current.relief.root.parentElement !== host) host.replaceChildren(current.relief.root);
