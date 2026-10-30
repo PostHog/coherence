@@ -2,6 +2,8 @@
   "name": "go",
   "version": "0.1.0",
   "pluginApi": 4,
+  "title": "Go",
+  "description": "through gopls",
   "provides": {
     "language": "go"
   },

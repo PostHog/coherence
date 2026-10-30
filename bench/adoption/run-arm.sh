@@ -1,14 +1,16 @@
 #!/bin/zsh
 # usage: run-arm.sh <arm dir>
 # Two headless sessions in the arm's clone: the Full setup prompt from the
-# arm's own Coherence README, then a bare continuation. Each arm has its own
+# arm's own Coherence docs/setup.md (its README, in a Coherence older than
+# that file), then a bare continuation. Each arm has its own
 # TMPDIR and is told to keep scratch files there: arms run side by side once
 # overwrote one another's scripts in /tmp.
 # STOP_AFTER=<n> ends session 1 after setup step n, so session 2 starts with
 # what the later steps would have closed still open.
 arm=${1:A}; proj=$arm/$(cat $arm/project)
 cd $proj || exit 1
-setup=$(python3 - $arm/coherence/README.md <<'PY'
+guide=$arm/coherence/docs/setup.md; [ -f $guide ] || guide=$arm/coherence/README.md
+setup=$(python3 - $guide <<'PY'
 import sys, re
 s = open(sys.argv[1]).read()
 sec = s[s.index("## Full setup"):]

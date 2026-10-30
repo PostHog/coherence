@@ -121,8 +121,8 @@ off unless a user turns it on, and never on by default.
 - **How.** Events go to a local queue and are flushed in the background, off
   the tool path; a send that fails is dropped, never retried inside a hook.
 - **Seen before sent.** A command shows exactly what is queued, and turns
-  telemetry on, off, or reports its state; the README says what each event
-  carries, field by field.
+  telemetry on, off, or reports its state; [telemetry.md](telemetry.md) says
+  what each event carries, field by field.
 
 ## Open questions for the owner
 
