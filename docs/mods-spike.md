@@ -1,6 +1,6 @@
 # Spike: Coherence as a Claude Code mod with a warm hook process
 
-Status: shipped as an opt-in fast path (`hooks install --host claude --mod`, see the README) on 2026-10-12; measured 2026-10-09 on Claude Code 2.1.295 and Coherence 1.7.0 plus the spike branch.
+Status: shipped as an opt-in fast path (`hooks install --host claude --mod`, see docs/tour.md) on 2026-10-12; measured 2026-10-09 on Claude Code 2.1.295 and Coherence 1.7.0 plus the spike branch.
 
 ## What was built
 

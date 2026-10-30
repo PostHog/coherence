@@ -247,7 +247,8 @@ test("--version, -v, version, --help, -h and help answer at the top level", asyn
 });
 
 test("the README's setup installs Coherence's latest release and names no version, invoked through npx --no --", () => {
-  const readme = readFileSync(join(CHECKOUT, "README.md"), "utf8");
+  // The README carries the quick setup, docs/setup.md the full and monorepo ones.
+  const readme = ["README.md", "docs/setup.md"].map((file) => readFileSync(join(CHECKOUT, file), "utf8")).join("\n");
   const installs = [...readme.matchAll(/@posthog\/coherence@(\S+?)[`\s)]/g)].map((m) => m[1]);
   assert.ok(installs.length >= 3, "the quick, full and monorepo setups each install it");
   assert.deepEqual([...new Set(installs)], ["latest"], "every install asks for the latest release, never a version or a range that the next release leaves behind");

@@ -11,6 +11,12 @@ export function isHost(name: string): name is Host {
   return (HOSTS as readonly string[]).includes(name);
 }
 
+/** What a person calls each host, as the README's generated list names it. */
+export const HOST_TITLE: Readonly<Record<Host, string>> = {
+  claude: "Claude Code",
+  codex: "Codex",
+};
+
 /** The folder each host keeps its settings in, relative to the project root. */
 export const HOST_FOLDER: Readonly<Record<Host, string>> = {
   claude: ".claude",

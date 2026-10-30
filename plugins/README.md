@@ -4,21 +4,25 @@ The plugins that ship inside `@posthog/coherence`. The core names no language:
 everything it knows of TypeScript, Python and Rust, and of the languages a
 config declares, is the plugin's here that provides it.
 
+<!-- generated: default plugins -->
 | Plugin | Provides |
 |---|---|
 | `typescript` | TypeScript and JavaScript, through typescript-language-server |
 | `python` | Python, through Pyright, with tach's module boundaries where a project draws them |
 | `rust` | Rust, through rust-analyzer |
-| `declared` | every language a config declares under `languages`, through its language server alone |
+| `declared` | Any language with a language server, through the server the config declares for it under `languages`: the chokepoint check alone |
+<!-- /generated -->
 
 Bundled but opt-in: a project runs these only by naming them,
 `"plugins": { "<name>": "bundled" }`.
 
+<!-- generated: opt-in plugins -->
 | Plugin | Adds |
 |---|---|
-| `go` | Go, through gopls: a language no default plugin provides, read as one is once a project names it |
-| `convex` | over TypeScript: a Convex function reached through the generated API as a reference, and a deployment's functions, HTTP routes and crons as entrances |
-| `quint` | a verifier: `via: [quint]` and `[quint run]` prove a property of a Quint model |
+| `convex` | Convex, over TypeScript: a Convex function reached through the generated API as a reference, and a deployment's functions, HTTP routes and crons as entrances |
+| `go` | Go, through gopls |
+| `quint` | Quint, a verifier: `via: [quint]` and `[quint run]` prove a property of a Quint model |
+<!-- /generated -->
 
 `defaults.json` lists the plugins every project runs without naming them, and
 the language a config that names none reads. A project's config may name a

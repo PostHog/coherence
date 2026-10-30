@@ -31,6 +31,7 @@
     "test:upgrade": "node --disable-warning=ExperimentalWarning --test --test-timeout=1800000 src/lifecycle/upgrade.e2e.ts",
     "test:pnpm": "node --disable-warning=ExperimentalWarning --test --test-timeout=1200000 src/adapters/pnpm.e2e.ts",
     "build": "node --disable-warning=ExperimentalWarning src/build.ts",
+    "readme": "node --disable-warning=ExperimentalWarning src/readme.ts",
     "prepare": "npm run build"
   },
   "devDependencies": {
@@ -58,6 +59,9 @@
     "docs/enforcement.md",
     "docs/spec.md",
     "docs/plugins.md",
+    "docs/setup.md",
+    "docs/tour.md",
+    "docs/telemetry.md",
     "plugins"
   ],
   "optionalDependencies": {
