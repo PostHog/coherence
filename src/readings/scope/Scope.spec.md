@@ -563,3 +563,8 @@ The reading: one surface projecting the model for a human, in eight views: Struc
   via: connections: every route and component has a deep link that names it back
   because: a link into the view must reach the origin it was copied from, or a reader shown a route by a link lands on another; the ids derive from the flow model's own, so no second naming of a route or a component can drift from it
   kinds: none
+- a relief that cannot draw says so in its place: When the browser cannot build the relief's scene (no WebGL), Structure says the relief cannot be drawn and why in the relief's own place, every other view and the rest of the page stay as they are, and the scene is not tried again until what it draws changes.
+  over: a scene maker that throws as a browser without WebGL does, across a first render, a render with the same data, a snapshot of equal data, a snapshot that changes what is drawn, and one with nothing to draw
+  via: a browser that cannot start WebGL gets a line saying the relief cannot be drawn, the page standing, and no second try until what it draws changes
+  because: a headless Chrome without a GPU threw "Error creating WebGL context" from the scene's renderer and the page replaced everything with its fault banner, the masthead and the other seven views included (2026-10-30); a browser with WebGL switched off is ordinary, and it should lose the one view that needs it, not Scope. Each try at a WebGL context costs one, and browsers cap them, so a failed one is not tried on every render
+  kinds: none

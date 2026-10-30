@@ -155,3 +155,32 @@ test("the page fetches a folder's files once per reading, again after a reread c
   const batches = asked.slice(before + 1);
   assert.ok(batches.length > 1 && batches.every((b) => b.map((f) => `folder=${encodeURIComponent(f)}&`).join("").length <= 4000), `${batches.length} fetches, each short`);
 });
+
+test("a browser that cannot start WebGL gets a line saying the relief cannot be drawn, the page standing, and no second try until what it draws changes", () => {
+  let tries = 0;
+  const create = (): Relief => {
+    tries += 1;
+    throw new Error("Error creating WebGL context");
+  };
+  const said: { className: string; textContent: string }[] = [];
+  const host = {
+    ownerDocument: { createElement: () => ({ className: "", textContent: "" }) },
+    replaceChildren(line: { className: string; textContent: string }) { said.push(line); },
+  };
+  const root = { querySelector: () => host } as unknown as HTMLElement;
+  const page = stateOf(reading());
+  assert.doesNotThrow(() => mountRelief(root, page, {}, create), "the failure stays in the relief's host");
+  assert.equal(said.at(-1)?.className, "absence");
+  assert.match(said.at(-1)!.textContent, /relief could not be drawn in this browser: Error creating WebGL context\. It needs WebGL; every other view works without it/);
+  mountRelief(root, page, {}, create);
+  mergeSnapshot(page, structuredClone(stateOf(reading())));
+  mountRelief(root, page, {}, create);
+  assert.equal(tries, 1, "an unchanged drawing does not try the browser again");
+  assert.equal(said.length, 3, "and every render still says why");
+  mergeSnapshot(page, stateOf(reading(55)));
+  mountRelief(root, page, {}, create);
+  assert.equal(tries, 2, "a changed drawing tries again");
+  // Nothing to draw clears the failure with the scene.
+  mergeSnapshot(page, stateOf({ kind: "unread", because: "mass could not be read" }));
+  mountRelief(root, page, {}, create);
+});

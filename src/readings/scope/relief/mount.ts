@@ -104,23 +104,45 @@ function filesFor(state: ShellState, data: ReliefData, io: ReliefIO): NonNullabl
 }
 
 let current: { relief: Relief; built: Built } | undefined;
+/** The data a scene could not be built from, and why: kept so a render does not try the browser's WebGL again until the data changes. */
+let failed: { built: Built; why: string } | undefined;
+
+/** Say in the host that the relief cannot be drawn here, leaving every other view as it is. */
+function sayUnbuilt(host: HTMLElement, why: string): void {
+  const line = host.ownerDocument.createElement("p");
+  line.className = "absence";
+  line.textContent = `The relief could not be drawn in this browser: ${why.replace(/\.+$/, "")}. It needs WebGL; every other view works without it, and Connections shows how the components connect.`;
+  host.replaceChildren(line);
+}
 
 /** Put the relief into the host the render left, building it first when what it draws changed. `create` is the scene's maker, given by tests. */
 export function mountRelief(root: HTMLElement, state: ShellState, io: ReliefIO, create: (data: ReliefData, io: ReliefIO, carried?: ReliefView) => Relief = createRelief): void {
   const host = root.querySelector<HTMLElement>("[data-relief-host]");
   if (host === null) return;
-  const step = reliefStep(current?.built, state);
+  const step = reliefStep(current?.built ?? failed?.built, state);
   if (step.kind === "absent") {
     current?.relief.dispose();
     current = undefined;
+    failed = undefined;
     return;
   }
   if (step.kind === "build") {
     const carried = current?.relief.view();
     current?.relief.dispose();
-    current = { relief: create(step.data, { ...io, files: filesFor(state, step.data, io) }, carried), built: step.built };
+    current = undefined;
+    // A browser without WebGL (no GPU, or one switched off) throws here: the relief says so in its own host, and the page stands.
+    try {
+      current = { relief: create(step.data, { ...io, files: filesFor(state, step.data, io) }, carried), built: step.built };
+      failed = undefined;
+    } catch (error) {
+      failed = { built: step.built, why: error instanceof Error ? error.message : String(error) };
+    }
   } else if (current !== undefined) current.built = step.built;
-  if (current === undefined) return;
+  else if (failed !== undefined) failed.built = step.built;
+  if (current === undefined) {
+    if (failed !== undefined) sayUnbuilt(host, failed.why);
+    return;
+  }
   if (current.relief.root.parentElement !== host) host.replaceChildren(current.relief.root);
   current.relief.resume();
 }
