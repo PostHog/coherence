@@ -22,7 +22,6 @@ import { DEFAULTS, projectNameOf, writeScopePage, type BuildOptions } from "./bu
 import { BUDGET_FLAG_NAMES, BUDGET_FLAGS, budgetFlags, readComponentInterfaces } from "./component-interfaces.ts";
 import { readAndRecord } from "./gaps.ts";
 import { keptLine } from "./kept-answers.ts";
-import { loadJournal } from "../../journal/store.ts";
 import { readRelief } from "../relief/relief.ts";
 
 export const SCOPE_USAGE = [
@@ -88,7 +87,7 @@ async function snapshot(root: string, values: Map<string, string>, switches: Set
     if (kept !== undefined) io.err(kept);
   }
   // Structure draws the relief: per-file lines from mass, districts, and the landings on HEAD's first-parent line.
-  options.relief = await readRelief(root, loadJournal(root).records);
+  options.relief = await readRelief(root);
   const domain = values.get("domain");
   if (domain !== undefined) options.domainPath = domain;
   const title = values.get("domain-title");

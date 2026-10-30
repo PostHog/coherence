@@ -623,6 +623,24 @@ test("the journal window keeps what kept records and work orders cite, one hop, 
   assert.ok(cappedIds.has(id(149)) && cappedIds.has(id(150 - CITED_WINDOW)) && !cappedIds.has(id(149 - CITED_WINDOW)), "the latest citers are served first");
 });
 
+test("the journal window keeps every open defect whatever its age, and the resolution of every defect it keeps", () => {
+  type Record = ShellState["journal"]["records"][number];
+  const head = (id: string, i: number) => ({ id, at: new Date(Date.UTC(2026, 8, 12) + i * 1000).toISOString(), session: "s", agent: "a", commit: null, dirty: false });
+  const defect = (id: string, i: number): Record => ({ ...head(id, i), kind: "defect", what: id, evidence: "e", files: ["src/a.ts"] });
+  const records: Record[] = [
+    defect("df-open", 0),
+    defect("df-closed", 1),
+    defect("df-cited", 2),
+    { ...head("rs-old", 3), kind: "resolution", of: "df-closed", because: "fixed" },
+    { ...head("rs-cited", 4), kind: "resolution", of: "df-cited", because: "fixed" },
+    ...Array.from({ length: 300 }, (_, i): Record => ({ ...head(`d-${i}`, 10 + i), kind: "decision", chose: "c", over: [], because: "b", ...(i === 299 ? { cites: ["df-cited"] } : {}) })),
+  ];
+  const kept = new Set(windowJournal(records, 150).records.map((r) => r.id));
+  assert.ok(kept.has("df-open"), "an old open defect is kept: the Structure view counts it");
+  assert.ok(!kept.has("df-closed") && !kept.has("rs-old"), "an old closed defect nothing cites is left out");
+  assert.ok(kept.has("df-cited") && kept.has("rs-cited"), "a closed defect kept for a citation keeps its resolution, so it never reads as open");
+});
+
 test("deep links resolve: every card id on every view resolves to that view", () => {
   const state = fresh();
   for (const view of state.views) {

@@ -1,10 +1,12 @@
 /**
  * The relief's data from Scope's state: the relief reading's components,
  * files and landings, joined with what the rest of the state already holds,
- * the spec's invariants, crossings and refutations per component and the
- * component interfaces' call sites between components.
+ * the spec's invariants, crossings and refutations per component, the
+ * component interfaces' call sites between components, and the journal's
+ * open defects.
  */
 
+import { defectsOfJournal } from "../derive.ts";
 import type { ShellState } from "../model.ts";
 import { flowBoundsText, flowOf, flowPartialText } from "../structure-flow.ts";
 
@@ -16,6 +18,7 @@ export interface ReliefMeasures {
   crossings: number;
   /** Call sites in other components that use this component's symbols: the load it carries. */
   leaned: number;
+  /** Open defects naming a file in it. */
   defects: number;
 }
 
@@ -59,6 +62,15 @@ export function reliefNotes(state: ShellState): string[] {
   return [...(partial === undefined ? [] : [upper(partial)]), ...(bounded === undefined ? [] : [upper(`Reliance and the Leaned on footprint come from component interfaces ${bounded}`)])];
 }
 
+/**
+ * What reliefData reads from the state, each the object the state holds. A
+ * merge replaces what it changed and keeps the rest, so while every one is
+ * the same object the data is the same, and a render need not join it again.
+ */
+export function reliefInputs(state: ShellState): readonly unknown[] {
+  return [state.project, state.relief, state.spec, state.componentInterfaces, state.journal.records];
+}
+
 /** The relief's data, or why there is none: the reading was not taken or could not be read. */
 export function reliefData(state: ShellState): ReliefData | { absent: string } {
   const reading = state.relief;
@@ -81,6 +93,21 @@ export function reliefData(state: ShellState): ReliefData | { absent: string } {
       leaned[b] = (leaned[b] ?? 0) + use.sites;
     }
   }
+  // An open defect counts once toward each component holding one of its files: the deepest folder, a district included.
+  const depth = (folder: string): number => (folder === "." ? 0 : folder.length + 1);
+  const holderOf = (path: string): number => {
+    let best = -1;
+    reading.components.forEach((c, i) => {
+      const holds = c.folder === "." || path === c.folder || path.startsWith(c.folder + "/");
+      if (holds && (best < 0 || depth(c.folder) > depth(reading.components[best]!.folder))) best = i;
+    });
+    return best;
+  };
+  const defects = reading.components.map(() => 0);
+  for (const defect of defectsOfJournal(state.journal.records)) {
+    if (defect.resolution !== undefined) continue;
+    for (const ci of new Set((defect.files ?? []).map(holderOf))) if (ci >= 0) defects[ci]! += 1;
+  }
   const components: ReliefDataComponent[] = reading.components.map((c, i) => {
     const spec = c.district ? undefined : specOf.get(c.folder);
     const invariants = spec?.invariants ?? [];
@@ -98,7 +125,7 @@ export function reliefData(state: ShellState): ReliefData | { absent: string } {
         refutations: invariants.reduce((n, inv) => n + inv.refutations.length, 0),
         crossings: invariants.filter((inv) => inv.crossing !== undefined).length,
         leaned: leaned[i] ?? 0,
-        defects: c.defects,
+        defects: defects[i] ?? 0,
       },
     };
   });

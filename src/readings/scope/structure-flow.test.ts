@@ -28,9 +28,9 @@ import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
 import { gapsOf, orientGapText, structureState } from "./gaps.ts";
 import { ADOPTER_ENTRANCES, APPLE, adopterFiles } from "../../spec/covers-fixture.ts";
-import { allInvariants, flowChokepointId, flowLevelId, invariantVerdict, relianceId, resolveHash, structureId } from "./derive.ts";
+import { allInvariants, flowChokepointId, invariantVerdict, relianceId, resolveHash, structureId } from "./derive.ts";
 import type { EntranceGuard, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
-import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, routeName, type FlowEntrance, type FlowModel, type FlowRoute } from "./structure-flow.ts";
+import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowLabelLines, flowNodeId, flowOf, flowSelected, flowVerdict, flowSelection, routeName, type FlowEntrance, type FlowModel, type FlowRoute } from "./structure-flow.ts";
 import { renderView } from "./shell.ts";
 
 let fixture: Fixture;
@@ -377,12 +377,11 @@ test("the comparison seam measures what a change did: entrance, interface added,
 });
 
 
-test("links into the retired Reliance view and the security spine land on the one map's selections", () => {
+test("links into the retired map, its Reliance view and the security spine open the Structure view", () => {
   const state = projectState();
-  assert.deepEqual(resolveHash(state, `#${relianceId("src/store", "single writer")}`), { view: "structure", id: flowChokepointId("src/store", "single writer") });
-  assert.deepEqual(resolveHash(state, `#${structureId("src/store", "single writer")}`), { view: "structure", id: flowChokepointId("src/store", "single writer") });
-  assert.deepEqual(resolveHash(state, "#reliance"), { view: "structure", id: undefined });
-  assert.deepEqual(resolveHash(state, `#${flowEntranceId(".", "run")}`), { view: "structure", id: flowEntranceId(".", "run") });
+  // The relief has no cards to land on: each opens the view alone, the masthead verdict's link among them.
+  for (const link of [relianceId("src/store", "single writer"), structureId("src/store", "single writer"), "reliance", flowEntranceId(".", "run"), flowChokepointId("src/store", "single writer"), flowVerdict(flowOf(state)).select])
+    assert.deepEqual(resolveHash(state, `#${link}`), { view: "structure", id: undefined }, link);
 });
 
 
@@ -851,7 +850,7 @@ test("the masthead leads with health: one verdict in large type that links to it
   const broken = verdictOf(healthState());
   assert.deepEqual([broken.kind, broken.text, broken.href], ["broken", "1 broken", flowBrokenId("src/store")], "one broken component: the verdict names its broken set");
   assert.match(broken.page, /data-field="verdict-detail">1 requirement not enforced yet/);
-  assert.equal(resolveHash(healthState(), `#${broken.href}`).view, "structure", "the link lands on the Structure view");
+  assert.equal(resolveHash(healthState(), `#${broken.href}`)?.view, "structure", "the link lands on the Structure view");
   const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
   const size = (selector: string): string => new RegExp(`\\n${selector.replace(/\./g, "\\.")} \\{[^}]*font-size: ([^;]+);`).exec(css)![1]!;
   assert.match(size(".masthead .verdict"), /clamp\(1\.375rem/, "large type");

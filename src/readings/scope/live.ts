@@ -286,7 +286,7 @@ class LiveReading implements HttpApp {
    */
   private readReliefAgain(): Promise<ReliefReading> {
     if (this.reliefRead === undefined) {
-      this.reliefRead = readRelief(this.root, loadJournal(this.root).records).finally(() => {
+      this.reliefRead = readRelief(this.root).finally(() => {
         this.reliefRead = undefined;
       });
       return this.reliefRead;

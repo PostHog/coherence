@@ -132,10 +132,6 @@ export const FLOW_CHANGE_ID = "structure--change";
 /** The selection a reader makes by clearing: nothing lit, every route muted. An absent selection is the default story. */
 export const FLOW_NONE_ID = "structure--none";
 
-export function isFlowId(id: string): boolean {
-  return id.startsWith("structure--");
-}
-
 /* ---------------------------------------------------------------- types */
 
 /** Where the symbols of the component interfaces came from. */
@@ -1332,14 +1328,6 @@ export function flowDefaultSelection(model: FlowModel): string | undefined {
 export function flowSelected(model: FlowModel, selected: string | undefined): string | undefined {
   if (selected === FLOW_NONE_ID) return undefined;
   return selected ?? flowDefaultSelection(model);
-}
-
-/** What a key does on the map: the page calls this, so what each key does is a pure function. */
-export function flowKeyAction(event: { key: string; select: string | undefined; button: boolean }): { select: string } | undefined {
-  if (event.key === "Escape") return { select: FLOW_NONE_ID };
-  // A real button activates itself on Enter and Space; every other select target is activated here.
-  if ((event.key === "Enter" || event.key === " ") && event.select !== undefined && !event.button) return { select: event.select };
-  return undefined;
 }
 
 /** One line of the label a component interface wears. */
