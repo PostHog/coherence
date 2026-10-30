@@ -24,6 +24,7 @@
 import { componentOfHash, journalId, resolveHash } from "./derive.ts";
 import type { JournalKind, JournalRecord, LifecycleState, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { renderMasthead, renderShell, renderViewResults } from "./shell.ts";
+import { mountRelief, touchRelief, type Touch } from "./relief/mount.ts";
 import { FLOW_NONE_ID, flowDefaultSelection, flowExpanded, flowKeyAction, flowOf, isFlowId } from "./structure-flow.ts";
 import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream } from "./updates.ts";
 import { setLanguageData } from "./language-data.ts";
@@ -93,9 +94,15 @@ function setFilter(state: ShellState, name: string, value: string): void {
 function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefined): { update: () => void } {
   // The languages' entrance rules and what they miss are the plugins', carried in the state: set before anything renders them.
   if (state.spec.languages !== undefined) setLanguageData(state.spec.languages);
+  // The relief is a live scene, not markup: after every render it is put back into the host the render left.
+  const io = live === undefined ? {} : { get: (path: string) => live.get(path) };
+  const mount = (): void => {
+    if (state.activeView === "structure") mountRelief(root, state, io);
+  };
   const renderAll = (): void => {
     document.title = `${state.project} Scope`;
     root.innerHTML = renderShell(state).text;
+    mount();
   };
 
   const update = (): void => {
@@ -152,6 +159,7 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
     const results = root.querySelector<HTMLElement>("[data-results]");
     if (results === null) return renderAll();
     results.innerHTML = renderViewResults(state).text;
+    mount();
   };
 
   const showView = (view: string): void => {
@@ -472,6 +480,13 @@ async function follow(root: HTMLElement, token: string): Promise<void> {
             delete held.connection.attempt;
             delete held.connection.reason;
             changed = true;
+          } else if (event.event === "touch") {
+            // Agent activity lights the Structure view directly; it changes no state, so nothing renders.
+            touchRelief((data as { touches: Touch[] }).touches);
+          } else if (event.event === "shell") {
+            // The server rebuilt the page from changed sources (a checkout): load the new one.
+            location.reload();
+            return;
           } else changed = applyUpdate(held, event.event, data) || changed;
         }
         if (changed && !drawn(root, () => shown?.update())) return;

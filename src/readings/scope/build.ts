@@ -25,8 +25,7 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { configuredName, projectName } from "../../adapters/project-config.ts";
-import { stripTypeScriptTypes } from "node:module";
-import { dirname, extname, posix, relative, resolve, sep } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { instrumentFor } from "../../adapters/index.ts";
 import { languageDataTable } from "../../plugins/languages.ts";
@@ -40,6 +39,7 @@ import { COHERENCE_LEXICON, projectLexiconPath } from "../../lifecycle/project.t
 import { loadSpecModel, projectPractices, type SpecModel } from "../../spec/model.ts";
 import { KERNEL_PREFIX } from "../../spec/practices.ts";
 import { projectLexiconCoverage } from "./lexicon-projection.ts";
+import type { ReliefReading } from "../relief/relief.ts";
 import { windowJournal, windowRuns } from "./derive.ts";
 import { parseLexicon, type Lexicon, type InterfaceReading, type Ladder, type PracticesData, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
 import { DEFAULT_VIEW, VIEWS } from "./shell.ts";
@@ -72,6 +72,8 @@ export interface BuildOptions {
   window?: boolean;
   /** The component interfaces as the language adapter read them (readComponentInterfaces); unread when absent. */
   componentInterfaces?: InterfaceReading;
+  /** What the Structure view draws beyond the spec: files, districts and landings (readRelief); unread when absent. */
+  relief?: ReliefReading;
 }
 
 export const DEFAULTS = {
@@ -294,6 +296,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     runs: { records: runs.records, damaged: runs.damaged },
     journal: { records: journal.records, damaged: journal.damaged, work: loadWork(root) },
     componentInterfaces: options.componentInterfaces ?? { kind: "unread", because: "no instrument was asked when this page was built" },
+    relief: options.relief ?? { kind: "unread", because: "no relief was read when this page was built" },
     components: { query: "" },
     structure: { preview: options.structurePreview === undefined ? [] : options.structurePreview.map((proposal) => ({ ...proposal, crossing: { ...proposal.crossing }, ...(proposal.chokepoints === undefined ? {} : { chokepoints: proposal.chokepoints.map((entry) => ({ ...entry })) }) })) },
     invariants: { query: "", state: "", component: "" },
@@ -323,99 +326,67 @@ export function windowState(state: ShellState): ShellState {
   };
 }
 
-/** One browser source stripped to JavaScript, as the published package carries it beside its compiled modules. */
-export function strippedName(name: string): string {
-  return name.replace(/\.ts$/, ".browser.js");
-}
+/** The page's script as the published package carries it, bundled beside its compiled modules. */
+export const BUNDLE_NAME = "page.bundle.js";
 
 /**
- * One browser source as JavaScript: stripped here in a checkout, and read
- * already stripped in the published package, whose build ran the same
- * stripper, so an installed Coherence never calls the experimental API.
+ * The browser sources bundled into one script, from the entry through every
+ * module it imports, packages included (the Structure view draws with
+ * three.js): bundled here by esbuild in a checkout, and read already bundled in
+ * the published package, whose build ran the same bundler, so an installed
+ * Coherence carries no bundler. An import the browser cannot resolve fails the
+ * bundle, naming it, so a page that would break in the browser is never built.
  */
-async function browserSource(name: string): Promise<string> {
-  if (extname(fileURLToPath(import.meta.url)) === ".js") return readFile(resolve(here, strippedName(name)), "utf8");
-  return stripTypeScriptTypes(await readFile(resolve(here, name), "utf8"), { mode: "strip" });
+export async function bundleBrowserScript(entry: string = resolve(here, BROWSER_ENTRY)): Promise<string> {
+  const esbuild = await import("esbuild");
+  // esbuild answers from a child process it keeps running; stopped after each bundle so nothing outlives the build.
+  const out = await esbuild.build({
+    entryPoints: [entry],
+    bundle: true,
+    write: false,
+    format: "iife",
+    platform: "browser",
+    target: "es2022",
+    minify: true,
+    legalComments: "none",
+    logLevel: "silent",
+    metafile: true,
+  }).finally(() => esbuild.stop());
+  for (const input of Object.keys(out.metafile.inputs)) pageInputs.add(resolve(process.cwd(), input));
+  pageInputs.add(resolve(here, "styles.css"));
+  return out.outputFiles[0]!.text;
 }
+
+/** The page's own bundle, made once per process: the shell is fixed, so every build of it bundles the same script. */
+let pageBundle: Promise<string> | undefined;
 
 /**
- * A stripped module's import and re-export statements, each with the module
- * it names. Type stripping has already removed every type-only import, so
- * what is left is exactly what the module needs at run time. An empty
- * import list, all of whose names were types, is no edge.
+ * Whether this Coherence runs from its sources (a checkout), where the page is
+ * bundled here and its sources can change under a running server: the
+ * published package carries the bundle beside this module, a checkout never does.
  */
-const MODULE_STATEMENT = /^(?:import|export)\s[^;]*?\sfrom\s+["']([^"']+)["'];[^\S\n]*$|^import\s+["']([^"']+)["'];[^\S\n]*$/gm;
+export const FROM_SOURCES = !existsSync(resolve(here, BUNDLE_NAME));
 
-/** One import or re-export as the page may join it: a list of names under their own exported names, or a bare import for its effect. */
-const JOINABLE = /^(?:import\s*\{[^}]*\}\s*from|export\s*\{[^}]*\}\s*from|import\s+["'])/;
+/** Every file the page is built from, by absolute path: the bundle's inputs as esbuild reports them, the styles and the fonts. Known once the page has been bundled. */
+const pageInputs = new Set<string>();
 
-function runtimeImports(stripped: string, name: string): string[] {
-  return [...stripped.matchAll(MODULE_STATEMENT)].flatMap((m) => {
-    const statement = m[0];
-    if (/^import\s*\{\s*\}\s*from/.test(statement)) return [];
-    // Joined into one module, a statement is removed and each name stands as its exporter declared it: a renamed, namespace
-    // or default import would leave its local name undefined in the browser, so it is refused here instead.
-    if (!JOINABLE.test(statement) || /\{[^}]*\sas\s[^}]*\}/.test(statement)) {
-      throw new Error(`Scope: ${name} has ${statement.replace(/\s+/g, " ")}; the page joins its modules into one name space, so a browser source imports names by their exported names, in braces, never renamed, as a namespace or as a default`);
-    }
-    return [(m[1] ?? m[2])!];
-  });
+/** Whether a file is one the page is built from: a change to it means the page must be built again. */
+export function isPageSource(path: string): boolean {
+  return pageInputs.has(resolve(path));
 }
 
-/**
- * Every browser source, dependencies first: the entry and each module it
- * imports at run time, followed to the end, as paths from this folder. An
- * import the browser cannot resolve inside the bundle (a package, a node:
- * module, anything but a relative path to another source) fails here, naming
- * the importer, so a page that would break in the browser is never built.
- */
-export async function browserSources(read: (name: string) => Promise<string> = browserSource): Promise<string[]> {
-  const order: string[] = [];
-  const seen = new Set<string>();
-  const visit = async (name: string): Promise<void> => {
-    if (seen.has(name)) return;
-    seen.add(name);
-    for (const target of runtimeImports(await read(name), name)) {
-      if (!target.startsWith("./") && !target.startsWith("../")) {
-        throw new Error(`Scope: ${name} imports ${target} at run time, and the page runs in a browser: a browser source imports only other sources by relative path, or types alone`);
-      }
-      await visit(posix.normalize(posix.join(posix.dirname(name), target)));
-    }
-    order.push(name);
-  };
-  await visit(BROWSER_ENTRY);
-  return order;
+/** The folder holding every source the page is bundled from, in a checkout: what a server watches to rebuild the page. */
+export const SOURCE_FOLDER = resolve(here, "../..");
+
+/** Drop the bundled page: the next shell bundles its sources again. */
+export function forgetPageBundle(): void {
+  pageBundle = undefined;
 }
 
-/** Drop a stripped source's import and re-export statements: browserSources has followed each into the bundle, so every one names a module joined beside it. */
-function toBrowserModule(stripped: string, name: string): string {
-  // A statement may span several lines; the pattern's `[^;]` crosses them.
-  return stripped.replace(MODULE_STATEMENT, "").concat(`\n// end of ${name}\n`);
-}
-
-/** The names a stripped module declares at its top level. */
-function topLevelNames(module: string): string[] {
-  return [...module.matchAll(/^(?:export )?(?:async )?(?:function|const|let|class) ([A-Za-z_$][A-Za-z0-9_$]*)/gm)].map((m) => m[1]!);
-}
-
-/**
- * The browser sources joined into one module. One module has one name space,
- * so a top-level name declared in two sources is refused here, by name, rather
- * than shipped as a page whose script fails to parse.
- */
 async function browserScript(): Promise<string> {
-  const parts: string[] = [];
-  const declared = new Map<string, string>();
-  for (const name of await browserSources()) {
-    const module = toBrowserModule(await browserSource(name), name);
-    for (const declaredName of topLevelNames(module)) {
-      const earlier = declared.get(declaredName);
-      if (earlier !== undefined) throw new Error(`Scope: ${name} declares ${declaredName} at top level, which ${earlier} already declares; the inline module has one name space`);
-      declared.set(declaredName, name);
-    }
-    parts.push(module);
-  }
-  return parts.join("\n");
+  if (!FROM_SOURCES) return readFile(resolve(here, BUNDLE_NAME), "utf8");
+  pageBundle ??= bundleBrowserScript();
+  return pageBundle;
 }
 
 /** JSON that is safe inside a script element: no `<` can close it. */

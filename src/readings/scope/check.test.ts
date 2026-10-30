@@ -458,12 +458,6 @@ test("every view renders from state: every component, invariant, run, and journa
   assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId("src/store", "read shape")], "the search narrows by sentence");
   state.invariants.query = "";
 
-  state.structure.selected = flowChokepointId("src/store", "single writer");
-  const reliance = renderView(state, "structure").text;
-  assert.ok(reliance.includes('data-kind="chokepoint"') && reliance.includes("reliance unknown: run carries no sites"), "a legacy run is explicitly incomplete on the chokepoint's selection");
-  assert.ok(reliance.includes('data-field="evidence"'), "the evidence boundary is said on the map");
-  delete state.structure.selected;
-
   const relied = allReliance(state.spec.components, state.runs.records).find((reading) => reading.invariant.name === "single writer");
   assert.ok(relied !== undefined && relied.evidence.status === "unknown");
   assert.match(relied.evidence.reason, /run carries no sites/);
@@ -527,28 +521,6 @@ function setSingleWriterSites(state: ShellState, sites: RecordedSite[] | undefin
   else entry.sites = sites;
 }
 
-/** The Structure view with one selection made: the one map's reading of it. */
-function selectedOn(state: ShellState, selected: string): string {
-  return renderView({ ...state, structure: { ...state.structure, selected } }, "structure").text;
-}
-
-test("a scaffold preview is drawn dashed and unverified on its component in the one map", () => {
-  const state = fresh();
-  const preview: StructurePreview = {
-    component: "src/store",
-    name: "preview writer",
-    crossing: { from: "outside", to: "inside" },
-    chokepoints: [{ chokepoint: "write", protects: "writeRow" }],
-  };
-  state.structure.preview = [preview];
-  const proposed = renderView(state, "structure").text;
-  assert.match(proposed, /proposed preview · preview writer/);
-  assert.match(proposed, /data-proposed="true"/);
-  assert.match(proposed, /class="structure-edge structure-proposed"/);
-  assert.match(proposed, /Reliance unknown: a proposal has no run evidence\. This dashed edge exists only in the ephemeral preview\./);
-  assert.equal(proposed, renderView(JSON.parse(JSON.stringify(state)) as ShellState, "structure").text, "the same state renders the same bytes");
-});
-
 test("reliance reads both protected and chokepoint endpoint sites, owner first, without calling a bypass a legal door reference", () => {
   const state = fresh();
   setSingleWriterSites(state, [
@@ -560,28 +532,20 @@ test("reliance reads both protected and chokepoint endpoint sites, owner first, 
   const reading = allReliance(state.spec.components, state.runs.records).find((candidate) => candidate.invariant.name === "single writer");
   assert.ok(reading !== undefined && reading.evidence.status === "complete");
   assert.deepEqual(reading.evidence.sites.map((site) => site.file), ["src/store/write.ts", "src/api/door.test.ts", "src/api/door.ts", "src/api/handler.ts"], "owner component is first and sites are stable");
-  const rendered = selectedOn(state, flowChokepointId("src/store", "single writer"));
-  assert.match(rendered, /protected thing · inside chokepoint/);
-  assert.match(rendered, /chokepoint · reference \(runtime call not established\)/);
-  assert.match(rendered, /protected thing · bypass \(not a legal chokepoint reference\)/);
-  assert.match(rendered, /data-test="true"/);
-
-  const protectedOnly = fresh();
-  setSingleWriterSites(protectedOnly, [{ file: "src/api/handler.ts", line: 12, symbol: "handle", class: "bypass", of: "protected", test: false }]);
-  assert.match(selectedOn(protectedOnly, flowChokepointId("src/store", "single writer")), /protected thing · bypass/);
-  const doorOnly = fresh();
-  setSingleWriterSites(doorOnly, [{ file: "src/api/door.ts", line: 7, symbol: "save", class: "chokepoint-reference", of: "chokepoint", test: false }]);
-  assert.match(selectedOn(doorOnly, flowChokepointId("src/store", "single writer")), /chokepoint · reference/);
 });
 
 test("legacy site absence stays unknown while a complete empty site list confirms zero", () => {
+  const writer = (state: ShellState) => allReliance(state.spec.components, state.runs.records).find((reading) => reading.invariant.name === "single writer");
   const legacy = fresh();
   setSingleWriterSites(legacy, undefined);
-  assert.match(selectedOn(legacy, flowChokepointId("src/store", "single writer")), /reliance unknown: run carries no sites; evidence is incomplete/);
+  const unknown = writer(legacy);
+  assert.ok(unknown !== undefined && unknown.evidence.status === "unknown", "a run that carries no sites leaves reliance unknown");
+  assert.match(unknown.evidence.reason, /run carries no sites/);
 
   const empty = fresh();
   setSingleWriterSites(empty, []);
-  assert.match(selectedOn(empty, flowChokepointId("src/store", "single writer")), /Complete run site evidence records 0 references/);
+  const confirmed = writer(empty);
+  assert.ok(confirmed !== undefined && confirmed.evidence.status === "complete" && confirmed.evidence.sites.length === 0, "a complete empty list confirms zero references");
 });
 
 test("the Structure preview bridge validates crossings, selects Structure, and writes deterministic generated pages only", async () => {
@@ -662,10 +626,13 @@ test("the journal window keeps what kept records and work orders cite, one hop, 
 test("deep links resolve: every card id on every view resolves to that view", () => {
   const state = fresh();
   for (const view of state.views) {
+    // Structure is the relief, a scene with no cards: its hash names the view alone.
+    if (view.id === "structure") {
+      assert.deepEqual(resolveHash(state, "#structure"), { view: "structure", id: undefined }, "#structure names the view alone");
+      continue;
+    }
     const rendered = renderView(state, view.id).text;
-    const ids = view.id === "structure"
-      ? [...rendered.matchAll(/ id="(structure--[^"]+)"/g)].map((match) => match[1]!)
-      : cardIds(rendered).filter((id) => !id.startsWith("pinned-"));
+    const ids = cardIds(rendered).filter((id) => !id.startsWith("pinned-"));
     assert.ok(ids.length > 0, `${view.id} renders cards`);
     for (const id of ids) {
       const target = resolveHash(state, `#${id}`);
@@ -762,17 +729,6 @@ test("the first load carries at most the site window's reference sites however m
   const governs = (state: ShellState) => /data-field="from"[\s\S]*?<\/p>/.exec(renderView(state, "invariants").text)?.[0];
   assert.match(governs(whole) ?? "", /\d+ references from inside it exempt/);
   assert.equal(governs(windowed), governs(whole), "the exempt references are counted the same");
-  const chokepoint = flowChokepointId("src/store", "single writer");
-  const left = sites.length - carried.sites!.length;
-  const snapshot = selectedOn(windowed, chokepoint);
-  assert.ok(snapshot.includes(`${sites.length} recorded reference sites to the chokepoint or protected thing; owner component first. This page lists ${carried.sites!.length} of them.`), "the listing says how many sites there are and how many it lists");
-  assert.match(snapshot, new RegExp(`data-field="sites-left" data-left="${left}">${left} more sites are counted and not listed \\([^)]*in src/api[^)]*\\): <code>query relies-on write</code> lists every one`), "a snapshot says where the rest are");
-  const live = { ...windowed, connection: { mode: "live", status: "live", version: "v" } } as ShellState;
-  assert.match(selectedOn(live, chokepoint), new RegExp(`data-load-sites="${last.at}~${last.session}" data-component="src/store" data-name="single writer">Load the other ${left}</button>`), "a live page offers the rest");
-  assert.ok(mergeSites(live, `${last.at}~${last.session}`, "src/store", "single writer", sites), "the fetched sites replace the share");
-  const loaded = selectedOn(live, chokepoint);
-  assert.doesNotMatch(loaded, /data-field="sites-left"/, "and nothing is left counted");
-  assert.ok(loaded.includes(`${sites.length} recorded reference sites to the chokepoint or protected thing; owner component first.</p>`));
   // The same over Coherence's own runs is the bench job's (bench/scope/own-tree.ts): it reads every run Coherence recorded.
 });
 

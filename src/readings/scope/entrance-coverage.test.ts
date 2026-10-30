@@ -12,7 +12,6 @@ import { orientUndeclaredText } from "./undeclared.ts";
 import { coverageLine, coverageOf, groupLine } from "./entrance-coverage.ts";
 import type { InterfaceReading, ShellState, SpecComponent, SpecEntrance } from "./model.ts";
 import { answerStructure } from "../query/query.ts";
-import { renderFlowSection } from "./structure-flow-view.ts";
 import { flowOf } from "./structure-flow.ts";
 import { makeFixture } from "./check-fixture.ts";
 import { buildScopePage } from "./build.ts";
@@ -72,7 +71,7 @@ describe("entrance coverage", () => {
     assert.equal(coverage.uncovered.length, 9);
   });
 
-  test("query structure, the map's health strip and orient carry one entrance coverage", async (t) => {
+  test("query structure and orient carry one entrance coverage", async (t) => {
     const fixture = makeFixture();
     t.after(() => fixture.remove());
     const { state } = await buildScopePage({ root: fixture.root, lexiconPath: COHERENCE_LEXICON, project: "Coverage" });
@@ -92,15 +91,12 @@ describe("entrance coverage", () => {
     assert.ok(text.includes(`entrance coverage: ${line}`), "the query prints the summary");
     assert.ok(text.includes("scripts/forgotten.ts:1  (the file)  script: a script directly under scripts/"), "and every undeclared entrance with its rule and why");
     assert.match(text, /detected by \(typescript\): server function, /, "and the rules, with what they cannot see");
-    const html = String(renderFlowSection(withCoverage));
-    assert.match(html, new RegExp(`data-field="entrance-coverage" data-detected="${coverage.detected}" data-covered="${coverage.individually + coverage.grouped}" data-undeclared="${coverage.uncovered.length}"`), "the health strip carries the same counts");
-    assert.ok(html.includes("scripts/forgotten.ts:1"), "and lists the undeclared, one click away");
     const orient = orientUndeclaredText({ declared: coverage.declared, detected: coverage.detected, covered: coverage.individually + coverage.grouped, undeclared: coverage.uncovered }, "coherence");
     assert.match(orient, new RegExp(`^Entrance coverage: ${coverage.declared} declared entrances cover ${coverage.individually + coverage.grouped} of ${coverage.detected} detected; ${coverage.uncovered.length} undeclared`), "orient says the same counts");
     assert.ok(orient.includes("scaffold entrances"), "and names the command that proposes them");
   });
 
-  test("undeclared entrances are a neutral count: the masthead and the health strip give how many of the detected are undeclared, in quiet ink, never in the attention color nor as a gap", async (t) => {
+  test("undeclared entrances are a neutral count: the masthead gives how many of the detected are undeclared, in quiet ink, never in the attention color nor as a gap", async (t) => {
     const fixture = makeFixture();
     t.after(() => fixture.remove());
     const { state } = await buildScopePage({ root: fixture.root, lexiconPath: COHERENCE_LEXICON, project: "Coverage" });
@@ -115,12 +111,8 @@ describe("entrance coverage", () => {
     const n = coverage.uncovered.length;
     assert.ok(n >= 2, "the fixture holds undeclared entrances");
     const masthead = String(renderMasthead(withCoverage));
-    assert.match(masthead, new RegExp(`data-field="verdict-detail">[^<]*${n} of ${coverage.detected} entrances undeclared`), "the masthead counts them beneath the verdict");
-    const strip = String(renderFlowSection(withCoverage));
-    const count = /<span class="([^"]*)" data-field="undeclared"[^>]*>([^<]*)<\/span>/.exec(strip);
-    assert.ok(count !== null, "the health strip carries the count");
-    assert.deepEqual([count[1], count[2]], ["flow-meta", `${n} of ${coverage.detected} undeclared`], "neutral, against what is detected");
-    assert.doesNotMatch(strip, /flow-attention[^>]*data-field="undeclared"/, "never in the attention color");
+    assert.match(masthead, new RegExp(`<p class="verdict-detail" data-field="verdict-detail">[^<]*${n} of ${coverage.detected} entrances undeclared`), "the masthead counts them beneath the verdict, in its quiet detail line");
+    assert.doesNotMatch(masthead, /data-verdict="[^"]*"[^>]*>[^<]*undeclared/, "never as the verdict itself");
     const none = { ...state, componentInterfaces: { ...base, candidates: [] } } as ShellState;
     assert.doesNotMatch(String(renderMasthead(none)), /entrances undeclared/, "nothing to count, nothing said");
   });

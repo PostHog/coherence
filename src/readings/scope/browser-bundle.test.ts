@@ -1,10 +1,10 @@
 /**
- * The browser bundle is derived, never listed: every module the page's entry
- * imports at run time, followed to the end. A module the page calls into
+ * The browser bundle is derived, never listed: esbuild follows every import
+ * from the page's entry, packages included. A module the page calls into
  * cannot be left out (1.6.0 to 1.7.1 shipped a page whose Structure view
  * called languagesReadLine, defined in a module no list named, so the live
- * page waited on "Connecting…" forever), and an import the browser cannot
- * resolve inside the bundle fails the build. And the page shows its own
+ * page waited on "Connecting…" forever), and an import the bundler cannot
+ * resolve fails the build. And the page shows its own
  * failures: a drawing that throws is put on the page, never kept as a
  * connection reason nothing shows.
  */
@@ -12,43 +12,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
-import { BROWSER_ENTRY, browserSources, buildShell } from "./build.ts";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { bundleBrowserScript, buildShell } from "./build.ts";
 
-/** A reader over in-memory sources, already stripped as the build strips them. */
-const reader = (files: Record<string, string>) => async (name: string): Promise<string> => {
-  const text = files[name];
-  if (text === undefined) throw new Error(`no source ${name}`);
-  return text;
-};
+test("the page's bundle carries every module its entry imports, packages included, and an import nothing resolves fails the bundle", async () => {
+  const script = await bundleBrowserScript();
+  // The relief draws with three.js: the bundle carries the package itself, so the page loads nothing from outside.
+  assert.match(script, /THREE\.WebGLRenderer/, "three.js is bundled into the page");
+  assert.doesNotMatch(script, /<\/script/i, "nothing in the bundle can close the inline script early");
 
-test("the browser bundle is every module the entry imports at run time, dependencies first, and an import the browser cannot resolve fails the build", async () => {
-  const files = {
-    [BROWSER_ENTRY]: 'import { view } from "./view.ts";\nimport "./effects.ts";\nexport function boot() { view(); }\n',
-    "view.ts": 'import { line } from "../../spec/line.ts";\nexport function view() { return line(); }\n',
-    "../../spec/line.ts": "export function line() { return 1; }\n",
-    "effects.ts": "globalThis.loaded = true;\n",
-    // Type stripping leaves an empty list where every name was a type: no edge, so this module is never read.
-    "unread.ts": "export const x = 1;\n",
-  };
-  files["view.ts"] = 'import { } from "./unread.ts";\n' + files["view.ts"];
-  assert.deepEqual(await browserSources(reader(files)), ["../../spec/line.ts", "view.ts", "effects.ts", BROWSER_ENTRY], "followed to the end, each module after what it imports");
-
-  const refused = async (statement: string, why: RegExp) => {
-    const bad = { ...files, "view.ts": `${statement}\nexport function view() {}\n` };
-    await assert.rejects(browserSources(reader(bad)), why, statement);
-  };
-  await refused('import { readFileSync } from "node:fs";', /view\.ts imports node:fs at run time, and the page runs in a browser/);
-  await refused('import { marked } from "marked";', /view\.ts imports marked at run time/);
-  await refused('import { line as l } from "../../spec/line.ts";', /never renamed, as a namespace or as a default/);
-  await refused('import * as lines from "../../spec/line.ts";', /never renamed, as a namespace or as a default/);
-  await refused('import line from "../../spec/line.ts";', /never renamed, as a namespace or as a default/);
-});
-
-test("the real page's bundle includes every module its sources call into, the one 1.7.1 left out among them", async () => {
-  const sources = await browserSources();
-  assert.equal(sources.at(-1), BROWSER_ENTRY, "the entry comes last");
-  assert.ok(sources.includes("languages-read.ts"), "structure-flow.ts calls languagesReadLine, so its module is joined");
-  assert.ok(sources.indexOf("languages-read.ts") < sources.indexOf("structure-flow.ts"), "before the module that calls it");
+  const dir = mkdtempSync(join(tmpdir(), "scope-bundle-"));
+  try {
+    writeFileSync(join(dir, "entry.ts"), 'import { gone } from "./missing.ts";\nimport { marked } from "no-such-package";\nconsole.log(gone, marked);\n');
+    await assert.rejects(bundleBrowserScript(join(dir, "entry.ts")), /missing\.ts|no-such-package/, "an import the bundler cannot resolve fails the build, naming it");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("a page whose drawing throws shows the failure where the reader sees it, never a waiting line forever", async () => {

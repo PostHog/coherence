@@ -32,15 +32,17 @@
  * Node-only; the browser bundle never imports it.
  */
 
-import { watch, type FSWatcher } from "node:fs";
+import { closeSync, openSync, readSync, readdirSync, statSync, watch, type FSWatcher } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { basename, dirname, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { tracesDir } from "../../economy/trace.ts";
 import type { HttpApp, HttpAppFactory, HttpContext } from "../../enforcement/server.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
+import { REVISION, WORKTREE, readRelief, reliefCommits, reliefDiff, touchesOf, type ReliefReading, type Touch } from "../relief/relief.ts";
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
 import { storeOfPath, type RecordStore } from "../../journal/stores.ts";
-import { buildShell, rootOptions, scopeState, windowState, type BuildOptions, type Shell } from "./build.ts";
+import { FROM_SOURCES, SOURCE_FOLDER, buildShell, forgetPageBundle, isPageSource, rootOptions, scopeState, windowState, type BuildOptions, type Shell } from "./build.ts";
 import { interfaceAdapter, interfaceBounds, readComponentInterfaces } from "./component-interfaces.ts";
 import { readAndRecord } from "./gaps.ts";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
@@ -142,6 +144,8 @@ class LiveReading implements HttpApp {
   private runKeys = new Set<string>();
   private workIds = new Set<string>();
   private interfaces: InterfaceReading;
+  /** What Structure draws beyond the spec, read when the state loads and again when the model changes. */
+  private relief: ReliefReading = { kind: "unread", because: "the warm server has not read it yet" };
   private reading: Promise<void> | undefined;
   private readAgain = false;
   /** The reading's own bounded server, when the shared instrument reads a whole workspace the reading never draws. */
@@ -172,7 +176,8 @@ class LiveReading implements HttpApp {
   /** The state, loaded once and kept current by the watchers from then on. */
   private ensure(): Promise<ShellState> {
     this.loading ??= (async () => {
-      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
+      this.relief = readRelief(this.root, loadJournal(this.root).records);
+      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces, relief: this.relief });
       this.base = state;
       this.remember(state);
       this.lexicons = await watchedLexicons(this.root, this.build);
@@ -189,10 +194,66 @@ class LiveReading implements HttpApp {
     this.workIds = new Set(state.journal.work.kind === "present" ? state.journal.work.orders.flatMap((order) => [order.id, ...order.history.map((h) => h.id)]) : []);
   }
 
+  /** How far each read trace has been sent: a trace line is a touch once, and the traces before the server started are history, not activity. */
+  private readonly traceOffsets = new Map<string, number>();
+  private tracePending: NodeJS.Timeout | undefined;
+
+  /**
+   * Agent activity, live: the lines appended to the read traces since the last
+   * look, each file a session read or wrote, sent as one touch event for the
+   * Structure view to light. Nothing is stored; a page that connects later sees
+   * only what happens from then on.
+   */
+  private traced(): void {
+    clearTimeout(this.tracePending);
+    this.tracePending = setTimeout(() => {
+      const dir = tracesDir(this.root);
+      const touches: Touch[] = [];
+      let names: string[] = [];
+      try {
+        names = readdirSync(dir).filter((n) => n.endsWith(".jsonl"));
+      } catch {
+        return;
+      }
+      for (const name of names) {
+        const file = join(dir, name);
+        let size = 0;
+        try {
+          size = statSync(file).size;
+        } catch {
+          continue;
+        }
+        // A trace this server has not seen is a session that began after it started: all of it is new.
+        const from = this.traceOffsets.get(file) ?? 0;
+        if (size <= from) {
+          this.traceOffsets.set(file, size);
+          continue;
+        }
+        const handle = openSync(file, "r");
+        const buffer = Buffer.alloc(size - from);
+        readSync(handle, buffer, 0, buffer.length, from);
+        closeSync(handle);
+        const found = touchesOf(buffer.toString("utf8"));
+        this.traceOffsets.set(file, from + found.consumed);
+        touches.push(...found.touches);
+      }
+      if (touches.length > 0) this.send("touch", { touches });
+    }, 120);
+    this.tracePending.unref();
+  }
+
   private watch(): void {
+    // Every trace as it stands now is history: only what is appended from here on is sent as activity.
+    try {
+      const dir = tracesDir(this.root);
+      for (const n of readdirSync(dir)) if (n.endsWith(".jsonl")) this.traceOffsets.set(join(dir, n), statSync(join(dir, n)).size);
+    } catch {
+      // no traces yet
+    }
     try {
       const watcher = watch(this.root, { recursive: true }, (_event, name) => {
         if (name === null) return;
+        if (String(name).split(sep).join("/").startsWith(".coherence/traces/")) return this.traced();
         const store = storeOf(String(name), this.lexicons);
         if (store !== undefined) this.changed(store);
       });
@@ -200,6 +261,27 @@ class LiveReading implements HttpApp {
       this.watchers.push(watcher);
     } catch (error) {
       this.context.log(`scope: could not watch ${this.root}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    // In a checkout the page is bundled from sources that can change under this server: a change to one rebuilds the page and reloads it.
+    if (FROM_SOURCES) {
+      let pending: NodeJS.Timeout | undefined;
+      try {
+        const watcher = watch(SOURCE_FOLDER, { recursive: true }, (_event, name) => {
+          // Only a file the page is built from rebuilds it: a server-side edit leaves open pages, and what they show, alone.
+          if (name === null || !isPageSource(resolve(SOURCE_FOLDER, String(name)))) return;
+          clearTimeout(pending);
+          pending = setTimeout(() => {
+            forgetPageBundle();
+            this.shell = undefined;
+            this.send("shell", {});
+          }, 300);
+          pending.unref();
+        });
+        watcher.on("error", () => {});
+        this.watchers.push(watcher);
+      } catch {
+        // Unwatchable: the page is rebuilt when the server restarts.
+      }
     }
     // Coherence's own lexicon lives outside a root that is another project.
     const own = resolve(this.build.lexiconPath);
@@ -259,7 +341,8 @@ class LiveReading implements HttpApp {
       const changed = orders.filter((order) => fresh.has(order.id) || order.history.some((h) => fresh.has(h.id)));
       if (changed.length > 0) this.send("work", { orders: changed, damaged: loaded.damaged });
     } else if (store === "model") {
-      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
+      this.relief = readRelief(this.root, loadJournal(this.root).records);
+      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces, relief: this.relief });
       this.base = state;
       this.remember(state);
       this.lexicons = await watchedLexicons(this.root, this.build);
@@ -399,6 +482,29 @@ class LiveReading implements HttpApp {
         else json(response, request, 200, { records: [record], more: false });
         return;
       }
+      case "/api/relief/commits": {
+        // The commits the Structure view's diff can name, from git, read-only.
+        try {
+          json(response, request, 200, reliefCommits(this.root));
+        } catch (error) {
+          json(response, request, 404, { reason: `no commits to diff: ${(error as Error).message.split("\n")[0]}` });
+        }
+        return;
+      }
+      case "/api/relief/diff": {
+        // What changed between two commits, or a commit and the working tree; both names are checked before git sees them.
+        const a = url.searchParams.get("a") ?? "", b = url.searchParams.get("b") ?? "";
+        if (!REVISION.test(a) || !(REVISION.test(b) || b === WORKTREE)) {
+          json(response, request, 400, { reason: "a and b must be commit ids (b may be WORKTREE)" });
+          return;
+        }
+        try {
+          json(response, request, 200, reliefDiff(this.root, a, b));
+        } catch (error) {
+          json(response, request, 404, { reason: `no diff between ${a} and ${b}: ${(error as Error).message.split("\n")[0]}` });
+        }
+        return;
+      }
       default:
         json(response, request, 404, { reason: "no such path" });
     }
@@ -462,6 +568,7 @@ class LiveReading implements HttpApp {
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
     for (const watcher of this.watchers) watcher.close();
+    clearTimeout(this.tracePending);
     for (const client of this.clients) client.end();
     this.clients.clear();
     void this.readingServer?.adapter.close();

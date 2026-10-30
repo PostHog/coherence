@@ -305,10 +305,6 @@ test("scaffold invariant --preview writes only an ephemeral proposed, dashed, un
     assert.equal("state" in proposal, false, "a proposal has no fabricated lifecycle state");
     assert.equal("verdict" in proposal, false, "a proposal has no fabricated verdict");
     assert.equal("reliance" in proposal, false, "a proposal has no fabricated evidence");
-    assert.match(html, /structure-edge\.structure-proposed \{[^}]*stroke-dasharray: 9 6;/, "the proposed edge is dashed");
-    assert.match(html, /proposed preview ·/, "the edge is visibly labeled as a proposal");
-    assert.match(html, /verdict: "unverified"/, "the renderer fixes proposals as unverified");
-    assert.match(html, /This dashed edge exists only in the ephemeral preview\./);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
