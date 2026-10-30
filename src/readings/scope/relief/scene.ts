@@ -936,16 +936,15 @@ async function loadDiff(a, b) {
   let d;
   try { d = await io.get(`/api/relief/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`); } catch { DIFF = null; retarget(); drawSide(); drawNote(); return; }
   if (d.error) { DIFF = null; return; }
-  // Per component and per file: [added, deleted, lines at the later end].
-  const comp = C.map(() => [0, 0, 0]), file = C.map((c) => c.files.map(() => [0, 0, 0]));
+  // Per component and per file: [added, deleted]. The diff lists only the paths that changed; any other stays [0, 0].
+  const comp = C.map(() => [0, 0]), file = C.map((c) => c.files.map(() => [0, 0]));
   const at = new Map(); C.forEach((c, ci) => c.files.forEach((f, fi) => at.set(f.file, [ci, fi])));
   let gone = 0;
   for (const f of d.files) {
-    const ci = ownerOf(f.path), hit = at.get(f.path);
-    comp[ci][2] += f.lb; if (hit) file[hit[0]][hit[1]][2] += f.lb;
     if (!f.add && !f.del) continue;
+    const ci = ownerOf(f.path), hit = at.get(f.path);
     comp[ci][0] += f.add; comp[ci][1] += f.del;
-    if (hit) { file[hit[0]][hit[1]][0] += f.add; file[hit[0]][hit[1]][1] += f.del; } else if (!f.lb) gone++;
+    if (hit) { file[hit[0]][hit[1]][0] += f.add; file[hit[0]][hit[1]][1] += f.del; } else if (f.gone) gone++;
   }
   DIFF = { a: d.a, b: d.b, comp, file, gone };
   for (const [id, end] of [["selA", d.a], ["selB", d.b]]) for (const o of $(id).options) if (o.dataset.linked && o.value === end.rev) o.textContent = `${end.date} ${end.sha} ${end.subject.slice(0, 52)}`;
@@ -967,7 +966,8 @@ async function startDiff() {
   selA.value = q.get("a") ?? cm.base; selB.value = q.get("b") ?? "WORKTREE";
   selA.onchange = selB.onchange = () => loadDiff(selA.value, selB.value);
   const rel = cm.list.filter((c) => c.tag && /^v\d+\.\d+\.\d+$/.test(c.tag)).slice(0, 2);
-  for (const [label, a] of [["This branch", cm.base], ...rel.map((c) => [`Since ${c.tag}`, c.rev]), ["None", "none"]]) {
+  // With no trunk the base is HEAD itself, so the first button shows what is uncommitted.
+  for (const [label, a] of [[cm.trunk === null ? "Uncommitted" : "This branch", cm.base], ...rel.map((c) => [`Since ${c.tag}`, c.rev]), ["None", "none"]]) {
     const b = el("button", null, label); b.onclick = () => { selA.value = a; selB.value = "WORKTREE"; loadDiff(a, "WORKTREE"); }; g.append(b);
   }
   await loadDiff(selA.value, selB.value);

@@ -357,8 +357,32 @@ export async function bundleBrowserScript(entry: string = resolve(here, BROWSER_
   return out.outputFiles[0]!.text;
 }
 
+/**
+ * A value made once and kept, unless making it fails: a rejection is handed to
+ * the callers waiting on it and then dropped, so the next caller makes it
+ * again rather than being answered with the old failure forever.
+ */
+export function keptUnlessRejected<T>(make: () => Promise<T>): { get(): Promise<T>; forget(): void } {
+  let kept: Promise<T> | undefined;
+  return {
+    get() {
+      if (kept === undefined) {
+        const made = make();
+        kept = made;
+        made.catch(() => {
+          if (kept === made) kept = undefined;
+        });
+      }
+      return kept;
+    },
+    forget() {
+      kept = undefined;
+    },
+  };
+}
+
 /** The page's own bundle, made once per process: the shell is fixed, so every build of it bundles the same script. */
-let pageBundle: Promise<string> | undefined;
+const pageBundle = keptUnlessRejected(() => bundleBrowserScript());
 
 /**
  * Whether this Coherence runs from its sources (a checkout), where the page is
@@ -380,13 +404,12 @@ export const SOURCE_FOLDER = resolve(here, "../..");
 
 /** Drop the bundled page: the next shell bundles its sources again. */
 export function forgetPageBundle(): void {
-  pageBundle = undefined;
+  pageBundle.forget();
 }
 
 async function browserScript(): Promise<string> {
   if (!FROM_SOURCES) return readFile(resolve(here, BUNDLE_NAME), "utf8");
-  pageBundle ??= bundleBrowserScript();
-  return pageBundle;
+  return pageBundle.get();
 }
 
 /** JSON that is safe inside a script element: no `<` can close it. */

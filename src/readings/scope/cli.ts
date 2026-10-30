@@ -88,7 +88,7 @@ async function snapshot(root: string, values: Map<string, string>, switches: Set
     if (kept !== undefined) io.err(kept);
   }
   // Structure draws the relief: per-file lines from mass, districts, and the landings on HEAD's first-parent line.
-  options.relief = readRelief(root, loadJournal(root).records);
+  options.relief = await readRelief(root, loadJournal(root).records);
   const domain = values.get("domain");
   if (domain !== undefined) options.domainPath = domain;
   const title = values.get("domain-title");

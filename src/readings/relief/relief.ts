@@ -8,9 +8,10 @@
  * reliance come from the spec and the component interfaces the state carries.
  */
 
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { promisify } from "node:util";
 import { computeMass } from "../../economy/mass.ts";
 import { LOCKFILES } from "../../lifecycle/lockfiles.ts";
 import type { JournalRecord } from "../../journal/record.ts";
@@ -99,16 +100,83 @@ export function districtsOf(folder: string, files: readonly ReliefFile[]): Map<s
   return new Map([...out].sort(([a], [b]) => a.localeCompare(b)));
 }
 
-/** numstat's path for a rename, either form, as the path it now has. */
-function renamedPath(path: string): string {
-  const brace = /^(.*)\{(.*) => (.*)\}(.*)$/.exec(path);
-  if (brace) return (brace[1]! + brace[3]! + brace[4]!).replace(/\/\//g, "/");
-  return path.includes(" => ") ? path.split(" => ")[1]! : path;
+/** One path a commit or a diff changed, with the lines it added and deleted; git counts none for a binary file, which is null. */
+export interface NumstatEntry {
+  path: string;
+  lines: [number, number] | null;
 }
 
-const git = (root: string, ...args: string[]): string => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 512 << 20, stdio: ["ignore", "pipe", "ignore"] });
+/**
+ * Numstat entries read with -z from tokens[i] on, into `into`: each is
+ * "added<TAB>deleted<TAB>path", or for a rename "added<TAB>deleted<TAB>" with
+ * the old path and the new as tokens of their own, counted under the new one.
+ * Stops at an empty token, which opens a log's next commit; returns where.
+ */
+function numstatFrom(tokens: readonly string[], i: number, into: NumstatEntry[]): number {
+  while (i < tokens.length && tokens[i] !== "") {
+    // A log puts a newline between a commit's header and its first entry.
+    const entry = tokens[i]!.replace(/^\n/, "");
+    i++;
+    const first = entry.indexOf("\t"), second = entry.indexOf("\t", first + 1);
+    if (first < 0 || second < 0) continue;
+    let path = entry.slice(second + 1);
+    if (path === "") {
+      path = tokens[i + 1] ?? "";
+      i += 2;
+    }
+    const added = entry.slice(0, first), deleted = entry.slice(first + 1, second);
+    into.push({ path, lines: added === "-" ? null : [Number(added), Number(deleted)] });
+  }
+  return i;
+}
 
-export function readRelief(rootGiven: string, journal: readonly JournalRecord[], given?: SpecModel): ReliefReading {
+/** `git diff --numstat -z` output as its entries. */
+export function parseNumstat(out: string): NumstatEntry[] {
+  const entries: NumstatEntry[] = [];
+  const tokens = out.split("\0");
+  for (let i = 0; i < tokens.length; i = numstatFrom(tokens, i, entries) + 1);
+  return entries;
+}
+
+/** The format a landing is logged in, with -z: NUL before each field, the one byte no subject can hold. */
+const LANDING_FORMAT = "%x00%h%x00%ad%x00%s";
+
+/**
+ * `git log -z --numstat --format=%x00%h%x00%ad%x00%s` as its commits, each
+ * with the paths it changed. A commit opens at an empty token and its next
+ * three are its id, date and subject, so a subject holding @@, a tab or
+ * anything else git prints is read whole and never opens a commit of its own.
+ */
+export function parseLandings(out: string): { sha: string; date: string; subject: string; files: NumstatEntry[] }[] {
+  const tokens = out.split("\0");
+  const commits: { sha: string; date: string; subject: string; files: NumstatEntry[] }[] = [];
+  let i = tokens.indexOf("");
+  while (i >= 0 && i + 3 < tokens.length) {
+    const files: NumstatEntry[] = [];
+    commits.push({ sha: tokens[i + 1]!, date: tokens[i + 2]!, subject: tokens[i + 3]!, files });
+    i = numstatFrom(tokens, i + 4, files);
+  }
+  return commits;
+}
+
+/** `git log -z --format=%h%x00%ad%x00%s` as its commits: three fields each, NUL between every one. */
+export function parseCommitRows(out: string): { sha: string; date: string; subject: string }[] {
+  const tokens = out.split("\0");
+  const rows: { sha: string; date: string; subject: string }[] = [];
+  for (let i = 0; i + 2 < tokens.length; i += 3) rows.push({ sha: tokens[i]!, date: tokens[i + 1]!, subject: tokens[i + 2]! });
+  return rows;
+}
+
+/** The longest one git command may run for the relief, and the most it may print: a stuck or runaway git fails the reading, never the server. */
+const GIT_TIMEOUT_MS = 60_000;
+const GIT_BUFFER = 256 << 20;
+const execGit = promisify(execFile);
+
+// Asynchronous: the warm server that runs these also answers the agent's hooks, and one pass over a large repository takes seconds.
+const git = async (root: string, ...args: string[]): Promise<string> =>
+  (await execGit("git", args, { cwd: root, encoding: "utf8", maxBuffer: GIT_BUFFER, timeout: GIT_TIMEOUT_MS })).stdout;
+
+export async function readRelief(rootGiven: string, journal: readonly JournalRecord[], given?: SpecModel): Promise<ReliefReading> {
   const root = resolve(rootGiven);
   let mass;
   let model: SpecModel;
@@ -166,20 +234,18 @@ export function readRelief(rootGiven: string, journal: readonly JournalRecord[],
   let landings: ReliefLanding[] = [];
   let head = "";
   try {
-    head = git(root, "log", "-1", "--format=%h %ad", "--date=short").trim();
-    const out = git(root, "log", "--first-parent", "--diff-merges=first-parent", "--numstat", "--format=@@%h%x09%ad%x09%s", "--date=short", "-n", String(LANDINGS_MAX), "HEAD");
-    for (const chunk of out.split("@@").slice(1)) {
-      const [first, ...rest] = chunk.split("\n");
-      const [sha = "", date = "", subject = ""] = first!.split("\t");
+    const [headLine, out] = await Promise.all([
+      git(root, "log", "-1", "--format=%h %ad", "--date=short"),
+      git(root, "log", "-z", "--first-parent", "--diff-merges=first-parent", "--numstat", `--format=${LANDING_FORMAT}`, "--date=short", "-n", String(LANDINGS_MAX), "HEAD"),
+    ]);
+    head = headLine.trim();
+    for (const { sha, date, subject, files: touched } of parseLandings(out)) {
       const perComponent = new Map<number, number>();
       const perFile: [number, number, number][] = [];
       let n = 0;
-      for (const line of rest) {
-        const parts = line.split("\t");
-        if (parts.length < 3 || parts[0] === "-") continue;
-        const path = renamedPath(parts.slice(2).join("\t"));
-        if (leftOut(path)) continue;
-        const changed = Number(parts[0]) + Number(parts[1]);
+      for (const { path, lines } of touched) {
+        if (lines === null || leftOut(path)) continue;
+        const changed = lines[0] + lines[1];
         n++;
         const ci = owner(path);
         perComponent.set(ci, (perComponent.get(ci) ?? 0) + changed);
@@ -210,27 +276,13 @@ export interface ReliefCommit {
   tag: string | null;
 }
 
-/** numstat's lines as path → [added, deleted]; a rename counts under its new path, binary files and left-out paths not at all. */
-function numstat(out: string): Map<string, [number, number]> {
-  const changed = new Map<string, [number, number]>();
-  for (const line of out.split("\n")) {
-    const parts = line.split("\t");
-    if (parts.length < 3 || parts[0] === "-") continue;
-    const path = renamedPath(parts.slice(2).join("\t"));
-    if (leftOut(path)) continue;
-    const [a, d] = changed.get(path) ?? [0, 0];
-    changed.set(path, [a + Number(parts[0]), d + Number(parts[1])]);
-  }
-  return changed;
-}
-
 /** Untracked files not ignored, each as lines added: the working tree's new files, which git diff does not list. */
-function untracked(root: string): Map<string, [number, number]> {
+async function untracked(root: string): Promise<Map<string, [number, number]>> {
   const found = new Map<string, [number, number]>();
-  for (const path of git(root, "ls-files", "--others", "--exclude-standard").split("\n").filter(Boolean)) {
+  for (const path of (await git(root, "ls-files", "-z", "--others", "--exclude-standard")).split("\0").filter(Boolean)) {
     if (leftOut(path)) continue;
     try {
-      const text = readFileSync(resolve(root, path), "utf8");
+      const text = await readFile(resolve(root, path), "utf8");
       if (!text.includes("\0")) found.set(path, [text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0), 0]);
     } catch {
       // unreadable: not counted
@@ -239,78 +291,113 @@ function untracked(root: string): Map<string, [number, number]> {
   return found;
 }
 
-/** The trunk a branch is measured from: main, or master where there is no main. */
-function trunk(root: string): string {
-  try {
-    git(root, "rev-parse", "--verify", "-q", "main");
-    return "main";
-  } catch {
-    return "master";
-  }
+const ORIGIN_HEAD = "refs/remotes/origin/HEAD";
+
+/** The refs that could be the trunk, most wanted first, each with the name git is then given: the branch origin's HEAD names, then main, then master, the local branch before origin's. */
+function trunkCandidates(originHead: string): [ref: string, name: string][] {
+  const prefix = "refs/remotes/origin/";
+  const named = originHead.startsWith(prefix) && originHead !== ORIGIN_HEAD ? [originHead.slice(prefix.length)] : [];
+  return [...new Set([...named, "main", "master"])].flatMap((name): [string, string][] => [[`refs/heads/${name}`, name], [`${prefix}${name}`, `origin/${name}`]]);
 }
 
-/** The commits a reader can diff between: this branch's own, then the trunk's recent first-parent line, each with its tag. */
-export function reliefCommits(rootGiven: string): { branch: string; base: string; worktree: ReliefCommit; list: ReliefCommit[] } {
+/**
+ * The trunk a branch is measured from, given what origin's HEAD points at
+ * ("" when unset) and which candidate refs exist: the first candidate that
+ * does, or none, where the diff offers HEAD's own line.
+ */
+export function trunkOf(originHead: string, present: ReadonlySet<string>): string | null {
+  return trunkCandidates(originHead).find(([ref]) => present.has(ref))?.[1] ?? null;
+}
+
+async function trunk(root: string): Promise<string | null> {
+  const originHead = (await git(root, "symbolic-ref", "-q", ORIGIN_HEAD).catch(() => "")).trim();
+  const refs = await git(root, "for-each-ref", "--format=%(refname)", ...trunkCandidates(originHead).map(([ref]) => ref));
+  return trunkOf(originHead, new Set(refs.split("\n").filter(Boolean)));
+}
+
+/**
+ * The commits a reader can diff between: this branch's own, then the trunk's
+ * recent first-parent line, each with its tag. With no trunk, HEAD's own line
+ * from HEAD, so every commit listed can still be diffed.
+ */
+export async function reliefCommits(rootGiven: string): Promise<{ branch: string; trunk: string | null; base: string; worktree: ReliefCommit; list: ReliefCommit[] }> {
   const root = resolve(rootGiven);
+  const [tagLines, branchLine, t] = await Promise.all([
+    git(root, "tag", "--format=%(objectname:short=7)%09%(*objectname:short=7)%09%(refname:short)"),
+    git(root, "rev-parse", "--abbrev-ref", "HEAD"),
+    trunk(root),
+  ]);
   const tags = new Map<string, string>();
-  for (const line of git(root, "tag", "--format=%(objectname:short=7)%09%(*objectname:short=7)%09%(refname:short)").split("\n").filter(Boolean)) {
+  for (const line of tagLines.split("\n").filter(Boolean)) {
     const [obj = "", peeled = "", name = ""] = line.split("\t");
     tags.set(peeled || obj, name);
   }
-  const branch = git(root, "rev-parse", "--abbrev-ref", "HEAD").trim();
-  const t = trunk(root);
-  let base = "";
-  try {
-    base = git(root, "merge-base", t, "HEAD").trim().slice(0, 7);
-  } catch {
-    base = git(root, "rev-parse", "--short=7", "HEAD").trim();
-  }
-  const rows = (range: string, on: string, ...extra: string[]): ReliefCommit[] =>
-    git(root, "log", "--first-parent", "--format=%h%x09%ad%x09%s", "--date=short", "--abbrev=7", ...extra, range)
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => {
-        const [sha = "", date = "", subject = ""] = line.split("\t");
-        return { rev: sha, sha, date, subject, on, tag: tags.get(sha) ?? null };
-      });
-  const mine = branch === t ? [] : rows(`${t}..HEAD`, branch);
-  return { branch, base, worktree: { rev: WORKTREE, sha: "working tree", date: "", subject: `uncommitted work on ${branch}`, on: branch, tag: null }, list: [...mine, ...rows(t, t, "-n", "150")] };
+  const branch = branchLine.trim();
+  const head = async () => (await git(root, "rev-parse", "--short=7", "HEAD")).trim();
+  const base = t === null ? await head() : await git(root, "merge-base", t, "HEAD").then((out) => out.trim().slice(0, 7), head);
+  const rows = async (range: string, on: string, ...extra: string[]): Promise<ReliefCommit[]> =>
+    parseCommitRows(await git(root, "log", "-z", "--first-parent", "--format=%h%x00%ad%x00%s", "--date=short", "--abbrev=7", ...extra, range, "--")).map(({ sha, date, subject }) => ({ rev: sha, sha, date, subject, on, tag: tags.get(sha) ?? null }));
+  const [mine, line] = await Promise.all([t === null || branch === t ? [] : rows(`${t}..HEAD`, branch), t === null ? rows("HEAD", branch, "-n", "150") : rows(t, t, "-n", "150")]);
+  return { branch, trunk: t, base, worktree: { rev: WORKTREE, sha: "working tree", date: "", subject: `uncommitted work on ${branch}`, on: branch, tag: null }, list: [...mine, ...line] };
 }
 
-function described(root: string, rev: string): { rev: string; sha: string; date: string; subject: string } {
+export interface ReliefEnd {
+  rev: string;
+  sha: string;
+  date: string;
+  subject: string;
+}
+
+async function described(root: string, rev: string): Promise<ReliefEnd> {
   if (rev === WORKTREE) {
-    const head = git(root, "log", "-1", "--format=%h").trim();
+    const head = (await git(root, "log", "-1", "--format=%h")).trim();
     return { rev, sha: "working tree", date: new Date().toISOString().slice(0, 10), subject: `uncommitted work on top of ${head}` };
   }
-  const [sha = "", date = "", subject = ""] = git(root, "log", "-1", "--format=%h%x09%ad%x09%s", "--date=short", rev).trim().split("\t");
-  return { rev, sha, date, subject };
+  const [row] = parseCommitRows(await git(root, "log", "-z", "-1", "--format=%h%x00%ad%x00%s", "--date=short", rev, "--"));
+  return { rev, sha: row?.sha ?? "", date: row?.date ?? "", subject: row?.subject ?? "" };
 }
 
-/** Lines per file at a revision, or in the working tree: the empty tree diffed against it. */
-function linesAt(root: string, rev: string): Map<string, number> {
-  const EMPTY = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
-  const changed = rev === WORKTREE ? numstat(git(root, "diff", "--numstat", EMPTY)) : numstat(git(root, "diff", "--numstat", EMPTY, rev));
-  if (rev === WORKTREE) for (const [path, v] of untracked(root)) changed.set(path, v);
-  return new Map([...changed].map(([path, [added]]) => [path, added]));
+/** One path a diff changed: lines added and deleted, and whether the later end no longer has it. */
+export interface ReliefDiffFile {
+  path: string;
+  add: number;
+  del: number;
+  gone?: true;
 }
 
 /**
  * What changed between two revisions, the later one possibly the working
- * tree: per path its lines at each end and the lines added and deleted. Both
- * ends are checked before git sees them; a name that is not a commit is
- * refused, never passed on.
+ * tree: only the paths that changed, each with the lines added and deleted; a
+ * path the diff leaves out did not change. Both ends are checked before git
+ * sees them, synchronously, so a name that is not a commit is refused (thrown)
+ * before any git runs, never passed on.
  */
-export function reliefDiff(rootGiven: string, a: string, b: string): { a: ReturnType<typeof described>; b: ReturnType<typeof described>; files: { path: string; la: number; lb: number; add: number; del: number }[] } {
+export function reliefDiff(rootGiven: string, a: string, b: string): Promise<{ a: ReliefEnd; b: ReliefEnd; files: ReliefDiffFile[] }> {
   if (!REVISION.test(a) || !(REVISION.test(b) || b === WORKTREE)) throw new Error("a and b must be commit ids (b may be WORKTREE)");
-  const root = resolve(rootGiven);
-  const la = linesAt(root, a), lb = linesAt(root, b);
-  const changed = b === WORKTREE ? numstat(git(root, "diff", "--numstat", "-M", a)) : numstat(git(root, "diff", "--numstat", "-M", a, b));
-  if (b === WORKTREE) for (const [path, v] of untracked(root)) if (!changed.has(path)) changed.set(path, v);
-  const files = [...new Set([...la.keys(), ...lb.keys(), ...changed.keys()])].map((path) => {
+  return diffBetween(resolve(rootGiven), a, b);
+}
+
+async function diffBetween(root: string, a: string, b: string): Promise<{ a: ReliefEnd; b: ReliefEnd; files: ReliefDiffFile[] }> {
+  // The ends are commits, then "--", so git reads neither as a path.
+  const ends = b === WORKTREE ? [a, "--"] : [a, b, "--"];
+  const [numstat, deleted, fresh, da, db] = await Promise.all([
+    git(root, "diff", "-z", "--numstat", "-M", ...ends),
+    git(root, "diff", "-z", "--name-only", "-M", "--diff-filter=D", ...ends),
+    b === WORKTREE ? untracked(root) : new Map<string, [number, number]>(),
+    described(root, a),
+    described(root, b),
+  ]);
+  // Binary files count no lines, and left-out paths are not drawn.
+  const changed = new Map<string, [number, number]>();
+  for (const { path, lines } of parseNumstat(numstat)) {
+    if (lines === null || leftOut(path)) continue;
     const [add, del] = changed.get(path) ?? [0, 0];
-    return { path, la: la.get(path) ?? 0, lb: lb.get(path) ?? 0, add, del };
-  });
-  return { a: described(root, a), b: described(root, b), files };
+    changed.set(path, [add + lines[0], del + lines[1]]);
+  }
+  for (const [path, v] of fresh) if (!changed.has(path)) changed.set(path, v);
+  const gone = new Set(deleted.split("\0").filter(Boolean));
+  const files = [...changed].map(([path, [add, del]]): ReliefDiffFile => ({ path, add, del, ...(gone.has(path) ? { gone: true as const } : {}) }));
+  return { a: da, b: db, files };
 }
 
 /* ---------------------------------------------------------- agent activity */
