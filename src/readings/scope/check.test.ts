@@ -209,19 +209,19 @@ function stringsIn(value: unknown): string[] {
   return [];
 }
 
-test("the render has one view strip with the seven views in order", async () => {
+test("the render has one view strip with the eight views in order", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
   const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ["structure", "lexicon", "components", "invariants", "practices", "runs", "journal"]);
-  for (const label of ["Structure", "Lexicon", "Components", "Invariants", "Practices", "Runs", "Journal"]) {
+  assert.deepEqual(tabs, ["structure", "connections", "lexicon", "components", "invariants", "practices", "runs", "journal"]);
+  for (const label of ["Structure", "Connections", "Lexicon", "Components", "Invariants", "Practices", "Runs", "Journal"]) {
     assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
   }
 });
 
-test("Structure is the first view: the strip leads with Structure then Lexicon, and a page whose address names no view opens on it", () => {
+test("Structure is the first view: the strip leads with Structure, then Connections, then Lexicon, and a page whose address names no view opens on it", () => {
   const state = fresh();
-  assert.deepEqual(state.views.map((v) => v.id), ["structure", "lexicon", "components", "invariants", "practices", "runs", "journal"], "Structure, then Lexicon, then the rest in their order");
+  assert.deepEqual(state.views.map((v) => v.id), ["structure", "connections", "lexicon", "components", "invariants", "practices", "runs", "journal"], "Structure, then Connections, then Lexicon, then the rest in their order");
   assert.equal(state.activeView, state.views[0]!.id, "the state opens on the first view");
   assert.equal(state.activeView, "structure");
   const rendered = renderShell(state).text;
@@ -645,14 +645,18 @@ test("the journal window keeps every open defect whatever its age, and the resol
 test("deep links resolve: every card id on every view resolves to that view", () => {
   const state = fresh();
   for (const view of state.views) {
-    // Structure is the relief, a scene with no cards, or the connections view, whose cards are drawn in the browser: its
-    // hash names the view alone, and every origin the connections view can be rooted at, a route or a component, has an id.
+    // Structure is the relief, a scene with no cards: its hash names the view alone.
     if (view.id === "structure") {
       assert.deepEqual(resolveHash(state, "#structure"), { view: "structure", id: undefined }, "#structure names the view alone");
+      continue;
+    }
+    // Connections draws its cards in the browser: its hash names the view alone, and every origin it can be rooted at, a route or a component, has an id.
+    if (view.id === "connections") {
+      assert.deepEqual(resolveHash(state, "#connections"), { view: "connections", id: undefined }, "#connections names the view alone");
       const model = flowOf(state);
       const origins = [...model.routes.map((r) => connectionsOriginId({ kind: "route", id: r.id })), ...model.nodes.map((n) => connectionsOriginId({ kind: "component", folder: n.folder }))];
       assert.ok(model.nodes.length > 0, "the fixture has components to start from");
-      for (const id of origins) assert.deepEqual(resolveHash(state, `#${id}`), { view: "structure", id }, `#${id} opens Structure on its origin`);
+      for (const id of origins) assert.deepEqual(resolveHash(state, `#${id}`), { view: "connections", id }, `#${id} opens Connections on its origin`);
       continue;
     }
     const rendered = renderView(state, view.id).text;

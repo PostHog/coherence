@@ -96,11 +96,10 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
   if (state.spec.languages !== undefined) setLanguageData(state.spec.languages);
   // The relief is a live scene, not markup: after every render it is put back into the host the render left.
   const io = live === undefined ? {} : { get: (path: string) => live.get(path) };
-  // The connections view is kept the same way, in the host a render leaves when Structure shows it instead.
+  // The Connections view is kept the same way, in the host a render leaves on its own tab.
   const mount = (): void => {
-    if (state.activeView !== "structure") return;
-    if (state.structure.shows === CONNECTIONS_ID) mountConnections(root, state);
-    else mountRelief(root, state, io);
+    if (state.activeView === CONNECTIONS_ID) mountConnections(root, state);
+    else if (state.activeView === "structure") mountRelief(root, state, io);
   };
   const renderAll = (): void => {
     document.title = `${state.project} Scope`;
@@ -175,9 +174,8 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
   const followHash = (): void => {
     const target = resolveHash(state, location.hash);
     if (target === undefined) return;
-    // A connections id roots that view at the origin it names: Structure shows it, and no card is scrolled to.
+    // A connections id roots that view at the origin it names, and no card is scrolled to.
     if (target.id?.startsWith(CONNECTIONS_PREFIX) === true) {
-      state.structure.shows = CONNECTIONS_ID;
       landConnections(target.id);
       state.activeView = target.view;
       renderAll();
@@ -268,16 +266,6 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
       return;
     }
 
-    const shows = target.closest<HTMLElement>("button[data-structure-shows]");
-    if (shows !== null) {
-      if (shows.dataset["structureShows"] === CONNECTIONS_ID) state.structure.shows = CONNECTIONS_ID;
-      else {
-        delete state.structure.shows;
-        history.replaceState(null, "", "#structure");
-      }
-      renderAll();
-      return;
-    }
 
     const select = target.closest<HTMLElement>("[data-select-component]");
     if (select !== null) {

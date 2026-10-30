@@ -1,6 +1,6 @@
 # Scope
 
-The reading: one surface projecting the model for a human, in seven views: Structure, Lexicon, Components, Invariants, Practices, Runs, Journal; a fixed shell that loads its state from the warm server and follows the stores live, or carries one state as a snapshot file; and the agent query, the same state as plain text.
+The reading: one surface projecting the model for a human, in eight views: Structure, Connections, Lexicon, Components, Invariants, Practices, Runs, Journal; a fixed shell that loads its state from the warm server and follows the stores live, or carries one state as a snapshot file; and the agent query, the same state as plain text.
 
 ## entrances
 - scope: a human opens the live reading from the root's warm server, or an agent writes a snapshot of this project or another root
@@ -107,7 +107,7 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   crossing: record -> reading
   refuted: withheld the retirement option from the defect section in renderDefect -> "a structural defect renders its bypass sites and both honest options" went red in check.test.ts; restored, green (2026-09-17)
   kinds: none
-- deep links resolve: Every card id on every view resolves, by its prefix, to the view that renders it, a hash naming a view alone resolves to that view, a link into the retired Reliance view, security spine or Structure map selections opens the Structure view, and a connections id opens the Structure view on the origin it names.
+- deep links resolve: Every card id on every view resolves, by its prefix, to the view that renders it, a hash naming a view alone resolves to that view, a link into the retired Reliance view, security spine or Structure map selections opens the Structure view, and a connections id opens the Connections view on the origin it names.
   over: every card id every view renders for the fixture project, every link the Invariants view carries, and the connections id of every component of the fixture project
   via: deep links resolve: every card id on every view resolves to that view
   because: a link into a card on another view must open that view first or it lands nowhere; one id space with a prefix per view is decided in one function, and the check walks every rendered id through it
@@ -332,9 +332,9 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   because: the owner saw the header jump when switching between Structure and the other tabs (the same request that ruled d-bf90cb79): the shell widened from 76rem to 100rem only while Structure was shown, so at 1440 wide the masthead moved 112 px left and the strip 112 px right. The masthead is where a reader's eye rests between views, so it must be one frame: every view shares the width the map needs, and the other views keep a readable measure inside it
   refuted: widened the shell only while Structure is shown, with .shell:has(.flow-stage) in styles.css -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
-- Structure is the first view: The view strip leads with Structure, then Lexicon, then Components, Invariants, Runs and Journal, and a page whose address names no view opens on Structure; an address naming a view opens that view.
+- Structure is the first view: The view strip leads with Structure, then Connections, then Lexicon, then Components, Invariants, Runs and Journal, and a page whose address names no view opens on Structure; an address naming a view opens that view.
   over: the strip of the fixture project's page, the view its state opens on, and every view's own address
-  via: Structure is the first view: the strip leads with Structure then Lexicon, and a page whose address names no view opens on it
+  via: Structure is the first view: the strip leads with Structure, then Connections, then Lexicon, and a page whose address names no view opens on it
   because: the owner ruled it (d-bf90cb79): the map is what a reader comes to Scope for, and the lexicon is the vocabulary beneath it. The first tab is the one a page opens on, so a reader who chooses nothing sees what the strip says comes first, and a deep link still opens the view it names
   refuted: opened a page whose address names no view on Lexicon in loadState, the strip still leading with Structure -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
@@ -528,7 +528,7 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   because: model.ts copied Lack, LifecycleState, PracticeState, the practice's reach and the close's results and outcome, believing the browser could not import the tool's modules; a type import is stripped before bundling, so the copies bought nothing and a state added to the tool would compile everywhere and be unknown to the page (c-a1a77f70)
   refuted: wrote a practice's state out by hand in model.ts again, candidate or established in place of PracticeState -> "Scope's page model and views write no closed list the tool's own modules declare; each is imported as a type" went red in declared-once.test.ts on its own assertion; restored (cmp), green batched and alone (2026-10-12)
   kinds: none
-- connections columns are hops from the origin: In Structure's connections view (connections/model.ts) a component origin stands in column 0 with every component it calls one column right and every component calling it (and not called by it) one column left; a structural route's origin is its entrance token in column 0, the component declaring it and each entrance's handler component in column 1, every component their entrances' handler's static reach enters from those at one plus its hops along that reach, and every component holding a chokepoint the work passes drawn from the start at one plus its hops; an origin the flow model lacks draws nothing.
+- connections columns are hops from the origin: In the Connections view (connections/model.ts) a component origin stands in column 0 with every component it calls one column right and every component calling it (and not called by it) one column left; a structural route's origin is its entrance token in column 0, the component declaring it and each entrance's handler component in column 1, every component their entrances' handler's static reach enters from those at one plus its hops along that reach, and every component holding a chokepoint the work passes drawn from the start at one plus its hops; an origin the flow model lacks draws nothing.
   over: a component origin and a route origin of a synthetic project, with and without a chokepoint traced on the route, and an origin no longer in the model
   via: connections: columns are hops from the origin, callees right and callers left of a component, along the handler's reach from a route
   because: the owner settled the view on depth measured from one origin (d-a314db4e): every whole-project layout failed on Coherence's 86 interfaces among 13 components, and following a route's stop order drew query as one seven-card line; the model holds which card stands in which column, the drawing only where a column is
@@ -558,7 +558,7 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   via: connections: selecting a card keeps only the lines that touch it and gives a token for every route whose reach gets to it, fewest hops first
   because: the owner asked to see every entrance that reaches a selected component and to prune the second-order connections from it, removed and not faded (d-9cf51e23); Journal is reached by 13 of 15 routes, which no route's own stops say
   kinds: none
-- every connections origin has a deep link: Every structural route and every component of the flow model has a connections id, the view's prefix and the flow model's own id for it, that no other origin shares, that names that origin back, and that the page's one hash scheme resolves to the Structure view with that id.
+- every connections origin has a deep link: Every structural route and every component of the flow model has a connections id, the view's prefix and the flow model's own id for it, that no other origin shares, that names that origin back, and that the page's one hash scheme resolves to the Connections view with that id.
   over: every route and every component of a synthetic project with two entrances
   via: connections: every route and component has a deep link that names it back
   because: a link into the view must reach the origin it was copied from, or a reader shown a route by a link lands on another; the ids derive from the flow model's own, so no second naming of a route or a component can drift from it

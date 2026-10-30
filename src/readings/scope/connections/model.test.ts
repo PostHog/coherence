@@ -227,7 +227,7 @@ test("connections: every route and component has a deep link that names it back"
   for (const [i, id] of ids.entries()) {
     assert.match(id, /^connections--(route|component)-/);
     assert.deepEqual(connectionsOriginOf(model, id), origins[i], `${id} names its origin`);
-    assert.deepEqual(resolveHash(state, `#${id}`), { view: "structure", id }, `#${id} opens Structure through the page's one hash scheme`);
+    assert.deepEqual(resolveHash(state, `#${id}`), { view: "connections", id }, `#${id} opens Connections through the page's one hash scheme`);
   }
   assert.equal(connectionsOriginId(CORE), "connections--component-src-core");
   assert.equal(connectionsOriginId({ kind: "component", folder: "." }), "connections--component-root");

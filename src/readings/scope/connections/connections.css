@@ -1,12 +1,4 @@
-/* ---------- Structure: the toggle between the relief and the connections view (structure-view.ts) ---------- */
-.structure-shows .segmented { display: flex; }
-.structure-shows button { font: inherit; font-size: 12.5px; height: 28px; padding: 0 11px; margin-left: -1px; border: 1px solid var(--rule); border-radius: 0; background: transparent; color: var(--ink-quiet); cursor: pointer; white-space: nowrap; }
-.structure-shows button:first-child { margin-left: 0; border-radius: 7px 0 0 7px; }
-.structure-shows button:last-child { border-radius: 0 7px 7px 0; }
-.structure-shows button:hover:not([aria-pressed="true"]) { background: var(--field); color: var(--ink); }
-.structure-shows button[aria-pressed="true"] { position: relative; z-index: 1; background: var(--ink); color: var(--paper); border-color: var(--ink); }
-
-/* ---------- Structure: the connections view (connections/drawing.ts), the prototype's look and colours ---------- */
+/* ---------- Connections (connections/drawing.ts), the prototype's look and colours ---------- */
 .connections {
   --paper: #eef1f7; --ink: #141a29; --quiet: #4d566b; --faint: rgb(20 26 41 / 0.32);
   --rule: rgb(20 26 41 / 0.14); --card: rgb(255 255 255 / 0.86); --card-edge: rgb(20 26 41 / 0.16);

@@ -1,5 +1,5 @@
 /**
- * Connections: Structure's view of component interfaces rooted at one origin,
+ * Connections: Scope's view of component interfaces rooted at one origin,
  * a structural route or a component (d-a314db4e). This module is its model:
  * which cards, lines, doors, chips and entrance tokens an origin, the cards
  * spawned from it and a selection give, as one pure function of the flow

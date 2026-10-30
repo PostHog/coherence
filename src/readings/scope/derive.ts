@@ -99,8 +99,8 @@ export function workId(id: string): string {
 }
 
 /**
- * Structure's connections view, named once (the owner's name, 2026-10-30): the
- * label its toggle shows, and the id its deep links start with, followed by
+ * The Connections view, named once (the owner's name, 2026-10-30): the label
+ * its tab shows, its view id, and the id its deep links start with, followed by
  * "--" as the flow model's ids are, so no card id of another view can collide.
  */
 export const CONNECTIONS_LABEL = "Connections";
@@ -118,7 +118,7 @@ const ID_PREFIXES: [string, string][] = [
   ["coherence-", "lexicon"],
   ["domain-", "lexicon"],
   ["layer-", "lexicon"],
-  [CONNECTIONS_PREFIX, "structure"],
+  [CONNECTIONS_PREFIX, CONNECTIONS_ID],
 ];
 
 export interface HashTarget {
