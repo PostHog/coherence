@@ -14,8 +14,9 @@
 
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { extname, resolve } from "node:path";
+import { closeSync, openSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
+import { basename, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { Worker } from "node:worker_threads";
@@ -201,16 +202,21 @@ const GIT_BUFFER = 256 << 20;
 const execGit = promisify(execFile);
 
 // Asynchronous: the warm server that runs these also answers the agent's hooks, and one pass over a large repository takes seconds.
-const git = async (root: string, ...args: string[]): Promise<string> =>
-  (await execGit("git", args, { cwd: root, encoding: "utf8", maxBuffer: GIT_BUFFER, timeout: GIT_TIMEOUT_MS })).stdout;
+// A signal that aborts ends the child: a worker that is stopped would otherwise leave its git running.
+const gitUntil =
+  (signal: AbortSignal | undefined) =>
+  async (root: string, ...args: string[]): Promise<string> =>
+    (await execGit("git", args, { cwd: root, encoding: "utf8", maxBuffer: GIT_BUFFER, timeout: GIT_TIMEOUT_MS, signal })).stdout;
+const git = gitUntil(undefined);
 
 /**
  * The relief, read in this thread. The spec model and mass are synchronous and
  * read every source file, seconds on a large project, so the warm server, which
  * also answers the agent's hooks, reads it apart (readReliefApart).
  */
-export async function readRelief(rootGiven: string): Promise<ReliefRead> {
+export async function readRelief(rootGiven: string, signal?: AbortSignal): Promise<ReliefRead> {
   const root = resolve(rootGiven);
+  const git = gitUntil(signal);
   let mass;
   let model;
   try {
@@ -313,9 +319,16 @@ const WORKER = new URL(`./worker${extname(fileURLToPath(import.meta.url))}`, imp
  * hook waiting on it, for thirteen seconds. Each folder's files come back as
  * text, so the server keeps them without parsing them. A worker that fails
  * reads as a relief that could not be read, never as a failed server.
+ *
+ * The answer comes once the worker has ended, so nothing it started outlives
+ * the reading. A signal that aborts stops it: the worker is asked to end its
+ * git children first, since a worker ended outright leaves them running, and
+ * one still deep in mass after STOP_GRACE_MS is ended outright, before any
+ * git has started.
  */
-export function readReliefApart(rootGiven: string): Promise<ReliefRead> {
+export function readReliefApart(rootGiven: string, signal?: AbortSignal): Promise<ReliefRead> {
   const root = resolve(rootGiven);
+  if (signal?.aborted) return Promise.resolve(unread(STOPPED));
   return new Promise((done) => {
     let worker: Worker;
     try {
@@ -325,17 +338,29 @@ export function readReliefApart(rootGiven: string): Promise<ReliefRead> {
       done(unread(`the relief's worker did not start: ${(error as Error).message}`));
       return;
     }
-    let answered = false;
-    worker.once("message", (read: ReliefRead) => {
-      answered = true;
-      done(read);
-    });
-    worker.once("error", (error) => done(unread(`the relief's worker failed: ${error.message}`)));
+    let answer: ReliefRead | undefined;
+    let failure: string | undefined;
+    let force: NodeJS.Timeout | undefined;
+    const stop = (): void => {
+      worker.postMessage("stop");
+      force = setTimeout(() => void worker.terminate(), STOP_GRACE_MS);
+    };
+    signal?.addEventListener("abort", stop, { once: true });
+    worker.once("message", (read: ReliefRead) => (answer = read));
+    worker.once("error", (error) => (failure = error.message));
     worker.once("exit", (code) => {
-      if (!answered) done(unread(`the relief's worker stopped (exit ${code}) before it answered`));
+      clearTimeout(force);
+      signal?.removeEventListener("abort", stop);
+      if (signal?.aborted) done(unread(STOPPED));
+      else if (answer !== undefined) done(answer);
+      else done(unread(failure !== undefined ? `the relief's worker failed: ${failure}` : `the relief's worker stopped (exit ${code}) before it answered`));
     });
   });
 }
+
+const STOPPED = "the reading was stopped";
+/** How long a stopped worker has to end its git children before it is ended outright. */
+const STOP_GRACE_MS = 500;
 
 /** The most a snapshot embeds of the relief's files: whole folders, in order, while they fit. */
 export const SNAPSHOT_FILES_BYTES = 1 << 20;
@@ -380,8 +405,31 @@ export function folderName(name: string): boolean {
 
 /** The working tree, as the later end of a diff. */
 export const WORKTREE = "WORKTREE";
-/** A commit a diff may name: an abbreviated or full object name, nothing a shell or git could read as an option. */
-export const REVISION = /^[0-9a-f]{4,40}$/;
+/**
+ * A commit a diff may name: an abbreviated or full object id, SHA-1 or
+ * SHA-256, nothing a shell or git could read as an option. A name of this
+ * shape can still be a branch's, so it is looked up among objects alone
+ * (commitOf) and never handed to git as it was given.
+ */
+export const REVISION = /^(?:[0-9a-f]{4,40}|[0-9a-f]{64})$/;
+
+/** The most objects an abbreviated id may match before it is refused as too short to name one commit. */
+const CANDIDATES_MAX = 16;
+
+/**
+ * The one commit an object id names, as its full id: git lists the objects
+ * whose ids begin with it (rev-parse --disambiguate reads objects, never
+ * refs), and exactly one of them must be a commit. A branch or tag named in
+ * hex digits is never what the name reads as.
+ */
+async function commitOf(root: string, name: string): Promise<string> {
+  const candidates = (await git(root, "rev-parse", `--disambiguate=${name}`).catch(() => "")).split("\n").filter(Boolean);
+  if (candidates.length > CANDIDATES_MAX) throw new Error(`${name} begins ${candidates.length} object ids; give more of the commit's id`);
+  const kinds = await Promise.all(candidates.map(async (id) => [id, (await git(root, "cat-file", "-t", id)).trim()] as const));
+  const commits = kinds.filter(([id, kind]) => kind === "commit" && REVISION.test(id)).map(([id]) => id);
+  if (commits.length === 1) return commits[0]!;
+  throw new Error(commits.length === 0 ? `no commit's id begins ${name}` : `${name} begins the ids of ${commits.length} commits`);
+}
 
 export interface ReliefCommit {
   rev: string;
@@ -392,14 +440,32 @@ export interface ReliefCommit {
   tag: string | null;
 }
 
-/** Untracked files not ignored, each as lines added: the working tree's new files, which git diff does not list. */
+/** The largest untracked file a working-tree diff reads to count its lines; a larger one is never read, and counts no lines, as git counts a binary file. */
+export const UNTRACKED_MAX_BYTES = 1 << 20;
+
+/** The lines in a file's bytes, as git counts them: a last line with no newline is a line. */
+function linesIn(bytes: Buffer): number {
+  let lines = 0;
+  for (let at = bytes.indexOf(10); at !== -1; at = bytes.indexOf(10, at + 1)) lines++;
+  return lines + (bytes.length > 0 && bytes[bytes.length - 1] !== 10 ? 1 : 0);
+}
+
+/**
+ * Untracked files not ignored, each as lines added: the working tree's new
+ * files, which git diff does not list. Each is sized before it is read, one
+ * at a time, so a large one (a build output, a dump) is never held in memory,
+ * and the lines are counted in its bytes, never split into strings.
+ */
 async function untracked(root: string): Promise<Map<string, [number, number]>> {
   const found = new Map<string, [number, number]>();
   for (const path of (await git(root, "ls-files", "-z", "--others", "--exclude-standard")).split("\0").filter(Boolean)) {
     if (leftOut(path)) continue;
     try {
-      const text = await readFile(resolve(root, path), "utf8");
-      if (!text.includes("\0")) found.set(path, [text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0), 0]);
+      const file = resolve(root, path);
+      const size = await stat(file);
+      if (!size.isFile() || size.size > UNTRACKED_MAX_BYTES) continue;
+      const bytes = await readFile(file);
+      if (!bytes.includes(0)) found.set(path, [linesIn(bytes), 0]);
     } catch {
       // unreadable: not counted
     }
@@ -485,8 +551,10 @@ export interface ReliefDiffFile {
  * What changed between two revisions, the later one possibly the working
  * tree: only the paths that changed, each with the lines added and deleted; a
  * path the diff leaves out did not change. Both ends are checked before git
- * sees them, synchronously, so a name that is not a commit is refused (thrown)
- * before any git runs, never passed on.
+ * sees them, synchronously, so a name that is not an object id is refused
+ * (thrown) before any git runs, never passed on; an id is then looked up
+ * among objects alone, and the diff is given the full id of the one commit it
+ * names, or refused when it names none or several.
  */
 export function reliefDiff(rootGiven: string, a: string, b: string): Promise<{ a: ReliefEnd; b: ReliefEnd; files: ReliefDiffFile[] }> {
   if (!REVISION.test(a) || !(REVISION.test(b) || b === WORKTREE)) throw new Error("a and b must be commit ids (b may be WORKTREE)");
@@ -494,15 +562,18 @@ export function reliefDiff(rootGiven: string, a: string, b: string): Promise<{ a
 }
 
 async function diffBetween(root: string, a: string, b: string): Promise<{ a: ReliefEnd; b: ReliefEnd; files: ReliefDiffFile[] }> {
-  // The ends are commits, then "--", so git reads neither as a path.
-  const ends = b === WORKTREE ? [a, "--"] : [a, b, "--"];
+  const [from, to] = await Promise.all([commitOf(root, a), b === WORKTREE ? WORKTREE : commitOf(root, b)]);
+  // The ends are full commit ids, then "--", so git reads neither as a ref, an option or a path.
+  const ends = to === WORKTREE ? [from, "--"] : [from, to, "--"];
   const [numstat, deleted, fresh, da, db] = await Promise.all([
     git(root, "diff", "-z", "--numstat", "-M", ...ends),
     git(root, "diff", "-z", "--name-only", "-M", "--diff-filter=D", ...ends),
-    b === WORKTREE ? untracked(root) : new Map<string, [number, number]>(),
-    described(root, a),
-    described(root, b),
+    to === WORKTREE ? untracked(root) : new Map<string, [number, number]>(),
+    described(root, from),
+    described(root, to),
   ]);
+  da.rev = a;
+  db.rev = b;
   // Binary files count no lines, and left-out paths are not drawn.
   const changed = new Map<string, [number, number]>();
   for (const { path, lines } of parseNumstat(numstat)) {
@@ -514,6 +585,34 @@ async function diffBetween(root: string, a: string, b: string): Promise<{ a: Rel
   const gone = new Set(deleted.split("\0").filter(Boolean));
   const files = [...changed].map(([path, [add, del]]): ReliefDiffFile => ({ path, add, del, ...(gone.has(path) ? { gone: true as const } : {}) }));
   return { a: da, b: db, files };
+}
+
+/** Where git records what moves the relief: this worktree's own HEAD, and the refs every worktree of the repository shares, loose and packed. */
+export interface GitRecords {
+  head: string;
+  refs: string;
+  packed: string;
+}
+
+/**
+ * The files a commit, a checkout or a fetch rewrites, as real paths: asked of
+ * git, since a worktree's .git is a file naming a folder elsewhere, and its
+ * refs lie in the repository's common folder. Undefined outside a repository.
+ */
+export async function gitRecords(rootGiven: string): Promise<GitRecords | undefined> {
+  const root = resolve(rootGiven);
+  try {
+    const [gitDir = "", common = ""] = (await git(root, "rev-parse", "--git-dir", "--git-common-dir")).split("\n");
+    const real = (path: string): string => realpathSync(resolve(root, path));
+    return { head: join(real(gitDir), "HEAD"), refs: join(real(common), "refs"), packed: join(real(common), "packed-refs") };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Whether a change at a real path is one git made to what the relief reads: HEAD, a ref, or the packed refs. */
+export function movesRelief(records: GitRecords, path: string): boolean {
+  return path === records.head || path === records.packed || path.startsWith(records.refs + sep);
 }
 
 /* ---------------------------------------------------------- agent activity */
@@ -546,4 +645,100 @@ export function touchesOf(appended: string): { touches: Touch[]; consumed: numbe
     }
   }
   return { touches, consumed: Buffer.byteLength(appended.slice(0, complete)) };
+}
+
+/** A trace's file name: one session's trace, as the hooks append it. */
+const isTrace = (name: string): boolean => name.endsWith(".jsonl");
+
+/**
+ * The read traces as a live server follows them: how far each has been sent,
+ * so every line appended is a touch once. The traces as they stand when it
+ * starts are history, and so is whatever was appended while no reader was
+ * there to see it (skip). A trace is read only when the watcher names it
+ * (note), from where it was last sent, never listed or sized as a whole on a
+ * beat; a trace that appears after the start is a new session, all of it new.
+ */
+export class TraceTail {
+  private readonly dir: string;
+  private readonly offsets = new Map<string, number>();
+  private readonly noted = new Set<string>();
+
+  constructor(dir: string) {
+    this.dir = dir;
+  }
+
+  private sizeOf(name: string): number | undefined {
+    try {
+      return statSync(join(this.dir, name)).size;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Every trace as it stands now is history: only what is appended from here on is sent. */
+  start(): void {
+    let names: string[] = [];
+    try {
+      names = readdirSync(this.dir).filter(isTrace);
+    } catch {
+      return; // no traces yet
+    }
+    for (const name of names) {
+      const size = this.sizeOf(name);
+      if (size !== undefined) this.offsets.set(name, size);
+    }
+  }
+
+  /** A change the watcher saw, by the path it named below the traces folder, or every trace when it named none. */
+  note(name: string | undefined): void {
+    if (name !== undefined) {
+      if (isTrace(name)) this.noted.add(basename(name));
+      return;
+    }
+    try {
+      for (const each of readdirSync(this.dir).filter(isTrace)) this.noted.add(each);
+    } catch {
+      // the folder is gone: nothing to read
+    }
+  }
+
+  /** What changed while no reader was there is history: each noted trace is counted as sent where it now ends. */
+  skip(): void {
+    for (const name of this.noted) {
+      const size = this.sizeOf(name);
+      if (size === undefined) this.offsets.delete(name);
+      else this.offsets.set(name, size);
+    }
+    this.noted.clear();
+  }
+
+  /** The touches appended to the noted traces since they were last read; a line still being written stays for the next. */
+  look(): Touch[] {
+    const touches: Touch[] = [];
+    for (const name of this.noted) {
+      const size = this.sizeOf(name);
+      if (size === undefined) {
+        this.offsets.delete(name);
+        continue;
+      }
+      const from = this.offsets.get(name) ?? 0;
+      // A trace cut short was rewritten: what it holds now is where the next look starts.
+      if (size <= from) {
+        this.offsets.set(name, size);
+        continue;
+      }
+      const buffer = Buffer.alloc(size - from);
+      const handle = openSync(join(this.dir, name), "r");
+      try {
+        readSync(handle, buffer, 0, buffer.length, from);
+      } finally {
+        closeSync(handle);
+      }
+      const found = touchesOf(buffer.toString("utf8"));
+      this.offsets.set(name, from + found.consumed);
+      touches.push(...found.touches);
+    }
+    this.noted.clear();
+    return touches;
+  }
 }

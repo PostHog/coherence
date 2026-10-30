@@ -12,14 +12,22 @@
  *   /api/runs        older run records by cursor (before=<at>~<session>)
  *   /api/record      one journal record by id, for a citation the page has not loaded
  *   /api/sites       every reference site of one chokepoint entry (run=<at>~<session>, component, name), where the first load counted some
- *   /api/relief/files  the files of components and districts the relief read (folder=, repeated), which the first load counts and does not list
+ *   /api/relief/files    the files of components and districts the relief read (folder=, repeated), which the first load counts and does not list
+ *   /api/relief/commits  the commits the Structure view's diff can name: the branch's own, then the trunk's recent line
+ *   /api/relief/diff     the paths that changed between two commits, or a commit and the working tree (a=, b=), with lines added and deleted
  *
  * The state is loaded once through scopeState, whole, and kept current: the
  * journal, runs and work folders are watched, and an append is read back
  * from its store and sent as the records that are new (by id, or a run's time
  * and session); a spec, a practice file, a lexicon or the config changing
  * (whatever the spec model reads by name) reloads the state and sends it as
- * a snapshot with a new version. The component interfaces
+ * a snapshot with a new version. The relief is read apart from that chain, in
+ * a worker, when the state first loads, when the model changes and when git
+ * moves HEAD or a ref (a commit, a checkout, a fetch); one reading runs at a
+ * time, with at most one more queued behind it, and each that lands is sent
+ * as a snapshot of its own with a new version, so no refresh or history
+ * answer waits on it and a page that loaded before it lands is sent it on
+ * the stream. The component interfaces
  * are read through the server's own instrument (or, for a Python adoption
  * the config bounds, a bounded server the reading keeps for itself) when the
  * reading is first asked for and again when a run lands, never on every file
@@ -33,14 +41,14 @@
  * Node-only; the browser bundle never imports it.
  */
 
-import { closeSync, openSync, readSync, readdirSync, statSync, watch, type FSWatcher } from "node:fs";
+import { realpathSync, watch, type FSWatcher } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { tracesDir } from "../../economy/trace.ts";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { TRACES_DIR, tracesDir } from "../../economy/trace.ts";
 import type { HttpApp, HttpAppFactory, HttpContext } from "../../enforcement/server.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
-import { REVISION, WORKTREE, folderName, readReliefApart, reliefCommits, reliefDiff, touchesOf, type ReliefRead, type ReliefReading, type Touch } from "../relief/relief.ts";
+import { REVISION, TraceTail, WORKTREE, folderName, gitRecords, movesRelief, readReliefApart, reliefCommits, reliefDiff, type GitRecords, type ReliefRead, type ReliefReading } from "../relief/relief.ts";
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
 import { storeOfPath, type RecordStore } from "../../journal/stores.ts";
 import { FROM_SOURCES, SOURCE_FOLDER, buildShell, forgetPageBundle, isPageSource, rootOptions, scopeState, windowState, type BuildOptions, type Shell } from "./build.ts";
@@ -246,6 +254,15 @@ class LiveReading implements HttpApp {
   private readonly timers = new Map<Store, NodeJS.Timeout>();
   private chain: Promise<void> = Promise.resolve();
   private closed = false;
+  /** Aborted by close: a relief reading under way stops, and its worker and git with it. */
+  private readonly stopping = new AbortController();
+  /** A relief reading under way, and whether a change since it began wants one more. */
+  private reliefRunning: Promise<void> | undefined;
+  private reliefAgain = false;
+  /** A commit, checkout or fetch settling before the relief is read again: git rewrites several refs for one. */
+  private reliefTimer: NodeJS.Timeout | undefined;
+  /** Where git records what moves the relief, located when the watch starts; undefined outside a repository. */
+  private git: GitRecords | undefined;
 
   constructor(context: HttpContext, options: LiveOptions) {
     this.context = context;
@@ -257,6 +274,7 @@ class LiveReading implements HttpApp {
       options.interfaces === false
         ? { kind: "unread", because: "this live reading was started without the instrument" }
         : { kind: "unread", because: "the warm server is reading the component interfaces; the map redraws when it is done" };
+    this.traces = new TraceTail(tracesDir(context.root));
   }
 
   private get versionId(): string {
@@ -270,6 +288,10 @@ class LiveReading implements HttpApp {
       this.base = state;
       this.remember(state);
       this.lexicons = await watchedLexicons(this.root, this.build);
+      // Closed during the first read: nothing is watched and nothing more is read.
+      if (this.closed) return state;
+      this.git = await gitRecords(this.root);
+      if (this.closed) return state;
       this.watch();
       this.readInterfaces();
       return state;
@@ -277,9 +299,9 @@ class LiveReading implements HttpApp {
     return this.loading;
   }
 
-  /** The whole state with the relief read again beside it: the relief reads in a worker while the state loads here. */
+  /** The whole state with the relief read beside it, for the first load: the relief reads in a worker while the state loads here. */
   private async stateWithRelief(): Promise<ShellState> {
-    const relief = this.readReliefAgain();
+    const relief = readReliefApart(this.root, this.stopping.signal);
     const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
     const read = await relief;
     this.relief = read.reading;
@@ -288,30 +310,58 @@ class LiveReading implements HttpApp {
     return state;
   }
 
-  /** A relief reading under way, and the one queued behind it for callers that arrived meanwhile. */
-  private reliefRead: Promise<ReliefRead> | undefined;
-  private reliefNext: Promise<ReliefRead> | undefined;
-
   /**
    * Read the relief again, in a worker thread and git's child processes, so the
-   * server keeps answering hooks meanwhile. Callers arriving while a reading
-   * runs share one more after it, since the running one may have started
-   * before their change.
+   * server keeps answering hooks and pages meanwhile; it never runs on the
+   * update chain. One reading at a time: a change while one runs, which it may
+   * have begun before, asks for one more after it, and any number of changes
+   * meanwhile ask for that same one.
    */
-  private readReliefAgain(): Promise<ReliefRead> {
-    if (this.reliefRead === undefined) {
-      this.reliefRead = readReliefApart(this.root).finally(() => {
-        this.reliefRead = undefined;
-      });
-      return this.reliefRead;
+  private rereadRelief(): void {
+    if (this.closed) return;
+    if (this.reliefRunning !== undefined) {
+      this.reliefAgain = true;
+      return;
     }
-    this.reliefNext ??= this.reliefRead
-      .catch(() => undefined)
-      .then(() => {
-        this.reliefNext = undefined;
-        return this.readReliefAgain();
-      });
-    return this.reliefNext;
+    this.reliefRunning = (async () => {
+      do {
+        this.reliefAgain = false;
+        const read = await readReliefApart(this.root, this.stopping.signal);
+        if (this.closed) return;
+        // Landed on the chain, so it never interleaves with a refresh replacing the state it lands in; landing is quick.
+        this.chain = this.chain.then(() => this.landRelief(read)).catch((error: unknown) => this.context.log(`scope: the relief did not land: ${error instanceof Error ? error.message : String(error)}`));
+      } while (this.reliefAgain && !this.closed);
+    })().finally(() => {
+      this.reliefRunning = undefined;
+    });
+  }
+
+  /**
+   * A relief reading that landed: held for the state and the files route, and
+   * sent as a snapshot with a new version when it differs from the one held.
+   * A page that loaded the state before it landed holds the older version, so
+   * its stream opens with this snapshot; one already streaming is sent it now.
+   */
+  private landRelief(read: ReliefRead): void {
+    if (this.closed || this.base === undefined) return;
+    const held = this.relief;
+    this.relief = read.reading;
+    this.reliefFiles = read.files;
+    this.base.relief = read.reading;
+    const same = held.kind === "read" && read.reading.kind === "read" ? held.stamp === read.reading.stamp : JSON.stringify(held) === JSON.stringify(read.reading);
+    if (same) return;
+    this.version += 1;
+    this.send("snapshot", { state: windowState(this.base), version: this.versionId });
+  }
+
+  /** Git moved HEAD or a ref: the landings and heights are read again once the commit, checkout or fetch settles. */
+  private gitMoved(): void {
+    if (this.closed) return;
+    clearTimeout(this.reliefTimer);
+    this.reliefTimer = setTimeout(() => {
+      this.reliefTimer = undefined;
+      this.rereadRelief();
+    }, Math.max(300, this.options.debounceMs ?? 100));
   }
 
   private remember(state: ShellState): void {
@@ -321,62 +371,70 @@ class LiveReading implements HttpApp {
   }
 
   /** How far each read trace has been sent: a trace line is a touch once, and the traces before the server started are history, not activity. */
-  private readonly traceOffsets = new Map<string, number>();
+  private readonly traces: TraceTail;
   /** A look at the traces, throttled rather than settled: a busy agent appends without pause, and its touches must light as they happen. */
   private readonly traced = throttle(() => this.lookAtTraces(), TOUCH_MS);
 
   /**
-   * Agent activity, live: the lines appended to the read traces since the last
-   * look, each file a session read or wrote, sent as one touch event for the
-   * Structure view to light. Nothing is stored; a page that connects later sees
-   * only what happens from then on.
+   * Agent activity, live: the lines appended to the traces the watcher named
+   * since the last look, each file a session read or wrote, sent as one touch
+   * event for the Structure view to light. Nothing is stored, and with no page
+   * connected nothing is read: a page that connects later sees only what
+   * happens from then on.
    */
   private lookAtTraces(): void {
-    const dir = tracesDir(this.root);
-    const touches: Touch[] = [];
-    let names: string[] = [];
-    try {
-      names = readdirSync(dir).filter((n) => n.endsWith(".jsonl"));
-    } catch {
-      return;
-    }
-    for (const name of names) {
-      const file = join(dir, name);
-      let size = 0;
-      try {
-        size = statSync(file).size;
-      } catch {
-        continue;
-      }
-      // A trace this server has not seen is a session that began after it started: all of it is new.
-      const from = this.traceOffsets.get(file) ?? 0;
-      if (size <= from) {
-        this.traceOffsets.set(file, size);
-        continue;
-      }
-      const handle = openSync(file, "r");
-      const buffer = Buffer.alloc(size - from);
-      readSync(handle, buffer, 0, buffer.length, from);
-      closeSync(handle);
-      const found = touchesOf(buffer.toString("utf8"));
-      this.traceOffsets.set(file, from + found.consumed);
-      touches.push(...found.touches);
-    }
+    if (this.clients.size === 0) return;
+    const touches = this.traces.look();
     if (touches.length > 0) this.send("touch", { touches });
+  }
+
+  /** A trace changed, by its path below the traces folder, or some trace when the watcher named none: looked at on the beat while a page is connected. */
+  private traceChanged(name: string | undefined): void {
+    this.traces.note(name);
+    if (this.clients.size > 0) this.traced.call();
   }
 
   private watch(): void {
     // Every trace as it stands now is history: only what is appended from here on is sent as activity.
+    this.traces.start();
+    const traces = TRACES_DIR.split(sep).join("/") + "/";
+    // Real paths, as git names its folders: a root reached through a link (a temporary folder on macOS) is matched by where it lies.
+    let realRoot = this.root;
     try {
-      const dir = tracesDir(this.root);
-      for (const n of readdirSync(dir)) if (n.endsWith(".jsonl")) this.traceOffsets.set(join(dir, n), statSync(join(dir, n)).size);
+      realRoot = realpathSync(this.root);
     } catch {
-      // no traces yet
+      // the root's own spelling
+    }
+    const git = this.git;
+    // A worktree's git folders, and a root inside a repository, lie outside the root: watched where they are.
+    const outside = (folder: string): boolean => {
+      const path = relative(realRoot, folder);
+      return path.startsWith("..") || isAbsolute(path);
+    };
+    if (git !== undefined) {
+      const folders: [folder: string, recursive: boolean][] = [
+        [dirname(git.head), false],
+        [dirname(git.packed), false],
+        [git.refs, true],
+      ];
+      for (const [folder, recursive] of folders.filter(([folder], i, all) => outside(folder) && all.findIndex(([other]) => other === folder) === i)) {
+        try {
+          const watcher = watch(folder, { recursive }, (_event, name) => {
+            if (name === null || movesRelief(git, join(folder, String(name)))) this.gitMoved();
+          });
+          watcher.on("error", () => {});
+          this.watchers.push(watcher);
+        } catch {
+          // Unwatchable: the relief is read again when the model changes.
+        }
+      }
     }
     try {
       const watcher = watch(this.root, { recursive: true }, (_event, name) => {
-        if (name === null) return;
-        if (String(name).split(sep).join("/").startsWith(".coherence/traces/")) return this.traced.call();
+        if (name === null) return this.traceChanged(undefined);
+        const path = String(name).split(sep).join("/");
+        if (path.startsWith(traces)) return this.traceChanged(path.slice(traces.length));
+        if (git !== undefined && movesRelief(git, join(realRoot, String(name)))) return this.gitMoved();
         const store = storeOf(String(name), this.lexicons);
         if (store !== undefined) this.changed(store);
       });
@@ -465,7 +523,10 @@ class LiveReading implements HttpApp {
       const changed = orders.filter((order) => fresh.has(order.id) || order.history.some((h) => fresh.has(h.id)));
       if (changed.length > 0) this.send("work", { orders: changed, damaged: loaded.damaged });
     } else if (store === "model") {
-      const state = await this.stateWithRelief();
+      // The relief reads apart and lands as its own snapshot: this one carries the relief held until then.
+      this.rereadRelief();
+      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
+      state.relief = this.relief;
       this.base = state;
       this.remember(state);
       this.lexicons = await watchedLexicons(this.root, this.build);
@@ -694,6 +755,8 @@ class LiveReading implements HttpApp {
       if (orders.length > 0) write("work", { orders, damaged: base.journal.work.damaged });
     }
     write("ready", { version: this.versionId });
+    // The first page since none was connected: what the traces gained meanwhile was never read, and is history to it.
+    if (this.clients.size === 0) this.traces.skip();
     this.clients.add(response);
     this.context.keepAlive();
     const beat = setInterval(() => {
@@ -708,16 +771,26 @@ class LiveReading implements HttpApp {
     response.on("close", end);
   }
 
-  close(): void {
+  /**
+   * Final: no watcher, timer, worker or git started before the close outlives
+   * it. A first load under way finds the reading closed and watches nothing;
+   * a relief reading is stopped, and the close returns once the first load,
+   * the update chain and the relief's worker have all ended.
+   */
+  async close(): Promise<void> {
     this.closed = true;
+    this.stopping.abort();
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
+    clearTimeout(this.reliefTimer);
     for (const watcher of this.watchers) watcher.close();
+    this.watchers.length = 0;
     this.traced.cancel();
     for (const client of this.clients) client.end();
     this.clients.clear();
     void this.readingServer?.adapter.close();
     this.readingServer = undefined;
+    await Promise.allSettled([this.loading, this.chain, this.reliefRunning]);
   }
 }
 

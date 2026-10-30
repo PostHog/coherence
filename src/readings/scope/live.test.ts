@@ -5,10 +5,14 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
+import type { LanguageAdapter } from "../../adapters/adapter.ts";
+import type { Touch } from "../relief/relief.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { connectAdapter, serve, type Serving } from "../../enforcement/server.ts";
 import { loadJournal } from "../../journal/store.ts";
@@ -420,6 +424,137 @@ test("a page source that does not build leaves the last good page served and ope
   assert.equal(await bundle.get(), "bundle 2", "a good one is kept");
   bundle.forget();
   assert.equal(await bundle.get(), "bundle 3");
+});
+
+/** The relief a state or a snapshot carries, by its stamp; "" when it holds none that was read. */
+const stampOf = (state: ShellState): string => (state.relief?.kind === "read" ? state.relief.stamp : "");
+const snapshots = (events: readonly StreamEvent[]): ShellState[] => events.filter((e) => e.event === "snapshot").map((e) => (JSON.parse(e.data) as { state: ShellState }).state);
+
+test("a spec edit sends the model at once and the relief as a snapshot of its own when it lands, and a page that loaded between them is sent the relief when its stream opens", async () => {
+  const fixture = makeFixture();
+  const server = await live(fixture.root);
+  try {
+    const state = await firstLoad(server);
+    const held = stampOf(state);
+    assert.notEqual(held, "", "the first load carries the relief");
+    const stream = await openStream(server, state);
+    assert.ok(await stream.until((events) => events.some((e) => e.event === "ready")));
+    const from = stream.events.length;
+    // A file the relief counts, and a spec edit that reads the model again.
+    writeFileSync(join(fixture.root, "src/store/later.ts"), "export const later = 1;\n");
+    appendFileSync(join(fixture.root, "src/store/Store.spec.md"), "\n");
+    assert.ok(await stream.until((events) => snapshots(events.slice(from)).length >= 1, 20_000), "the model's snapshot arrives");
+    // A second page loads now, likely before the relief has landed; whichever, its stream must leave it holding the newest relief.
+    const second = await firstLoad(server);
+    assert.ok(await stream.until((events) => snapshots(events.slice(from)).some((s) => stampOf(s) !== held), 20_000), "the relief's own snapshot arrives");
+    const sent = snapshots(stream.events.slice(from));
+    assert.equal(stampOf(sent[0]!), held, "the model's snapshot never waited on the relief: it carries the relief held until then");
+    const fresh = stampOf(sent.at(-1)!);
+    assert.notEqual(fresh, held, "and the relief lands after it, under a new stamp");
+    fold(state, stream.events, 0);
+    assert.equal(stampOf(state), fresh, "the first page merged it");
+    const back = await openStream(server, second);
+    assert.ok(await back.until((events) => events.some((e) => e.event === "ready")));
+    fold(second, back.events);
+    assert.equal(stampOf(second), fresh, "a page that loaded before the relief landed holds it once its stream opens");
+    stream.close();
+    back.close();
+  } finally {
+    await server.stop();
+    fixture.remove();
+  }
+});
+
+test("a commit reads the relief again, in a worktree whose git folders lie outside it", async () => {
+  const fixture = makeFixture();
+  const elsewhere = mkdtempSync(join(tmpdir(), "coherence-live-worktree-"));
+  const run = (cwd: string, ...args: string[]): string => execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const worktree = join(elsewhere, "side");
+  let server: Live | undefined;
+  try {
+    run(fixture.root, "init", "-q");
+    run(fixture.root, "add", "-A");
+    run(fixture.root, "commit", "-q", "-m", "the fixture");
+    run(fixture.root, "worktree", "add", "-q", "-b", "side", worktree);
+    server = await live(worktree);
+    const state = await firstLoad(server);
+    const held = state.relief?.kind === "read" ? state.relief : undefined;
+    assert.equal(held?.landings.length, 1, "the worktree's one landing");
+    const stream = await openStream(server, state);
+    assert.ok(await stream.until((events) => events.some((e) => e.event === "ready")));
+    // A commit in the worktree moves a ref in the repository's common folder, outside the root the server watches.
+    writeFileSync(join(worktree, "src/api/more.ts"), "export const more = 1;\nexport const again = 2;\n");
+    run(worktree, "add", "-A");
+    run(worktree, "commit", "-q", "-m", "a second landing");
+    const landed = (s: ShellState): boolean => s.relief?.kind === "read" && s.relief.landings.length === 2;
+    assert.ok(await stream.until((events) => snapshots(events).some(landed), 20_000), "the commit is read as a landing without a spec edit");
+    fold(state, stream.events);
+    assert.equal(state.relief?.kind === "read" ? state.relief.landings[0]!.subject : "", "a second landing");
+    stream.close();
+  } finally {
+    await server?.stop();
+    rmSync(elsewhere, { recursive: true, force: true });
+    fixture.remove();
+  }
+});
+
+test("agent activity reaches a connected page once per line, and the traces before the server or while no page was connected are never sent", async () => {
+  const fixture = makeFixture();
+  const traces = join(fixture.root, ".coherence", "traces");
+  const line = (session: string, file: string): string => `${JSON.stringify({ kind: "read", at: new Date().toISOString(), session, file })}\n`;
+  mkdirSync(traces, { recursive: true });
+  writeFileSync(join(traces, "s-old.jsonl"), line("s-old", "src/history.ts"));
+  const server = await live(fixture.root);
+  try {
+    const state = await firstLoad(server);
+    const touched = (events: readonly StreamEvent[]): string[] => events.filter((e) => e.event === "touch").flatMap((e) => (JSON.parse(e.data) as { touches: Touch[] }).touches.flatMap((t) => t.files));
+    let stream = await openStream(server, state);
+    assert.ok(await stream.until((events) => events.some((e) => e.event === "ready")));
+    appendFileSync(join(traces, "s-old.jsonl"), line("s-old", "src/one.ts"));
+    writeFileSync(join(traces, "s-new.jsonl"), line("s-new", "src/two.ts"));
+    assert.ok(await stream.until((events) => touched(events).length >= 2), "each appended line arrives");
+    // A beat or two more: nothing is sent twice.
+    await new Promise((r) => setTimeout(r, 400));
+    assert.deepEqual(touched(stream.events).sort(), ["src/one.ts", "src/two.ts"], "each once, and the trace's history never");
+    stream.close();
+
+    // No page connected: what is appended is never read, and is history to the next page.
+    // The server sees the stream end, and the beat after it passes.
+    await new Promise((r) => setTimeout(r, 300));
+    appendFileSync(join(traces, "s-old.jsonl"), line("s-old", "src/away.ts"));
+    await new Promise((r) => setTimeout(r, 600));
+    stream = await openStream(server, state);
+    assert.ok(await stream.until((events) => events.some((e) => e.event === "ready")));
+    appendFileSync(join(traces, "s-old.jsonl"), line("s-old", "src/back.ts"));
+    assert.ok(await stream.until((events) => touched(events).includes("src/back.ts")), "a line appended once a page is back arrives");
+    assert.deepEqual(touched(stream.events), ["src/back.ts"], "the line appended while no page was connected never does");
+    stream.close();
+  } finally {
+    await server.stop();
+    fixture.remove();
+  }
+});
+
+test("a close during the first load is final: no watcher is left open and the relief's worker is stopped", async () => {
+  const fixture = makeFixture();
+  const watchers = (): number => process.getActiveResourcesInfo().filter((kind) => kind === "FSEventWrap").length;
+  const before = watchers();
+  const said: string[] = [];
+  const app = scopeApp({ interfaces: false, debounceMs: 30 })({ root: fixture.root, adapter: {} as LanguageAdapter, log: (line) => said.push(line), keepAlive: () => {} });
+  const answered: number[] = [];
+  const response = { writeHead: (status: number) => answered.push(status), end: () => {} } as unknown as ServerResponse;
+  try {
+    // The first load starts with the request, and the close comes while its relief is still being read.
+    const asked = app.handle({ method: "GET" } as IncomingMessage, response, new URL("http://127.0.0.1/api/state"));
+    await app.close();
+    await asked;
+    assert.equal(watchers(), before, "nothing the first load would have watched is open");
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(watchers(), before, "and nothing opens later");
+    assert.deepEqual(said, [], `nothing failed: ${said.join("; ")}`);
+  } finally {
+    fixture.remove();
+  }
 });
 
 test("agent activity is sent on a beat while an agent keeps working, never held until it pauses, and the last of it is never dropped", (t) => {
