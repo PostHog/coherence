@@ -48,7 +48,7 @@ import { loadJournal } from "../../journal/store.ts";
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
 import { storeOfPath, type RecordStore } from "../../journal/stores.ts";
 import { buildShell, rootOptions, scopeState, windowState, type BuildOptions, type Shell } from "./build.ts";
-import { coverageOffLoop } from "./coverage-reading.ts";
+import { coverageOffLoop, type CoverageAsk } from "./coverage-reading.ts";
 import { interfaceAdapter, interfaceBounds, readComponentInterfaces } from "./component-interfaces.ts";
 import { readAndRecord } from "./gaps.ts";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
@@ -74,7 +74,7 @@ export interface LiveOptions {
   /** Build options beyond the root's defaults (Coherence's lexicon, the project's name). */
   build?: Partial<BuildOptions>;
   /** How the vocabulary coverage is read (default on a worker thread, coverageOffLoop); a test holds it to see the reading go on without it. */
-  coverage?: (root: string) => Promise<LexiconCoverage>;
+  coverage?: (root: string) => CoverageAsk;
 }
 
 /** A record store, or the model: the specs, the config and the lexicons. */
@@ -157,6 +157,7 @@ class LiveReading implements HttpApp {
   /** The vocabulary coverage as last read, or why it is not yet; one reading at a time, off the loop, once more if the model reloaded meanwhile. */
   private coverage: LexiconCoverage | CoverageUnread = { kind: "reading", because: "the warm server is reading the vocabulary coverage; this section fills when it is done" };
   private coverageReading: Promise<void> | undefined;
+  private coverageAsk: CoverageAsk | undefined;
   private readCoverageAgain = false;
   /** The reading's own bounded server, when the shared instrument reads a whole workspace the reading never draws. */
   private readingServer: { adapter: LanguageAdapter; bounds: string } | undefined;
@@ -336,12 +337,17 @@ class LiveReading implements HttpApp {
       do {
         this.readCoverageAgain = false;
         let coverage: LexiconCoverage | CoverageUnread;
+        const ask = (this.options.coverage ?? coverageOffLoop)(this.root);
+        this.coverageAsk = ask;
         try {
-          coverage = await (this.options.coverage ?? coverageOffLoop)(this.root);
+          coverage = await ask.reading;
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error);
-          this.context.log(`scope: reading the vocabulary coverage failed: ${reason}`);
+          if (!this.closed) this.context.log(`scope: reading the vocabulary coverage failed: ${reason}`);
           coverage = { kind: "failed", because: `the warm server could not read the vocabulary coverage (${reason}); coherence lexicon coverage reads it from the project's root` };
+        } finally {
+          this.coverageAsk = undefined;
+          await ask.release();
         }
         if (this.closed || this.readCoverageAgain) continue;
         this.coverage = coverage;
@@ -513,7 +519,7 @@ class LiveReading implements HttpApp {
     response.on("close", end);
   }
 
-  close(): void {
+  async close(): Promise<void> {
     this.closed = true;
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
@@ -522,6 +528,9 @@ class LiveReading implements HttpApp {
     this.clients.clear();
     void this.readingServer?.adapter.close();
     this.readingServer = undefined;
+    // A coverage reading still running is stopped, and its worker's end awaited: it writes under the project, which may be removed next.
+    await this.coverageAsk?.release();
+    await this.coverageReading;
   }
 }
 

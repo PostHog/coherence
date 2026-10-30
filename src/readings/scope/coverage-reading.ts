@@ -16,6 +16,13 @@
  * projection, so the main thread never parses the reading itself either.
  * Callers that ask while a reading of the same root is under way share it.
  *
+ * A worker writes under the project's .coherence/cache as it reads (the code
+ * identity, the kept reading), so its end is the callers' to await: each
+ * releases its ask, the last release of a reading still running stops the
+ * worker, and a release resolves only once the worker's thread has ended.
+ * A server that closed, and a test that then removed its project, never
+ * finds a write landing after.
+ *
  * The reading reads no text through a parser (its code names come from each
  * language's lines, lexicon-coverage.ts); the worker still starts the parser
  * runtime, as the CLI does before any command, so it runs any reading the
@@ -45,37 +52,78 @@ interface Asked {
 /** What the worker answers: the projection, or why it could not read. */
 type Answered = { coverage: LexiconCoverage } | { failed: string };
 
-const underWay = new Map<string, Promise<LexiconCoverage>>();
+/** One worker's reading, the callers holding it, and when its thread has ended. */
+interface Underway {
+  reading: Promise<LexiconCoverage>;
+  worker: Worker;
+  ended: Promise<void>;
+  askers: number;
+}
+
+const underWay = new Map<string, Underway>();
+
+/** One caller's ask: the reading, and the release the caller awaits once it no longer wants it. */
+export interface CoverageAsk {
+  reading: Promise<LexiconCoverage>;
+  release: () => Promise<void>;
+}
 
 /**
  * The page's coverage, read on a worker thread so the caller's loop never
  * waits on it; a call while a reading of the same root is under way shares
  * that reading.
  */
-export function coverageOffLoop(root: string): Promise<LexiconCoverage> {
-  const found = underWay.get(root);
-  if (found !== undefined) return found;
-  const reading = new Promise<LexiconCoverage>((resolve, reject) => {
+export function coverageOffLoop(root: string): CoverageAsk {
+  let underway = underWay.get(root);
+  if (underway === undefined) {
     // The worker runs this module; no inherited preload (a test's leak guard) runs in it, and it never holds the process open.
     const worker = new Worker(new URL(import.meta.url), { workerData: { coverageOf: root } satisfies Asked, execArgv: [] });
     worker.unref();
-    let settled = false;
-    worker.once("message", (answer: Answered) => {
-      settled = true;
-      if ("coverage" in answer) resolve(answer.coverage);
-      else reject(new Error(answer.failed));
-      void worker.terminate();
+    const ended = new Promise<void>((resolve) => worker.once("exit", () => resolve()));
+    const reading = new Promise<LexiconCoverage>((resolve, reject) => {
+      let settled = false;
+      worker.once("message", (answer: Answered) => {
+        settled = true;
+        if ("coverage" in answer) resolve(answer.coverage);
+        else reject(new Error(answer.failed));
+        void worker.terminate();
+      });
+      worker.once("error", (error) => {
+        settled = true;
+        reject(error);
+      });
+      worker.once("exit", (code) => {
+        if (!settled) reject(new Error(`the coverage reading's worker exited (code ${code}) without an answer`));
+      });
     });
-    worker.once("error", (error) => {
-      settled = true;
-      reject(error);
-    });
-    worker.once("exit", (code) => {
-      if (!settled) reject(new Error(`the coverage reading's worker exited (code ${code}) without an answer`));
-    });
-  }).finally(() => underWay.delete(root));
-  underWay.set(root, reading);
-  return reading;
+    // A reading every caller released before it settled rejects with no one awaiting it; that is no failure to report.
+    reading.catch(() => {});
+    const made: Underway = { reading, worker, ended, askers: 0 };
+    // Settled, it is no longer shared: the next ask reads again.
+    reading.then(
+      () => underWay.get(root) === made && underWay.delete(root),
+      () => underWay.get(root) === made && underWay.delete(root),
+    );
+    underWay.set(root, made);
+    underway = made;
+  }
+  const mine = underway;
+  mine.askers += 1;
+  let released = false;
+  return {
+    reading: mine.reading,
+    release: async () => {
+      if (!released) {
+        released = true;
+        mine.askers -= 1;
+        // Another caller still wants it: its release ends the worker.
+        if (mine.askers > 0) return;
+        if (underWay.get(root) === mine) underWay.delete(root);
+        void mine.worker.terminate();
+      }
+      if (mine.askers === 0) await mine.ended;
+    },
+  };
 }
 
 if (!isMainThread && typeof (workerData as Partial<Asked> | null)?.coverageOf === "string") {

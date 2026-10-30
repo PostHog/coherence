@@ -18,7 +18,7 @@ import { CONFIG_FILE, loadSpecModel } from "../../spec/model.ts";
 import { scopeState } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { latestOf } from "./derive.ts";
-import { coverageOffLoop, pageCoverage } from "./coverage-reading.ts";
+import { coverageOffLoop, pageCoverage, type CoverageAsk } from "./coverage-reading.ts";
 import { scopeApp, storeOf, watchedLexicons, type LiveOptions } from "./live.ts";
 import type { CoverageUnread, JournalRecord, LexiconCoverage, PageEntry, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { answer } from "../query/query.ts";
@@ -153,7 +153,7 @@ test("coverage never stalls the warm server: the first load is sent before the c
   const fixture = makeFixture();
   // Each coverage reading the server asks for waits until the test lets it go.
   const held: (() => void)[] = [];
-  const reading = (root: string): Promise<LexiconCoverage> => new Promise((resolve, reject) => held.push(() => pageCoverage(root).then(resolve, reject)));
+  const reading = (root: string): CoverageAsk => ({ reading: new Promise((resolve, reject) => held.push(() => pageCoverage(root).then(resolve, reject))), release: async () => {} });
   const server = await live(fixture.root, { coverage: reading });
   const within = <T>(promise: Promise<T>, what: string): Promise<T> =>
     Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${what} waited on the coverage reading`)), 4_000))]);
@@ -204,7 +204,9 @@ test("coverage never stalls the warm server: the first load is sent before the c
     const scope = openWork();
     let both: LexiconCoverage[];
     try {
-      both = await Promise.all([coverageOffLoop(fixture.root), coverageOffLoop(fixture.root)]);
+      const asks = [coverageOffLoop(fixture.root), coverageOffLoop(fixture.root)];
+      both = await Promise.all(asks.map((ask) => ask.reading));
+      for (const ask of asks) await ask.release();
     } finally {
       closeWork(scope);
     }
@@ -212,6 +214,10 @@ test("coverage never stalls the warm server: the first load is sent before the c
     assert.equal(scope.work.counts["coverage reading"], 0, "the caller's thread takes no coverage reading");
     assert.equal(both[0], both[1], "both callers get the one reading");
     assert.deepEqual(both[0], await pageCoverage(fixture.root), "the worker's reading is the page's coverage");
+    // Released before it lands, the reading's worker is stopped, and the release returns once its thread has ended.
+    const dropped = coverageOffLoop(fixture.root);
+    await dropped.release();
+    await assert.rejects(dropped.reading, /exited/, "the last release of a running reading stops its worker");
   } finally {
     fixture.remove();
   }
