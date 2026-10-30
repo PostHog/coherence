@@ -1,6 +1,8 @@
 # Coherence
 
-Agent-assisted software development is great—for Anthropic’s income statement. Coherence exists to make it great for everyone else.
+Coherence slots into your agent's hooks to give it the structural information, decision history, and project context to make every edit smarter. You sweep up fewer messes on every review. It also gives you clearer insight into your project and the agents who are building it, so you can move with confidence.
+
+Agent-assisted software development is great—for AI labs and their income statements. Coherence exists to make it great for everyone else.
 
 The status quo of development using LLMs is comical: we use inference to generate code, then we use more inference to ask if that code is good. Meanwhile, our projects become more and more opaque.
 
