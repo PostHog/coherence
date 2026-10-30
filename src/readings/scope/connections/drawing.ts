@@ -56,6 +56,11 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
 const short = (f: string): string => (f === "." ? "(root)" : f.replace(/^src\//, ""));
 const worst = (states: readonly FlowState[]): FlowState => (states.includes("broken") ? "broken" : states.includes("requirement") ? "requirement" : "verified");
 const routeName = (r: FlowRoute): string => (r.names.length > 2 ? `${r.names[0]} +${r.names.length - 1}` : r.names.join(", "));
+/**
+ * How wide a line of monospace text is: every mark set centred or flush right (a door's identifiers, +N, a token's
+ * trust line) is set in the page's mono face, whose advance is 0.6 em, so it is placed from its start, not aligned.
+ */
+const mono = (text: string, px: number): number => text.length * px * 0.6;
 const width = (sites: number): number => 1.2 + Math.min(6, Math.log2(1 + sites) * 0.75);
 
 /** A cubic from one card to another: forward across columns, a side curve within one, or round against the flow. */
@@ -268,7 +273,7 @@ export function createConnections(first: FlowModel): Connections {
     if (door !== undefined) x -= w / 2 + 3;
     if (crossing) el("line", { class: "trust", x1: x - w / 2 - 6, y1: y - 22, x2: x - w / 2 - 6, y2: y + 22 }, g);
     el("rect", { x: x - w / 2, y: y - 9, width: w, height: 18, rx: 4 }, g);
-    el("text", { x, y }, g).textContent = text;
+    el("text", { x: x - mono(text, 10.5) / 2, y }, g).textContent = text;
     onPress(g, run);
   }
 
@@ -281,7 +286,7 @@ export function createConnections(first: FlowModel): Connections {
     el("path", { d: `M${-w / 2},${-h / 2} H${w / 2 - 12} L${w / 2 + 4},0 L${w / 2 - 12},${h / 2} H${-w / 2} Z` }, g);
     names.forEach((n, i) => (el("text", { x: -w / 2 + 12, y: -h / 2 + 20 + i * 16 }, g).textContent = n));
     const tag = r.noTracedControl ? "no traced control" : r.noControl ? "no control needed" : (r.trust.join(", ") || "trust unknown") + (r.trustSource === "derived" ? " · derived" : "");
-    el("text", { class: "t", x: w / 2 + 4, y: h / 2 + 16, "text-anchor": "end" }, g).textContent = tag;
+    el("text", { class: "t", x: w / 2 + 4 - mono(tag, 10.5), y: h / 2 + 16 }, g).textContent = tag;
     g.addEventListener("pointerdown", (ev) => startDrag(ev, TOKEN));
   }
 
@@ -311,7 +316,8 @@ export function createConnections(first: FlowModel): Connections {
       el("path", { d: `M${-w / 2},${-h / 2} H${w / 2 - 9} L${w / 2 + 2},0 L${w / 2 - 9},${h / 2} H${-w / 2} Z` }, tok);
       el("text", { x: -w / 2 + 9, y: 4 }, tok).textContent = names;
       const where = t.hops === 0 ? "enters here" : `enters at ${label(t.enters)} · ${plural(t.hops, "hop")}`;
-      el("text", { class: "t", x: w / 2 + 2, y: h / 2 + 12, "text-anchor": "end" }, tok).textContent = `${where} · ${t.trust.join(", ") || "trust unknown"}`;
+      const trust = `${where} · ${t.trust.join(", ") || "trust unknown"}`;
+      el("text", { class: "t", x: w / 2 + 2 - mono(trust, 10), y: h / 2 + 12 }, tok).textContent = trust;
       onPress(tok, () => setOrigin({ kind: "route", id: t.route }));
       line(tx + 2, y, t.hops);
     });
@@ -350,7 +356,7 @@ export function createConnections(first: FlowModel): Connections {
     if (c.more > 0) {
       const m = el("g", { class: "more", transform: `translate(${c.column < 0 ? -14 : W + 14},${H / 2})` }, g);
       el("circle", { r: 12 }, m);
-      el("text", {}, m).textContent = `+${c.more}`;
+      el("text", { x: -mono(`+${c.more}`, 10.5) / 2 }, m).textContent = `+${c.more}`;
       onPress(m, () => {
         S.spawned.add(c.folder);
         draw(true);
