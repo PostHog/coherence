@@ -1,45 +1,57 @@
 # A tour of Coherence
 
-## See the system: the Structure view
+## See the system: Structure and Connections
 
 `coherence scope` opens Scope, a live page that projects the whole model of
 your project for a human. It leads with one verdict (all verified, nothing
-enforced yet, or how many invariants are broken), and its first view is
-Structure: a transit-style map of what the system is made of and how work
-flows through it.
+enforced yet, or how many invariants are broken). Its first two views show
+what the system is made of.
 
-- **Entrances** on the left are where work enters from outside: commands,
-  routes, host events, tools. Each carries the trust level of the data or
-  caller it lets in.
-- **Components** are the folders that carry a spec. They are laid out by how
-  far they sit from an entrance.
-- **Structural routes** are drawn one color per entrance, following the path
-  work takes through the components, in the order it flows.
-- **Core dependencies**, the components most others call, run as rails
-  along the bottom so they don't tangle the map.
-- **Interface identifiers** (X1, X7, …) tag the places where one component
-  uses another and a chokepoint or crossing stands there: solid when
-  verified, hatched when only a requirement, red when broken.
+**Structure** shows the project as a relief, one block per component (a
+folder that carries a spec), each standing on its parent's platform.
+
+- A block's **footprint** is its share of a measure you pick: lines, lines no
+  invariant reaches, invariants, refutations, crossings, how much other
+  components lean on it, or open defects.
+- Its **height** is churn: how often it changed in the window you pick.
+- Folders with no spec inside a component stand as **districts**, so code
+  no spec covers still has a place.
+- Pick two commits, or a commit and the working tree, and each block shows
+  the lines added and deleted between them.
+- What agents read and edit lights up as they do it, so you can see where a
+  session is working.
+
+Double-click a platform or block to step into it.
+
+![Scope's Structure view of Coherence itself: each component is a block on the project's platform, its footprint its lines and its height how often it changed in the last 30 days, the lines added and deleted since the last release shown as green and red meters on each block, and the components ranked in a list beside it.](https://raw.githubusercontent.com/PostHog/coherence/main/docs/images/scope-structure-relief.jpg)
+
+**Connections** shows how components use one another, starting from one
+entrance or one component. Columns are hops from that start, and **+N** on a
+card brings in what lies one hop further out.
+
+- Each **chokepoint** is drawn once, at the door of the component it
+  protects. Select the door to see every caller that reaches the protected
+  thing through it.
+- **Core dependencies**, the components most others call, are chips on the
+  cards that use them, so they don't tangle the view.
+- Select a component to see every **entrance** whose work reaches it: how
+  many hops away, through which component, and the trust level it carries
+  in.
 
 Every line comes from resolved references the language server reports, not
 from a diagram someone drew and forgot to update. When an agent changes how
-components relate, the map changes with it.
+components relate, the view changes with it.
 
-Select anything to trace it. Selecting an entrance lights its route and dims
-the rest, and the side bar lists every interface along the way and how many
-reference sites back each one:
+![Scope's Connections view started from the Journal component: the entrances whose work reaches it on the left, the components that call it in the next column, the components it calls on the right, and beside them the list of every entrance that reaches it and through which component.](https://raw.githubusercontent.com/PostHog/coherence/main/docs/images/scope-connections.jpg)
 
-![The run and refute route selected on the Structure map: the route is lit from the entrance through Coherence (root), Enforcement, Observation, and Economy; everything else is dimmed.](https://raw.githubusercontent.com/PostHog/coherence/main/docs/images/scope-structure-route.jpg)
-
-When a chokepoint breaks, the component wears a red mark listing every
-bypass site, and the map opens on the worst one. An entrance whose untrusted
-input reaches the system with no verified chokepoint or totality oracle
-traced on its route is flagged `no traced control` (see `scope http` above):
-not a demonstrated bypass, but a place to look. A chokepoint counts where the
-reading sees the handler pass it; a totality oracle counts only on the
-entrances its invariant names (`entrances:`), never on every entrance whose
-trust its crossing matches. Selecting a trust level lights every
-crossing that carries it, so you can see where sensitive data goes.
+A chokepoint that a caller goes around is marked broken at its door, and the
+interface carrying the bypass lists each bypass site by file and line. An
+entrance whose untrusted input reaches the system with no verified
+chokepoint or totality oracle traced on its way is flagged `no traced
+control`: not a demonstrated bypass, but a place to look. A chokepoint counts
+where the reading sees the handler pass it; a totality oracle counts only on
+the entrances its invariant names (`entrances:`), never on every entrance
+whose trust its crossing matches.
 
 ## Agents start with clear definitions
 

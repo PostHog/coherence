@@ -31,7 +31,7 @@ For the full setup, adopting one folder of a monorepo, and platform requirements
 - Perturbation-based **test validation**, called refutation, ensures your agents didn’t write fake tests
 - **Chokepoints** use your language server to ensure that security-sensitive surfaces are precisely documented and monitored. If an agent bypasses your defined security checks, it's warned immediately.
 - Agent **decisions and practices** are stored alongside project code, distilling millions of tokens of context into easy-to-read summaries, preventing re-litigation and re-discovery of settled directions
-- A web UI for **understanding your project and its history as it evolves**, including a map of its structure
+- A web UI for **understanding your project and its history as it evolves**: a 3D view of its components and how much each changes, with agents' reads and edits lit as they happen, and a view of how components connect and where work enters
 
 When an agent starts diverging from your project's architecture goals, Coherence can detect and warn that agent in the same turn, spending less inference at review time. Instead of accreting entropy and slop, your agents build a compass toward order and complexity reduction.
 
