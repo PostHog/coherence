@@ -145,7 +145,7 @@ private-usage rule, an import-linter rule, or a `tach.toml` interface
 (where tach's own check refuses a planted outside import, and the chokepoint is
 graded checker-choked by tach). Coherence's own reference search still covers
 what such a checker cannot see.
-Coherence verifies itself: every screenshot in these docs is its own Scope reading.
+Coherence verifies itself: every screenshot in the [tour](tour.md) is its own Scope reading.
 
 The language adapters ask tsserver, Pyright and rust-analyzer for references. Where a Python
 project runs a checker that refuses a bypass, the chokepoint is graded on that

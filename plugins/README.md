@@ -20,7 +20,7 @@ Bundled but opt-in: a project runs these only by naming them,
 | Plugin | Adds |
 |---|---|
 | `convex` | Convex, over TypeScript: a Convex function reached through the generated API as a reference, and a deployment's functions, HTTP routes and crons as entrances |
-| `go` | Go, through gopls |
+| `go` | Go, through gopls: a language no default plugin provides, read as one is once a project names it |
 | `quint` | Quint, a verifier: `via: [quint]` and `[quint run]` prove a property of a Quint model |
 <!-- /generated -->
 

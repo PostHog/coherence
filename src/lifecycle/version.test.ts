@@ -247,13 +247,20 @@ test("--version, -v, version, --help, -h and help answer at the top level", asyn
 });
 
 test("the README's setup installs Coherence's latest release and names no version, invoked through npx --no --", () => {
-  // The README carries the quick setup, docs/setup.md the full and monorepo ones.
-  const readme = ["README.md", "docs/setup.md"].map((file) => readFileSync(join(CHECKOUT, file), "utf8")).join("\n");
-  const installs = [...readme.matchAll(/@posthog\/coherence@(\S+?)[`\s)]/g)].map((m) => m[1]);
-  assert.ok(installs.length >= 3, "the quick, full and monorepo setups each install it");
-  assert.deepEqual([...new Set(installs)], ["latest"], "every install asks for the latest release, never a version or a range that the next release leaves behind");
-  assert.doesNotMatch(readme, /\bcoherence \d+\.\d+(\.\d+)?\b/, "no example shows a version that goes stale");
-  assert.doesNotMatch(readme, /npx --no coherence/, "npx eats a flag such as --version unless -- ends its own");
-  assert.match(readme, /npx --no -- coherence/);
-  assert.match(readme, /minimumReleaseAgeExclude/);
+  // The README carries the quick setup, docs/setup.md the full and monorepo ones;
+  // each file is read on its own, so neither satisfies an assertion for the other.
+  const owed = [
+    { file: "README.md", floor: 1, why: "the quick setup installs it" },
+    { file: "docs/setup.md", floor: 3, why: "the full setup's steps and the monorepo setup install it" },
+  ];
+  for (const { file, floor, why } of owed) {
+    const text = readFileSync(join(CHECKOUT, file), "utf8");
+    const installs = [...text.matchAll(/@posthog\/coherence@(\S+?)[`\s)]/g)].map((m) => m[1]);
+    assert.ok(installs.length >= floor, `${file}: ${why}, at least ${floor} install${floor === 1 ? "" : "s"} of @posthog/coherence@latest; found ${installs.length}`);
+    assert.deepEqual([...new Set(installs)], ["latest"], `${file}: every install asks for the latest release, never a version or a range that the next release leaves behind`);
+    assert.doesNotMatch(text, /\bcoherence \d+\.\d+(\.\d+)?\b/, `${file}: no example shows a version that goes stale`);
+    assert.doesNotMatch(text, /npx --no coherence/, `${file}: npx eats a flag such as --version unless -- ends its own`);
+    assert.match(text, /npx --no -- coherence/, file);
+    assert.match(text, /minimumReleaseAgeExclude/, `${file}: the prompt has pnpm's release-age setting exempt Coherence`);
+  }
 });

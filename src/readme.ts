@@ -24,7 +24,8 @@ export const GENERATED: Readonly<Record<string, readonly string[]>> = {
   "plugins/README.md": ["default plugins", "opt-in plugins"],
 };
 
-const MARKED = /<!-- generated: ([a-z -]+) -->[\s\S]*?<!-- \/generated -->/g;
+const OPEN = /<!-- generated: ([a-z -]+) -->/g;
+const CLOSE = "<!-- /generated -->";
 
 interface Bundled {
   name: string;
@@ -50,7 +51,14 @@ function bundled(): Bundled[] {
 
 const optInNote = (p: Bundled): string => (p.byDefault ? "" : ` (opt-in: \`"plugins": { "${p.name}": "bundled" }\`)`);
 const bullets = (plugins: Bundled[]): string => plugins.map((p) => `- **${p.title}**, ${p.description}${optInNote(p)}`).join("\n");
-const table = (header: string, plugins: Bundled[]): string => [`| Plugin | ${header} |`, "|---|---|", ...plugins.map((p) => `| \`${p.name}\` | ${p.title}, ${p.description} |`)].join("\n");
+const table = (header: string, plugins: Bundled[], note: (p: Bundled) => string = () => ""): string =>
+  [`| Plugin | ${header} |`, "|---|---|", ...plugins.map((p) => `| \`${p.name}\` | ${p.title}, ${p.description}${note(p)} |`)].join("\n");
+
+/** Whether an opt-in plugin provides a language that no default plugin does, which the opt-in table says, since naming it adds a language rather than swapping one. */
+const newLanguage = (p: Bundled, plugins: Bundled[]): boolean => {
+  const language = p.manifest.provides?.language;
+  return !p.byDefault && language !== undefined && !plugins.some((d) => d.byDefault && d.manifest.provides?.language === language);
+};
 
 /** Each block's text, by name: a one-line block sits inline between its markers, a longer one on lines of its own. */
 export function generatedBlocks(): Record<string, string> {
@@ -64,39 +72,70 @@ export function generatedBlocks(): Record<string, string> {
     "language plugins": bullets([...named, ...declared]),
     "tool plugins": bullets(tools),
     "default plugins": table("Provides", plugins.filter((p) => p.byDefault)),
-    "opt-in plugins": table("Adds", plugins.filter((p) => !p.byDefault)),
+    "opt-in plugins": table("Adds", plugins.filter((p) => !p.byDefault), (p) => (newLanguage(p, plugins) ? ": a language no default plugin provides, read as one is once a project names it" : "")),
   };
 }
 
-/** The file's text with every generated block written afresh; a block the file is not owed, or one it is owed and lacks, is named. */
+/**
+ * The file's text with every generated block written afresh; a block the file
+ * is not owed, one it is owed and lacks, and one opened and not closed before
+ * the next block opens are named. An unclosed block is left as it stands: read
+ * to the next closing marker, it would swallow the author's text between.
+ */
 export function fill(file: string, text: string, blocks: Record<string, string> = generatedBlocks()): { text: string; problems: string[] } {
   const owed = GENERATED[file] ?? [];
   const problems: string[] = [];
   const seen = new Set<string>();
-  const filled = text.replace(MARKED, (whole, name: string) => {
+  let filled = "";
+  let at = 0;
+  for (;;) {
+    OPEN.lastIndex = at;
+    const open = OPEN.exec(text);
+    if (open === null) break;
+    const name = open[1]!;
+    const inner = open.index + open[0].length;
     seen.add(name);
+    const close = text.indexOf(CLOSE, inner);
+    OPEN.lastIndex = inner;
+    const next = OPEN.exec(text);
+    if (close === -1 || (next !== null && next.index < close)) {
+      problems.push(`${file} opens its generated block ${name} and does not close it with ${CLOSE} before ${next === null ? "the file ends" : `the block ${next[1]} opens`}`);
+      filled += text.slice(at, inner);
+      at = inner;
+      continue;
+    }
     const block = owed.includes(name) ? blocks[name] : undefined;
     if (block === undefined) {
       problems.push(`${file} carries a generated block named ${name}, which it is not owed (${owed.join(", ")})`);
-      return whole;
+      filled += text.slice(at, close + CLOSE.length);
+    } else {
+      filled += text.slice(at, open.index) + (block.includes("\n") ? `<!-- generated: ${name} -->\n${block}\n${CLOSE}` : `<!-- generated: ${name} -->${block}${CLOSE}`);
     }
-    return block.includes("\n") ? `<!-- generated: ${name} -->\n${block}\n<!-- /generated -->` : `<!-- generated: ${name} -->${block}<!-- /generated -->`;
-  });
-  for (const name of owed) if (!seen.has(name)) problems.push(`${file} lacks its generated block ${name}: <!-- generated: ${name} --><!-- /generated -->`);
+    at = close + CLOSE.length;
+  }
+  filled += text.slice(at);
+  for (const name of owed) if (!seen.has(name)) problems.push(`${file} lacks its generated block ${name}: <!-- generated: ${name} -->${CLOSE}`);
   return { text: filled, problems };
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const blocks = generatedBlocks();
-  let failed = false;
-  for (const file of Object.keys(GENERATED)) {
-    const path = join(root, file);
+/**
+ * Every generated file under dir written afresh, or, when any file has a
+ * problem, none written: a file filled around a broken marker could lose text.
+ */
+export function regenerate(dir: string, blocks: Record<string, string> = generatedBlocks()): { files: { file: string; changed: boolean }[]; problems: string[] } {
+  const results = Object.keys(GENERATED).map((file) => {
+    const path = join(dir, file);
     const before = readFileSync(path, "utf8");
-    const { text, problems } = fill(file, before, blocks);
-    for (const problem of problems) console.error(problem);
-    failed ||= problems.length > 0;
-    if (text !== before) writeFileSync(path, text);
-    console.log(`${file}: ${text === before ? "current" : "written"}`);
-  }
-  if (failed) process.exitCode = 1;
+    return { file, path, before, ...fill(file, before, blocks) };
+  });
+  const problems = results.flatMap((r) => r.problems);
+  if (problems.length === 0) for (const r of results) if (r.text !== r.before) writeFileSync(r.path, r.text);
+  return { files: results.map((r) => ({ file: r.file, changed: r.text !== r.before })), problems };
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const { files, problems } = regenerate(root);
+  for (const problem of problems) console.error(problem);
+  for (const { file, changed } of files) console.log(`${file}: ${!changed ? "current" : problems.length > 0 ? "not written, for the problems above" : "written"}`);
+  if (problems.length > 0) process.exitCode = 1;
 }
