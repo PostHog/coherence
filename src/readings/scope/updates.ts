@@ -4,7 +4,8 @@
  * The server sends a first load (a windowed state), then updates on an event
  * stream: journal, runs and work appends as the records that are new, a
  * recomputed snapshot when a spec, a lexicon or the config changes, and the
- * component interfaces when the language server has read them again. Every
+ * component interfaces when the language server has read them again, which
+ * moves the state's version as a snapshot does. Every
  * update is merged into the state the page already holds and the page
  * renders again; nothing is kept beside the state.
  *
@@ -203,9 +204,13 @@ export function applyUpdate(state: ShellState, event: string, data: unknown): bo
       if (state.connection !== undefined) state.connection.version = update.version;
       return true;
     }
-    case "interfaces":
-      state.componentInterfaces = data as InterfaceReading;
+    case "interfaces": {
+      // The reading moves the state's version, so a reconnect from here is sent no snapshot it already holds.
+      const update = data as { interfaces: InterfaceReading; version: string };
+      state.componentInterfaces = update.interfaces;
+      if (state.connection !== undefined) state.connection.version = update.version;
       return true;
+    }
     default:
       return false;
   }
