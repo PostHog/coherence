@@ -8,11 +8,12 @@
 
 import { html, type Markup } from "./html.ts";
 import type { ShellState } from "./model.ts";
-import { reliefData } from "./relief/data.ts";
+import { reliefAbsence } from "./relief/data.ts";
 
+/** The relief's host, or why there is none: asked of the reading alone, so a render never joins the relief's data (mount.ts does, when what it draws changed). */
 export function renderStructureResults(state: ShellState): Markup {
-  const data = reliefData(state);
-  if ("absent" in data) return html`<p class="absence">${data.absent}</p>`;
+  const absent = reliefAbsence(state);
+  if (absent !== undefined) return html`<p class="absence">${absent}</p>`;
   return html`<div class="relief-host" data-relief-host></div>`;
 }
 

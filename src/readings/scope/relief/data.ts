@@ -58,33 +58,53 @@ export interface ReliefData {
 }
 
 /**
- * The interface reading's limits in the words query structure uses: when it
- * stopped at a budget or could not read some files, and what it was bounded
- * to. The relief draws reliance from that reading, so it says them too.
+ * What the relief could not read, first: the landings, when git failed for a
+ * reason other than having no history. Then the interface reading's limits in
+ * the words query structure uses: when it stopped at a budget or could not
+ * read some files, and what it was bounded to. The relief draws reliance from
+ * that reading, so it says them too.
  */
 export function reliefNotes(state: ShellState): string[] {
-  if (state.componentInterfaces.kind !== "read") return [];
+  const upper = (text: string) => text.charAt(0).toUpperCase() + text.slice(1) + ".";
+  const unread = state.relief?.kind === "read" ? state.relief.landingsUnread : undefined;
+  const landings = unread === undefined ? [] : [upper(`landings not read: ${unread}; the heights are flat for that, not because nothing landed`)];
+  if (state.componentInterfaces.kind !== "read") return landings;
   const model = flowOf(state);
   const partial = flowPartialText(model);
   const bounded = flowBoundsText(model);
-  const upper = (text: string) => text.charAt(0).toUpperCase() + text.slice(1) + ".";
-  return [...(partial === undefined ? [] : [upper(partial)]), ...(bounded === undefined ? [] : [upper(`Reliance and the Leaned on footprint come from component interfaces ${bounded}`)])];
+  return [...landings, ...(partial === undefined ? [] : [upper(partial)]), ...(bounded === undefined ? [] : [upper(`Reliance and the Leaned on footprint come from component interfaces ${bounded}`)])];
+}
+
+/** The journal's open defects and the files each names, as one line of text: what the relief counts from the journal, and nothing else of it. */
+export function openDefectsKey(records: ShellState["journal"]["records"]): string {
+  return defectsOfJournal(records)
+    .filter((defect) => defect.resolution === undefined)
+    .map((defect) => `${defect.id}\t${(defect.files ?? []).join("\t")}`)
+    .join("\n");
 }
 
 /**
- * What reliefData reads from the state, each the object the state holds. A
- * merge replaces what it changed and keeps the rest, so while every one is
- * the same object the data is the same, and a render need not join it again.
+ * What reliefData reads from the state: each object the state holds, and of
+ * the journal only its open defects, as text. A merge replaces what it
+ * changed and keeps the rest, so while every object is the same and the open
+ * defects are too the data is the same, and a render need not join it again;
+ * an append to the journal that opens or closes no defect joins nothing.
  */
 export function reliefInputs(state: ShellState): readonly unknown[] {
-  return [state.project, state.relief, state.spec, state.componentInterfaces, state.journal.records];
+  return [state.project, state.relief, state.spec, state.componentInterfaces, openDefectsKey(state.journal.records)];
+}
+
+/** Why the state has no relief to draw, or undefined when it has one: the reading was not taken or could not be read. */
+export function reliefAbsence(state: ShellState): string | undefined {
+  const reading = state.relief;
+  if (reading === undefined) return "This reading carries no relief: the page was built before the relief existed.";
+  return reading.kind === "read" ? undefined : reading.because;
 }
 
 /** The relief's data, or why there is none: the reading was not taken or could not be read. */
 export function reliefData(state: ShellState): ReliefData | { absent: string } {
   const reading = state.relief;
-  if (reading === undefined) return { absent: "This reading carries no relief: the page was built before the relief existed." };
-  if (reading.kind !== "read") return { absent: reading.because };
+  if (reading?.kind !== "read") return { absent: reliefAbsence(state)! };
   const specOf = new Map(state.spec.components.map((c) => [c.folder, c]));
   const index = new Map(reading.components.map((c, i) => [c.folder, i]));
   const pairs = new Map<string, { a: number; b: number; sites: number; values: number; symbols: [string, number, string][] }>();

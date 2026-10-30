@@ -24,7 +24,7 @@ import { loadProjectLexicons } from "../lifecycle/project.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { serverFingerprint } from "../enforcement/server.ts";
 import { PluginAdapter } from "./adapter.ts";
-import { BUNDLED_DIR, moduleOf } from "./registry.ts";
+import { BUNDLED_DIR, moduleOf, readManifest } from "./registry.ts";
 
 const SAMPLE = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures", "sample");
 const roots: string[] = [];
@@ -209,6 +209,18 @@ test("a verifier's command must name what it proves, and with a match its exit 0
   assert.equal(by.get("matched")!.verdict, "pass", by.get("matched")!.reason);
   assert.equal(by.get("unmatched")!.verdict, "fail", "an exit 0 whose output does not match is a fail");
   assert.match(by.get("unmatched")!.reason, /exited 0 but its output did not match \/\^proved \//);
+});
+
+test("a manifest's title and description are each one line of text when present, and a manifest without them loads as before", () => {
+  const read = (extra: Record<string, unknown>): string[] => {
+    const root = project({ "plugin.json": JSON.stringify({ name: "named", version: "1.0.0", pluginApi: 4, verifiers: [{ form: "named prove", evidence: "model-checked", command: ["true", "{name}"] }], ...extra }) });
+    return readManifest("named", root, "test").problems;
+  };
+  // Every plugin written outside this repository carries neither, and one carrying both as the bundled plugins do is no problem.
+  assert.deepEqual(read({}), [], "neither key");
+  assert.deepEqual(read({ title: "Named", description: "through a server, with a note" }), [], "both, one line each");
+  for (const key of ["title", "description"])
+    for (const value of ["", "two\nlines", 3]) assert.deepEqual(read({ [key]: value }), [`test: plugin named's ${key} is one line of text`], `${key} ${JSON.stringify(value)}`);
 });
 
 test("an edited plugin replaces the warm server and a fixed module is read again: the server's fingerprint holds every plugin's folder, and a failed import is never kept", async () => {

@@ -4,7 +4,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { REVISION, TraceTail, UNTRACKED_MAX_BYTES, WORKTREE, districtsOf, parseCommitRows, parseLandings, parseNumstat, readReliefApart, reliefCommits, reliefDiff, touchesOf, trunkOf, type ReliefFile, type Touch } from "./relief.ts";
+import { REVISION, TraceTail, UNTRACKED_MAX_BYTES, WORKTREE, districtsOf, landingsUnreadBecause, parseCommitRows, parseLandings, parseNumstat, readRelief, readReliefApart, reliefCommits, reliefDiff, touchesOf, trunkOf, type ReliefFile, type Touch } from "./relief.ts";
 
 /** A repository of its own in a temporary folder, and git run in it: a test never reads this checkout's history. */
 function repository(prefix: string): { root: string; run: (...args: string[]) => string } {
@@ -231,6 +231,36 @@ test("a relief reading that is stopped ends its worker and answers that it was s
     assert.deepEqual((await reading).reading, { kind: "unread", because: "the reading was stopped" });
     assert.deepEqual((await readReliefApart(root, stop.signal)).reading, { kind: "unread", because: "the reading was stopped" }, "a signal already aborted starts no worker");
     assert.equal((await readReliefApart(root)).reading.kind, "read", "an unstopped one reads");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a git log that fails for any reason but having no history is kept on the reading, a timeout among them; no checkout or no commit keeps nothing", async () => {
+  const root = mkdtempSync(join(tmpdir(), "relief-git-"));
+  try {
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "git", language: "typescript" }));
+    writeFileSync(join(root, "a.ts"), "export const a = 1;\n");
+    // execFile's own failures, stubbed: a git killed at its timeout, a runaway output, a missing git, and git's own refusals.
+    const failing = (error: object) => async (): Promise<string> => {
+      throw Object.assign(new Error("Command failed: git log"), error);
+    };
+    const timedOut = (await readRelief(root, undefined, failing({ killed: true, signal: "SIGTERM", code: null, stderr: "" }))).reading;
+    assert.equal(timedOut.kind, "read", "the components stand whatever git did");
+    assert.equal(timedOut.kind === "read" ? timedOut.landingsUnread : undefined, "git log timed out after 60 s");
+    assert.deepEqual(timedOut.kind === "read" ? timedOut.landings : undefined, []);
+
+    const reason = async (error: object): Promise<string | undefined> => {
+      const read = (await readRelief(root, undefined, failing(error))).reading;
+      return read.kind === "read" ? read.landingsUnread : "unread";
+    };
+    assert.equal(await reason({ code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" }), "git log printed more than 256 MB");
+    assert.equal(await reason({ code: "ENOENT" }), "git was not found");
+    assert.equal(await reason({ code: 128, stderr: "fatal: bad object HEAD\n" }), "git log failed: fatal: bad object HEAD");
+    // No history to read is the genuine case: flat heights, nothing said.
+    assert.equal(await reason({ code: 128, stderr: "fatal: not a git repository (or any of the parent directories): .git\n" }), undefined);
+    assert.equal(await reason({ code: 128, stderr: "fatal: your current branch 'main' does not have any commits yet\n" }), undefined);
+    assert.equal(landingsUnreadBecause({ code: 128, stderr: "fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.\n" }), undefined);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

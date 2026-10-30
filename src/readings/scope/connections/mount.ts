@@ -13,7 +13,7 @@ import { createConnections, type Connections } from "./drawing.ts";
 
 /** What flowOf reads from the state, each the object the state holds: while every one is the same, the model is too. */
 function inputsOf(state: ShellState): readonly unknown[] {
-  return [state.spec, state.componentInterfaces, state.runs.records, state.journal.records, state.structure.expanded];
+  return [state.spec, state.componentInterfaces, state.runs.records, state.journal.records];
 }
 
 let current: { view: Connections; inputs: readonly unknown[] } | undefined;

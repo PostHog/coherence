@@ -24,10 +24,12 @@ export interface Built {
 export type ReliefStep = { kind: "keep"; built: Built } | { kind: "build"; data: ReliefData; built: Built } | { kind: "absent" };
 
 /**
- * Whether the scene must be built again. The same input objects are the same
- * data, so nothing is joined; otherwise the data is joined and compared whole,
- * since a snapshot replaces the spec and the interfaces on every spec edit
- * while what the relief draws from them is most often unchanged.
+ * Whether the scene must be built again. The same inputs (the same objects,
+ * and the same open defects of the journal) are the same data, so nothing is
+ * joined, and a journal append that opens or closes no defect is that;
+ * otherwise the data is joined and compared whole, since a snapshot replaces
+ * the spec and the interfaces on every spec edit while what the relief draws
+ * from them is most often unchanged.
  */
 export function reliefStep(built: Built | undefined, state: ShellState): ReliefStep {
   const inputs = reliefInputs(state);

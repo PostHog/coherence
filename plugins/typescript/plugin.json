@@ -2,6 +2,8 @@
   "name": "typescript",
   "version": "1.11.0",
   "pluginApi": 4,
+  "title": "TypeScript and JavaScript",
+  "description": "through typescript-language-server",
   "provides": {
     "language": "typescript"
   },

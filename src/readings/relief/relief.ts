@@ -71,6 +71,8 @@ export type ReliefReading =
       files?: Record<string, ReliefFileLanded[]>;
       /** How many folders holding files a snapshot left out of `files`. */
       filesLeftOut?: number;
+      /** Why the landings were not read, when git failed for any reason but a checkout with no history: the heights are flat, and not because nothing landed. */
+      landingsUnread?: string;
     }
   | { kind: "unread"; because: string };
 
@@ -209,14 +211,34 @@ const gitUntil =
     (await execGit("git", args, { cwd: root, encoding: "utf8", maxBuffer: GIT_BUFFER, timeout: GIT_TIMEOUT_MS, signal })).stdout;
 const git = gitUntil(undefined);
 
+/** How the relief runs git: given by tests, so a git that fails can be had without one. */
+export type ReliefGit = (root: string, ...args: string[]) => Promise<string>;
+
+/**
+ * Why git log could not give the landings, or undefined when it failed because
+ * there are none to give: no checkout, or a checkout with no commit yet. A
+ * timeout, a runaway output, a missing git or any other failure is said, so
+ * flat heights never pass for a project where nothing landed.
+ */
+export function landingsUnreadBecause(error: unknown): string | undefined {
+  const failure = (error ?? {}) as { killed?: boolean; signal?: string | null; code?: unknown; stderr?: unknown; message?: unknown };
+  const said = `${typeof failure.stderr === "string" ? failure.stderr : ""}\n${typeof failure.message === "string" ? failure.message : String(error)}`;
+  if (/not a git repository|does not have any commits yet|unknown revision or path not in the working tree|ambiguous argument 'HEAD'/i.test(said)) return undefined;
+  if (failure.killed === true && failure.signal !== undefined && failure.signal !== null) return `git log timed out after ${GIT_TIMEOUT_MS / 1000} s`;
+  if (failure.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") return `git log printed more than ${GIT_BUFFER >> 20} MB`;
+  if (failure.code === "ENOENT") return "git was not found";
+  const line = said.split("\n").map((l) => l.trim()).find((l) => l !== "" && !l.startsWith("Command failed:")) ?? "no reason given";
+  return `git log failed: ${line}`;
+}
+
 /**
  * The relief, read in this thread. The spec model and mass are synchronous and
  * read every source file, seconds on a large project, so the warm server, which
  * also answers the agent's hooks, reads it apart (readReliefApart).
  */
-export async function readRelief(rootGiven: string, signal?: AbortSignal): Promise<ReliefRead> {
+export async function readRelief(rootGiven: string, signal?: AbortSignal, run?: ReliefGit): Promise<ReliefRead> {
   const root = resolve(rootGiven);
-  const git = gitUntil(signal);
+  const git = run ?? gitUntil(signal);
   let mass;
   let model;
   try {
@@ -273,6 +295,7 @@ export async function readRelief(rootGiven: string, signal?: AbortSignal): Promi
   const landed = held.map((mine) => mine.map((): [number, number][] => []));
   let landings: ReliefLanding[] = [];
   let head = "";
+  let landingsUnread: string | undefined;
   try {
     const [headLine, out] = await Promise.all([
       git(root, "log", "-1", "--format=%h %ad", "--date=short"),
@@ -296,13 +319,15 @@ export async function readRelief(rootGiven: string, signal?: AbortSignal): Promi
       for (const [ci, fi, changed] of perFile) landed[ci]![fi]!.push([landings.length, changed]);
       landings.push({ sha, date, subject, n, c: [...perComponent] });
     }
-  } catch {
-    // Not a git checkout, or no history: heights are flat and the view says so.
+  } catch (error) {
+    // Not a git checkout, or no history: heights are flat and the view says so. Any other failure (a timeout among them) is kept, and the notes say it.
     landings = [];
+    head = "";
     for (const mine of landed) for (const l of mine) l.length = 0;
+    landingsUnread = landingsUnreadBecause(error);
   }
   const texts = new Map(folders.map((folder, ci) => [folder, JSON.stringify(held[ci]!.map((f, fi): ReliefFileLanded => (landed[ci]![fi]!.length > 0 ? { ...f, l: landed[ci]![fi]! } : f)))]));
-  const reading = { components, landings, head, leftOut: [".coherence/", ...[...LOCKFILE_NAMES].sort()] };
+  const reading = { components, landings, head, leftOut: [".coherence/", ...[...LOCKFILE_NAMES].sort()], ...(landingsUnread === undefined ? {} : { landingsUnread }) };
   const digest = createHash("sha256").update(JSON.stringify(reading));
   for (const [folder, text] of texts) digest.update(folder).update("\0").update(text);
   return { reading: { kind: "read", ...reading, stamp: digest.digest("base64url").slice(0, 16) }, files: texts };

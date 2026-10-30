@@ -131,6 +131,10 @@ export interface PluginManifest {
   name: string;
   version: string;
   pluginApi: number;
+  /** What a person reads the plugin as ("TypeScript and JavaScript"): the README's and plugins/README.md's generated lists name each bundled plugin by it. */
+  title?: string;
+  /** One line on what it adds, read after its title ("through typescript-language-server"), for the same lists. */
+  description?: string;
   /** The language the plugin's adapter is the provider for, or the languages a config declares (the bundled declared plugin). */
   provides?: { language?: string; declaredLanguages?: true };
   /** The language whose adapter the plugin's adapter is handed to wrap. */
@@ -214,7 +218,7 @@ export interface ModuleResolution {
  * them; the type below fails to compile when PluginManifest gains a key this
  * list lacks, so the list and the docs' table cannot drift from the type.
  */
-export const MANIFEST_KEYS = ["name", "version", "pluginApi", "provides", "extends", "extensions", "files", "source", "serverExtensions", "testFiles", "testFolders", "basisFiles", "moduleFolders", "members", "entrances", "notScanned", "environmentFolders", "markedFolders", "ci", "wellKnown", "module", "syntax", "treeSitter", "ladder", "verifiers", "lexicon"] as const satisfies readonly (keyof PluginManifest)[];
+export const MANIFEST_KEYS = ["name", "version", "pluginApi", "title", "description", "provides", "extends", "extensions", "files", "source", "serverExtensions", "testFiles", "testFolders", "basisFiles", "moduleFolders", "members", "entrances", "notScanned", "environmentFolders", "markedFolders", "ci", "wellKnown", "module", "syntax", "treeSitter", "ladder", "verifiers", "lexicon"] as const satisfies readonly (keyof PluginManifest)[];
 type ManifestKeyMissing = Exclude<keyof PluginManifest, (typeof MANIFEST_KEYS)[number]>;
 export const MANIFEST_KEYS_COMPLETE: [ManifestKeyMissing] extends [never] ? true : ManifestKeyMissing = true;
 
