@@ -15,10 +15,10 @@ import { loadJournal } from "../../journal/store.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { closeWork, openWork } from "../../lifecycle/work-meter.ts";
 import { CONFIG_FILE, loadSpecModel } from "../../spec/model.ts";
-import { scopeState } from "./build.ts";
+import { keptUnlessRejected, scopeState, type Shell } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { latestOf } from "./derive.ts";
-import { scopeApp, storeOf, watchedLexicons } from "./live.ts";
+import { PageShell, scopeApp, storeOf, throttle, watchedLexicons } from "./live.ts";
 import type { JournalRecord, PageEntry, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
 import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream, runKeyOf, type StreamEvent } from "./updates.ts";
@@ -319,4 +319,71 @@ test("every file the spec model reads by name refreshes the live reading: each s
   } finally {
     rmSync(project, { recursive: true, force: true });
   }
+});
+
+test("a page source that does not build leaves the last good page served and open pages where they are, and the next build tries again", async () => {
+  const said: string[] = [];
+  let broken = false;
+  let builds = 0;
+  // An injected bundler: the sources build until a save breaks them.
+  const make = async (): Promise<Shell> => {
+    builds++;
+    if (broken) throw new Error("page.ts:3:1: Unexpected end of file");
+    return { html: `page ${builds}`, scriptHash: `h${builds}` };
+  };
+  const shell = new PageShell(make, () => {}, (line) => said.push(line));
+  // A first build that fails answers that request with the error and is never kept.
+  broken = true;
+  await assert.rejects(shell.current(), /Unexpected end of file/);
+  broken = false;
+  assert.equal((await shell.current()).html, "page 2");
+  assert.equal((await shell.current()).html, "page 2", "kept once it built");
+  // Saved mid-edit with a syntax error: no reload, the last good page served, the failure said once.
+  broken = true;
+  assert.equal(await shell.rebuild(), false, "open pages are not told to reload onto a page that did not build");
+  assert.equal(await shell.rebuild(), false);
+  assert.equal((await shell.current()).html, "page 2");
+  assert.equal(said.length, 1, "a failure is said once, not once per save");
+  // Fixed: the next save builds, replaces the page, and reloads open pages.
+  broken = false;
+  assert.equal(await shell.rebuild(), true);
+  assert.equal((await shell.current()).html, "page 5");
+  // Saves in quick succession build once, from the newest sources.
+  const before = builds;
+  assert.deepEqual(await Promise.all([shell.rebuild(), shell.rebuild(), shell.rebuild()]), [false, false, true]);
+  assert.equal(builds, before + 1);
+
+  // The bundle beneath the page keeps a result, never a failure.
+  let attempts = 0;
+  const bundle = keptUnlessRejected(async () => {
+    attempts++;
+    if (attempts === 1) throw new Error("broken");
+    return `bundle ${attempts}`;
+  });
+  await assert.rejects(bundle.get(), /broken/);
+  assert.equal(await bundle.get(), "bundle 2", "a failed bundle is made again");
+  assert.equal(await bundle.get(), "bundle 2", "a good one is kept");
+  bundle.forget();
+  assert.equal(await bundle.get(), "bundle 3");
+});
+
+test("agent activity is sent on a beat while an agent keeps working, never held until it pauses, and the last of it is never dropped", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  const fired: number[] = [];
+  const look = throttle(() => fired.push(Date.now()), 120);
+  // A trace appended every 20 ms for a second: a settle that restarts on each append would send nothing until it stops.
+  for (let at = 0; at <= 1000; at += 20) {
+    look.call();
+    for (let ms = 0; ms < 20; ms++) t.mock.timers.tick(1);
+  }
+  assert.ok(fired.length >= 8, `sent ${fired.length} times during a second of activity`);
+  assert.ok(fired[0]! <= 1, "the first append after a quiet spell is sent at once");
+  for (let i = 1; i < fired.length; i++) assert.ok(fired[i]! - fired[i - 1]! >= 120, "never more often than the beat");
+  t.mock.timers.tick(200);
+  assert.ok(fired.at(-1)! >= 1000, "the last append, after the last send, is sent too");
+  const count = fired.length;
+  look.call();
+  look.cancel();
+  t.mock.timers.tick(500);
+  assert.equal(fired.length, count, "a stopped server sends nothing more");
 });

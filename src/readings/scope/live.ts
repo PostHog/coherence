@@ -130,12 +130,98 @@ export async function watchedLexicons(root: string, build: Pick<BuildOptions, "l
   return [...new Set(inside.filter((p) => !p.startsWith("..")))];
 }
 
+/**
+ * The page the server serves, kept through a broken edit: a rebuild after a
+ * page source changes replaces it only when it succeeds, so a save that does
+ * not build (a syntax error mid-edit) leaves open pages on the last good page
+ * instead of reloading them into an error. A build that fails is never kept,
+ * so the next request or change tries again. Builds run one at a time, since
+ * the bundler is one process each build stops.
+ */
+export class PageShell {
+  private good: Shell | undefined;
+  private queue: Promise<unknown> = Promise.resolve();
+  private generation = 0;
+  private failed: string | undefined;
+  private readonly make: () => Promise<Shell>;
+  private readonly forget: () => void;
+  private readonly log: (line: string) => void;
+
+  constructor(make: () => Promise<Shell>, forget: () => void, log: (line: string) => void) {
+    this.make = make;
+    this.forget = forget;
+    this.log = log;
+  }
+
+  private queued<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(work);
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  /** The last good page, or a first build of it; a first build that fails is answered as an error and tried again next time. */
+  current(): Promise<Shell> {
+    if (this.good !== undefined) return Promise.resolve(this.good);
+    return this.queued(async () => (this.good ??= await this.make()));
+  }
+
+  /** Build the page again from its sources; true when the new page replaced the old, which is when open pages should reload. */
+  rebuild(): Promise<boolean> {
+    const generation = ++this.generation;
+    return this.queued(async () => {
+      // A later change is queued behind this one and will build the newer sources.
+      if (generation !== this.generation) return false;
+      this.forget();
+      try {
+        this.good = await this.make();
+        this.failed = undefined;
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        // Said once per failure, not once per save of the same broken file.
+        if (message !== this.failed) this.log(`scope: the page did not build, so open pages keep the last one: ${message}`);
+        this.failed = message;
+        return false;
+      }
+    });
+  }
+}
+
+/** How often agent activity is sent at most, while an agent keeps reading and writing. */
+const TOUCH_MS = 120;
+
+/**
+ * A call to `fire` made at most once per `ms`: the first call in a quiet spell
+ * runs at once, and calls while one is due fold into it; a call after a run
+ * is due `ms` after it, so a steady stream runs on that beat and the last
+ * call is never dropped.
+ */
+export function throttle(fire: () => void, ms: number): { call(): void; cancel(): void } {
+  let due: NodeJS.Timeout | undefined;
+  let last = -Infinity;
+  return {
+    call() {
+      if (due !== undefined) return;
+      due = setTimeout(() => {
+        due = undefined;
+        last = Date.now();
+        fire();
+      }, Math.max(0, last + ms - Date.now()));
+      due.unref();
+    },
+    cancel() {
+      clearTimeout(due);
+      due = undefined;
+    },
+  };
+}
+
 class LiveReading implements HttpApp {
   private readonly root: string;
   private readonly options: LiveOptions;
   private readonly context: HttpContext;
   private readonly build: BuildOptions;
-  private shell: Promise<Shell> | undefined;
+  private readonly shell: PageShell;
   private loading: Promise<ShellState> | undefined;
   private base: ShellState | undefined;
   private version = 0;
@@ -163,6 +249,7 @@ class LiveReading implements HttpApp {
     this.root = context.root;
     this.options = options;
     this.build = { ...rootOptions(context.root), ...options.build, root: context.root };
+    this.shell = new PageShell(buildShell, forgetPageBundle, (line) => context.log(line));
     this.interfaces =
       options.interfaces === false
         ? { kind: "unread", because: "this live reading was started without the instrument" }
@@ -176,7 +263,7 @@ class LiveReading implements HttpApp {
   /** The state, loaded once and kept current by the watchers from then on. */
   private ensure(): Promise<ShellState> {
     this.loading ??= (async () => {
-      this.relief = readRelief(this.root, loadJournal(this.root).records);
+      this.relief = await this.readReliefAgain();
       const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces, relief: this.relief });
       this.base = state;
       this.remember(state);
@@ -188,6 +275,31 @@ class LiveReading implements HttpApp {
     return this.loading;
   }
 
+  /** A relief reading under way, and the one queued behind it for callers that arrived meanwhile. */
+  private reliefRead: Promise<ReliefReading> | undefined;
+  private reliefNext: Promise<ReliefReading> | undefined;
+
+  /**
+   * Read the relief again; its git runs in child processes, so the server keeps
+   * answering hooks meanwhile. Callers arriving while a reading runs share one
+   * more after it, since the running one may have started before their change.
+   */
+  private readReliefAgain(): Promise<ReliefReading> {
+    if (this.reliefRead === undefined) {
+      this.reliefRead = readRelief(this.root, loadJournal(this.root).records).finally(() => {
+        this.reliefRead = undefined;
+      });
+      return this.reliefRead;
+    }
+    this.reliefNext ??= this.reliefRead
+      .catch(() => undefined)
+      .then(() => {
+        this.reliefNext = undefined;
+        return this.readReliefAgain();
+      });
+    return this.reliefNext;
+  }
+
   private remember(state: ShellState): void {
     this.journalIds = new Set(state.journal.records.map((record) => record.id));
     this.runKeys = new Set(state.runs.records.map(runKeyOf));
@@ -196,7 +308,8 @@ class LiveReading implements HttpApp {
 
   /** How far each read trace has been sent: a trace line is a touch once, and the traces before the server started are history, not activity. */
   private readonly traceOffsets = new Map<string, number>();
-  private tracePending: NodeJS.Timeout | undefined;
+  /** A look at the traces, throttled rather than settled: a busy agent appends without pause, and its touches must light as they happen. */
+  private readonly traced = throttle(() => this.lookAtTraces(), TOUCH_MS);
 
   /**
    * Agent activity, live: the lines appended to the read traces since the last
@@ -204,42 +317,38 @@ class LiveReading implements HttpApp {
    * Structure view to light. Nothing is stored; a page that connects later sees
    * only what happens from then on.
    */
-  private traced(): void {
-    clearTimeout(this.tracePending);
-    this.tracePending = setTimeout(() => {
-      const dir = tracesDir(this.root);
-      const touches: Touch[] = [];
-      let names: string[] = [];
+  private lookAtTraces(): void {
+    const dir = tracesDir(this.root);
+    const touches: Touch[] = [];
+    let names: string[] = [];
+    try {
+      names = readdirSync(dir).filter((n) => n.endsWith(".jsonl"));
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const file = join(dir, name);
+      let size = 0;
       try {
-        names = readdirSync(dir).filter((n) => n.endsWith(".jsonl"));
+        size = statSync(file).size;
       } catch {
-        return;
+        continue;
       }
-      for (const name of names) {
-        const file = join(dir, name);
-        let size = 0;
-        try {
-          size = statSync(file).size;
-        } catch {
-          continue;
-        }
-        // A trace this server has not seen is a session that began after it started: all of it is new.
-        const from = this.traceOffsets.get(file) ?? 0;
-        if (size <= from) {
-          this.traceOffsets.set(file, size);
-          continue;
-        }
-        const handle = openSync(file, "r");
-        const buffer = Buffer.alloc(size - from);
-        readSync(handle, buffer, 0, buffer.length, from);
-        closeSync(handle);
-        const found = touchesOf(buffer.toString("utf8"));
-        this.traceOffsets.set(file, from + found.consumed);
-        touches.push(...found.touches);
+      // A trace this server has not seen is a session that began after it started: all of it is new.
+      const from = this.traceOffsets.get(file) ?? 0;
+      if (size <= from) {
+        this.traceOffsets.set(file, size);
+        continue;
       }
-      if (touches.length > 0) this.send("touch", { touches });
-    }, 120);
-    this.tracePending.unref();
+      const handle = openSync(file, "r");
+      const buffer = Buffer.alloc(size - from);
+      readSync(handle, buffer, 0, buffer.length, from);
+      closeSync(handle);
+      const found = touchesOf(buffer.toString("utf8"));
+      this.traceOffsets.set(file, from + found.consumed);
+      touches.push(...found.touches);
+    }
+    if (touches.length > 0) this.send("touch", { touches });
   }
 
   private watch(): void {
@@ -253,7 +362,7 @@ class LiveReading implements HttpApp {
     try {
       const watcher = watch(this.root, { recursive: true }, (_event, name) => {
         if (name === null) return;
-        if (String(name).split(sep).join("/").startsWith(".coherence/traces/")) return this.traced();
+        if (String(name).split(sep).join("/").startsWith(".coherence/traces/")) return this.traced.call();
         const store = storeOf(String(name), this.lexicons);
         if (store !== undefined) this.changed(store);
       });
@@ -270,10 +379,11 @@ class LiveReading implements HttpApp {
           // Only a file the page is built from rebuilds it: a server-side edit leaves open pages, and what they show, alone.
           if (name === null || !isPageSource(resolve(SOURCE_FOLDER, String(name)))) return;
           clearTimeout(pending);
+          // Open pages reload only onto a page that built; a broken save leaves them where they are.
           pending = setTimeout(() => {
-            forgetPageBundle();
-            this.shell = undefined;
-            this.send("shell", {});
+            void this.shell.rebuild().then((replaced) => {
+              if (replaced && !this.closed) this.send("shell", {});
+            });
           }, 300);
           pending.unref();
         });
@@ -341,7 +451,7 @@ class LiveReading implements HttpApp {
       const changed = orders.filter((order) => fresh.has(order.id) || order.history.some((h) => fresh.has(h.id)));
       if (changed.length > 0) this.send("work", { orders: changed, damaged: loaded.damaged });
     } else if (store === "model") {
-      this.relief = readRelief(this.root, loadJournal(this.root).records);
+      this.relief = await this.readReliefAgain();
       const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces, relief: this.relief });
       this.base = state;
       this.remember(state);
@@ -419,8 +529,7 @@ class LiveReading implements HttpApp {
   async handle(request: IncomingMessage, response: ServerResponse, url: URL): Promise<void> {
     switch (url.pathname) {
       case "/": {
-        this.shell ??= buildShell();
-        const shell = await this.shell;
+        const shell = await this.shell.current();
         response.writeHead(200, {
           "content-type": "text/html; charset=utf-8",
           "content-length": Buffer.byteLength(shell.html),
@@ -485,7 +594,7 @@ class LiveReading implements HttpApp {
       case "/api/relief/commits": {
         // The commits the Structure view's diff can name, from git, read-only.
         try {
-          json(response, request, 200, reliefCommits(this.root));
+          json(response, request, 200, await reliefCommits(this.root));
         } catch (error) {
           json(response, request, 404, { reason: `no commits to diff: ${(error as Error).message.split("\n")[0]}` });
         }
@@ -499,7 +608,7 @@ class LiveReading implements HttpApp {
           return;
         }
         try {
-          json(response, request, 200, reliefDiff(this.root, a, b));
+          json(response, request, 200, await reliefDiff(this.root, a, b));
         } catch (error) {
           json(response, request, 404, { reason: `no diff between ${a} and ${b}: ${(error as Error).message.split("\n")[0]}` });
         }
@@ -568,7 +677,7 @@ class LiveReading implements HttpApp {
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
     for (const watcher of this.watchers) watcher.close();
-    clearTimeout(this.tracePending);
+    this.traced.cancel();
     for (const client of this.clients) client.end();
     this.clients.clear();
     void this.readingServer?.adapter.close();
