@@ -21,10 +21,11 @@
  * the page's one script, so it must not rely on anything outside them.
  */
 
-import { componentOfHash, journalId, resolveHash } from "./derive.ts";
+import { CONNECTIONS_ID, CONNECTIONS_PREFIX, componentOfHash, journalId, resolveHash } from "./derive.ts";
 import type { JournalKind, JournalRecord, LifecycleState, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { renderMasthead, renderShell, renderViewResults } from "./shell.ts";
 import { mountRelief, touchRelief, type Touch } from "./relief/mount.ts";
+import { landConnections, mountConnections } from "./connections/mount.ts";
 import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream } from "./updates.ts";
 import { setLanguageData } from "./language-data.ts";
 
@@ -95,8 +96,11 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
   if (state.spec.languages !== undefined) setLanguageData(state.spec.languages);
   // The relief is a live scene, not markup: after every render it is put back into the host the render left.
   const io = live === undefined ? {} : { get: (path: string) => live.get(path) };
+  // The connections view is kept the same way, in the host a render leaves when Structure shows it instead.
   const mount = (): void => {
-    if (state.activeView === "structure") mountRelief(root, state, io);
+    if (state.activeView !== "structure") return;
+    if (state.structure.shows === CONNECTIONS_ID) mountConnections(root, state);
+    else mountRelief(root, state, io);
   };
   const renderAll = (): void => {
     document.title = `${state.project} Scope`;
@@ -171,6 +175,14 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
   const followHash = (): void => {
     const target = resolveHash(state, location.hash);
     if (target === undefined) return;
+    // A connections id roots that view at the origin it names: Structure shows it, and no card is scrolled to.
+    if (target.id?.startsWith(CONNECTIONS_PREFIX) === true) {
+      state.structure.shows = CONNECTIONS_ID;
+      landConnections(target.id);
+      state.activeView = target.view;
+      renderAll();
+      return;
+    }
     if (target.id !== undefined) {
       const component = componentOfHash(state, target.id);
       if (component !== undefined) state.components.selected = component.folder;
@@ -253,6 +265,17 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
         history.replaceState(null, "", `#${view}`);
         root.querySelector<HTMLElement>("[role=tab][aria-selected=true]")?.focus();
       }
+      return;
+    }
+
+    const shows = target.closest<HTMLElement>("button[data-structure-shows]");
+    if (shows !== null) {
+      if (shows.dataset["structureShows"] === CONNECTIONS_ID) state.structure.shows = CONNECTIONS_ID;
+      else {
+        delete state.structure.shows;
+        history.replaceState(null, "", "#structure");
+      }
+      renderAll();
       return;
     }
 

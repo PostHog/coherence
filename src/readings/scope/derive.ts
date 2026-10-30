@@ -98,6 +98,15 @@ export function workId(id: string): string {
   return `work-${slug(id)}`;
 }
 
+/**
+ * Structure's connections view, named once (the owner's name, 2026-10-30): the
+ * label its toggle shows, and the id its deep links start with, followed by
+ * "--" as the flow model's ids are, so no card id of another view can collide.
+ */
+export const CONNECTIONS_LABEL = "Connections";
+export const CONNECTIONS_ID = "connections";
+export const CONNECTIONS_PREFIX = `${CONNECTIONS_ID}--`;
+
 /** The prefixes each view's card ids carry; a hash resolves to its view by them. */
 const ID_PREFIXES: [string, string][] = [
   ["component-", "components"],
@@ -109,6 +118,7 @@ const ID_PREFIXES: [string, string][] = [
   ["coherence-", "lexicon"],
   ["domain-", "lexicon"],
   ["layer-", "lexicon"],
+  [CONNECTIONS_PREFIX, "structure"],
 ];
 
 export interface HashTarget {

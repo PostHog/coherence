@@ -54,6 +54,9 @@ const here = dirname(fileURLToPath(import.meta.url));
  */
 export const BROWSER_ENTRY = "page.ts";
 
+/** The page's styles, in the order the shell joins them: Scope's own, then the connections view's beside the module that draws it. */
+export const STYLE_SHEETS = ["styles.css", "connections/connections.css"];
+
 export interface BuildOptions {
   /** The project root whose specs, runs, journal and work are read. The working directory when absent. */
   root?: string;
@@ -352,7 +355,7 @@ export async function bundleBrowserScript(entry: string = resolve(here, BROWSER_
     metafile: true,
   }).finally(() => esbuild.stop());
   for (const input of Object.keys(out.metafile.inputs)) pageInputs.add(resolve(process.cwd(), input));
-  pageInputs.add(resolve(here, "styles.css"));
+  for (const sheet of STYLE_SHEETS) pageInputs.add(resolve(here, sheet));
   return out.outputFiles[0]!.text;
 }
 
@@ -470,7 +473,7 @@ export interface Shell {
  * title names the reading; the page names the project once its state is in.
  */
 export async function buildShell(): Promise<Shell> {
-  const css = (await plexMono()) + (await readFile(resolve(here, "styles.css"), "utf8"));
+  const css = (await plexMono()) + (await Promise.all(STYLE_SHEETS.map((sheet) => readFile(resolve(here, sheet), "utf8")))).join("\n");
   const script = `\n${await browserScript()}\n`;
   const html = `<!doctype html>
 <html lang="en">

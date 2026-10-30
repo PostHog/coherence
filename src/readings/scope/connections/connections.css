@@ -1,0 +1,144 @@
+/* ---------- Structure: the toggle between the relief and the connections view (structure-view.ts) ---------- */
+.structure-shows .segmented { display: flex; }
+.structure-shows button { font: inherit; font-size: 12.5px; height: 28px; padding: 0 11px; margin-left: -1px; border: 1px solid var(--rule); border-radius: 0; background: transparent; color: var(--ink-quiet); cursor: pointer; white-space: nowrap; }
+.structure-shows button:first-child { margin-left: 0; border-radius: 7px 0 0 7px; }
+.structure-shows button:last-child { border-radius: 0 7px 7px 0; }
+.structure-shows button:hover:not([aria-pressed="true"]) { background: var(--field); color: var(--ink); }
+.structure-shows button[aria-pressed="true"] { position: relative; z-index: 1; background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* ---------- Structure: the connections view (connections/drawing.ts), the prototype's look and colours ---------- */
+.connections {
+  --paper: #eef1f7; --ink: #141a29; --quiet: #4d566b; --faint: rgb(20 26 41 / 0.32);
+  --rule: rgb(20 26 41 / 0.14); --card: rgb(255 255 255 / 0.86); --card-edge: rgb(20 26 41 / 0.16);
+  --accent: #2346b0; --accent-soft: rgb(35 70 176 / 0.14);
+  --ok: #0f766e; --req: #b7791f; --broken: #c62828; --sel: #141a29;
+  /* entrance tokens: each fill and its text measured, 8.2:1 here and the no-traced-control amber 5.9:1 */
+  --token: #2346b0; --token-ink: #ffffff; --token-gap: #8a5a12; --token-gap-ink: #ffffff;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  .connections {
+    --paper: #0a0d16; --ink: #f1f4fb; --quiet: #aeb7ca; --faint: rgb(255 255 255 / 0.3);
+    --rule: rgb(255 255 255 / 0.12); --card: rgb(22 27 40 / 0.92); --card-edge: rgb(255 255 255 / 0.16);
+    --accent: #8fb0ff; --accent-soft: rgb(143 176 255 / 0.16);
+    --ok: #5ed6c4; --req: #f0b44c; --broken: #ff6b6b; --sel: #f1f4fb;
+    /* 9.1:1, and the amber 10.5:1 */
+    --token: #8fb0ff; --token-ink: #0a0d16; --token-gap: #f0b44c; --token-gap-ink: #0a0d16;
+  }
+}
+.connections, .connections * { box-sizing: border-box; }
+.connections { color: var(--ink); font: 13px/1.45 var(--sans); margin-top: 1rem; }
+.connections button { font: inherit; }
+.connections .cx-head { display: flex; align-items: center; gap: 14px; padding: 0 0 10px; }
+.connections .cx-trail { display: flex; gap: 4px; align-items: center; flex: 1; overflow: hidden; min-height: 26px; }
+.connections .cx-trail button { border: 0; background: none; color: var(--quiet); cursor: pointer; padding: 2px 4px; border-radius: 4px; white-space: nowrap; }
+.connections .cx-trail button:hover { background: var(--accent-soft); color: var(--ink); }
+.connections .cx-trail button.now { color: var(--ink); font-weight: 600; cursor: default; }
+.connections .cx-trail .sep { color: var(--faint); }
+.connections .cx-tools { display: flex; gap: 6px; }
+.connections .cx-tools button { border: 1px solid var(--rule); background: var(--card); color: var(--ink); border-radius: 6px; height: 28px; padding: 0 10px; cursor: pointer; }
+.connections .cx-tools button:hover { border-color: var(--accent); }
+.connections .cx-body {
+  display: grid; grid-template-columns: 240px minmax(0, 1fr) 330px;
+  height: clamp(560px, calc(100vh - 14rem), 980px);
+  border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; background: var(--paper);
+}
+.connections .cx-rail { overflow: auto; padding: 12px 12px 24px; border-right: 1px solid var(--rule); }
+.connections h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--quiet); margin: 14px 4px 6px; font-weight: 600; font-family: var(--sans); }
+.connections .cx-rail h3:first-child { margin-top: 2px; }
+.connections .pick { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--ink); padding: 5px 8px; border-radius: 6px; cursor: pointer; }
+.connections .pick:hover { background: var(--accent-soft); }
+.connections .pick.now { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.connections .pick .sub { display: block; color: var(--quiet); font: 11px var(--mono); }
+.connections .tag { display: inline-block; font: 10.5px var(--mono); padding: 0 5px; border-radius: 3px; border: 1px solid var(--rule); color: var(--quiet); margin-left: 4px; vertical-align: 1px; }
+.connections .tag.gap { border-color: var(--req); color: var(--req); }
+.connections .tag.core { border-style: dashed; }
+.connections .cx-stage { position: relative; overflow: hidden; min-width: 0; }
+.connections svg[data-x="svg"] { width: 100%; height: 100%; display: block; cursor: grab; user-select: none; touch-action: none; }
+.connections svg.panning { cursor: grabbing; }
+.connections .cx-inspector { overflow: auto; padding: 12px 16px 24px; border-left: 1px solid var(--rule); overflow-wrap: anywhere; }
+.connections .cx-inspector h2 { margin: 2px 0 2px; font: 650 16px/1.3 var(--sans); }
+.connections .cx-inspector .folder { font: 12px var(--mono); color: var(--quiet); }
+.connections .cx-inspector p { margin: 6px 0; }
+.connections .cx-muted { color: var(--quiet); }
+.connections .cx-inspector ul { list-style: none; margin: 0; padding: 0; }
+.connections .cx-inspector li { padding: 3px 0; border-bottom: 1px solid var(--rule); display: flex; gap: 8px; align-items: baseline; }
+.connections .cx-inspector li .n { margin-left: auto; color: var(--quiet); font: 11px var(--mono); white-space: nowrap; }
+.connections .cx-inspector code { font: 11.5px var(--mono); }
+.connections .act { border: 1px solid var(--rule); background: var(--card); color: var(--ink); border-radius: 6px; padding: 3px 9px; cursor: pointer; margin: 6px 6px 0 0; }
+.connections .act:hover { border-color: var(--accent); }
+.connections .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; text-align: left; }
+.connections .pill { white-space: nowrap; overflow-wrap: normal; flex: none; display: inline-block; font: 600 10.5px var(--mono); padding: 0 5px; border-radius: 3px; border: 1.5px solid var(--ok); color: var(--ok); }
+.connections .pill.requirement { border-color: var(--req); color: var(--req); border-style: dashed; }
+.connections .pill.broken { background: var(--broken); border-color: var(--broken); color: #fff; }
+.connections .cx-key { position: absolute; left: 12px; bottom: 12px; background: var(--card); border: 1px solid var(--card-edge); border-radius: 8px; padding: 8px 10px; font-size: 11.5px; color: var(--quiet); max-width: 330px; }
+.connections .cx-key summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+.connections .cx-key div { display: flex; gap: 8px; align-items: center; margin: 2px 0; }
+.connections .cx-key svg { width: 34px; height: 12px; flex: none; }
+.connections .cx-hint { position: absolute; right: 12px; bottom: 12px; color: var(--quiet); font-size: 11.5px; text-align: right; pointer-events: none; }
+/* the canvas */
+.connections .edge { fill: none; stroke: var(--faint); stroke-linecap: round; }
+.connections .edge.lb { stroke: var(--quiet); }
+.connections .edge.work { stroke: var(--accent); stroke-opacity: .85; }
+.connections .edge.moving { stroke-dasharray: 2 10; stroke: var(--paper); stroke-opacity: .9; animation: cx-moving 1.1s linear infinite; pointer-events: none; }
+@keyframes cx-moving { to { stroke-dashoffset: -12; } }
+@media (prefers-reduced-motion: reduce) { .connections .edge.moving { animation: none; } }
+.connections .edge.other { stroke-dasharray: 3 4; }
+.connections .edge.back { stroke-dasharray: 5 4; }
+.connections .edge.dim { opacity: .09; }
+.connections .hovering .dim { opacity: 1; }
+.connections .hovering .edge.hdim { opacity: 0; }
+.connections .hovering .node.hdim, .connections .hovering .door.hdim { opacity: .3; }
+.connections .door.dim, .connections .node.dim, .connections .chip.dim { opacity: .3; }
+.connections .edge.on { stroke: var(--sel); stroke-opacity: 1; }
+.connections .hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
+.connections .node { cursor: pointer; }
+.connections .node rect.card { fill: var(--card); stroke: var(--card-edge); stroke-width: 1; }
+.connections .node.origin rect.card { stroke: var(--accent); stroke-width: 2; }
+.connections .node.sel rect.card { stroke: var(--sel); stroke-width: 2; }
+.connections .node .bar { stroke: none; }
+.connections .node .bar.verified { fill: var(--ok); }
+.connections .node .bar.requirement { fill: var(--req); }
+.connections .node .bar.broken { fill: var(--broken); }
+.connections .node .bar.none { fill: var(--rule); }
+.connections .node text { fill: var(--ink); font: 600 13px var(--sans); }
+.connections .node text.f { fill: var(--quiet); font: 10.5px var(--mono); }
+.connections .node text.b { fill: var(--quiet); font: 10.5px var(--sans); }
+.connections .node .pin { fill: var(--accent); }
+.connections .more { cursor: pointer; }
+.connections .more circle { fill: var(--paper); stroke: var(--accent); stroke-width: 1.5; }
+.connections .more text { fill: var(--accent); font: 600 10.5px var(--mono); dominant-baseline: central; }
+.connections .more:hover circle { fill: var(--accent-soft); }
+.connections .chip { cursor: pointer; }
+.connections .chip rect { fill: var(--paper); stroke: var(--quiet); stroke-dasharray: 3 2; }
+.connections .chip text { fill: var(--quiet); font: 10px var(--mono); dominant-baseline: central; }
+.connections .door { cursor: pointer; }
+.connections .door rect { stroke-width: 1.5; }
+.connections .door.verified rect { fill: var(--paper); stroke: var(--ok); }
+.connections .door.verified text { fill: var(--ok); }
+.connections .door.requirement rect { fill: var(--paper); stroke: var(--req); stroke-dasharray: 3 2; }
+.connections .door.requirement text { fill: var(--req); }
+.connections .door.broken rect { fill: var(--broken); stroke: var(--broken); }
+.connections .door.broken text { fill: #fff; }
+.connections .door text { font: 600 10.5px var(--mono); dominant-baseline: central; }
+.connections .door.sel rect { stroke: var(--sel); stroke-width: 2.5; }
+.connections .trust { stroke: var(--req); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.connections .token { cursor: pointer; }
+.connections .token path { fill: var(--token); }
+.connections .token.gap path { fill: var(--token-gap); }
+.connections .token text { fill: var(--token-ink); font: 600 12px var(--sans); }
+.connections .token.gap text:not(.t) { fill: var(--token-gap-ink); }
+.connections .token text.t { fill: var(--quiet); font: 10.5px var(--mono); }
+.connections .token.mini text { font: 600 11px var(--sans); }
+.connections .token.mini text.t { font: 10px var(--mono); }
+.connections .edge.reach { stroke: var(--accent); stroke-opacity: .75; }
+.connections .edge.reach.far { stroke-dasharray: 6 5; }
+.connections .token.sel path { stroke: var(--sel); stroke-width: 2; }
+
+@media (max-width: 63.99rem) {
+  .connections .cx-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(420px, 1fr) auto; height: auto; }
+  .connections .cx-rail { max-height: 12rem; border-right: 0; border-bottom: 1px solid var(--rule); }
+  .connections .cx-stage { height: 70vh; }
+  .connections .cx-inspector { border-left: 0; border-top: 1px solid var(--rule); }
+}

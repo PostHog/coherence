@@ -17,6 +17,7 @@ import { escapeHtml } from "./html.ts";
 import type { Lexicon, LexiconCoverage, PageEntry, RecordedSite, RunRecord, ShellState, SiteTally, StructurePreview, WorkOrder } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
 import { flowOf } from "./structure-flow.ts";
+import { connectionsOriginId } from "./connections/model.ts";
 import { mergeSites } from "./updates.ts";
 
 /**
@@ -644,9 +645,14 @@ test("the journal window keeps every open defect whatever its age, and the resol
 test("deep links resolve: every card id on every view resolves to that view", () => {
   const state = fresh();
   for (const view of state.views) {
-    // Structure is the relief, a scene with no cards: its hash names the view alone.
+    // Structure is the relief, a scene with no cards, or the connections view, whose cards are drawn in the browser: its
+    // hash names the view alone, and every origin the connections view can be rooted at, a route or a component, has an id.
     if (view.id === "structure") {
       assert.deepEqual(resolveHash(state, "#structure"), { view: "structure", id: undefined }, "#structure names the view alone");
+      const model = flowOf(state);
+      const origins = [...model.routes.map((r) => connectionsOriginId({ kind: "route", id: r.id })), ...model.nodes.map((n) => connectionsOriginId({ kind: "component", folder: n.folder }))];
+      assert.ok(model.nodes.length > 0, "the fixture has components to start from");
+      for (const id of origins) assert.deepEqual(resolveHash(state, `#${id}`), { view: "structure", id }, `#${id} opens Structure on its origin`);
       continue;
     }
     const rendered = renderView(state, view.id).text;
