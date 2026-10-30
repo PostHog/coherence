@@ -586,8 +586,8 @@ export interface ReadOptions {
   budget?: Partial<InterfaceBudget>;
   /** Ask every declaration, as before the word index: the reading the prefilter is checked against. */
   exhaustive?: boolean;
-  /** The language server's memory in megabytes (default: languageServerMemory); a test stubs it. */
-  memory?: () => Promise<number | undefined>;
+  /** The memory in megabytes of the language server an adapter asks (default: languageServerMemory of its process); a test stubs it, and a reading on a worker asks the thread that holds the server. */
+  memory?: (adapter: LanguageAdapter) => Promise<number | undefined>;
   /** How often memory is sampled, in milliseconds (default 2000). */
   sampleMs?: number;
   /**
@@ -845,7 +845,7 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
   const inScope = (component: string, name: string): boolean => starting === undefined || starting.some((e) => e.component === component && e.name === name);
   let stop: { limit: "time" | "memory"; observed?: number } | undefined;
   let memory: number | undefined;
-  const measure = options.memory ?? (() => languageServerMemory(adapter.serverPid?.()));
+  const measure = (): Promise<number | undefined> => (options.memory === undefined ? languageServerMemory(adapter.serverPid?.()) : options.memory(adapter));
   let sampling = false;
   const sampler = setInterval(() => {
     if (sampling) return;
