@@ -1,14 +1,18 @@
 /**
- * The relief's data from Scope's state: the relief reading's components,
- * files and landings, joined with what the rest of the state already holds,
- * the spec's invariants, crossings and refutations per component, the
- * component interfaces' call sites between components, and the journal's
- * open defects.
+ * The relief's data from Scope's state: the relief reading's components and
+ * landings, joined with what the rest of the state already holds, the spec's
+ * invariants, crossings and refutations per component, the component
+ * interfaces' call sites between components, and the journal's open defects.
+ * Each component's files are counted here and load by folder when the scene
+ * asks for them (mount.ts), so the data never grows with the code.
  */
 
+import type { ReliefFileLanded } from "../../relief/relief.ts";
 import { defectsOfJournal } from "../derive.ts";
 import type { ShellState } from "../model.ts";
 import { flowBoundsText, flowOf, flowPartialText } from "../structure-flow.ts";
+
+export type { ReliefFileLanded };
 
 export interface ReliefMeasures {
   lines: number;
@@ -29,7 +33,8 @@ export interface ReliefDataComponent {
   intent: string;
   /** A folder with no spec inside a component that holds others. */
   virtual?: true;
-  files: { file: string; lines: number; reached: number }[];
+  /** How many files it holds; the files themselves load by folder. */
+  files: number;
   v: ReliefMeasures;
 }
 
@@ -37,11 +42,15 @@ export interface ReliefData {
   project: string;
   trunk: string;
   snapshot: string;
+  /** The reading the data came from: files are fetched under it, and files fetched under another are another reading's. */
+  stamp: string;
+  /** In a snapshot, how many folders holding files it left out of what it embeds. */
+  filesLeftOut?: number;
   windows: { key: string; label: string; days: number | null }[];
   defaultWindow: string;
   leaveOut: string[];
   components: ReliefDataComponent[];
-  landings: { sha: string; date: string; subject: string; n: number; c: [number, number][]; f: [number, number, number][] }[];
+  landings: { sha: string; date: string; subject: string; n: number; c: [number, number][] }[];
   /** Per ordered pair: [user, used, call sites, value call sites, the most used symbols as [name, sites, kind]]. */
   relies: [number, number, number, number, [string, number, string][]][];
   /** What the reading of the component interfaces was bounded to, and whether it stopped short: said first in the notes. */
@@ -133,6 +142,8 @@ export function reliefData(state: ShellState): ReliefData | { absent: string } {
     project: state.project,
     trunk: "HEAD",
     snapshot: reading.head,
+    stamp: reading.stamp,
+    ...(reading.filesLeftOut === undefined ? {} : { filesLeftOut: reading.filesLeftOut }),
     windows: [
       { key: "7", label: "7 days", days: 7 },
       { key: "30", label: "30 days", days: 30 },

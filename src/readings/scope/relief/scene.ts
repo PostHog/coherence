@@ -9,7 +9,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { ReliefData } from "./data.ts";
+import type { ReliefData, ReliefFileLanded } from "./data.ts";
 import type { Touch } from "../../relief/relief.ts";
 
 export type { Touch };
@@ -18,6 +18,8 @@ export type { Touch };
 export interface ReliefIO {
   get?: (path: string) => Promise<unknown>;
   diff?: string;
+  /** The files of the folders named, by folder; a folder left out of the answer has none to give here. */
+  files?: (folders: string[]) => Promise<Record<string, ReliefFileLanded[]>>;
 }
 
 /**
@@ -114,19 +116,24 @@ const WIN = D.windows ? D.windows.map((w) => ({ key: w.key, label: w.label, from
 ];
 const BIG = 200;
 const state = { foot: "lines", height: "landings", win: D.defaultWindow ?? "30", split: false, big: false, scope: null, own: false, preview: null, selected: null, file: null };
+// Each component's files, null until the files view, a slice of it or a selection first needs them (need, below): the
+// data counts them and no more, so the first load never grows with the code. A component holding none has them already.
+const FL = C.map((c) => (c.files ? null : []));
 
 // ---------- measures ----------
 for (const c of C) for (const m of FOOT) c.v[m.key] ??= 0; // a model without a reading of this measure records none of it
 const totals = {}; for (const m of FOOT) totals[m.key] = C.reduce((a, c) => a + c.v[m.key], 0);
 function churn() {
   const from = WIN.find((w) => w.key === state.win).from;
+  const out = (l) => l.date < from || (!state.big && l.n > BIG);
   const comp = C.map(() => ({ landings: 0, volume: 0, list: [] }));
-  const file = C.map((c) => c.files.map(() => ({ landings: 0, volume: 0 })));
+  const file = FL.map((files) => (files ?? []).map(() => ({ landings: 0, volume: 0 })));
   for (const l of D.landings) {
-    if (l.date < from || (!state.big && l.n > BIG)) continue;
+    if (out(l)) continue;
     for (const [ci, v] of l.c) { comp[ci].landings++; comp[ci].volume += v; comp[ci].list.push([l, v]); }
-    for (const [ci, fi, v] of l.f) { file[ci][fi].landings++; file[ci][fi].volume += v; }
   }
+  // A file carries the landings that changed it, by their index.
+  FL.forEach((files, ci) => files?.forEach((f, fi) => { for (const [li, v] of f.l ?? []) if (!out(D.landings[li])) { file[ci][fi].landings++; file[ci][fi].volume += v; } }));
   return { comp, file };
 }
 
@@ -251,6 +258,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2 - 0.05; controls.minDistance = 60; controls.maxDistance = 700;
 state.own = false;
 state.scope = tops[0];
+let pendingFile = null; // [folder, path] of a carried file selection, until its folder's files arrive
 // A rebuild opens on the reader's view: the measures, the slice and the selection, as far as the new data still has them.
 if (carried) {
   const index = new Map(C.map((c, ci) => [c.folder, ci]));
@@ -261,8 +269,8 @@ if (carried) {
   const scope = index.get(carried.scope);
   if (scope !== undefined) { state.scope = scope; state.own = carried.own && kids[scope].length > 0; }
   state.selected = index.get(carried.selected) ?? null;
-  const fci = carried.file ? index.get(carried.file[0]) : undefined, ffi = fci === undefined ? -1 : C[fci].files.findIndex((f) => f.file === carried.file[1]);
-  state.file = ffi >= 0 ? [fci, ffi] : null;
+  // A selected file is chosen again once its folder's files arrive.
+  if (carried.file && index.has(carried.file[0])) pendingFile = carried.file;
 }
 // The camera stands back far enough to take in the widest platform: Coherence's framing is the floor.
 const reach = Math.max(1, ...tops.map((t) => Math.hypot(...ext[t]))), far = Math.max(1, (reach * 2.2) / 340);
@@ -322,7 +330,8 @@ function edged(mat) {
   };
   return mat;
 }
-const FILES = []; C.forEach((c, ci) => c.files.forEach((f, fi) => FILES.push([ci, fi])));
+// Every file has its instance from the start, by the count the data carries; one whose files have not arrived stays zero-sized.
+const FILES = []; C.forEach((c, ci) => { for (let fi = 0; fi < c.files; fi++) FILES.push([ci, fi]); });
 const fileAt = C.map(() => []); FILES.forEach(([ci, fi], i) => { fileAt[ci][fi] = i; });
 const NF = FILES.length;
 function instances(roughness) {
@@ -347,7 +356,7 @@ const FS = { faded: new Uint8Array(NF), cur: new Float32Array(NF * 6), to: new F
 const selBox = new THREE.LineSegments(unitEdges, new THREE.LineBasicMaterial({ color: 0xff8a4c })); selBox.visible = false; world.add(selBox);
 const fileRects = C.map((c) => null); // treemaps of each component's files in its lines footprint, relative to its centre
 function rectsOf(ci) {
-  if (!fileRects[ci]) { const s = side(C[ci], "lines"); fileRects[ci] = treemap(C[ci].files.map((f) => ({ v: f.lines })), -s / 2, -s / 2, s, s); }
+  if (!fileRects[ci]) { const s = side(C[ci], "lines"); fileRects[ci] = treemap(FL[ci].map((f) => ({ v: f.lines })), -s / 2, -s / 2, s, s); }
   return fileRects[ci];
 }
 const outlines = C.map(() => {
@@ -388,6 +397,8 @@ function ramp(t) { const i = Math.min(6, Math.max(0, Math.floor(t * 7))); return
 
 const RECT = C.map(() => null); // each component's platform, or its block when it has none, at the current footprint
 function layout() {
+  // The files view draws every file in the slice: those that have not arrived are asked for, and rise when they do.
+  if (state.split) need(C.map((_, ci) => ci).filter(inScope));
   CH = churn();
   const hk = state.height, fk = state.split ? "lines" : state.foot;
   // Heights rescale to what is in scope, so a slice uses the whole range.
@@ -419,10 +430,10 @@ function layout() {
       pos.needsUpdate = true; survey[ci].geometry.computeBoundingSphere(); survey[ci].computeLineDistances();
       survey[ci].visible = IN[ci] && s > 0;
     }
-    const rects = rectsOf(ci), sl = side(c, "lines");
     let top = h;
     if (state.split) top = 0;
-    c.files.forEach((f, fi) => {
+    const rects = FL[ci] ? rectsOf(ci) : null, sl = side(c, "lines");
+    FL[ci]?.forEach((f, fi) => {
       const r = rects[fi], fv = CH.file[ci][fi][hk], fh = fv ? MINH + (fv / fileMax) * MAXH : MINH * 0.5;
       const k = s / sl, pad = Math.min(0.25, (r.w * k) / 6, (r.h * k) / 6), i = fileAt[ci][fi], o = i * 6;
       FS.to.set([x + (r.x + r.w / 2) * k, y, z + (r.y + r.h / 2) * k, Math.max(0.02, r.w * k - pad * 2), Math.max(0.02, r.h * k - pad * 2), state.split ? fh : 0.01], o);
@@ -678,8 +689,47 @@ function retarget() {
   layout();
 }
 
+// ---------- files, loaded by folder ----------
+// A component's files are asked for once, when something first needs them, and each arrives as its own count says;
+// one answered without them (a snapshot that left them out, a server that failed) is not asked for again by this scene.
+const pending = new Set(), unloaded = new Set();
+function need(cis) {
+  const want = cis.filter((ci) => !FL[ci] && !pending.has(ci) && !unloaded.has(ci));
+  if (!want.length) return;
+  if (!io.files) { for (const ci of want) unloaded.add(ci); return; }
+  for (const ci of want) pending.add(ci);
+  io.files(want.map((ci) => C[ci].folder)).then((got) => {
+    if (disposed) return;
+    for (const ci of want) {
+      pending.delete(ci);
+      const files = got[C[ci].folder];
+      // Files of another count are another reading's; the scene built from that reading asks for its own.
+      if (!files || files.length !== C[ci].files) { unloaded.add(ci); continue; }
+      FL[ci] = files;
+      files.forEach((f, fi) => fileIndex.set(f.file, [ci, fi]));
+    }
+    arrived(want);
+  }, () => {
+    if (disposed) return;
+    for (const ci of want) { pending.delete(ci); unloaded.add(ci); }
+    drawSide();
+  });
+}
+// Files that arrive rise from their footprints, as they do when the view turns to files.
+function arrived(cis) {
+  diffFiles();
+  layout();
+  for (const ci of cis) if (FL[ci]) for (let fi = 0; fi < FL[ci].length; fi++) { const o = fileAt[ci][fi] * 6; for (let j = 0; j < 5; j++) FS.now[o + j] = FS.to[o + j]; FS.now[o + 5] = 0.01; }
+  if (pendingFile) {
+    const ci = C.findIndex((c) => c.folder === pendingFile[0]);
+    if (FL[ci]) { const fi = FL[ci].findIndex((f) => f.file === pendingFile[1]); if (fi >= 0) state.file = [ci, fi]; pendingFile = null; }
+    else if (unloaded.has(ci)) pendingFile = null;
+  }
+  retarget(); drawSide(); drawNote();
+}
+
 // The component a path belongs to: the one holding it as a counted file, else the deepest folder holding it.
-const fileIndex = new Map(); C.forEach((c, ci) => c.files.forEach((f, fi) => fileIndex.set(f.file, [ci, fi])));
+const fileIndex = new Map(); // path → [ci, fi], for the files that have arrived
 function componentOfPath(path) {
   let best = -1, len = -1;
   C.forEach((c, ci) => { const l = c.folder === "." ? 0 : c.folder.length; if ((c.folder === "." || path === c.folder || path.startsWith(c.folder + "/")) && l > len) { best = ci; len = l; } });
@@ -798,7 +848,7 @@ renderer.domElement.addEventListener("pointermove", (e) => {
     if (DIFF) { const r3 = el("div", "row"); r3.append(el("span", null, `Diff ${DIFF.a.sha} → ${DIFF.b.sha}`), signed(...DIFF.comp[u.ci])); tip.append(r3); }
     tip.append(el("div", "k", "click for the files and landings"));
   } else {
-    const f = c.files[u.fi], fc = CH.file[u.ci][u.fi];
+    const f = FL[u.ci][u.fi], fc = CH.file[u.ci][u.fi];
     tip.append(el("b", null, f.file), el("div", "k", c.name));
     const r1 = el("div", "row"); r1.append(el("span", null, "Footprint: lines"), el("span", null, fmt(f.lines)));
     const r2 = el("div", "row"); r2.append(el("span", null, `Landings, ${w.label.toLowerCase()}`), el("span", null, fmt(fc.landings)));
@@ -913,19 +963,22 @@ function drawSide() {
     s.append(u);
   }
   if (state.file && state.file[0] === ci) {
-    const f = c.files[state.file[1]], fc = CH.file[ci][state.file[1]];
+    const f = FL[ci][state.file[1]], fc = CH.file[ci][state.file[1]];
     s.append(el("h3", null, "Selected file"));
     const u = el("ul", "items"); const li = el("li"); li.append(el("code", null, f.file), el("div", "m", `${fmt(f.lines)} lines · ${fc.landings} landings · ${fmt(fc.volume)} lines changed · ${f.reached ? "reached by " + f.reached : "unreached"}`)); u.append(li); s.append(u);
   }
   s.append(el("h3", null, `Files by ${hm.label.toLowerCase()}, ${w.label.toLowerCase()}`));
   const fl = el("ul", "items");
-  c.files.map((f, fi) => [f, fi]).sort((a, b) => CH.file[ci][b[1]][hm.key] - CH.file[ci][a[1]][hm.key] || b[0].lines - a[0].lines).slice(0, 25).forEach(([f, fi]) => {
+  need([ci]);
+  // Until its files arrive the list says why it is empty: on their way, left out of a snapshot, or not served.
+  if (!FL[ci]) fl.append(el("li", "m", pending.has(ci) ? `${fmt(c.files)} files, loading` : io.get ? `${fmt(c.files)} files; the server did not send them` : `${fmt(c.files)} files, not in this snapshot: it embeds files only up to a fixed size, and the live page loads every component's`));
+  (FL[ci] ?? []).map((f, fi) => [f, fi]).sort((a, b) => CH.file[ci][b[1]][hm.key] - CH.file[ci][a[1]][hm.key] || b[0].lines - a[0].lines).slice(0, 25).forEach(([f, fi]) => {
     const li = el("li", "click"); li.append(el("code", null, f.file), el("div", "m", `${fmt(f.lines)} lines · ${CH.file[ci][fi].landings} landings · ${fmt(CH.file[ci][fi].volume)} changed`));
     if (DIFF && (DIFF.file[ci][fi][0] || DIFF.file[ci][fi][1])) { const m = el("div", "m"); m.append("diff ", signed(...DIFF.file[ci][fi])); li.append(m); }
     li.onclick = () => { state.split = true; state.file = [ci, fi]; sync(); retarget(); drawSide(); drawNote(); };
     fl.append(li);
   });
-  if (c.files.length > 25) fl.append(el("li", "m", `and ${c.files.length - 25} more`));
+  if (FL[ci] && c.files > 25) fl.append(el("li", "m", `and ${c.files - 25} more`));
   s.append(fl);
   const list = CH.comp[ci].list;
   s.append(el("h3", null, `${list.length} landings, ${w.label.toLowerCase()}`));
@@ -959,6 +1012,7 @@ function drawNote() {
     ...D.notes,
     ...(DIFF ? [`Diff: ${DIFF.a.sha} (${DIFF.a.date}, ${DIFF.a.subject}) → ${DIFF.b.sha} (${DIFF.b.subject}), from git diff --numstat, standing on each block as two thin meters, green for lines added and red for lines deleted, on one scale for the whole view (the tallest meter is the biggest change in view) and the same width on every block, so only their height is read. The numbers ride in each component's callout. Height stays the window's churn and the diff adds nothing to it. Components count every path in their folder; files count only the files mass counts. ${DIFF.gone} deleted path${DIFF.gone === 1 ? "" : "s"} with no block here ${DIFF.gone === 1 ? "is" : "are"} left out.`] : []),
     `One block is one component${state.split ? ", split into one block per file it owns; file footprints are lines" : ""}. Snapshot: ${D.snapshot}.`,
+    ...(D.filesLeftOut ? [`Files: this snapshot embeds files only up to a fixed size and left out those of ${D.filesLeftOut} component${D.filesLeftOut === 1 ? "" : "s"} and folder${D.filesLeftOut === 1 ? "" : "s"}, which stand empty in the files view; the live page loads every one.`] : []),
     `Footprint: ${fm.label.toLowerCase()}, ${fm.how}. Every measure shares the same total area, so a footprint is that component's share; area, not side, is the quantity.`,
     `Height and color: ${HEIGHT.map((m) => m.label.toLowerCase() + " = " + m.how).join("; ")}. ${inWin - (state.big ? 0 : bigIn.length)} landings count in this window (${w.from === "0000" ? "from " + (D.landings.at(-1)?.date ?? LATEST) : "from " + w.from} to ${LATEST}). In component view, a landing counts toward every component it touches, tests and specs included; in file view, only the files mass counts.`,
     state.big ? `Landings over ${BIG} files are included (${bigIn.length} in this window). ${D.project ? "Bulk moves like these tower over everything else." : "The rebuild merge of 2026-09-23 alone changed 322,695 lines across 582 files, and it towers over everything else."}` : `Left out of heights: the ${bigIn.length} landing${bigIn.length === 1 ? "" : "s"} in this window that touch${bigIn.length === 1 ? "es" : ""} more than ${BIG} files${bigIn.length ? " (" + bigIn.slice(0, 3).map((l) => l.subject.slice(0, 48)).join("; ") + (bigIn.length > 3 ? "; …" : "") + ")" : ""}. Bulk moves like these touch every component at once and say nothing about any one of them; ordinary merged pull requests stay in.`,
@@ -975,6 +1029,12 @@ function drawNote() {
 // ---------- diff overlay, when served beside git ----------
 const signed = (a, d) => { const x = el("span"); x.append(el("span", "add", "+" + fmt(a)), " ", el("span", "del", "−" + fmt(d))); return x; };
 function ownerOf(p) { let best = 0, len = -1; C.forEach((c, i) => { if (c.folder !== "." && (p === c.folder || p.startsWith(c.folder + "/")) && c.folder.length > len) { best = i; len = c.folder.length; } }); return best; }
+// The diff per file, over the files that have arrived, again as more arrive; a deleted path no file here holds is counted aside.
+function diffFiles() {
+  if (!DIFF) return;
+  DIFF.file = FL.map((files) => (files ?? []).map((f) => DIFF.byPath.get(f.file) ?? [0, 0]));
+  DIFF.gone = DIFF.goneAll.filter((p) => !fileIndex.has(p)).length;
+}
 async function loadDiff(a, b) {
   if (!a || !b || a === "none") { DIFF = null; retarget(); drawSide(); drawNote(); return; }
   let d;
@@ -983,16 +1043,16 @@ async function loadDiff(a, b) {
   if (disposed) return;
   if (d.error) { DIFF = null; return; }
   // Per component and per file: [added, deleted]. The diff lists only the paths that changed; any other stays [0, 0].
-  const comp = C.map(() => [0, 0]), file = C.map((c) => c.files.map(() => [0, 0]));
-  const at = new Map(); C.forEach((c, ci) => c.files.forEach((f, fi) => at.set(f.file, [ci, fi])));
-  let gone = 0;
+  const comp = C.map(() => [0, 0]), byPath = new Map(), gone = [];
   for (const f of d.files) {
     if (!f.add && !f.del) continue;
-    const ci = ownerOf(f.path), hit = at.get(f.path);
+    const ci = ownerOf(f.path), was = byPath.get(f.path) ?? [0, 0];
     comp[ci][0] += f.add; comp[ci][1] += f.del;
-    if (hit) { file[hit[0]][hit[1]][0] += f.add; file[hit[0]][hit[1]][1] += f.del; } else if (f.gone) gone++;
+    byPath.set(f.path, [was[0] + f.add, was[1] + f.del]);
+    if (f.gone) gone.push(f.path);
   }
-  DIFF = { a: d.a, b: d.b, comp, file, gone };
+  DIFF = { a: d.a, b: d.b, comp, byPath, goneAll: gone };
+  diffFiles();
   for (const [id, end] of [["selA", d.a], ["selB", d.b]]) for (const o of $(id).options) if (o.dataset.linked && o.value === end.rev) o.textContent = `${end.date} ${end.sha} ${end.subject.slice(0, 52)}`;
   retarget(); drawSide(); drawNote();
 }
@@ -1020,6 +1080,7 @@ async function startDiff() {
   await loadDiff(selA.value, selB.value);
 }
 let running = true;
+if (pendingFile) need([C.findIndex((c) => c.folder === pendingFile[0])]);
 sync(); layout(); aim(carried?.camera.view ?? "tilt", false);
 if (carried) { camera.position.fromArray(carried.camera.position); controls.target.fromArray(carried.camera.target); controls.update(); }
 drawCrumbs(); drawSide(); drawTable(); drawNote(); resize(); frame(); startDiff();
@@ -1030,7 +1091,7 @@ return {
   resume() { if (disposed || !root.isConnected) return; paint(); drawScale(lastMax); if (!running) { running = true; resize(); frame(); } },
   touch,
   view() {
-    const file = state.file ? [C[state.file[0]].folder, C[state.file[0]].files[state.file[1]].file] : null;
+    const file = state.file ? [C[state.file[0]].folder, FL[state.file[0]][state.file[1]].file] : pendingFile;
     return {
       layout: LAYOUT, foot: state.foot, height: state.height, win: state.win, split: state.split, big: state.big,
       scope: C[state.scope].folder, own: state.own, selected: state.selected == null ? null : C[state.selected].folder, file,

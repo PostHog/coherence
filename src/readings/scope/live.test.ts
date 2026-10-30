@@ -200,10 +200,15 @@ test("a page that reconnects with its cursors gets every record appended while i
   }
 });
 
-test("the first load stays flat as the journal and the runs grow, every derived verdict is unchanged, and history loads every record left out by cursor, once", async () => {
+test("the first load stays flat as the journal, the runs and the code grow, every derived verdict is unchanged, and history loads every record left out by cursor, once", async () => {
   const grown = makeFixture();
   try {
     const session = "s-growth";
+    // The code grows too: files the relief counts in the first load and serves by folder.
+    const code = (files: number, from: number): void => {
+      mkdirSync(join(grown.root, "src/api/routes"), { recursive: true });
+      for (let i = from; i < from + files; i++) writeFileSync(join(grown.root, `src/api/routes/route${i}.ts`), `export function route${i}(request: string): string {\n  return request;\n}\n`);
+    };
     const grow = (records: number, runs: number, from: number): void => {
       const journal = Array.from({ length: records }, (_, i) => JSON.stringify({ id: `d-${(from + i).toString(16).padStart(8, "0")}`, kind: "decision", at: new Date(Date.UTC(2026, 8, 12) + (from + i) * 1000).toISOString(), session, agent: "growth", commit: "abc1234", dirty: false, chose: `choice ${from + i} with some words to weigh the record`, over: ["the other one"], because: "the test grows the journal" }));
       appendFileSync(join(grown.root, `.coherence/journal/${session}.jsonl`), journal.join("\n") + "\n");
@@ -227,14 +232,23 @@ test("the first load stays flat as the journal and the runs grow, every derived 
     };
     grow(400, 60, 0);
     check(800, 0);
+    code(20, 0);
     const small = await firstLoadBytes();
     await small.server.stop();
     grow(2000, 300, 400);
     const sites = check(8000, 1);
+    code(2000, 20);
     const large = await firstLoadBytes();
     try {
-      assert.ok(Math.abs(large.bytes - small.bytes) < 1024, `the first load stays flat: ${small.bytes} bytes, then ${large.bytes} after 2000 records, 300 runs and 7200 reference sites more`);
+      assert.ok(Math.abs(large.bytes - small.bytes) < 1024, `the first load stays flat: ${small.bytes} bytes, then ${large.bytes} after 2000 records, 300 runs, 7200 reference sites and 2000 code files more`);
       const state = large.state;
+      // The relief counts every file and lists none; the files load by their folder, every one.
+      assert.equal(state.relief?.kind, "read", "the relief was read");
+      const api = state.relief!.kind === "read" ? state.relief!.components.find((c) => c.folder === "src/api")! : undefined;
+      assert.equal(api?.files, 2021, "the first load counts every file of the component");
+      const served = (await large.server.get(`/api/relief/files?folder=src%2Fapi`)) as { stamp: string; folders: Record<string, { file: string }[]> };
+      assert.equal(served.folders["src/api"]!.length, 2021, "and the files route lists every one");
+      assert.equal(served.stamp, state.relief!.kind === "read" ? state.relief!.stamp : "", "under the reading the first load carried");
       const allJournal = loadJournal(grown.root).records;
       const allRuns = loadRuns(grown.root).records;
       assert.equal(state.journal.records.length + (state.journal.omitted ?? 0), allJournal.length, "every journal record is loaded or counted");
@@ -279,6 +293,47 @@ test("the first load stays flat as the journal and the runs grow, every derived 
     }
   } finally {
     grown.remove();
+  }
+});
+
+test("the relief's files load by folder: a folder the relief read is answered whole, any other name is refused, and a reread that changed the reading answers under a new stamp", async () => {
+  const fixture = makeFixture();
+  const server = await live(fixture.root);
+  try {
+    const status = async (query: string): Promise<number> => (await fetch(`${server.base}/api/relief/files?${query}`, { headers: { authorization: `Bearer ${server.token}` } })).status;
+    // An odd name is refused before the state loads at all.
+    for (const odd of ["..", "../etc", "/etc", "/", "-n", "--output=x", "src/../src", "src/./store", "src//store", "src/store/", "src\\store", "", "src/\u0000"]) {
+      assert.equal(await status(`folder=${encodeURIComponent(odd)}`), 400, `${JSON.stringify(odd)} is refused as no folder name`);
+    }
+    assert.equal(await status(""), 400, "a request naming no folder is refused");
+    const state = await firstLoad(server);
+    assert.equal(state.relief?.kind, "read");
+    const relief = state.relief as Extract<NonNullable<ShellState["relief"]>, { kind: "read" }>;
+    assert.equal(JSON.stringify(relief).includes("write.ts"), false, "the first load names no file");
+    const store = relief.components.find((c) => c.folder === "src/store")!;
+    const answer = (await server.get(`/api/relief/files?folder=src%2Fstore&folder=.`)) as { stamp: string; folders: Record<string, { file: string; lines: number }[]> };
+    assert.equal(answer.stamp, relief.stamp);
+    assert.deepEqual(Object.keys(answer.folders).sort(), [".", "src/store"], "each folder asked for, and only those");
+    assert.equal(answer.folders["src/store"]!.length, store.files);
+    assert.ok(answer.folders["src/store"]!.some((f) => f.file === "src/store/write.ts" && f.lines === 1));
+    // A name of a folder's shape that the relief did not read is refused by lookup, and with it every folder the request named.
+    for (const unknown of ["src/nowhere", "node_modules", "src/store/write.ts", ".git"]) assert.equal(await status(`folder=${encodeURIComponent(unknown)}`), 404, `${unknown} is no folder the relief read`);
+    assert.equal(await status("folder=src%2Fstore&folder=..%2Fetc"), 400, "one odd name refuses the whole request");
+    assert.equal(await status("folder=src%2Fstore&folder=src%2Fnowhere"), 404, "one unknown folder refuses the whole request");
+
+    // A spec edit rereads the relief; the file written meanwhile is in the new reading, under a new stamp.
+    writeFileSync(join(fixture.root, "src/store/later.ts"), "export const later = 1;\nexport const again = 2;\n");
+    appendFileSync(join(fixture.root, "src/store/Store.spec.md"), "\n");
+    let after: { stamp: string; folders: Record<string, { file: string }[]> } | undefined;
+    for (const deadline = Date.now() + 20_000; Date.now() < deadline; await new Promise((r) => setTimeout(r, 100))) {
+      after = (await server.get(`/api/relief/files?folder=src%2Fstore`)) as typeof after;
+      if (after!.stamp !== relief.stamp) break;
+    }
+    assert.notEqual(after!.stamp, relief.stamp, "the reread answers under a new stamp");
+    assert.ok(after!.folders["src/store"]!.some((f) => f.file === "src/store/later.ts"), "with the files as they now stand");
+  } finally {
+    await server.stop();
+    fixture.remove();
   }
 });
 

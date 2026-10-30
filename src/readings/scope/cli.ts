@@ -22,7 +22,7 @@ import { DEFAULTS, projectNameOf, writeScopePage, type BuildOptions } from "./bu
 import { BUDGET_FLAG_NAMES, BUDGET_FLAGS, budgetFlags, readComponentInterfaces } from "./component-interfaces.ts";
 import { readAndRecord } from "./gaps.ts";
 import { keptLine } from "./kept-answers.ts";
-import { readRelief } from "../relief/relief.ts";
+import { readRelief, withSnapshotFiles } from "../relief/relief.ts";
 
 export const SCOPE_USAGE = [
   "  scope [--root <dir>] [--no-open]   open the live Scope reading from the warm server (prints its address)",
@@ -86,8 +86,9 @@ async function snapshot(root: string, values: Map<string, string>, switches: Set
     const kept = options.componentInterfaces.kind === "read" ? keptLine(options.componentInterfaces.kept) : undefined;
     if (kept !== undefined) io.err(kept);
   }
-  // Structure draws the relief: per-file lines from mass, districts, and the landings on HEAD's first-parent line.
-  options.relief = await readRelief(root);
+  // Structure draws the relief: per-file lines from mass, districts, and the landings on HEAD's first-parent line. With no server
+  // behind the file to load files on demand, it embeds as many folders' files as its budget holds and says how many it left out.
+  options.relief = withSnapshotFiles(await readRelief(root));
   const domain = values.get("domain");
   if (domain !== undefined) options.domainPath = domain;
   const title = values.get("domain-title");

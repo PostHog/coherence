@@ -11,7 +11,7 @@ import type { ReliefReading } from "../../relief/relief.ts";
 import type { JournalRecord, ShellState } from "../model.ts";
 import { mergeSnapshot } from "../updates.ts";
 import { reliefData, type ReliefData } from "./data.ts";
-import { mountRelief, reliefStep } from "./mount.ts";
+import { filesCache, mountRelief, reliefStep } from "./mount.ts";
 import type { Relief, ReliefView } from "./scene.ts";
 
 function reading(storeLines = 40): ReliefReading {
@@ -19,12 +19,13 @@ function reading(storeLines = 40): ReliefReading {
     kind: "read",
     head: "abc1234 2026-10-30",
     leftOut: [],
-    landings: [{ sha: "abc1234", date: "2026-10-30", subject: "land", n: 1, c: [[1, 3]], f: [[1, 0, 3]] }],
+    stamp: `stamp-${storeLines}`,
+    landings: [{ sha: "abc1234", date: "2026-10-30", subject: "land", n: 1, c: [[1, 3]] }],
     components: [
-      { folder: ".", name: "root", files: [{ file: "cli.ts", lines: 10, reached: 0 }], lines: 10, unreached: 10 },
-      { folder: "src", name: "Src", files: [{ file: "src/main.ts", lines: 5, reached: 0 }], lines: 5, unreached: 5 },
-      { folder: "src/lib", name: "lib/", district: true, files: [{ file: "src/lib/a.ts", lines: 7, reached: 0 }], lines: 7, unreached: 7 },
-      { folder: "src/store", name: "Store", files: [{ file: "src/store/store.ts", lines: storeLines, reached: 1 }], lines: storeLines, unreached: 0 },
+      { folder: ".", name: "root", files: 1, lines: 10, unreached: 10 },
+      { folder: "src", name: "Src", files: 1, lines: 5, unreached: 5 },
+      { folder: "src/lib", name: "lib/", district: true, files: 1, lines: 7, unreached: 7 },
+      { folder: "src/store", name: "Store", files: 1, lines: storeLines, unreached: 0 },
     ],
   };
 }
@@ -110,4 +111,47 @@ test("the relief is built again only when what it draws changed, the old scene d
   mergeSnapshot(page, stateOf({ kind: "unread", because: "mass could not be read" }));
   mountRelief(root, page, {}, create);
   assert.equal(made[1]!.disposed, 1, "the scene is disposed when there is nothing to draw");
+});
+
+test("the page fetches a folder's files once per reading, again after a reread changed the reading, and again after a fetch failed", async () => {
+  const asked: string[][] = [];
+  let stamp = "one";
+  let failing = false;
+  const get = async (path: string): Promise<unknown> => {
+    const url = new URL(path, "http://scope");
+    assert.equal(url.pathname, "/api/relief/files");
+    const folders = url.searchParams.getAll("folder");
+    asked.push(folders);
+    if (failing) throw new Error("the server went away");
+    return { stamp, folders: Object.fromEntries(folders.map((folder) => [folder, [{ file: `${folder}/a.ts`, lines: stamp.length, reached: 0 }]])) };
+  };
+  const files = filesCache(get);
+  assert.deepEqual(Object.keys(await files("one", ["src", "src/store"])), ["src", "src/store"]);
+  assert.deepEqual(asked, [["src", "src/store"]], "one fetch carries every folder asked for at once");
+  await Promise.all([files("one", ["src"]), files("one", ["src/store", "src"])]);
+  assert.equal(asked.length, 1, "a folder fetched under the same reading is never fetched again");
+  await files("one", ["src", "."]);
+  assert.deepEqual(asked.at(-1), ["."], "only the folder not yet fetched goes out");
+
+  // A reread that changed the reading gives the scene built from it another stamp: everything fetched under the last is dropped.
+  stamp = "three";
+  const again = await files("three", ["src"]);
+  assert.deepEqual(asked.at(-1), ["src"], "the folder is fetched again under the new reading");
+  assert.equal(again["src"]![0]!.lines, 5);
+
+  // An answer from another reading belongs to it, and a failed fetch is forgotten: both answer nothing, and the next ask fetches again.
+  assert.deepEqual(await files("four", ["src"]), {}, "an answer stamped by another reading is no answer");
+  failing = true;
+  assert.deepEqual(await files("four", ["src"]), {}, "a failed fetch answers nothing");
+  failing = false;
+  stamp = "four";
+  const before = asked.length;
+  assert.deepEqual(Object.keys(await files("four", ["src"])), ["src"]);
+  assert.equal(asked.length, before + 1, "and the next ask fetches it again");
+
+  // Hundreds of folders go out in several fetches, each address short enough for any server.
+  const many = Array.from({ length: 400 }, (_, i) => `products/a-rather-long-product-name-${i}/frontend`);
+  assert.equal(Object.keys(await files("four", many)).length, 400);
+  const batches = asked.slice(before + 1);
+  assert.ok(batches.length > 1 && batches.every((b) => b.map((f) => `folder=${encodeURIComponent(f)}&`).join("").length <= 4000), `${batches.length} fetches, each short`);
 });

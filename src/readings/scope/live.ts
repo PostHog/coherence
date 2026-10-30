@@ -12,6 +12,7 @@
  *   /api/runs        older run records by cursor (before=<at>~<session>)
  *   /api/record      one journal record by id, for a citation the page has not loaded
  *   /api/sites       every reference site of one chokepoint entry (run=<at>~<session>, component, name), where the first load counted some
+ *   /api/relief/files  the files of components and districts the relief read (folder=, repeated), which the first load counts and does not list
  *
  * The state is loaded once through scopeState, whole, and kept current: the
  * journal, runs and work folders are watched, and an append is read back
@@ -39,7 +40,7 @@ import { tracesDir } from "../../economy/trace.ts";
 import type { HttpApp, HttpAppFactory, HttpContext } from "../../enforcement/server.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
-import { REVISION, WORKTREE, readRelief, reliefCommits, reliefDiff, touchesOf, type ReliefReading, type Touch } from "../relief/relief.ts";
+import { REVISION, WORKTREE, folderName, readReliefApart, reliefCommits, reliefDiff, touchesOf, type ReliefRead, type ReliefReading, type Touch } from "../relief/relief.ts";
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
 import { storeOfPath, type RecordStore } from "../../journal/stores.ts";
 import { FROM_SOURCES, SOURCE_FOLDER, buildShell, forgetPageBundle, isPageSource, rootOptions, scopeState, windowState, type BuildOptions, type Shell } from "./build.ts";
@@ -232,6 +233,8 @@ class LiveReading implements HttpApp {
   private interfaces: InterfaceReading;
   /** What Structure draws beyond the spec, read when the state loads and again when the model changes. */
   private relief: ReliefReading = { kind: "unread", because: "the warm server has not read it yet" };
+  /** The relief's files by folder, as the files route sends them: read with the relief, never in the first load. */
+  private reliefFiles: ReadonlyMap<string, string> = new Map();
   private reading: Promise<void> | undefined;
   private readAgain = false;
   /** The reading's own bounded server, when the shared instrument reads a whole workspace the reading never draws. */
@@ -263,8 +266,7 @@ class LiveReading implements HttpApp {
   /** The state, loaded once and kept current by the watchers from then on. */
   private ensure(): Promise<ShellState> {
     this.loading ??= (async () => {
-      this.relief = await this.readReliefAgain();
-      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces, relief: this.relief });
+      const state = await this.stateWithRelief();
       this.base = state;
       this.remember(state);
       this.lexicons = await watchedLexicons(this.root, this.build);
@@ -275,18 +277,30 @@ class LiveReading implements HttpApp {
     return this.loading;
   }
 
+  /** The whole state with the relief read again beside it: the relief reads in a worker while the state loads here. */
+  private async stateWithRelief(): Promise<ShellState> {
+    const relief = this.readReliefAgain();
+    const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
+    const read = await relief;
+    this.relief = read.reading;
+    this.reliefFiles = read.files;
+    state.relief = read.reading;
+    return state;
+  }
+
   /** A relief reading under way, and the one queued behind it for callers that arrived meanwhile. */
-  private reliefRead: Promise<ReliefReading> | undefined;
-  private reliefNext: Promise<ReliefReading> | undefined;
+  private reliefRead: Promise<ReliefRead> | undefined;
+  private reliefNext: Promise<ReliefRead> | undefined;
 
   /**
-   * Read the relief again; its git runs in child processes, so the server keeps
-   * answering hooks meanwhile. Callers arriving while a reading runs share one
-   * more after it, since the running one may have started before their change.
+   * Read the relief again, in a worker thread and git's child processes, so the
+   * server keeps answering hooks meanwhile. Callers arriving while a reading
+   * runs share one more after it, since the running one may have started
+   * before their change.
    */
-  private readReliefAgain(): Promise<ReliefReading> {
+  private readReliefAgain(): Promise<ReliefRead> {
     if (this.reliefRead === undefined) {
-      this.reliefRead = readRelief(this.root).finally(() => {
+      this.reliefRead = readReliefApart(this.root).finally(() => {
         this.reliefRead = undefined;
       });
       return this.reliefRead;
@@ -451,8 +465,7 @@ class LiveReading implements HttpApp {
       const changed = orders.filter((order) => fresh.has(order.id) || order.history.some((h) => fresh.has(h.id)));
       if (changed.length > 0) this.send("work", { orders: changed, damaged: loaded.damaged });
     } else if (store === "model") {
-      this.relief = await this.readReliefAgain();
-      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces, relief: this.relief });
+      const state = await this.stateWithRelief();
       this.base = state;
       this.remember(state);
       this.lexicons = await watchedLexicons(this.root, this.build);
@@ -612,6 +625,29 @@ class LiveReading implements HttpApp {
         } catch (error) {
           json(response, request, 404, { reason: `no diff between ${a} and ${b}: ${(error as Error).message.split("\n")[0]}` });
         }
+        return;
+      }
+      case "/api/relief/files": {
+        // The files of the folders asked for, each one the relief read: a name of any other shape is refused before the state loads,
+        // and one the reading does not hold is refused by lookup. The texts were made when the relief was read, so nothing here reads a file.
+        const folders = [...new Set(url.searchParams.getAll("folder"))];
+        const odd = folders.find((folder) => !folderName(folder));
+        if (folders.length === 0 || odd !== undefined) {
+          json(response, request, 400, { reason: odd === undefined ? "name one folder or more (folder=)" : `${JSON.stringify(odd)} is no folder name` });
+          return;
+        }
+        await this.ensure();
+        await this.chain;
+        const relief = this.relief, files = this.reliefFiles;
+        const unknown = folders.find((folder) => !files.has(folder));
+        if (relief.kind !== "read" || unknown !== undefined) {
+          json(response, request, 404, { reason: relief.kind !== "read" ? `the relief is not read: ${relief.because}` : `the relief holds no folder ${JSON.stringify(unknown)}` });
+          return;
+        }
+        // Each folder's text goes out as it was made, never parsed again: on a large project they are megabytes.
+        const body = `{"stamp":${JSON.stringify(relief.stamp)},"folders":{${folders.map((folder) => `${JSON.stringify(folder)}:${files.get(folder)!}`).join(",")}}}`;
+        response.writeHead(200, { "content-type": "application/json; charset=utf-8", "content-length": Buffer.byteLength(body) });
+        response.end(request.method === "HEAD" ? undefined : body);
         return;
       }
       default:

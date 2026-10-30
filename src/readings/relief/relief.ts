@@ -1,21 +1,27 @@
 /**
  * The relief reading: what Scope's Structure view draws that the rest of the
- * state does not already hold. Per component, its files with their lines and
- * whether an enforcement reaches them (from mass); the folders with no spec
- * inside a component that holds others, each a district of its own; and the
- * landings on HEAD's first-parent line, each with the lines it changed per
- * component and per file. Invariants, crossings, refutations, reliance and
- * open defects come from the spec, the component interfaces and the journal
- * the state carries, so none goes stale here as they change.
+ * state does not already hold. Per component, its totals and how many files it
+ * holds, with the files themselves (their lines, whether an enforcement
+ * reaches them, from mass, and the landings that changed each) kept aside by
+ * folder for the live page to load on demand, so the first load never grows
+ * with the code; the folders with no spec inside a component that holds
+ * others, each a district of its own; and the landings on HEAD's first-parent
+ * line, each with the lines it changed per component. Invariants, crossings,
+ * refutations, reliance and open defects come from the spec, the component
+ * interfaces and the journal the state carries, so none goes stale here as
+ * they change.
  */
 
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { Worker } from "node:worker_threads";
 import { computeMass } from "../../economy/mass.ts";
 import { LOCKFILES } from "../../lifecycle/lockfiles.ts";
-import { loadSpecModel, type SpecModel } from "../../spec/model.ts";
+import { loadSpecModel } from "../../spec/model.ts";
 
 export interface ReliefFile {
   file: string;
@@ -24,18 +30,24 @@ export interface ReliefFile {
   reached: number;
 }
 
+/** A file as the page loads it: the landings that changed it as [index into the reading's landings, lines changed], absent when none did. */
+export interface ReliefFileLanded extends ReliefFile {
+  l?: [number, number][];
+}
+
 export interface ReliefComponent {
   folder: string;
   /** The spec's name, or for a district its folder below the component that holds it, ending in a slash. */
   name: string;
   /** A folder with no spec inside a component that holds other components: unclaimed land, drawn as a district. */
   district?: true;
-  files: ReliefFile[];
+  /** How many files it holds; the files themselves load by folder, never with the first load. */
+  files: number;
   lines: number;
   unreached: number;
 }
 
-/** One first-parent commit: per component [index, lines changed], per file [component, file, lines changed]. */
+/** One first-parent commit: per component [index, lines changed]. What it changed per file rides with each file. */
 export interface ReliefLanding {
   sha: string;
   date: string;
@@ -43,12 +55,29 @@ export interface ReliefLanding {
   /** Files it touched, lockfiles and .coherence/ left out. */
   n: number;
   c: [number, number][];
-  f: [number, number, number][];
 }
 
 export type ReliefReading =
-  | { kind: "read"; components: ReliefComponent[]; landings: ReliefLanding[]; head: string; leftOut: string[] }
+  | {
+      kind: "read";
+      components: ReliefComponent[];
+      landings: ReliefLanding[];
+      head: string;
+      leftOut: string[];
+      /** A digest of everything read, files included: files a page fetched under another stamp belong to another reading. */
+      stamp: string;
+      /** A snapshot's files by folder, as many whole folders as SNAPSHOT_FILES_BYTES holds; a live first load carries none. */
+      files?: Record<string, ReliefFileLanded[]>;
+      /** How many folders holding files a snapshot left out of `files`. */
+      filesLeftOut?: number;
+    }
   | { kind: "unread"; because: string };
+
+/** A relief as read: the reading the state carries, and each folder's files as the live page loads them, JSON text ready to send. */
+export interface ReliefRead {
+  reading: ReliefReading;
+  files: ReadonlyMap<string, string>;
+}
 
 /** The most landings a reading carries, newest first: the first load is bounded, and a busy repository lands hundreds a day. */
 export const LANDINGS_MAX = 1500;
@@ -175,15 +204,20 @@ const execGit = promisify(execFile);
 const git = async (root: string, ...args: string[]): Promise<string> =>
   (await execGit("git", args, { cwd: root, encoding: "utf8", maxBuffer: GIT_BUFFER, timeout: GIT_TIMEOUT_MS })).stdout;
 
-export async function readRelief(rootGiven: string, given?: SpecModel): Promise<ReliefReading> {
+/**
+ * The relief, read in this thread. The spec model and mass are synchronous and
+ * read every source file, seconds on a large project, so the warm server, which
+ * also answers the agent's hooks, reads it apart (readReliefApart).
+ */
+export async function readRelief(rootGiven: string): Promise<ReliefRead> {
   const root = resolve(rootGiven);
   let mass;
-  let model: SpecModel;
+  let model;
   try {
-    model = given ?? loadSpecModel(root);
+    model = loadSpecModel(root);
     mass = computeMass(root, { model });
   } catch (error) {
-    return { kind: "unread", because: `mass could not be read: ${(error as Error).message}` };
+    return unread(`mass could not be read: ${(error as Error).message}`);
   }
   const specced = [...new Set([".", ...model.components.map((c) => c.folder)])].sort();
   const files = new Map<string, ReliefFile[]>(specced.map((f) => [f, []]));
@@ -205,16 +239,17 @@ export async function readRelief(rootGiven: string, given?: SpecModel): Promise<
 
   const name = new Map(model.components.map((c) => [c.folder, c.name]));
   const folders = [...specced, ...districts.keys()].sort();
-  const components: ReliefComponent[] = folders.map((folder) => {
+  const held = folders.map((folder) => (districts.get(folder)?.files ?? files.get(folder)!).slice().sort((a, b) => b.lines - a.lines || a.file.localeCompare(b.file)));
+  const components: ReliefComponent[] = folders.map((folder, ci) => {
     const district = districts.get(folder);
-    const held = (district?.files ?? files.get(folder)!).slice().sort((a, b) => b.lines - a.lines || a.file.localeCompare(b.file));
+    const mine = held[ci]!;
     return {
       folder,
       name: district ? folder.slice(district.of === "." ? 0 : district.of.length + 1) + "/" : (name.get(folder) ?? (folder === "." ? "root" : folder)),
       ...(district ? { district: true as const } : {}),
-      files: held,
-      lines: held.reduce((n, f) => n + f.lines, 0),
-      unreached: held.reduce((n, f) => n + (f.reached ? 0 : f.lines), 0),
+      files: mine.length,
+      lines: mine.reduce((n, f) => n + f.lines, 0),
+      unreached: mine.reduce((n, f) => n + (f.reached ? 0 : f.lines), 0),
     };
   });
   const index = new Map(folders.map((f, i) => [f, i]));
@@ -227,7 +262,9 @@ export async function readRelief(rootGiven: string, given?: SpecModel): Promise<
   };
 
   const at = new Map<string, [number, number]>();
-  components.forEach((c, ci) => c.files.forEach((f, fi) => at.set(f.file, [ci, fi])));
+  held.forEach((mine, ci) => mine.forEach((f, fi) => at.set(f.file, [ci, fi])));
+  // Per file, the landings that changed it, as [landing index, lines changed].
+  const landed = held.map((mine) => mine.map((): [number, number][] => []));
   let landings: ReliefLanding[] = [];
   let head = "";
   try {
@@ -249,12 +286,94 @@ export async function readRelief(rootGiven: string, given?: SpecModel): Promise<
         const hit = at.get(path);
         if (hit) perFile.push([hit[0], hit[1], changed]);
       }
-      if (perComponent.size > 0) landings.push({ sha, date, subject, n, c: [...perComponent], f: perFile });
+      if (perComponent.size === 0) continue;
+      for (const [ci, fi, changed] of perFile) landed[ci]![fi]!.push([landings.length, changed]);
+      landings.push({ sha, date, subject, n, c: [...perComponent] });
     }
   } catch {
-    landings = []; // not a git checkout, or no history: heights are flat and the view says so
+    // Not a git checkout, or no history: heights are flat and the view says so.
+    landings = [];
+    for (const mine of landed) for (const l of mine) l.length = 0;
   }
-  return { kind: "read", components, landings, head, leftOut: [".coherence/", ...[...LOCKFILE_NAMES].sort()] };
+  const texts = new Map(folders.map((folder, ci) => [folder, JSON.stringify(held[ci]!.map((f, fi): ReliefFileLanded => (landed[ci]![fi]!.length > 0 ? { ...f, l: landed[ci]![fi]! } : f)))]));
+  const reading = { components, landings, head, leftOut: [".coherence/", ...[...LOCKFILE_NAMES].sort()] };
+  const digest = createHash("sha256").update(JSON.stringify(reading));
+  for (const [folder, text] of texts) digest.update(folder).update("\0").update(text);
+  return { reading: { kind: "read", ...reading, stamp: digest.digest("base64url").slice(0, 16) }, files: texts };
+}
+
+const unread = (because: string): ReliefRead => ({ reading: { kind: "unread", because }, files: new Map() });
+
+/** The worker that reads the relief apart: beside this module, with the same extension, so a checkout runs its source and the package its compiled module. */
+const WORKER = new URL(`./worker${extname(fileURLToPath(import.meta.url))}`, import.meta.url);
+
+/**
+ * The relief, read in a worker thread. Mass reads every source file
+ * synchronously, and on PostHog's tree that held the warm server, and every
+ * hook waiting on it, for thirteen seconds. Each folder's files come back as
+ * text, so the server keeps them without parsing them. A worker that fails
+ * reads as a relief that could not be read, never as a failed server.
+ */
+export function readReliefApart(rootGiven: string): Promise<ReliefRead> {
+  const root = resolve(rootGiven);
+  return new Promise((done) => {
+    let worker: Worker;
+    try {
+      // None of this process's flags: a test's --import would load the suite's leak guard into the worker.
+      worker = new Worker(WORKER, { workerData: { root }, execArgv: [] });
+    } catch (error) {
+      done(unread(`the relief's worker did not start: ${(error as Error).message}`));
+      return;
+    }
+    let answered = false;
+    worker.once("message", (read: ReliefRead) => {
+      answered = true;
+      done(read);
+    });
+    worker.once("error", (error) => done(unread(`the relief's worker failed: ${error.message}`)));
+    worker.once("exit", (code) => {
+      if (!answered) done(unread(`the relief's worker stopped (exit ${code}) before it answered`));
+    });
+  });
+}
+
+/** The most a snapshot embeds of the relief's files: whole folders, in order, while they fit. */
+export const SNAPSHOT_FILES_BYTES = 1 << 20;
+
+/**
+ * A relief as a snapshot carries it. No server stands behind a snapshot to
+ * load files on demand, so it embeds as many whole folders as fit in `budget`
+ * bytes, in the reading's order, and counts the folders holding files it left
+ * out, which the Structure view says.
+ */
+export function withSnapshotFiles(read: ReliefRead, budget = SNAPSHOT_FILES_BYTES): ReliefReading {
+  if (read.reading.kind !== "read") return read.reading;
+  const files: Record<string, ReliefFileLanded[]> = {};
+  let bytes = 0;
+  let leftOut = 0;
+  for (const c of read.reading.components) {
+    const text = read.files.get(c.folder);
+    if (c.files === 0 || text === undefined) continue;
+    const size = Buffer.byteLength(text);
+    if (bytes + size > budget) {
+      leftOut++;
+      continue;
+    }
+    bytes += size;
+    files[c.folder] = JSON.parse(text) as ReliefFileLanded[];
+  }
+  return { ...read.reading, files, ...(leftOut > 0 ? { filesLeftOut: leftOut } : {}) };
+}
+
+/**
+ * A name the files route may look up: "." for the root component, or a
+ * relative path of plain segments. An absolute path, a "..", an option, a
+ * backslash or a control character is refused before anything is looked up.
+ */
+export function folderName(name: string): boolean {
+  if (name === ".") return true;
+  if (name === "" || name.length > 1024 || name.startsWith("-") || name.startsWith("/") || /[\\\x00-\x1f]/.test(name)) return false;
+  return name.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
 /* ---------------------------------------------------------- diffs, for the live page */
