@@ -4,9 +4,11 @@
  * from src into dist, at the same depth, so every path a module takes from
  * its own location (the lexicon and checklist seed in docs, the package.json)
  * resolves the same compiled as in a checkout. Beside the JavaScript go the
- * files modules read at run time: the data files, the stylesheet, the Scope
- * browser sources stripped by the same stripper a checkout runs when it
- * builds a page, and the one font file the page embeds with its license.
+ * files modules read at run time: the data files, the stylesheets, the Scope
+ * page's script as one esbuild bundle (page.bundle.js, made by the same
+ * bundleBrowserScript a checkout runs when it builds a page, so an installed
+ * Coherence carries no bundler), and the one font file the page embeds with
+ * its license; and the bundled plugins, each module stripped of its types.
  * npm runs this as prepare, so an install from the git repository builds too.
  */
 
@@ -15,7 +17,7 @@ import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { createRequire, stripTypeScriptTypes } from "node:module";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { browserSources, strippedName } from "./readings/scope/build.ts";
+import { BUNDLE_NAME, bundleBrowserScript } from "./readings/scope/build.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "src");
@@ -72,8 +74,5 @@ for (const file of files(plugins)) {
   } else if (/\.(wasm|scm)$/.test(file)) copy(file, join(bundled, at)); // A plugin's parser and its queries (its manifest's treeSitter), as they are.
 }
 
-// The same modules the page joins, found the same way: from the entry, by what each imports at run time.
-for (const name of await browserSources()) {
-  const source = readFileSync(join(src, scope, name), "utf8");
-  writeFileSync(join(dist, scope, strippedName(name)), stripTypeScriptTypes(source, { mode: "strip" }));
-}
+// The page's script, bundled once here so an installed Coherence reads it and never needs the bundler.
+writeFileSync(join(dist, scope, BUNDLE_NAME), await bundleBrowserScript());

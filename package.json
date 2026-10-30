@@ -35,6 +35,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
+    "@types/three": "0.160.0",
+    "esbuild": "0.24.0",
+    "three": "0.160.0",
     "typescript": "^5.9.3"
   },
   "bin": {

@@ -117,8 +117,8 @@ a {
 }
 
 /*
- * One width for every view: the masthead and the view strip never move when the view changes. Structure's map needs the
- * room; the other views keep a readable measure inside it (their prose is capped in ch), so the width is the frame's and
+ * One width for every view: the masthead and the view strip never move when the view changes. The relief and Connections need
+ * the room; the other views keep a readable measure inside it (their prose is capped in ch), so the width is the frame's and
  * not the text's.
  */
 .shell {
@@ -825,7 +825,6 @@ code {
 
 .state-mark,
 .verdict-word,
-.owner-mark,
 .kept,
 .dirty {
   display: inline-block;
@@ -868,12 +867,6 @@ code {
 .dirty {
   color: var(--hold);
   border-color: var(--hold);
-}
-
-.owner-mark {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: none;
 }
 
 .entry[data-state="structural defect"] > .margin .headword,
@@ -1024,7 +1017,6 @@ code {
 .refutations ul,
 .checklist ul,
 .bypasses,
-.reliance-entries,
 .run-entries,
 .results,
 .candidates ul,
@@ -1120,815 +1112,7 @@ code {
   margin-top: 0.75rem;
 }
 
-/* Structure */
-
-/* Structure: one map */
-
-/*
- * Type scale for the Structure view: product UI, one system family.
- * Page: 20 semibold (the view heading), 17 semibold (the inspector heading),
- * 15 regular (the lede), 14 regular (inspector body and picks), 13 (labels,
- * meta, section heads semibold, key). Canvas: 13 / 12 / 11, set in the map.
- * Sentence case throughout; weight marks hierarchy; color marks state and
- * what can be selected, never decoration. Monospace only for code
- * identifiers and paths.
- */
-
-.flow {
-  --flow-key-rail: #5f6b7a;
-  --flow-key-quiet: #9aa5bd;
-  --flow-key-verified: #1f3a5f;
-  /* Broken is filled dark enough that white text on it reaches 4.5:1. */
-  --flow-key-broken: #c32836;
-  /* Attention that is not breakage (nothing enforced, no traced control, not covered): amber, never red. */
-  --flow-key-attention: #945400;
-  --flow-key-halo: rgb(23 32 51 / 0.2);
-  /* The map's pane, opaque: what the fade at its scrolling edge fades to. */
-  --flow-pane: #f4f6fb;
-  /* An inspector opened as a sheet over the map: nearly opaque, so its text never sits on the map's colors. */
-  --flow-sheet: rgb(246 248 252 / 0.92);
-}
-
-/* Numbers that line up down a column of rows are tabular; identifiers are not. */
-.flow-row-count .flow-meta,
-.flow-facts dd {
-  font-variant-numeric: tabular-nums;
-}
-
-@media (prefers-color-scheme: dark) {
-  .flow {
-    --flow-key-rail: #9aa6b6;
-    --flow-key-quiet: #6f7c96;
-    --flow-key-verified: #c9d6f2;
-    --flow-key-broken: #c4262e;
-    --flow-key-attention: #f0b04a;
-    --flow-key-halo: rgb(243 246 255 / 0.26);
-    --flow-pane: #121a2c;
-    --flow-sheet: rgb(16 21 34 / 0.92);
-  }
-}
-
-/* The health strip: every count a selection, each drawn in the state the map draws it. */
-.flow-map {
-  min-width: 0;
-}
-
-.flow-health {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.375rem 0.5rem;
-  margin: 0 0 0.75rem;
-  padding: 0.625rem 0.75rem 0.75rem;
-}
-
-/*
- * The glass panes: the health strip with its trust key, the map's frame, and the inspector. Each is a frosted pane
- * with a hairline frame, a lighter inner top edge and a soft drop. Only the inspector blurs what is behind it (it opens
- * as a sheet over the map); the others sit on the lit field, where a blur would cost the GPU and show nothing.
- */
-.flow-health,
-.flow-canvas,
-.flow-inspector {
-  background: var(--glass);
-  border: 1px solid var(--glass-frame);
-  border-radius: 0.75rem;
-  box-shadow: var(--glass-edge), var(--glass-drop);
-}
-
-/* Expanse's cut corners on the panes and chips where the browser draws them; rounded glass elsewhere. */
-@supports (corner-shape: bevel) {
-  .flow-health,
-  .flow-inspector {
-    border-radius: var(--cut) 0;
-    corner-shape: bevel;
-  }
-
-  .flow-canvas {
-    border-radius: 18px 0;
-    corner-shape: bevel;
-  }
-
-  .flow-fade {
-    border-radius: 0 0 17px 0;
-    corner-shape: bevel;
-  }
-
-  .flow-health-count,
-  .flow-trust-level,
-  .flow-close,
-  .flow-action {
-    border-radius: 7px 0;
-    corner-shape: bevel;
-  }
-}
-
-.flow-health-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  font: inherit;
-  font-size: 0.875rem;
-  color: var(--ink);
-  background: var(--glass-chip);
-  border: 1px solid var(--glass-border);
-  border-radius: 999px;
-  box-shadow: var(--glass-edge);
-  padding: 0.25rem 0.75rem 0.25rem 0.55rem;
-  cursor: pointer;
-}
-
-.flow-health-count strong {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.flow-health-count[aria-pressed="true"] {
-  border-color: var(--ink);
-  box-shadow: var(--glass-edge), 0 0 0 3px var(--flow-key-halo);
-}
-
-.flow-health-swatch,
-.flow-verdict-swatch {
-  display: inline-block;
-  flex: none;
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 0.2rem;
-  border: 1.5px solid var(--flow-key-verified);
-  background: var(--flow-key-verified);
-}
-
-.flow-health-count[data-health="requirements"] .flow-health-swatch,
-[data-verdict-state="requirement"] > .flow-verdict-swatch {
-  background: repeating-linear-gradient(45deg, var(--flow-key-verified) 0 1.5px, transparent 1.5px 4px);
-  border-style: dashed;
-}
-
-.flow-health-count[data-health="defects"] .flow-health-swatch,
-.flow-health-count[data-health="bypassed"] .flow-health-swatch,
-[data-verdict-state="broken"] > .flow-verdict-swatch {
-  background: var(--flow-key-broken);
-  border-color: var(--flow-key-broken);
-}
-
-.flow-health-count[data-health="escalations"] .flow-health-swatch {
-  background: none;
-  border-color: var(--flow-key-attention);
-  border-radius: 50%;
-}
-
-.flow-health-count[data-health="uncovered"] .flow-health-swatch {
-  background: none;
-  border-color: var(--flow-key-attention);
-}
-
-.flow-health-count[data-health="defects"][data-count="0"] .flow-health-swatch {
-  background: none;
-}
-
-/* Nothing enforced is attention, not breakage: amber with a bar, never red. */
-.flow-health-note {
-  flex-basis: 100%;
-  margin: 0.125rem 0 0;
-  padding: 0.125rem 0 0.125rem 0.625rem;
-  border-left: 3px solid var(--flow-key-attention);
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--flow-key-attention);
-}
-
-.flow-attention {
-  color: var(--flow-key-attention);
-}
-
-.flow-verdict-line {
-  margin: 0.5rem 0 0;
-  font-weight: 600;
-}
-
-/* Entrance coverage beneath the trust key: one line of counts, the undeclared in attention, the lists one click away. */
-.flow-coverage {
-  flex-basis: 100%;
-  margin: 0.375rem 0 0;
-  font-size: 0.8125rem;
-  color: var(--ink-quiet);
-}
-
-.flow-coverage > summary {
-  cursor: pointer;
-}
-
-.flow-coverage-title {
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.flow-coverage .flow-rows {
-  margin: 0.25rem 0 0;
-  max-height: 16rem;
-  overflow-y: auto;
-}
-
-.flow-coverage code {
-  overflow-wrap: anywhere;
-}
-
-.flow-coverage > p.flow-meta {
-  margin: 0.375rem 0 0;
-}
-
-/* The trust-level key beside the health counts: each level a selection, defined in one line. */
-.flow-trust-key {
-  flex-basis: 100%;
-  margin: 0.25rem 0 0;
-  font-size: 0.8125rem;
-}
-
-.flow-trust-key-title {
-  margin: 0 0 0.25rem;
-  font-weight: 600;
-}
-
-.flow-trust-key-title .flow-meta {
-  font-weight: 400;
-}
-
-.flow-trust-key ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1.25rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.flow-trust-key li {
-  display: inline-flex;
-  gap: 0.375rem;
-  align-items: baseline;
-  color: var(--ink-quiet);
-}
-
-.flow-trust-level {
-  flex: none;
-  font: inherit;
-  color: var(--ink);
-  background: var(--glass-chip);
-  border: 1px solid var(--glass-border);
-  border-radius: 999px;
-  box-shadow: var(--glass-edge);
-  padding: 0 0.5rem;
-  cursor: pointer;
-}
-
-.flow-trust-level[aria-pressed="true"] {
-  border-color: var(--ink);
-  box-shadow: var(--glass-edge), 0 0 0 3px var(--flow-key-halo);
-}
-
-/* Unknown and no traced control read in the key as they read on the map: the tag beneath a token, words alone. */
-.flow-trust-tag {
-  flex: none;
-  color: var(--ink-quiet);
-}
-
-.flow-trust-tag.flow-trust-untraced {
-  color: var(--flow-key-attention);
-}
-
-.flow-trust-level code,
-.flow-trust-tag code {
-  font-size: 0.75rem;
-}
-
-.flow-verdict {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.flow-verdict[data-verdict-state="broken"] {
-  color: var(--fail);
-  font-weight: 600;
-}
-
-.flow-ident[data-verdict-state="verified"] {
-  background: var(--flow-key-verified);
-  border-color: var(--flow-key-verified);
-  color: var(--paper);
-}
-
-.flow-ident[data-verdict-state="requirement"] {
-  border-color: var(--ink-quiet);
-  background: repeating-linear-gradient(45deg, var(--rule) 0 1px, var(--paper) 1px 4px);
-}
-
-.flow-ident[data-verdict-state="broken"] {
-  background: var(--flow-key-broken);
-  border-color: var(--flow-key-broken);
-  color: #ffffff;
-}
-
-.flow-term {
-  color: inherit;
-  font-style: normal;
-  text-decoration: underline dotted;
-  text-underline-offset: 0.2em;
-  cursor: help;
-}
-
-a.flow-term {
-  cursor: pointer;
-}
-
-.flow-defect {
-  margin-top: 0.75rem;
-}
-
-.flow-defect h4 {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: baseline;
-}
-
-.flow-head {
-  margin: 1.5rem 0 0;
-}
-
-.flow-head h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.flow-lede {
-  margin: 0.25rem 0 0;
-  font-size: 0.9375rem;
-  max-width: 72ch;
-}
-
-.flow-evidence {
-  margin: 0.25rem 0 0;
-  font-size: 0.8125rem;
-  color: var(--ink-quiet);
-  max-width: 96ch;
-}
-
-/* A partial map says so before anything else is read: the attention color, not the quiet one. */
-.flow-evidence.flow-partial {
-  color: var(--flow-key-attention);
-  font-weight: 600;
-}
-
-.flow-stage {
-  margin: 1rem 0;
-}
-
-.flow-canvas {
-  max-width: 100%;
-  overflow-x: auto;
-  scroll-timeline: --flow-x inline;
-}
-
-/*
- * When the map is wider than its room, a hint above it and a fade at the edge it continues past say that it scrolls. The
- * page writes the container query from the map's own width; the fade clears once the map is scrolled to its end.
- */
-.flow-canvas-wrap {
-  container: flow-canvas / inline-size;
-  timeline-scope: --flow-x;
-}
-
-.flow-canvas-frame {
-  position: relative;
-}
-
-.flow-scroll-hint {
-  display: none;
-  margin: 0 0 0.375rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--ink-quiet);
-}
-
-.flow-fade {
-  display: none;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 3rem;
-  pointer-events: none;
-  border-radius: 0 0.75rem 0.75rem 0;
-}
-
-.flow-fade-end {
-  right: 1px;
-  top: 1px;
-  bottom: 1px;
-  background: linear-gradient(to right, transparent, var(--flow-pane) 85%);
-  animation: flow-fade-end linear both;
-  animation-timeline: --flow-x;
-}
-
-@keyframes flow-fade-end {
-  0%, 92% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-/* The map fills its canvas and never shrinks below its own size (text never shrinks below what was measured). */
-.flow-canvas svg {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.flow-inspector {
-  padding: 1rem 1.125rem 1.125rem;
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
-  font-size: 0.875rem;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-  margin-top: 1rem;
-}
-
-.flow-close {
-  float: right;
-  margin: -0.25rem -0.25rem 0.25rem 0.5rem;
-  width: 1.75rem;
-  height: 1.75rem;
-  font: inherit;
-  font-size: 1.125rem;
-  line-height: 1;
-  color: var(--ink-quiet);
-  background: var(--glass-chip);
-  border: 1px solid var(--glass-border);
-  border-radius: 999px;
-  box-shadow: var(--glass-edge);
-  cursor: pointer;
-}
-
-.flow-close:hover {
-  color: var(--ink);
-}
-
-/* Desktop: the inspector stands beside the canvas in its own column, never over it; the canvas keeps its full height. */
-@media (min-width: 64rem) {
-  .flow-stage {
-    display: grid;
-    /* The map takes the room; the inspector is a fixed, modest column beside it. */
-    grid-template-columns: minmax(0, 1fr) 20rem;
-    gap: 1rem;
-    align-items: start;
-  }
-
-  .flow-map {
-    grid-column: 1;
-  }
-
-  .flow-inspector {
-    grid-column: 2;
-    margin-top: 0;
-    position: sticky;
-    top: 1rem;
-    max-height: calc(100vh - 2rem);
-    overflow-y: auto;
-  }
-}
-
-/*
- * Below desktop width: an inspector the reader opened is a sheet over the bottom of the screen, dismissed by its close
- * button or Escape. The default story's inspector (the reader chose nothing) never covers the map: it stays in the
- * page's flow beneath it.
- */
-@media (max-width: 63.99rem) {
-  .flow-inspector[data-open="true"]:not([data-default="true"]) {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 20;
-    max-height: 55vh;
-    overflow-y: auto;
-    margin: 0;
-    border-radius: 0.75rem 0.75rem 0 0;
-    corner-shape: round;
-    background: var(--flow-sheet);
-    box-shadow: var(--glass-edge), 0 -0.5rem 1.5rem rgb(0 0 0 / 0.22);
-  }
-
-  .flow-stage:has(.flow-inspector[data-open="true"]:not([data-default="true"])) {
-    padding-bottom: 55vh;
-  }
-}
-
-/* The inspector: kind, heading, one-line summary, facts, then rows. */
-
-.flow-kind {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--ink-quiet);
-}
-
-.flow-inspector h3 {
-  margin: 0.125rem 0 0;
-  font-size: 1.0625rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.flow-inspector h3 a {
-  color: inherit;
-  text-decoration-color: var(--rule);
-}
-
-.flow-sub {
-  margin: 0.375rem 0 0;
-}
-
-.flow-inspector h4 {
-  margin: 1.125rem 0 0.25rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--ink-quiet);
-}
-
-.flow-inspector h5 {
-  margin: 0 0 0.25rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-
-.flow-inspector p {
-  margin: 0.375rem 0;
-}
-
-.flow-inspector code {
-  font-size: 0.8125rem;
-}
-
-.flow-count {
-  font-weight: 400;
-  color: var(--ink-quiet);
-}
-
-.flow-count {
-  margin-left: 0.25rem;
-}
-
-.flow-note {
-  font-size: 0.8125rem;
-  color: var(--ink-quiet);
-}
-
-.flow-facts,
-.flow-levels {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 0.25rem 0.75rem;
-  margin: 0.75rem 0 0;
-  padding: 0.625rem 0 0;
-  border-top: 1px solid var(--rule-soft);
-}
-
-.flow-facts dt,
-.flow-levels dt {
-  color: var(--ink-quiet);
-}
-
-.flow-facts dd,
-.flow-levels dd {
-  margin: 0;
-  min-width: 0;
-}
-
-.flow-levels {
-  font-size: 0.8125rem;
-  border-top: 0;
-  padding-top: 0;
-  margin-top: 0.375rem;
-}
-
-.flow-levels dt {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-}
-
-.flow-facts .crossing {
-  margin: 0;
-  font-size: inherit;
-}
-
-.flow-bad {
-  color: var(--fail);
-  font-weight: 600;
-}
-
-.flow-rows,
-.flow-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.flow-list li {
-  position: relative;
-  padding-left: 0.875rem;
-  margin: 0.25rem 0;
-}
-
-.flow-list li::before {
-  content: "";
-  position: absolute;
-  left: 0.125rem;
-  top: 0.6em;
-  width: 0.3rem;
-  height: 0.3rem;
-  border-radius: 50%;
-  background: var(--ink-quiet);
-}
-
-.flow-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 0.5rem;
-  padding: 0.3rem 0;
-  border-top: 1px solid var(--rule-soft);
-}
-
-.flow-rows > .flow-row:first-child {
-  border-top: 0;
-}
-
-.flow-row .flow-meta {
-  flex-basis: 100%;
-}
-
-.flow-row-count .flow-meta {
-  flex-basis: auto;
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.flow-meta {
-  font-size: 0.8125rem;
-  color: var(--ink-quiet);
-}
-
-.flow-pick {
-  font: inherit;
-  color: var(--accent);
-  background: none;
-  border: 0;
-  border-radius: 0.25rem;
-  padding: 0;
-  cursor: pointer;
-  text-align: left;
-}
-
-.flow-pick:hover {
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
-}
-
-.flow-action {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-chip);
-  box-shadow: var(--glass-edge);
-}
-
-.flow-ident {
-  display: inline-block;
-  min-width: 2.25rem;
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  font-weight: 400;
-  line-height: 1.4;
-  text-align: center;
-  padding: 0 0.3rem;
-  border: 1px solid var(--rule);
-  border-radius: 0.25rem;
-  background: var(--paper);
-  color: var(--ink);
-}
-
-.flow-kind .flow-ident {
-  min-width: 0;
-  margin-left: 0.125rem;
-}
-
-.flow-swatch {
-  display: inline-block;
-  flex: none;
-  width: 1.25rem;
-  height: 0.375rem;
-  border-radius: 1rem;
-  vertical-align: middle;
-  align-self: center;
-}
-
-.flow-swatch-derived {
-  opacity: 0.7;
-}
-
-.flow-inspector details {
-  margin-top: 1rem;
-}
-
-.flow-inspector details > summary,
-.flow-key details > summary {
-  cursor: pointer;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--ink-quiet);
-}
-
-.flow-inspector details[open] > summary {
-  margin-bottom: 0.25rem;
-}
-
-.flow-inspector details .flow-rows {
-  margin-top: 0.25rem;
-}
-
-/* The shared enforcement and refutation blocks, compacted for the column. */
-.flow-inspector .enforcements,
-.flow-inspector .refutations {
-  margin-top: 0.25rem;
-}
-
-.flow-inspector .refutations h4 {
-  display: none;
-}
-
-.flow-inspector .enforcements li,
-.flow-inspector .refutations li {
-  padding: 0.25rem 0 0.25rem 0.625rem;
-  border-left-width: 2px;
-}
-
-.flow-inspector .enforcement p {
-  margin: 0.125rem 0;
-}
-
-.flow-inspector .reason,
-.flow-inspector .enforced-by,
-.flow-inspector .refutation .quiet {
-  font-size: 0.8125rem;
-}
-
-.flow-inspector .label {
-  color: var(--ink-quiet);
-}
-
-.flow-inspector .defect {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-}
-
-/* The key below the map: each mark and what it means. */
-
-.flow-key {
-  font-size: 0.8125rem;
-  color: var(--ink-quiet);
-}
-
-.flow-key > ul {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
-  gap: 0.375rem 1.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.flow-key > ul > li {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.flow-key-glyph {
-  flex: none;
-  margin-top: 0.1rem;
-  color: var(--ink-quiet);
-}
-
-.flow-key details {
-  margin-top: 0.75rem;
-  max-width: 80ch;
-}
-
-.flow-key details .flow-list {
-  margin-top: 0.375rem;
-}
-
-/* Reference sites, on the Structure inspector */
+/* Reference sites, on a chokepoint invariant's reliance listing */
 
 .site-list {
   margin: 0.25rem 0 0;
@@ -2325,3 +1509,129 @@ a.flow-term {
 .strip-legend .cell {
   margin: 0 0.15rem 0 0.35rem;
 }
+
+/* ---------- Structure: the relief (relief/scene.ts) ---------- */
+.relief {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --line: #e1e0d9; --chip: #f0efec; --sel: #d6470f;
+  --r1: #cde2fb; --r2: #9ec5f4; --r3: #6da7ec; --r4: #3987e5; --r5: #2a78d6; --r6: #1c5cab; --r7: #0d366b;
+  --ground: #efeee9; --edge: rgba(11,11,11,.28); --plinth: #dcdad2;
+  --add: #2e9d5b; --del: #d1453b;
+}
+@media (prefers-color-scheme: dark) {
+  .relief {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --line: #2c2c2a; --chip: #2c2c2a; --sel: #ff8a4c;
+    --r1: #0d366b; --r2: #1c5cab; --r3: #2a78d6; --r4: #3987e5; --r5: #6da7ec; --r6: #9ec5f4; --r7: #cde2fb;
+    --ground: #171716; --edge: rgba(255,255,255,.22); --plinth: #2a2a28;
+    --add: #4cc47f; --del: #f0645a;
+  }
+}
+.relief, .relief * { box-sizing: border-box; }
+.relief { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.relief .wrap { max-width: 1600px; margin: 0 auto; padding: 18px 16px 40px; }
+.relief h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; letter-spacing: -.01em; }
+.relief .sub { color: var(--ink-2); margin: 0 0 14px; max-width: 1000px; }
+.relief .controls { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; margin-bottom: 12px; }
+.relief .group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.relief .group > span { color: var(--muted); font-size: 12px; margin-right: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.relief button { font: inherit; font-size: 13px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.relief button[aria-pressed="true"] { background: var(--ink); color: var(--page); border-color: var(--ink); }
+.relief button:disabled { opacity: .4; cursor: default; }
+.relief .main { display: grid; grid-template-columns: 1fr 380px; gap: 16px; }
+@media (max-width: 1000px) { .main { grid-template-columns: 1fr; } }
+.relief .stage { position: relative; height: 720px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.relief .stage canvas { display: block; }
+.relief .label { font-size: 12px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--surface) 82%, transparent); padding: 1px 6px; border-radius: 4px; white-space: nowrap; pointer-events: none; line-height: 1.3; text-align: center; }
+.relief .label small { display: block; font-weight: 400; color: var(--ink-2); font-size: 11px; opacity: .5; }
+.relief .label.dim { opacity: .35; }
+.relief .label .dl { display: block; font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.relief .label.virt { font-style: italic; font-weight: 500; color: var(--ink-2); }
+.relief .label.plat { font-size: 13px; color: var(--ink-2); }
+.relief .callouts { position: absolute; inset: 0; pointer-events: none; }
+.relief .callouts .label { position: absolute; pointer-events: auto; cursor: pointer; display: none; }
+.relief .callouts .label { text-align: left; }
+.relief .callouts .label.r { text-align: right; }
+.relief .leaders { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.relief .leaders polyline { fill: none; stroke: var(--muted); stroke-width: .75; opacity: .6; stroke-linejoin: round; }
+.relief .leaders circle { fill: var(--ink-2); }
+.relief .label.plat small { color: var(--muted); }
+.relief .crumbs { position: absolute; left: 12px; top: 10px; font-size: 13px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 85%, transparent); padding: 5px 8px; border-radius: 6px; max-width: 70%; }
+.relief .crumbs a { color: var(--ink); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.relief .crumbs b { color: var(--ink); font-weight: 650; }
+.relief .crumbs small { display: block; color: var(--muted); font-size: 11px; }
+.relief .scale { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 85%, transparent); padding: 6px 8px; border-radius: 6px; }
+.relief .scale .ramp { display: flex; margin: 4px 0 2px; }
+.relief .scale .ramp i { width: 22px; height: 10px; }
+.relief .scale .sw { display: inline-block; width: 12px; height: 10px; vertical-align: -1px; margin-right: 4px; }
+.relief .add { color: var(--add); font-variant-numeric: tabular-nums; } .del { color: var(--del); font-variant-numeric: tabular-nums; }
+.relief select { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); max-width: 330px; }
+.relief .scale .ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+.relief .tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; max-width: 340px; box-shadow: 0 6px 20px rgba(0,0,0,.12); display: none; }
+.relief .tip b { font-weight: 650; }
+.relief .tip .k { color: var(--muted); }
+.relief .tip .row { display: flex; justify-content: space-between; gap: 16px; }
+.relief aside { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px; height: 720px; overflow: auto; }
+.relief aside h2 { font-size: 16px; margin: 0 0 2px; }
+.relief aside h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 16px 0 6px; font-weight: 600; }
+.relief aside .intent { color: var(--ink-2); margin: 0 0 8px; }
+.relief .nums { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.relief .nums div { background: var(--chip); border-radius: 6px; padding: 5px 8px; }
+.relief .nums .n { font-weight: 650; font-variant-numeric: tabular-nums; }
+.relief .nums .k { font-size: 11px; color: var(--ink-2); }
+.relief .nums .cur { outline: 2px solid var(--ink); }
+.relief ul.items { list-style: none; margin: 0; padding: 0; }
+.relief ul.items li { padding: 5px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.relief ul.items li .m { color: var(--muted); font-size: 12px; }
+.relief ul.items li code { font-size: 12px; }
+.relief ul.items li.click { cursor: pointer; }
+.relief ul.items li.click:hover { background: var(--chip); }
+.relief .rank { display: grid; grid-template-columns: 1fr auto auto; gap: 2px 12px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.relief .rank > * { padding: 3px 0; border-top: 1px solid var(--line); }
+.relief .rank .h { color: var(--muted); font-size: 11px; text-transform: uppercase; border-top: 0; }
+.relief .rank .nm { cursor: pointer; }
+.relief .rank .nm:hover { text-decoration: underline; }
+.relief .note { color: var(--ink-2); font-size: 13px; max-width: 1100px; margin-top: 14px; }
+.relief .note li { margin: 3px 0; }
+.relief details { margin-top: 12px; }
+.relief summary { cursor: pointer; color: var(--ink-2); }
+.relief table { border-collapse: collapse; font-size: 13px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.relief th, .relief td { padding: 4px 10px; border-bottom: 1px solid var(--line); text-align: right; }
+.relief th:first-child, .relief td:first-child { text-align: left; }
+.relief th.cur, .relief td.cur { background: var(--chip); }
+
+/* The relief's control strip: each group one segmented control, every control one height on one baseline. */
+.relief .controls { gap: 10px 28px; padding: 2px 0 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.relief .group { gap: 0; flex-wrap: nowrap; }
+.relief .group > span:first-child { font-size: 11px; font-weight: 600; letter-spacing: .06em; margin-right: 10px; }
+.relief .group button { height: 28px; padding: 0 11px; margin-left: -1px; border-radius: 0; font-size: 12.5px; background: transparent; color: var(--ink-2); border-color: var(--line); white-space: nowrap; }
+.relief .group button:first-of-type { margin-left: 0; border-radius: 7px 0 0 7px; }
+.relief .group button:last-of-type { border-radius: 0 7px 7px 0; }
+.relief .group button:only-of-type { border-radius: 7px; }
+.relief .group button:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--chip); color: var(--ink); }
+.relief .group button[aria-pressed="true"] { position: relative; z-index: 1; background: var(--ink); color: var(--page); border-color: var(--ink); }
+.relief .group select { height: 28px; max-width: 250px; padding: 0 8px; border-radius: 7px; font-size: 12.5px; text-overflow: ellipsis; }
+.relief .group select + span { margin: 0 6px; color: var(--muted); }
+.relief [data-r="gDiff"] select ~ button:first-of-type { margin-left: 10px; }
+.relief [hidden] { display: none !important; } /* a group the page cannot use, the diff in a snapshot, stays hidden whatever its display */
+
+/* The relief sits on Scope's own page: no slab of its own, and its strip lies on the page itself, with the tool strip's spacing and rule. */
+.relief { background: transparent; }
+.relief .controls {
+  margin: 0 0 1rem;
+  padding: 0.875rem 0;
+  background: none;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.relief [data-r="gDiff"] { flex-basis: 100%; } /* the diff has the second row of the strip to itself */
+
+/* Agent activity: a callout whose component an agent is touching, and the ticker of what was touched. */
+.relief .activity { position: absolute; right: 12px; bottom: 10px; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; align-items: flex-end; pointer-events: none; max-width: 46%; }
+.relief .activity li { font-size: 12px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 88%, transparent); padding: 2px 8px; border-radius: 5px; border-left: 3px solid #7fdcff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.relief .activity li.write { border-left-color: #ffb347; }
+.relief .activity li b { color: var(--ink); font-weight: 650; }
+.relief .activity li code { font-size: 11.5px; }
+.relief .activity li.gone { animation: relief-fade .9s forwards; }
+@keyframes relief-fade { to { opacity: 0; } }

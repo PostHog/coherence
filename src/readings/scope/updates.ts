@@ -141,8 +141,8 @@ export function mergeWork(state: ShellState, orders: readonly WorkOrder[], damag
 }
 
 /**
- * Take a recomputed snapshot: the model (lexicons, specs, interfaces, work)
- * is replaced, the records the page already holds are kept beside the
+ * Take a recomputed snapshot: the model (lexicons, specs, interfaces, work,
+ * the relief) is replaced, the records the page already holds are kept beside the
  * snapshot's, and the count of what is left out is the snapshot's total less
  * what the page now holds. What the reader chose (the view, queries, filters,
  * a selection) is kept.
@@ -156,6 +156,8 @@ export function mergeSnapshot(state: ShellState, incoming: ShellState): void {
   state.spec = incoming.spec;
   if (incoming.spec.languages !== undefined) setLanguageData(incoming.spec.languages);
   state.componentInterfaces = incoming.componentInterfaces;
+  if (incoming.relief === undefined) delete state.relief;
+  else state.relief = incoming.relief;
   state.structure = { ...state.structure, preview: incoming.structure.preview };
   const journal = { ...incoming.journal, records: state.journal.records };
   delete journal.omitted;

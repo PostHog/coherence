@@ -428,6 +428,7 @@ export type JournalStepOutcome = { result: "done"; evidence?: string } | { resul
  */
 import type { WorkOrder } from "../../journal/work.ts";
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
+import type { ReliefReading } from "../relief/relief.ts";
 import type { LanguageData } from "./language-data.ts";
 import type { LanguagesRead } from "./languages-read.ts";
 export type { WorkOrder };
@@ -466,6 +467,8 @@ export interface InvariantsViewState {
   state: LifecycleState | "";
   /** A component folder, or "" for every component. */
   component: string;
+  /** The reliance listing open on its card, by its id: a link landed on it or the reader opened it. Absent while every listing is folded. */
+  reliance?: string;
 }
 
 /**
@@ -637,13 +640,9 @@ export interface StructurePreview {
   chokepoints?: { chokepoint: string; protects: string }[];
 }
 
-/** Structure has no filters: an optional generated-page preview, and what the reader selected in the flow. */
+/** Structure has no filters: an optional generated-page preview. */
 export interface StructureViewState {
   preview: StructurePreview[];
-  /** A flow id (an entrance, a trust level, a component, a component interface, a chokepoint) whose story is lit. Absent until the reader selects one. */
-  selected?: string;
-  /** Component folders opened in place, one level of the tree at a time. Absent: the top level is open. */
-  expanded?: string[];
 }
 
 export interface RunsViewState {
@@ -707,6 +706,8 @@ export interface ShellState {
   journal: JournalData;
   /** Every component interface, as the language adapter resolved the references when the page was built. */
   componentInterfaces: InterfaceReading;
+  /** What the Structure view draws that the rest of the state does not hold: files, districts and landings (relief.ts). Absent from a page built before it. */
+  relief?: ReliefReading;
   components: ComponentsViewState;
   structure: StructureViewState;
   invariants: InvariantsViewState;
