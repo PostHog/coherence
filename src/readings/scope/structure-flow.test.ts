@@ -852,7 +852,7 @@ test("the masthead leads with health: one verdict in large type that links to it
   assert.match(broken.page, /data-field="verdict-detail">1 requirement not enforced yet/);
   assert.equal(resolveHash(healthState(), `#${broken.href}`)?.view, "structure", "the link lands on the Structure view");
   const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
-  const size = (selector: string): string => new RegExp(`\\n${selector.replace(/\./g, "\\.")} \\{[^}]*font-size: ([^;]+);`).exec(css)![1]!;
+  const size = (selector: string): string => new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{[^}]*font-size: ([^;]+);`).exec(css)![1]!;
   assert.match(size(".masthead .verdict"), /clamp\(1\.375rem/, "large type");
   assert.equal(size(".masthead .meta-counts"), "0.8125rem", "the counts are small");
 });
