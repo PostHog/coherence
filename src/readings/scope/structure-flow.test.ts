@@ -832,7 +832,7 @@ test("with the handler's reach read, a route follows the handler and stops where
   assert.equal(flowOf(projectState()).routes[0]!.followed, "weight");
 });
 
-test("the masthead leads with health: one verdict in large type that links to its set, with the counts demoted beneath it", () => {
+test("the masthead leads with health: one verdict in large type that links to Structure, with the counts demoted beneath it", () => {
   const verdictOf = (state: ShellState): { kind: string; href: string; text: string; page: string } => {
     const page = renderView(state, "lexicon").text;
     const m = /<a class="verdict" data-field="verdict" data-verdict="([a-z]+)" href="#([^"]+)">([^<]+)<\/a>/.exec(page);
@@ -850,7 +850,7 @@ test("the masthead leads with health: one verdict in large type that links to it
   const broken = verdictOf(healthState());
   assert.deepEqual([broken.kind, broken.text, broken.href], ["broken", "1 broken", flowBrokenId("src/store")], "one broken component: the verdict names its broken set");
   assert.match(broken.page, /data-field="verdict-detail">1 requirement not enforced yet/);
-  assert.equal(resolveHash(healthState(), `#${broken.href}`)?.view, "structure", "the link lands on the Structure view");
+  for (const verdict of [healthy, nothing, broken]) assert.equal(resolveHash(healthState(), `#${verdict.href}`)?.view, "structure", `the ${verdict.kind} verdict's link lands on the Structure view`);
   const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
   const size = (selector: string): string => new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{[^}]*font-size: ([^;]+);`).exec(css)![1]!;
   assert.match(size(".masthead .verdict"), /clamp\(1\.375rem/, "large type");

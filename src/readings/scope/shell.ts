@@ -73,9 +73,9 @@ export function renderConnection(state: ShellState): Markup | null {
 }
 
 /**
- * The masthead leads with health: one verdict in large type, the link to its
- * set on the Structure map (the broken component's mark when one component
- * holds everything broken), and what else the verdict leaves out beneath it,
+ * The masthead leads with health: one verdict in large type, linking to
+ * Structure (its href still names the verdict's set, which resolveHash sends
+ * to the Structure view), and what else the verdict leaves out beneath it,
  * the undeclared entrances among it as a neutral count.
  * The lexicon and the record counts are demoted to one small line.
  */

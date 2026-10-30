@@ -7,8 +7,10 @@
  * one function every reader of the state goes through (the snapshot here,
  * the warm server's live reading in live.ts, the agent query).
  *
- * The shell: the styles, the embedded font and the browser script joined into
- * one HTML document whose bytes depend on no project content. Live, the warm
+ * The shell: the styles, the embedded font and the browser script (one
+ * esbuild bundle of the page's entry and every module it imports, three.js
+ * included: bundleBrowserScript) joined into one HTML document whose bytes
+ * depend on no project content. Live, the warm
  * server serves it and the page fetches its state and follows the stores as
  * they grow (live.ts). A snapshot is the same shell with one inline state, a
  * self-contained file for sharing and CI (snapshotOf). The browser renders

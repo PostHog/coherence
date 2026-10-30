@@ -206,7 +206,9 @@ first and filled second.
 
 `--preview` requires a declared `--crossing "<level> -> <level>"`. It builds a
 self-contained Scope page in a private system temporary directory, opens on
-Structure, and adds the proposed crossing as a dashed, unverified edge. The
+Structure, and carries the proposed crossing in the page's state. No view
+draws the proposal yet: the relief has no place for it, and drawing it as a
+dashed, unverified door in Connections is the next round. The
 command prints the generated page path. The proposal is not run evidence: it
 has no grade, lifecycle state, verdict, or reliance sites, and it does not
 change the component spec. Add `--write` explicitly to append the same

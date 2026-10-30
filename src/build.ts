@@ -4,9 +4,11 @@
  * from src into dist, at the same depth, so every path a module takes from
  * its own location (the lexicon and checklist seed in docs, the package.json)
  * resolves the same compiled as in a checkout. Beside the JavaScript go the
- * files modules read at run time: the data files, the stylesheet, the Scope
- * browser sources stripped by the same stripper a checkout runs when it
- * builds a page, and the one font file the page embeds with its license.
+ * files modules read at run time: the data files, the stylesheets, the Scope
+ * page's script as one esbuild bundle (page.bundle.js, made by the same
+ * bundleBrowserScript a checkout runs when it builds a page, so an installed
+ * Coherence carries no bundler), and the one font file the page embeds with
+ * its license; and the bundled plugins, each module stripped of its types.
  * npm runs this as prepare, so an install from the git repository builds too.
  */
 

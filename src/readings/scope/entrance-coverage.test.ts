@@ -2,7 +2,7 @@
  * Entrance coverage (entrance-coverage.ts, c-3760638e): every detected
  * entrance is covered individually, through a grouped entrance, or not at
  * all, by the three rules (names it, through its handler, in its module);
- * the query, the map and orient say the same counts from one derivation.
+ * the query, the masthead and orient say the same counts from one derivation.
  */
 
 import assert from "node:assert/strict";

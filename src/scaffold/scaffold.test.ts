@@ -287,10 +287,11 @@ function embeddedState(html: string): Record<string, unknown> {
   return JSON.parse(match[1]!) as Record<string, unknown>;
 }
 
-test("scaffold invariant --preview writes only an ephemeral proposed, dashed, unverified Structure edge", async () => {
+test("scaffold invariant --preview writes a self-contained page outside the project carrying the proposal ungraded in its state, changes no spec, and gives identical bytes for identical inputs", async () => {
   const { root, specPath, original } = previewFixture();
   try {
-    const run = await runAsync(root, "invariant", "./vault", "A thing crosses.", "--kinds", "none", "--crossing", "a -> b", "--preview");
+    const argv = ["invariant", "./vault", "A thing crosses.", "--kinds", "none", "--crossing", "a -> b", "--preview"];
+    const run = await runAsync(root, ...argv);
     assert.equal(run.code, 0, run.err.join("\n"));
     assert.equal(readFileSync(specPath, "utf8"), original, "preview alone does not write the proposal into the spec");
     const outPath = writtenPreview(run);
@@ -298,6 +299,7 @@ test("scaffold invariant --preview writes only an ephemeral proposed, dashed, un
     assert.equal(outPath.startsWith(tmpdir()), true, "the generated reading is in the system temporary area");
     const html = readFileSync(outPath, "utf8");
     const state = embeddedState(html);
+    assert.doesNotMatch(html, /<script[^>]*\ssrc=|<link[^>]*\shref=/, "the page loads nothing from outside itself");
     assert.equal(state.activeView, "structure");
     const proposal = ((state.structure as { preview: Record<string, unknown>[] }).preview)[0]!;
     assert.deepEqual(proposal, { component: "vault", name: "<name>", crossing: { from: "a", to: "b" } });
@@ -305,6 +307,10 @@ test("scaffold invariant --preview writes only an ephemeral proposed, dashed, un
     assert.equal("state" in proposal, false, "a proposal has no fabricated lifecycle state");
     assert.equal("verdict" in proposal, false, "a proposal has no fabricated verdict");
     assert.equal("reliance" in proposal, false, "a proposal has no fabricated evidence");
+    const again = await runAsync(root, ...argv);
+    assert.equal(again.code, 0, again.err.join("\n"));
+    assert.notEqual(writtenPreview(again), outPath, "each preview gets a private temporary directory");
+    assert.deepEqual(readFileSync(writtenPreview(again)), readFileSync(outPath), "identical inputs give identical page bytes");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
