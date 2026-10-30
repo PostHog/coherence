@@ -24,6 +24,13 @@
  * reading is first asked for and again when a run lands, never on every file
  * save, within the same budget as a snapshot's.
  *
+ * The vocabulary coverage is read on a worker thread (coverage-reading.ts),
+ * when the reading is first asked for and again when the model reloads: a
+ * full reading scans the whole corpus, and this loop also answers the
+ * agent's hooks. The first load and a reloaded snapshot never wait for it;
+ * they carry the coverage as being read, and the reading follows as an
+ * update.
+ *
  * A page resumes from cursors derived from what it holds. The catch-up sends
  * every record at or after a little before each cursor, since a writer whose
  * clock read earlier can append after a later record; the page merges by
@@ -41,6 +48,7 @@ import { loadJournal } from "../../journal/store.ts";
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
 import { storeOfPath, type RecordStore } from "../../journal/stores.ts";
 import { buildShell, rootOptions, scopeState, windowState, type BuildOptions, type Shell } from "./build.ts";
+import { coverageOffLoop } from "./coverage-reading.ts";
 import { interfaceAdapter, interfaceBounds, readComponentInterfaces } from "./component-interfaces.ts";
 import { readAndRecord } from "./gaps.ts";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
@@ -48,7 +56,7 @@ import { isLanguage } from "../../adapters/index.ts";
 import { readByModel } from "../../spec/model.ts";
 import { DEFAULT_PROJECT_LEXICON, projectLexiconPath } from "../../lifecycle/project.ts";
 import { JOURNAL_WINDOW, RUN_WINDOW } from "./derive.ts";
-import type { InterfaceReading, JournalRecord, RunRecord, ShellState, WorkOrder } from "./model.ts";
+import type { CoverageUnread, InterfaceReading, JournalRecord, LexiconCoverage, RunRecord, ShellState, WorkOrder } from "./model.ts";
 import { runKeyOf } from "./updates.ts";
 
 /** How far before a page's cursor the catch-up reaches, for a writer whose clock read earlier but appended later. */
@@ -65,6 +73,8 @@ export interface LiveOptions {
   debounceMs?: number;
   /** Build options beyond the root's defaults (Coherence's lexicon, the project's name). */
   build?: Partial<BuildOptions>;
+  /** How the vocabulary coverage is read (default on a worker thread, coverageOffLoop); a test holds it to see the reading go on without it. */
+  coverage?: (root: string) => Promise<LexiconCoverage>;
 }
 
 /** A record store, or the model: the specs, the config and the lexicons. */
@@ -144,6 +154,10 @@ class LiveReading implements HttpApp {
   private interfaces: InterfaceReading;
   private reading: Promise<void> | undefined;
   private readAgain = false;
+  /** The vocabulary coverage as last read, or why it is not yet; one reading at a time, off the loop, once more if the model reloaded meanwhile. */
+  private coverage: LexiconCoverage | CoverageUnread = { kind: "reading", because: "the warm server is reading the vocabulary coverage; this section fills when it is done" };
+  private coverageReading: Promise<void> | undefined;
+  private readCoverageAgain = false;
   /** The reading's own bounded server, when the shared instrument reads a whole workspace the reading never draws. */
   private readingServer: { adapter: LanguageAdapter; bounds: string } | undefined;
   private readonly clients = new Set<ServerResponse>();
@@ -172,7 +186,10 @@ class LiveReading implements HttpApp {
   /** The state, loaded once and kept current by the watchers from then on. */
   private ensure(): Promise<ShellState> {
     this.loading ??= (async () => {
-      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
+      this.readCoverage();
+      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces, coverage: this.coverage });
+      // The coverage as it stands now: a reading that landed while the state loaded is kept, never the one asked with.
+      state.lexicon.coverage = this.coverage;
       this.base = state;
       this.remember(state);
       this.lexicons = await watchedLexicons(this.root, this.build);
@@ -259,7 +276,11 @@ class LiveReading implements HttpApp {
       const changed = orders.filter((order) => fresh.has(order.id) || order.history.some((h) => fresh.has(h.id)));
       if (changed.length > 0) this.send("work", { orders: changed, damaged: loaded.damaged });
     } else if (store === "model") {
-      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
+      // A lexicon, a spec or the config moved: the coverage is read again, and said as being read until it lands.
+      this.coverage = { kind: "reading", because: "the warm server is reading the vocabulary coverage again after a change; this section fills when it is done" };
+      this.readCoverage();
+      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces, coverage: this.coverage });
+      state.lexicon.coverage = this.coverage;
       this.base = state;
       this.remember(state);
       this.lexicons = await watchedLexicons(this.root, this.build);
@@ -297,6 +318,41 @@ class LiveReading implements HttpApp {
       } while (this.readAgain && !this.closed);
     })().finally(() => {
       this.reading = undefined;
+    });
+  }
+
+  /**
+   * Read the vocabulary coverage on a worker thread and send it when it lands.
+   * A reading asked for while one runs is taken after it, and the one it
+   * superseded is never sent: the model it read has moved.
+   */
+  private readCoverage(): void {
+    if (this.closed) return;
+    if (this.coverageReading !== undefined) {
+      this.readCoverageAgain = true;
+      return;
+    }
+    this.coverageReading = (async () => {
+      do {
+        this.readCoverageAgain = false;
+        let coverage: LexiconCoverage | CoverageUnread;
+        try {
+          coverage = await (this.options.coverage ?? coverageOffLoop)(this.root);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          this.context.log(`scope: reading the vocabulary coverage failed: ${reason}`);
+          coverage = { kind: "failed", because: `the warm server could not read the vocabulary coverage (${reason}); coherence lexicon coverage reads it from the project's root` };
+        }
+        if (this.closed || this.readCoverageAgain) continue;
+        this.coverage = coverage;
+        if (this.base === undefined) continue;
+        // A new version: a page that loaded the state before the reading landed and opens its stream after is sent a snapshot holding it.
+        this.base.lexicon.coverage = coverage;
+        this.version += 1;
+        this.send("coverage", { coverage, version: this.versionId });
+      } while (this.readCoverageAgain && !this.closed);
+    })().finally(() => {
+      this.coverageReading = undefined;
     });
   }
 

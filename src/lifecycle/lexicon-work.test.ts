@@ -28,7 +28,7 @@ import {
 import { loadJournal } from "../journal/store.ts";
 import { COHERENCE_LEXICON, PACKAGE_NAME } from "./project.ts";
 import { loadLexicon } from "./lexicon.ts";
-import { parseLexicon as parseScopeLexicon } from "../readings/scope/model.ts";
+import { parseLexicon as parseScopeLexicon, type LexiconCoverage } from "../readings/scope/model.ts";
 
 const who = { session: "lexicon-test", agent: "test" };
 function fixture(): string {
@@ -531,8 +531,7 @@ test("Scope and the fixed lexicon query expose the same live sense evidence and 
     assert.match(read.text, /USD/);
     assert.match(read.text, /calendar days/);
     assert.ok(
-      state.lexicon
-        .coverage!.terms.find((t) => t.term === "exposure")!
+      (state.lexicon.coverage as LexiconCoverage).terms.find((t) => t.term === "exposure")!
         .contexts.every(
           (c) =>
             html.includes(c.fingerprint) && read.text.includes(c.fingerprint),

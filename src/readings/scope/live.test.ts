@@ -18,8 +18,10 @@ import { CONFIG_FILE, loadSpecModel } from "../../spec/model.ts";
 import { scopeState } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { latestOf } from "./derive.ts";
-import { scopeApp, storeOf, watchedLexicons } from "./live.ts";
-import type { JournalRecord, PageEntry, RecordedSite, RunRecord, ShellState } from "./model.ts";
+import { coverageOffLoop, pageCoverage } from "./coverage-reading.ts";
+import { scopeApp, storeOf, watchedLexicons, type LiveOptions } from "./live.ts";
+import type { CoverageUnread, JournalRecord, LexiconCoverage, PageEntry, RecordedSite, RunRecord, ShellState } from "./model.ts";
+import { answer } from "../query/query.ts";
 import { renderShell, renderView } from "./shell.ts";
 import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream, runKeyOf, type StreamEvent } from "./updates.ts";
 
@@ -32,8 +34,8 @@ interface Live {
 }
 
 /** Serve a root with the live reading (no instrument reading, a short settle) and ask it for HTTP, as `scope` does. */
-async function live(root: string): Promise<Live> {
-  const serving = await serve(root, { idleMs: 60_000, http: scopeApp({ interfaces: false, debounceMs: 30 }) });
+async function live(root: string, options: LiveOptions = {}): Promise<Live> {
+  const serving = await serve(root, { idleMs: 60_000, http: scopeApp({ interfaces: false, debounceMs: 30, ...options }) });
   const connected = await connectAdapter(root, { spawn: false });
   const { url } = await connected.adapter.openHttp();
   await connected.adapter.close();
@@ -143,6 +145,74 @@ test("a journal record appended while a page is connected reaches it as a live u
     stream.close();
   } finally {
     await server.stop();
+    fixture.remove();
+  }
+});
+
+test("coverage never stalls the warm server: the first load is sent before the coverage is read and says it is being read, the reading arrives as an update, a reload carries it as being read again, and the reading runs on one worker thread however many ask", async () => {
+  const fixture = makeFixture();
+  // Each coverage reading the server asks for waits until the test lets it go.
+  const held: (() => void)[] = [];
+  const reading = (root: string): Promise<LexiconCoverage> => new Promise((resolve, reject) => held.push(() => pageCoverage(root).then(resolve, reject)));
+  const server = await live(fixture.root, { coverage: reading });
+  const within = <T>(promise: Promise<T>, what: string): Promise<T> =>
+    Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${what} waited on the coverage reading`)), 4_000))]);
+  const unread = (state: ShellState): CoverageUnread | undefined => {
+    const coverage = state.lexicon.coverage;
+    return coverage !== undefined && "kind" in coverage ? coverage : undefined;
+  };
+  try {
+    const state = await within(firstLoad(server), "the first load");
+    assert.equal(held.length, 1, "the reading was asked for and is still held");
+    assert.equal(unread(state)?.kind, "reading", "the first load carries the coverage as being read");
+    const lexicon = renderView(state, "lexicon").text;
+    assert.match(lexicon, /Still being read/, "the Lexicon view says the coverage is still being read");
+    assert.doesNotMatch(lexicon, /No recurring term lacks a definition|Full observed population/, "and shows no signal or total in its place");
+    assert.match(answer(state, "lexicon", ["store"]).text, /still being read/, "the agent query says so too");
+    const response = await within(fetch(`${server.base}/api/no-such-path`, { headers: { authorization: `Bearer ${server.token}` } }), "another request");
+    assert.equal(response.status, 404, "the server answers other requests while the reading is held");
+
+    // The reading lands after the page loaded and before it opens its stream: the stream's catch-up carries it.
+    held[0]!();
+    for (let i = 0; i < 200 && unread(((await server.get("/api/state")) as { state: ShellState }).state) !== undefined; i++) await new Promise((r) => setTimeout(r, 25));
+    const stream = await openStream(server, state);
+    assert.ok(await stream.until((events) => events.some((e) => e.event === "ready")));
+    assert.ok(stream.events.some((e) => e.event === "snapshot"), "the reading moved the state's version, so the page that loaded before it is sent a snapshot");
+    let seen = fold(state, stream.events);
+    assert.equal(unread(state), undefined, "the merged state holds the reading");
+    assert.deepEqual(state.lexicon.coverage, await pageCoverage(fixture.root), "the reading the page carries is the page's own coverage");
+    assert.match(renderView(state, "lexicon").text, /Full observed population/, "and the Lexicon view shows it");
+
+    // A spec changes: the reloaded snapshot carries the coverage as being read again, and the new reading follows.
+    appendFileSync(join(fixture.root, "Fixture.spec.md"), "\nA line the reload reads.\n");
+    assert.ok(await stream.until((events) => events.slice(seen).some((e) => e.event === "snapshot")), "the reload arrives as a snapshot");
+    seen = fold(state, stream.events, seen);
+    assert.equal(unread(state)?.kind, "reading", "the snapshot's merge carries the coverage as being read again");
+    assert.ok(await stream.until(() => held.length === 2), "the reload asked for the reading again");
+    held[1]!();
+    assert.ok(await stream.until((events) => events.slice(seen).some((e) => e.event === "coverage")), "the new reading arrives as an update");
+    fold(state, stream.events, seen);
+    assert.equal(unread(state), undefined, "and the merged state holds it");
+    const latest = (await server.get("/api/state")) as { version: string };
+    assert.equal(state.connection?.version, latest.version, "at the version the reading moved the state to");
+    stream.close();
+  } finally {
+    await server.stop();
+  }
+  // The server's own reader: one worker thread for every caller asking at once, and no reading on the caller's thread.
+  try {
+    const scope = openWork();
+    let both: LexiconCoverage[];
+    try {
+      both = await Promise.all([coverageOffLoop(fixture.root), coverageOffLoop(fixture.root)]);
+    } finally {
+      closeWork(scope);
+    }
+    assert.equal(scope.work.spawns.filter((line) => line.startsWith("worker")).length, 1, `two callers at once share one worker thread (${scope.work.spawns.join("; ")})`);
+    assert.equal(scope.work.counts["coverage reading"], 0, "the caller's thread takes no coverage reading");
+    assert.equal(both[0], both[1], "both callers get the one reading");
+    assert.deepEqual(both[0], await pageCoverage(fixture.root), "the worker's reading is the page's coverage");
+  } finally {
     fixture.remove();
   }
 });

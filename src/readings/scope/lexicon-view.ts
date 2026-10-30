@@ -6,7 +6,7 @@
  * state on every call, so the page can never disagree with itself.
  */
 
-import { lexiconReviewCommand } from "./model.ts";
+import { coverageUnread, lexiconReviewCommand } from "./model.ts";
 import { plural } from "./derive.ts";
 import { html, join, raw, slug, type Markup } from "./html.ts";
 import type {
@@ -423,6 +423,12 @@ function renderAttention(coverage: LexiconCoverage): Markup {
 function renderVocabularyCoverage(state: LexiconViewState): Markup | null {
   const coverage = state.coverage;
   if (!coverage) return null;
+  // Not read yet, or the reading failed: said in the section's place, never a signal or a total of zero.
+  if (coverageUnread(coverage))
+    return html`<section class="lexicon-coverage" data-field="coverage-unread" data-coverage="${coverage.kind}"><h2>Vocabulary coverage and sense review</h2>
+      <p class="section-lead">${coverage.kind === "reading" ? "Still being read" : "Not read"}: ${coverage.because}.</p>
+      <p class="quiet">The full reading from this project's root: <code>coherence lexicon coverage --json</code>.</p>
+    </section>`;
   const query = state.query.trim().toLowerCase();
   const population = coverage.projection?.population ?? {
     files: coverage.population.files.length,

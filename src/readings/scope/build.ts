@@ -35,13 +35,12 @@ import type { LoadedPlugin } from "../../plugins/plugin.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { WORK_DIR, foldOrders, loadWork as loadWorkRecords, workDir } from "../../journal/work.ts";
-import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON, projectLexiconPath } from "../../lifecycle/project.ts";
 import { loadSpecModel, projectPractices, type SpecModel } from "../../spec/model.ts";
 import { KERNEL_PREFIX } from "../../spec/practices.ts";
-import { projectLexiconCoverage } from "./lexicon-projection.ts";
+import { pageCoverage } from "./coverage-reading.ts";
 import { windowJournal, windowRuns } from "./derive.ts";
-import { parseLexicon, type Lexicon, type InterfaceReading, type Ladder, type PracticesData, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
+import { parseLexicon, type CoverageUnread, type Lexicon, type LexiconCoverage, type InterfaceReading, type Ladder, type PracticesData, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
 import { DEFAULT_VIEW, VIEWS } from "./shell.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -72,6 +71,8 @@ export interface BuildOptions {
   window?: boolean;
   /** The component interfaces as the language adapter read them (readComponentInterfaces); unread when absent. */
   componentInterfaces?: InterfaceReading;
+  /** The vocabulary coverage, when the caller reads it elsewhere (the warm server, off its loop: coverage-reading.ts); read here, through the kept reading, when absent. */
+  coverage?: LexiconCoverage | CoverageUnread;
 }
 
 export const DEFAULTS = {
@@ -289,7 +290,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     project: options.project,
     views: VIEWS.map((v) => ({ id: v.id, label: v.label })),
     activeView: options.structurePreview === undefined || options.structurePreview.length === 0 ? DEFAULT_VIEW : "structure",
-    lexicon: { layers: [coherence, ...(await pluginLexiconLayers(root)), domain], query: "", coverage: projectLexiconCoverage(await lexiconCoverage(root)) },
+    lexicon: { layers: [coherence, ...(await pluginLexiconLayers(root)), domain], query: "", coverage: options.coverage ?? (await pageCoverage(root)) },
     spec,
     runs: { records: runs.records, damaged: runs.damaged },
     journal: { records: journal.records, damaged: journal.damaged, work: loadWork(root) },

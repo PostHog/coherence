@@ -165,9 +165,25 @@ export function lexiconReviewCommand(term: string): string {
   return `coherence lexicon review '${term.replace(/'/g, "'\\''")}' --json`;
 }
 
+/**
+ * The coverage the warm server has not read yet: its first load carries this
+ * in the coverage's place while the reading runs off its loop, and the
+ * reading arrives as an update ("reading"); or the reading failed, and why
+ * ("failed"). Every reader says which, never a zero.
+ */
+export interface CoverageUnread {
+  kind: "reading" | "failed";
+  because: string;
+}
+
+/** Whether the state holds no coverage reading yet: one under way, or one that failed. */
+export function coverageUnread(coverage: LexiconCoverage | CoverageUnread | undefined): coverage is CoverageUnread {
+  return coverage !== undefined && "kind" in coverage;
+}
+
 /** The state of the Lexicon view: the layers it reads and the reader's query. */
 export interface LexiconViewState {
-  coverage?: LexiconCoverage;
+  coverage?: LexiconCoverage | CoverageUnread;
   layers: Layer[];
   query: string;
 }

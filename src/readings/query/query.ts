@@ -38,9 +38,9 @@ import type { FlowModel } from "../scope/structure-flow.ts";
 import { candidateRulesOf, coverageLine, groupLine, notDetectedOf } from "../scope/entrance-coverage.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
 import { BUDGET_FLAGS } from "../scope/component-interfaces.ts";
-import { lexiconReviewCommand } from "../scope/model.ts";
+import { coverageUnread, lexiconReviewCommand } from "../scope/model.ts";
 import { MIRRORS_USAGE } from "../mirrors/policy.ts";
-import type { LexiconCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
+import type { CoverageUnread, LexiconCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
 
 export const QUESTIONS = ["invariants", "relies-on", "spine", "structure", "status", "component", "order", "economy", "lexicon", "observed"] as const;
 export type Question = (typeof QUESTIONS)[number];
@@ -375,9 +375,10 @@ export interface QueryOptions {
 }
 
 /** Render either the full authoritative reading or an explicitly labelled page selection. */
-export function answerLexicon(report: LexiconCoverage | undefined, args: string[]): Answer {
+export function answerLexicon(report: LexiconCoverage | CoverageUnread | undefined, args: string[]): Answer {
   if (args.length !== 1 || args[0]!.trim() === "") return { text: "query lexicon needs one term", code: 64 };
   if (!report) return { text: "No vocabulary usage reading is available in this page state.", code: 64 };
+  if (coverageUnread(report)) return { text: `The vocabulary coverage is ${report.kind === "reading" ? "still being read" : "not read"}: ${report.because}.`, code: 64 };
   const term = args[0]!.trim().toLowerCase();
   const terms = report.terms.filter((t) =>
     t.term === term || t.concept?.toLowerCase() === term || t.meaningAlternatives?.some((meaning) => meaning.concept.toLowerCase() === term));

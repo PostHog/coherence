@@ -3,8 +3,9 @@
  *
  * The server sends a first load (a windowed state), then updates on an event
  * stream: journal, runs and work appends as the records that are new, a
- * recomputed snapshot when a spec, a lexicon or the config changes, and the
- * component interfaces when the language server has read them again. Every
+ * recomputed snapshot when a spec, a lexicon or the config changes, the
+ * component interfaces when the language server has read them again, and the
+ * vocabulary coverage when the server's worker has read it. Every
  * update is merged into the state the page already holds and the page
  * renders again; nothing is kept beside the state.
  *
@@ -17,7 +18,7 @@
  * Shared by the browser bundle and the Node tests; it imports types only.
  */
 
-import type { Damaged, InterfaceReading, JournalRecord, PageEntry, RecordedSite, RunRecord, ShellState, WorkOrder } from "./model.ts";
+import type { CoverageUnread, Damaged, InterfaceReading, JournalRecord, LexiconCoverage, PageEntry, RecordedSite, RunRecord, ShellState, WorkOrder } from "./model.ts";
 import { setLanguageData } from "./language-data.ts";
 
 /** One event off the stream: its name and its data, still JSON text. */
@@ -141,8 +142,9 @@ export function mergeWork(state: ShellState, orders: readonly WorkOrder[], damag
 }
 
 /**
- * Take a recomputed snapshot: the model (lexicons, specs, interfaces, work)
- * is replaced, the records the page already holds are kept beside the
+ * Take a recomputed snapshot: the model (lexicons, their coverage as the
+ * snapshot carries it, read or still being read, specs, interfaces, work) is
+ * replaced, the records the page already holds are kept beside the
  * snapshot's, and the count of what is left out is the snapshot's total less
  * what the page now holds. What the reader chose (the view, queries, filters,
  * a selection) is kept.
@@ -204,6 +206,13 @@ export function applyUpdate(state: ShellState, event: string, data: unknown): bo
     case "interfaces":
       state.componentInterfaces = data as InterfaceReading;
       return true;
+    case "coverage": {
+      // The reading moves the state's version, so a reconnect from here is sent no snapshot it already holds.
+      const update = data as { coverage: LexiconCoverage | CoverageUnread; version: string };
+      state.lexicon.coverage = update.coverage;
+      if (state.connection !== undefined) state.connection.version = update.version;
+      return true;
+    }
     default:
       return false;
   }
