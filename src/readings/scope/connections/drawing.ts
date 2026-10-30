@@ -24,8 +24,8 @@ export interface Connections {
   update(model: FlowModel): void;
   /** Root the view at the origin a deep link names; false when the model has none by that id. */
   land(id: string): boolean;
-  /** The view is on the page again: name its origin in the address and fit it when it has not been fitted. */
-  resume(): void;
+  /** The view is on the page again: name its origin in the address (unless a deep link still waits to land) and fit it when it has not been fitted. */
+  resume(name?: boolean): void;
   dispose(): void;
 }
 
@@ -709,9 +709,9 @@ export function createConnections(first: FlowModel): Connections {
       if (S.origin === undefined || !same(S.origin, o)) setOrigin(o);
       return true;
     },
-    resume() {
+    resume(name = true) {
       if (disposed || !root.isConnected) return;
-      writeHash();
+      if (name) writeHash();
       if (S.fit) requestAnimationFrame(() => fitView());
     },
     dispose() {

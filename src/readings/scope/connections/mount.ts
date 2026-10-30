@@ -17,7 +17,7 @@ function inputsOf(state: ShellState): readonly unknown[] {
 }
 
 let current: { view: Connections; inputs: readonly unknown[] } | undefined;
-/** The origin a deep link named before the view was on the page: applied at the next mount. */
+/** The origin a deep link named that the view has not landed on: applied at the next mount, and kept until a reading has that origin (a first load may carry an older reading than the link was copied from). */
 let landing: string | undefined;
 
 /** Root the view at the origin a deep link names, now when it is built, else when it is first mounted. */
@@ -36,9 +36,6 @@ export function mountConnections(root: HTMLElement, state: ShellState): void {
     current.inputs = inputs;
   }
   if (current.view.root.parentElement !== host) host.replaceChildren(current.view.root);
-  if (landing !== undefined) {
-    current.view.land(landing);
-    landing = undefined;
-  }
-  current.view.resume();
+  if (landing !== undefined && current.view.land(landing)) landing = undefined;
+  current.view.resume(landing === undefined);
 }
