@@ -176,7 +176,7 @@ class LiveReading implements HttpApp {
   /** The state, loaded once and kept current by the watchers from then on. */
   private ensure(): Promise<ShellState> {
     this.loading ??= (async () => {
-      this.relief = readRelief(this.root, loadJournal(this.root).records);
+      this.relief = readRelief(this.root);
       const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces, relief: this.relief });
       this.base = state;
       this.remember(state);
@@ -341,7 +341,7 @@ class LiveReading implements HttpApp {
       const changed = orders.filter((order) => fresh.has(order.id) || order.history.some((h) => fresh.has(h.id)));
       if (changed.length > 0) this.send("work", { orders: changed, damaged: loaded.damaged });
     } else if (store === "model") {
-      this.relief = readRelief(this.root, loadJournal(this.root).records);
+      this.relief = readRelief(this.root);
       const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces, relief: this.relief });
       this.base = state;
       this.remember(state);

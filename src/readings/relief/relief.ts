@@ -1,11 +1,12 @@
 /**
  * The relief reading: what Scope's Structure view draws that the rest of the
  * state does not already hold. Per component, its files with their lines and
- * whether an enforcement reaches them (from mass), and its defect records; the
- * folders with no spec inside a component that holds others, each a district
- * of its own; and the landings on HEAD's first-parent line, each with the lines
- * it changed per component and per file. Invariants, crossings, refutations and
- * reliance come from the spec and the component interfaces the state carries.
+ * whether an enforcement reaches them (from mass); the folders with no spec
+ * inside a component that holds others, each a district of its own; and the
+ * landings on HEAD's first-parent line, each with the lines it changed per
+ * component and per file. Invariants, crossings, refutations, reliance and
+ * open defects come from the spec, the component interfaces and the journal
+ * the state carries, so none goes stale here as they change.
  */
 
 import { execFileSync } from "node:child_process";
@@ -13,7 +14,6 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { computeMass } from "../../economy/mass.ts";
 import { LOCKFILES } from "../../lifecycle/lockfiles.ts";
-import type { JournalRecord } from "../../journal/record.ts";
 import { loadSpecModel, type SpecModel } from "../../spec/model.ts";
 
 export interface ReliefFile {
@@ -32,7 +32,6 @@ export interface ReliefComponent {
   files: ReliefFile[];
   lines: number;
   unreached: number;
-  defects: number;
 }
 
 /** One first-parent commit: per component [index, lines changed], per file [component, file, lines changed]. */
@@ -108,7 +107,7 @@ function renamedPath(path: string): string {
 
 const git = (root: string, ...args: string[]): string => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 512 << 20, stdio: ["ignore", "pipe", "ignore"] });
 
-export function readRelief(rootGiven: string, journal: readonly JournalRecord[], given?: SpecModel): ReliefReading {
+export function readRelief(rootGiven: string, given?: SpecModel): ReliefReading {
   const root = resolve(rootGiven);
   let mass;
   let model: SpecModel;
@@ -148,7 +147,6 @@ export function readRelief(rootGiven: string, journal: readonly JournalRecord[],
       files: held,
       lines: held.reduce((n, f) => n + f.lines, 0),
       unreached: held.reduce((n, f) => n + (f.reached ? 0 : f.lines), 0),
-      defects: 0,
     };
   });
   const index = new Map(folders.map((f, i) => [f, i]));
@@ -159,7 +157,6 @@ export function readRelief(rootGiven: string, journal: readonly JournalRecord[],
     const district = districtFolders.find((d) => path.startsWith(d + "/") && districts.get(d)!.of === own);
     return index.get(district ?? own)!;
   };
-  for (const record of journal) if (record.kind === "defect") for (const ci of new Set(record.files.map(owner))) components[ci]!.defects++;
 
   const at = new Map<string, [number, number]>();
   components.forEach((c, ci) => c.files.forEach((f, fi) => at.set(f.file, [ci, fi])));

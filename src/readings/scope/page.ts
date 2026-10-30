@@ -17,15 +17,14 @@
  * reconnects with backoff, resuming from cursors derived from the state it
  * holds, so nothing appended while it was away is lost or held twice.
  *
- * This file is stripped of types and inlined into the page together with the
- * modules it imports, so it must not rely on anything outside them.
+ * This file is the entry esbuild bundles, with every module it imports, into
+ * the page's one script, so it must not rely on anything outside them.
  */
 
 import { componentOfHash, journalId, resolveHash } from "./derive.ts";
 import type { JournalKind, JournalRecord, LifecycleState, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { renderMasthead, renderShell, renderViewResults } from "./shell.ts";
 import { mountRelief, touchRelief, type Touch } from "./relief/mount.ts";
-import { FLOW_NONE_ID, flowDefaultSelection, flowExpanded, flowKeyAction, flowOf, isFlowId } from "./structure-flow.ts";
 import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream } from "./updates.ts";
 import { setLanguageData } from "./language-data.ts";
 
@@ -175,60 +174,11 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
     if (target.id !== undefined) {
       const component = componentOfHash(state, target.id);
       if (component !== undefined) state.components.selected = component.folder;
-      if (isFlowId(target.id)) state.structure.selected = target.id;
-    } else if (target.view === "structure") delete state.structure.selected;
+    }
     const changed = target.view !== state.activeView;
     state.activeView = target.view;
     if (changed || target.id !== undefined) renderAll();
-    // A card scrolls into view; a map element does not, since the map is already where Structure opens and the inspector shows it.
-    const landed = target.id === undefined ? null : document.getElementById(decodeURIComponent(target.id));
-    if (landed !== null && landed.closest(".flow-svg") === null) landed.scrollIntoView();
-    revealSelection(false);
-  };
-
-  /**
-   * Bring what is selected on the map into view: the canvas scrolls sideways
-   * to center it when it is outside the canvas's width (a narrow window, or a
-   * broken mark past the right edge); after a reader's click the page also
-   * scrolls, as little as it can, so the map element is on screen. A load
-   * never scrolls the page, only the canvas.
-   */
-  const revealSelection = (page: boolean): void => {
-    if (state.activeView !== "structure") return;
-    const canvas = root.querySelector<HTMLElement>(".flow-canvas");
-    const id = state.structure.selected ?? (state.structure.preview.length > 0 ? undefined : flowDefaultSelection(flowOf(state)));
-    if (canvas === null || id === undefined || id === FLOW_NONE_ID) return;
-    const target = canvas.querySelector<SVGElement>(`svg [id="${id}"]`) ?? canvas.querySelector<SVGElement>(`svg [data-structure-select="${id}"]`);
-    if (target === null) return;
-    const box = target.getBoundingClientRect();
-    const frame = canvas.getBoundingClientRect();
-    if (box.left < frame.left || box.right > frame.right) canvas.scrollLeft += box.left + box.width / 2 - (frame.left + frame.width / 2);
-    if (!page) return;
-    // Below the side-by-side width the inspector is a sheet over the lower part of the screen: keep the element above it.
-    const sheet = window.matchMedia("(max-width: 63.99rem)").matches;
-    const shown = target.getBoundingClientRect();
-    const floor = sheet ? window.innerHeight * 0.42 : window.innerHeight - 8;
-    if (shown.top < 8 || shown.bottom > floor) window.scrollBy({ top: shown.top - (sheet ? 72 : window.innerHeight / 3), behavior: "instant" });
-  };
-
-  /**
-   * Select a story in the Structure flow, opening the inspector beside the
-   * map; selecting what is already selected (the default story included), the
-   * close button, and Escape clear it to nothing selected, which closes the
-   * inspector. The hash follows so it can be linked.
-   */
-  const selectStory = (id: string): void => {
-    const current = state.structure.selected ?? (state.structure.preview.length > 0 ? undefined : flowDefaultSelection(flowOf(state)));
-    const closing = id === "" || id === FLOW_NONE_ID || current === id;
-    if (closing && state.structure.selected === FLOW_NONE_ID) return;
-    state.structure.selected = closing ? FLOW_NONE_ID : id;
-    history.replaceState(null, "", `#${state.structure.selected}`);
-    renderResults();
-    if (!closing) revealSelection(true);
-    const again = closing
-      ? root.querySelector<HTMLElement | SVGElement>(`[data-structure-select="${current ?? ""}"]`) ?? root.querySelector<HTMLElement>(".flow-canvas")
-      : root.querySelector<HTMLElement | SVGElement>(`[id="${id}"][data-structure-select]`) ?? root.querySelector<HTMLElement | SVGElement>(`svg [data-structure-select="${id}"]`);
-    again?.focus({ preventScroll: true });
+    if (target.id !== undefined) document.getElementById(decodeURIComponent(target.id))?.scrollIntoView();
   };
 
   root.addEventListener("input", (event) => {
@@ -306,24 +256,6 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
       return;
     }
 
-    const expand = target.closest<Element>("[data-structure-expand]");
-    if (expand !== null) {
-      // One level of the component tree at a time: open or close this component in place.
-      const folder = expand.getAttribute("data-structure-expand") ?? "";
-      const open = flowExpanded(state);
-      if (open.has(folder)) open.delete(folder);
-      else open.add(folder);
-      state.structure.expanded = [...open].sort();
-      renderResults();
-      return;
-    }
-
-    const story = target.closest<Element>("[data-structure-select]");
-    if (story !== null) {
-      selectStory(story.getAttribute("data-structure-select") ?? "");
-      return;
-    }
-
     const select = target.closest<HTMLElement>("[data-select-component]");
     if (select !== null) {
       const folder = select.dataset["selectComponent"];
@@ -353,24 +285,8 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
     }
   });
 
-  // Escape closes the Structure inspector wherever focus is.
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || state.activeView !== "structure" || state.structure.selected === FLOW_NONE_ID) return;
-    const action = flowKeyAction({ key: event.key, select: undefined, button: false });
-    if (action === undefined) return;
-    event.preventDefault();
-    selectStory(action.select);
-  });
-
   root.addEventListener("keydown", (event) => {
     const target = event.target;
-    if (target instanceof Element && target.hasAttribute("data-structure-select")) {
-      const action = flowKeyAction({ key: event.key, select: target.getAttribute("data-structure-select") ?? undefined, button: target instanceof HTMLButtonElement });
-      if (action === undefined || event.key === "Escape") return;
-      event.preventDefault();
-      selectStory(action.select);
-      return;
-    }
     if (!(target instanceof HTMLElement) || target.getAttribute("role") !== "tab") return;
     if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return;
     const ids = state.views.map((v) => v.id);

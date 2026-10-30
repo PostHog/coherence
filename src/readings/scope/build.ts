@@ -47,11 +47,10 @@ import { DEFAULT_VIEW, VIEWS } from "./shell.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 
 /**
- * The page's one entry. The browser bundle is not a list kept by hand: it is
- * every module the entry imports at run time, followed to the end and joined
- * dependencies first (browserSources). A module the page calls into cannot be
- * left out, and one the browser cannot run cannot be reached without failing
- * the build.
+ * The page's one entry. The browser bundle is not a list kept by hand: esbuild
+ * follows every module the entry imports, packages included, into one script
+ * (bundleBrowserScript). A module the page calls into cannot be left out, and
+ * an import the browser cannot resolve fails the build.
  */
 export const BROWSER_ENTRY = "page.ts";
 

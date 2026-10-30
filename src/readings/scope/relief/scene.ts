@@ -20,11 +20,34 @@ export interface ReliefIO {
   diff?: string;
 }
 
+/**
+ * What the reader has made of a scene, by folder and path rather than index,
+ * so a scene built from new data opens where the old one stood.
+ */
+export interface ReliefView {
+  layout: Record<string, { own: number[]; sub: number[] }>;
+  foot: string;
+  height: string;
+  win: string;
+  split: boolean;
+  big: boolean;
+  scope: string;
+  own: boolean;
+  selected: string | null;
+  file: [string, string] | null;
+  camera: { view: string; position: number[]; target: number[] };
+  /** The diff's two ends as the selects held them; null before the commits arrived, or in a snapshot. */
+  diff: { a: string; b: string } | null;
+}
+
 export interface Relief {
   root: HTMLElement;
   resume(): void;
   /** Light the files an agent just read or wrote, and the components holding them. */
   touch(touches: readonly Touch[]): void;
+  view(): ReliefView;
+  /** Stop for good: the frame loop, timers and listeners end, the GL context and every buffer are released, the root leaves the page. */
+  dispose(): void;
 }
 
 
@@ -49,7 +72,11 @@ const MARKUP = `<div class="controls">
   <details><summary>Table view</summary><div data-r="table"></div></details>
   <div class="tip" data-r="tip"></div>`;
 
-export function createRelief(D: ReliefData, io: ReliefIO = {}): Relief {
+export function createRelief(D: ReliefData, io: ReliefIO = {}, carried?: ReliefView): Relief {
+let disposed = false, raf = 0;
+// Timers the scene sets, so disposing clears what is still pending.
+const timers = new Set();
+const later = (run, ms) => { const t = setTimeout(() => { timers.delete(t); run(); }, ms); timers.add(t); };
 const root = document.createElement("div");
 root.className = "relief";
 root.innerHTML = MARKUP;
@@ -70,7 +97,7 @@ const FOOT = [
   { key: "refutations", label: "Refutations", unit: "refutations", how: "refuted: entries under the component's bullets" },
   { key: "crossings", label: "Crossings", unit: "crossing bullets", how: "bullets that carry a crossing" },
   { key: "leaned", label: "Leaned on", unit: "call sites in", how: "call sites in other components that use this component's symbols, values and types alike, from Scope's component interfaces: the load it carries" },
-  { key: "defects", label: "Defects", unit: "defect records", how: D.project ? "journal defect records whose files fall in the component's folder" : "journal defect records whose files fall in the component's folder; 51 of 143 name no file and count nowhere" },
+  { key: "defects", label: "Defects", unit: "open defects", how: "open defect records in the journal (a resolution closes one, a retraction withdraws it) naming a file in the component's folder; one naming no file counts nowhere" },
 ];
 const HEIGHT = [
   { key: "landings", label: "Landings", unit: "landings", how: `first-parent commits on ${TRUNK} touching the component` },
@@ -127,7 +154,7 @@ const GAP = 3;
 // Lay out items {hx, hz, set} by co-change, then push apart so no rectangle overlaps at its largest.
 // The last build's layout seeds this one, so the map stays familiar: what was settled starts where it was and
 // only drifts as far as its co-change has really changed; a newcomer starts beside its strongest co-change neighbour.
-const SEED = D.seed ?? {};
+const SEED = D.seed ?? carried?.layout ?? {};
 function settle(items) {
   const n = items.length, J = items.map((a) => items.map((b) => (a === b ? 1 : jac(a.set, b.set))));
   const rad = items.map((it) => Math.max(it.hx, it.hz));
@@ -224,6 +251,19 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2 - 0.05; controls.minDistance = 60; controls.maxDistance = 700;
 state.own = false;
 state.scope = tops[0];
+// A rebuild opens on the reader's view: the measures, the slice and the selection, as far as the new data still has them.
+if (carried) {
+  const index = new Map(C.map((c, ci) => [c.folder, ci]));
+  if (FOOT.some((m) => m.key === carried.foot)) state.foot = carried.foot;
+  if (HEIGHT.some((m) => m.key === carried.height)) state.height = carried.height;
+  if (WIN.some((w) => w.key === carried.win)) state.win = carried.win;
+  state.split = carried.split; state.big = carried.big;
+  const scope = index.get(carried.scope);
+  if (scope !== undefined) { state.scope = scope; state.own = carried.own && kids[scope].length > 0; }
+  state.selected = index.get(carried.selected) ?? null;
+  const fci = carried.file ? index.get(carried.file[0]) : undefined, ffi = fci === undefined ? -1 : C[fci].files.findIndex((f) => f.file === carried.file[1]);
+  state.file = ffi >= 0 ? [fci, ffi] : null;
+}
 // The camera stands back far enough to take in the widest platform: Coherence's framing is the floor.
 const reach = Math.max(1, ...tops.map((t) => Math.hypot(...ext[t]))), far = Math.max(1, (reach * 2.2) / 340);
 const TILT = [175, 185, 225].map((v) => v * far), TOP = [0.01, 330 * far, 0.01];
@@ -477,7 +517,8 @@ function paint() {
   tags.forEach((t, ci) => t.element.classList.toggle("dim", focus != null && focus !== ci));
 }
 function matchDark() { const t = document.documentElement.dataset.theme; return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; }
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", paint);
+const darkScheme = matchMedia("(prefers-color-scheme: dark)");
+darkScheme.addEventListener("change", paint);
 
 let lastMax = 1, dScale = 1;
 function drawScale(max) {
@@ -554,8 +595,10 @@ function resize() {
   const w = stage.clientWidth, h = stage.clientHeight;
   renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
 }
-new ResizeObserver(resize).observe(stage);
+const resizing = new ResizeObserver(resize);
+resizing.observe(stage);
 function frame() {
+  if (disposed) return;
   // Freeze the start of each tween at the current values before targets change.
   if (camTween) {
     const k = ease(Math.min(1, (performance.now() - camTween.t0) / 700));
@@ -566,7 +609,7 @@ function frame() {
   // Drawing stops while the view is not on the page and starts again when it is mounted.
   if (!root.isConnected) { running = false; return; }
   step(); stepGlows(); controls.update(); renderer.render(scene, camera); placeCallouts();
-  requestAnimationFrame(frame);
+  raf = requestAnimationFrame(frame);
 }
 // Callouts stack in two columns at the edges of the viewport, each on the side its point is, in their points'
 // top-to-bottom order so no two hairlines cross. Where a column is full, the biggest footprints keep their names;
@@ -670,8 +713,8 @@ function logActivity(kind, path, c, session) {
   li.append(el("b", null, kind === "write" ? "wrote" : "read"), " ", el("code", null, path), el("span", null, ` · ${c.virtual ? c.name : c.name}${session ? " · " + session.slice(0, 8) : ""}`));
   activity.prepend(li);
   while (activity.children.length > 6) activity.lastChild.remove();
-  setTimeout(() => li.classList.add("gone"), 12000);
-  setTimeout(() => li.remove(), 13000);
+  later(() => li.classList.add("gone"), 12000);
+  later(() => li.remove(), 13000);
 }
 // Each frame: every glow fades by its age; a glow past its life is dropped.
 const _gc = new THREE.Color();
@@ -791,7 +834,8 @@ renderer.domElement.addEventListener("dblclick", (e) => {
   // A platform steps into the whole component; a block of a component's own files steps into those files alone.
   rescope(u.ci, u.kind !== "plinth" && kids[u.ci].length > 0);
 });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape" && root.isConnected && !(e.target instanceof HTMLInputElement)) stepOut(); });
+const onKey = (e) => { if (e.key === "Escape" && root.isConnected && !(e.target instanceof HTMLInputElement)) stepOut(); };
+document.addEventListener("keydown", onKey);
 function drawCrumbs() {
   const b = $("crumbs"); b.innerHTML = "";
   const chain = []; for (let p = state.scope; p >= 0; p = parent[p]) chain.unshift(p);
@@ -934,7 +978,9 @@ function ownerOf(p) { let best = 0, len = -1; C.forEach((c, i) => { if (c.folder
 async function loadDiff(a, b) {
   if (!a || !b || a === "none") { DIFF = null; retarget(); drawSide(); drawNote(); return; }
   let d;
-  try { d = await io.get(`/api/relief/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`); } catch { DIFF = null; retarget(); drawSide(); drawNote(); return; }
+  try { d = await io.get(`/api/relief/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`); } catch { if (disposed) return; DIFF = null; retarget(); drawSide(); drawNote(); return; }
+  // An answer that arrives after the scene was disposed lands nowhere.
+  if (disposed) return;
   if (d.error) { DIFF = null; return; }
   // Per component and per file: [added, deleted, lines at the later end].
   const comp = C.map(() => [0, 0, 0]), file = C.map((c) => c.files.map(() => [0, 0, 0]));
@@ -954,17 +1000,18 @@ async function loadDiff(a, b) {
 async function startDiff() {
   if (!io.get) return;
   let cm; try { cm = await io.get("/api/relief/commits"); } catch { return; }
-  if (!cm || !cm.list) return;
+  if (disposed || !cm || !cm.list) return;
   const g = $("gDiff"); g.hidden = false;
   const selA = $("selA"), selB = $("selB");
   const opt = (c) => { const o = el("option", null, c.rev === "WORKTREE" ? `working tree (${c.on})` : `${c.tag ? c.tag + " · " : ""}${c.date} ${c.sha} ${c.subject.slice(0, 52)}`); o.value = c.rev; return o; };
   const none = el("option", null, "no diff"); none.value = "none"; selA.append(none);
   for (const c of cm.list) selA.append(opt(c));
   for (const c of [cm.worktree, ...cm.list]) selB.append(opt(c));
-  const q = new URLSearchParams(io.diff ?? "");
+  // The ends a rebuild carried over, or those a link names.
+  const q = new URLSearchParams(io.diff ?? ""), want = carried?.diff ?? { a: q.get("a"), b: q.get("b") };
   // A link may name any commit, not only the recent ones listed; it gets an entry of its own, named once the diff loads.
-  for (const [sel, rev] of [[selA, q.get("a")], [selB, q.get("b")]]) if (rev && ![...sel.options].some((o) => o.value === rev)) { const o = el("option", null, rev); o.value = rev; o.dataset.linked = "1"; sel.prepend(o); }
-  selA.value = q.get("a") ?? cm.base; selB.value = q.get("b") ?? "WORKTREE";
+  for (const [sel, rev] of [[selA, want.a], [selB, want.b]]) if (rev && ![...sel.options].some((o) => o.value === rev)) { const o = el("option", null, rev); o.value = rev; o.dataset.linked = "1"; sel.prepend(o); }
+  selA.value = want.a || cm.base; selB.value = want.b || "WORKTREE";
   selA.onchange = selB.onchange = () => loadDiff(selA.value, selB.value);
   const rel = cm.list.filter((c) => c.tag && /^v\d+\.\d+\.\d+$/.test(c.tag)).slice(0, 2);
   for (const [label, a] of [["This branch", cm.base], ...rel.map((c) => [`Since ${c.tag}`, c.rev]), ["None", "none"]]) {
@@ -973,12 +1020,39 @@ async function startDiff() {
   await loadDiff(selA.value, selB.value);
 }
 let running = true;
-sync(); layout(); aim("tilt", false); drawCrumbs(); drawSide(); drawTable(); drawNote(); resize(); frame(); startDiff();
+sync(); layout(); aim(carried?.camera.view ?? "tilt", false);
+if (carried) { camera.position.fromArray(carried.camera.position); controls.target.fromArray(carried.camera.target); controls.update(); }
+drawCrumbs(); drawSide(); drawTable(); drawNote(); resize(); frame(); startDiff();
 return {
   root,
   /** Start drawing again after the view was off the page. */
   // Colours come from the relief's own element, which only resolves its tokens once it is on the page.
-  resume() { if (!root.isConnected) return; paint(); drawScale(lastMax); if (!running) { running = true; resize(); frame(); } },
+  resume() { if (disposed || !root.isConnected) return; paint(); drawScale(lastMax); if (!running) { running = true; resize(); frame(); } },
   touch,
+  view() {
+    const file = state.file ? [C[state.file[0]].folder, C[state.file[0]].files[state.file[1]].file] : null;
+    return {
+      layout: LAYOUT, foot: state.foot, height: state.height, win: state.win, split: state.split, big: state.big,
+      scope: C[state.scope].folder, own: state.own, selected: state.selected == null ? null : C[state.selected].folder, file,
+      camera: { view: lastView, position: camera.position.toArray(), target: controls.target.toArray() },
+      diff: $("gDiff").hidden ? null : { a: $("selA").value, b: $("selB").value },
+    };
+  },
+  dispose() {
+    if (disposed) return;
+    disposed = true; running = false;
+    cancelAnimationFrame(raf);
+    for (const t of timers) clearTimeout(t);
+    timers.clear();
+    resizing.disconnect();
+    darkScheme.removeEventListener("change", paint);
+    document.removeEventListener("keydown", onKey);
+    controls.dispose();
+    // Shared geometries and materials are met more than once; disposing one twice is harmless.
+    scene.traverse((o) => { o.geometry?.dispose(); for (const m of [o.material].flat()) m?.dispose(); if (o.isInstancedMesh) o.dispose(); });
+    renderer.dispose();
+    renderer.forceContextLoss();
+    root.remove();
+  },
 };
 }

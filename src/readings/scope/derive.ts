@@ -6,6 +6,8 @@
  * its view.
  */
 
+import { defectStates, type DefectState } from "../../journal/defect-states.ts";
+import type { JournalRecord as StoredRecord } from "../../journal/record.ts";
 import { slug } from "./html.ts";
 import type {
   WorkOrder,
@@ -98,7 +100,6 @@ export function workId(id: string): string {
 
 /** The prefixes each view's card ids carry; a hash resolves to its view by them. */
 const ID_PREFIXES: [string, string][] = [
-  ["structure-", "structure"],
   ["component-", "components"],
   ["invariant-", "invariants"],
   ["practice-", "practices"],
@@ -121,33 +122,13 @@ export function resolveHash(state: ShellState, hash: string): HashTarget | undef
   const text = hash.startsWith("#") ? hash.slice(1) : hash;
   if (text === "") return undefined;
   if (state.views.some((v) => v.id === text)) return { view: text, id: undefined };
-  const redirected = retiredStructureLink(state, text);
-  if (redirected !== undefined) return redirected;
+  // The relief has no cards: a link into the retired map, its Reliance view or its security spine (the masthead's
+  // verdict and an invariant's reliance link among them) opens Structure, where reliance is the Leaned on footprint.
+  if (text === "reliance" || text.startsWith("reliance-") || text.startsWith("structure-")) return { view: "structure", id: undefined };
   for (const [prefix, view] of ID_PREFIXES) {
     if (text.startsWith(prefix)) return { view, id: text };
   }
   return undefined;
-}
-
-/**
- * Links into the retired Reliance view and the retired security-spine section
- * land on the one map's selection that replaced them: a reliance card, or a
- * spine crossing of an invariant with a chokepoint, selects that chokepoint;
- * a spine crossing with no chokepoint selects the trust level it leaves.
- */
-function retiredStructureLink(state: ShellState, text: string): HashTarget | undefined {
-  if (text === "reliance") return { view: "structure", id: undefined };
-  const spine = text.startsWith("structure-") && !text.startsWith("structure--");
-  if (!text.startsWith("reliance-") && !spine) return undefined;
-  for (const component of state.spec.components) {
-    for (const invariant of component.invariants) {
-      if (text !== relianceId(invariant.component, invariant.name) && text !== structureId(invariant.component, invariant.name)) continue;
-      if (invariant.enforcements.some((e) => e.form === "chokepoint")) return { view: "structure", id: flowChokepointId(invariant.component, invariant.name) };
-      if (invariant.crossing !== undefined) return { view: "structure", id: flowLevelId(invariant.crossing.from) };
-      return { view: "invariants", id: invariantId(invariant.component, invariant.name) };
-    }
-  }
-  return text.startsWith("reliance-") ? { view: "structure", id: undefined } : undefined;
 }
 
 /** The component a hash names, when it names one. */
@@ -628,10 +609,11 @@ export function windowRuns(
 
 /**
  * The journal records a page embeds: the latest `keep`, every open
- * escalation, up to `cap` older records that a kept record or a work order
- * cites (so a citation lands on a card; the latest citers are served first),
- * and every record one of those points at (so a retraction or a close can
- * name what it answers), in their original order. `orders` supplies the
+ * escalation and open defect (and the resolution of every defect kept, so
+ * none reads as open that is closed), up to `cap` older records that a kept
+ * record or a work order cites (so a citation lands on a card; the latest
+ * citers are served first), and every record one of those points at (so a
+ * retraction or a close can name what it answers), in their original order. `orders` supplies the
  * work orders' own citations. Of the enactments it keeps each practice's
  * latest `enactmentWindow`, every amendment and what an amendment cites.
  */
@@ -647,6 +629,9 @@ export function windowJournal(
   // Records a reading must be able to land on whatever their age: what the practices cite (their pitfalls and what they were learned from).
   for (const record of records) if (pinned.has(record.id)) kept.add(record.id);
   for (const escalation of openEscalations(records)) kept.add(escalation.id);
+  // The Structure view counts open defects per component: every open one is kept whatever its age.
+  const defects = defectsOfJournal(records);
+  for (const defect of defects) if (defect.resolution === undefined) kept.add(defect.id);
   // The Practices view's strips read each practice's latest ENACTMENT_WINDOW enactments, so the window keeps those; every decision
   // that cites an enactment (an amendment), and the enactments it cites, are kept whatever their age: they are few.
   const enactments = records.filter((record): record is Extract<JournalRecord, { kind: "enactment" }> => record.kind === "enactment");
@@ -675,6 +660,8 @@ export function windowJournal(
     const of = kept.has(record.id) ? pointsAt(record) : null;
     if (of !== null) kept.add(of);
   }
+  // A defect kept for a citation would read as open without the resolution that closed it.
+  for (const defect of defects) if (defect.resolution !== undefined && kept.has(defect.id)) kept.add(defect.resolution.id);
   const window = records.filter((record) => kept.has(record.id));
   return { records: window, omitted: records.length - window.length };
 }
@@ -766,6 +753,15 @@ export function citations(records: readonly JournalRecord[], orders: readonly Wo
 export function openEscalations(records: readonly JournalRecord[]): (JournalRecord & { kind: "escalation" })[] {
   const acknowledged = new Set(records.filter((r) => r.kind === "acknowledgement").map((r) => pointsAt(r)));
   return records.filter((r): r is JournalRecord & { kind: "escalation" } => r.kind === "escalation" && !acknowledged.has(r.id));
+}
+
+/**
+ * The journal's defects, folded as the CLI folds them (defectStates): a
+ * resolution closes one, a retracted one is none. The page holds the
+ * journal's own records, so they are read as the store's.
+ */
+export function defectsOfJournal(records: readonly JournalRecord[]): DefectState[] {
+  return defectStates(records as readonly StoredRecord[]);
 }
 
 /** The status each record has acquired from later records that point at it, as "resolved by rs-…". */
