@@ -16,14 +16,17 @@ import { renderPracticesResults, renderPracticesTools } from "./practices-view.t
 import type { ShellState } from "./model.ts";
 import { renderRunsResults, renderRunsTools } from "./runs-view.ts";
 import { flowOf, flowVerdict } from "./structure-flow.ts";
-import { renderStructureResults, renderStructureTools } from "./structure-view.ts";
+import { renderConnectionsResults, renderStructureResults } from "./structure-view.ts";
+import { CONNECTIONS_ID, CONNECTIONS_LABEL } from "./derive.ts";
 
 /**
- * The views in strip order: Structure first, then Lexicon, then the rest (the owner's ruling, d-bf90cb79). The builder
+ * The views in strip order: Structure first, Connections beside it, then Lexicon, then the rest (the owner's rulings, d-bf90cb79,
+ * 2026-10-30). The builder
  * embeds this list; the page reads it from state.
  */
 export const VIEWS = [
   { id: "structure", label: "Structure" },
+  { id: CONNECTIONS_ID, label: CONNECTIONS_LABEL },
   { id: "lexicon", label: "Lexicon" },
   { id: "components", label: "Components" },
   { id: "invariants", label: "Invariants" },
@@ -70,9 +73,9 @@ export function renderConnection(state: ShellState): Markup | null {
 }
 
 /**
- * The masthead leads with health: one verdict in large type, the link to its
- * set on the Structure map (the broken component's mark when one component
- * holds everything broken), and what else the verdict leaves out beneath it,
+ * The masthead leads with health: one verdict in large type, linking to
+ * Structure (its href still names the verdict's set, which resolveHash sends
+ * to the Structure view), and what else the verdict leaves out beneath it,
  * the undeclared entrances among it as a neutral count.
  * The lexicon and the record counts are demoted to one small line.
  */
@@ -132,6 +135,8 @@ export function renderViewResults(state: ShellState): Markup {
       return renderComponentsResults(state);
     case "structure":
       return renderStructureResults(state);
+    case CONNECTIONS_ID:
+      return renderConnectionsResults(state);
     case "invariants":
       return renderInvariantsResults(state);
     case "practices":
@@ -156,8 +161,6 @@ function renderViewTools(state: ShellState): Markup | null {
       </div>`;
     case "components":
       return renderComponentsTools(state);
-    case "structure":
-      return renderStructureTools(state);
     case "invariants":
       return renderInvariantsTools(state);
     case "practices":

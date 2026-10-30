@@ -36,12 +36,13 @@ import { loadSpecModel } from "../../spec/model.ts";
 import { parseSpec } from "../../spec/grammar.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { adapterCode, keptLine } from "./kept-answers.ts";
-import { lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
+import { STRUCTURE_DIR, lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
+import { readInterfacesApart } from "./apart.ts";
 import type { InterfaceReading } from "./model.ts";
 import { bothWays, sameMap } from "./both-ways.ts";
 import { checked, routedProject } from "./routed-fixture.ts";
 import { scopedUnsettled } from "./scoped-route.ts";
-import { renderView } from "./shell.ts";
+import { reliefNotes } from "./relief/data.ts";
 import { flowOf } from "./structure-flow.ts";
 
 const COHERENCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -160,9 +161,9 @@ test("interfaces read only within the declared components", async () => {
     assert.deepEqual(read.outside, { sites: 2, files: 1, into: [{ component: "src/store", sites: 2 }] }, "an import and a call in loose/use.ts, counted into the store; none from vendor/");
     assert.ok(read.symbols.every((s) => s.from.startsWith("src/")), "no outside caller is drawn as a component");
     const { state } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: read });
-    const evidence = /data-field="evidence">([^<]*)</.exec(renderView(state, "structure").text)?.[1] ?? "";
+    const evidence = reliefNotes(state).join(" ");
     assert.match(evidence, /read only within the 2 declared components/);
-    assert.match(evidence, /2 reference sites from 1 file in no declared component counted, not drawn: 2 into src\/store; a declaration only such code names is not asked, and code past the config&#39;s bounds is not read/);
+    assert.match(evidence, /2 reference sites from 1 file in no declared component counted, not drawn: 2 into src\/store; a declaration only such code names is not asked, and code past the config's bounds is not read/);
     assert.match(answerStructure(state).text, /^evidence: .*read only within the 2 declared components.*2 reference sites from 1 file in no declared component counted, not drawn/m, "query structure says the same");
   } finally {
     remove();
@@ -253,8 +254,7 @@ test("the interface reading is bounded in time and says when it is partial", { t
     assert.deepEqual(read.partial?.unread, ["src/api", "src/store"], "the store's write was never answered, and the api's entrance reach was never read");
     assert.match(read.entrances[0]?.reason ?? "", /^not read: the interface reading stopped at its time budget \(1 s\)/);
     const { state } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: read });
-    const page = renderView(state, "structure").text;
-    assert.match(page, /data-field="partial" data-partial="time">Partial map: the interface reading stopped at its time budget \(1 s\)[^<]*src\/api, src\/store were not all read/);
+    assert.match(reliefNotes(state)[0] ?? "", /^Partial map: the interface reading stopped at its time budget \(1 s\).*src\/api, src\/store were not all read/, "the Structure view says it first");
     assert.match(answerStructure(state).text, /^partial map: the interface reading stopped at its time budget \(1 s\)/, "query structure leads with it");
     // Memory: a server over its ceiling stops the reading before the next question.
     const heavy = await readComponentInterfaces(root, new TextServer(root), { budget: { memoryMB: 100 }, memory: async () => 250 });
@@ -263,7 +263,7 @@ test("the interface reading is bounded in time and says when it is partial", { t
     const complete = await readComponentInterfaces(root, new TextServer(root), { budget: { seconds: 60 } });
     assert.equal(complete.kind === "read" && complete.partial, undefined, "a reading that finished says nothing of the kind");
     const { state: whole } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: complete });
-    assert.doesNotMatch(renderView(whole, "structure").text, /data-field="partial"/);
+    assert.ok(!reliefNotes(whole).some((note) => /^Partial map/.test(note)), "a finished reading says nothing of the kind");
   } finally {
     remove();
   }
@@ -298,7 +298,7 @@ test("a file the language server cannot answer for is named and left unread whil
     assert.ok(read.symbols.some((s) => s.from === "src/api" && s.to === "src/store" && s.symbol === "write"), "every other file is read: the api's use of the store's write is drawn");
     assert.equal(read.partial, undefined, "no budget was spent");
     const { state } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: read });
-    assert.match(renderView(state, "structure").text, /data-field="partial" data-partial="unanswered">Partial map: the language server could not answer for 1 file, which was left unread while the rest was read[^<]*src\/store\/clock_windows\.ts \(no package metadata/);
+    assert.match(reliefNotes(state)[0] ?? "", /^Partial map: the language server could not answer for 1 file, which was left unread while the rest was read.*src\/store\/clock_windows\.ts \(no package metadata/, "the Structure view says it first");
     assert.match(answerStructure(state).text, /^partial map: the language server could not answer for 1 file[^\n]*src\/store\/clock_windows\.ts/, "query structure leads with it");
     const whole = await readComponentInterfaces(root, new TextServer(root), { keep: false });
     assert.equal(whole.kind === "read" && whole.unanswered, undefined, "a server that answers every file leaves nothing unanswered");
@@ -446,6 +446,34 @@ function mapOf(reading: InterfaceReading): unknown {
   const { kept: _kept, ...map } = reading;
   return map;
 }
+
+test("the interface reading on a worker thread is the reading in process: each question goes to the adapter the caller holds, the reading is kept for the hooks, and a stop ends the worker", async () => {
+  const { root, remove } = routedProject();
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    const held = new TextServer(root);
+    const languages: string[] = [];
+    const apart = await readInterfacesApart(root, (language) => (languages.push(language), held));
+    assert.equal(apart.kind, "read");
+    assert.ok(held.questions.length > 0 && languages.every((l) => l === "typescript"), "the worker asked the caller's adapter, for the project's language");
+    assert.deepEqual(lastReading(root)?.reading, apart, "and the reading is kept for the hooks, as in process");
+    const here = await readComponentInterfaces(root, new TextServer(root), { keep: false });
+    assert.deepEqual(mapOf(apart), mapOf(here), "the map is the one the reading in process draws");
+
+    // A server that never answers, asked again since nothing is kept, and a stop: the reading is refused and its worker ended.
+    rmSync(join(root, STRUCTURE_DIR), { recursive: true, force: true });
+    const silent = { ...new TextServer(root), language: "typescript", ready: () => new Promise<never>(() => {}) } as unknown as LanguageAdapter;
+    const stop = new AbortController();
+    let asked = false;
+    const stopped = readInterfacesApart(root, () => ((asked = true), silent), stop.signal);
+    for (let i = 0; i < 400 && !asked; i++) await new Promise((r) => setTimeout(r, 25));
+    assert.ok(asked, "the reading asked the silent server");
+    stop.abort();
+    await assert.rejects(stopped, /was stopped/);
+  } finally {
+    remove();
+  }
+});
 
 test("a spec edit asks the language server only what no reading asked before, and rereads no source", async () => {
   const { root, remove } = routedProject();

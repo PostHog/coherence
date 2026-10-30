@@ -70,6 +70,8 @@ const LOCK_GRACE_MS = SPAWN_WAIT_MS;
 const CHECK_MS = 5_000;
 /** How long a client waits for a stale server to exit after asking it to stop, before signalling it. */
 const STOP_WAIT_MS = 5_000;
+/** The signals that stop a server. */
+const SIGNALS = ["SIGINT", "SIGTERM"] as const;
 /** Spawns one client attempts before it reports failure: a server that dies at start is not respawned forever. */
 const SPAWN_ATTEMPTS = 3;
 /** How long a client waits for the answer to a question the server answers at once (status, stop, http). */
@@ -503,11 +505,14 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   // HTTP (the Scope reading) is the primary server's alone: another language's server never takes the root's port.
   const httpFactory = slot === undefined ? options.http : undefined;
 
+  const onSignal = (): void => void stop();
   const stop = async (): Promise<void> => {
     if (stopping) return;
     stopping = true;
     if (idle !== undefined) clearTimeout(idle);
     if (check !== undefined) clearInterval(check);
+    // A stopped server answers no signal: a process that serves one root after another holds no handler per stopped one.
+    for (const signal of SIGNALS) process.off(signal, onSignal);
     log("stopping");
     if (http !== undefined) {
       const closing = http;
@@ -706,7 +711,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   }, options.checkMs ?? CHECK_MS);
   check.unref();
   options.onListen?.(paths);
-  for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => void stop());
+  for (const signal of SIGNALS) process.once(signal, onSignal);
   return { paths, done, stop };
 }
 

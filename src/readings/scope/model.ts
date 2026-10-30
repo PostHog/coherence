@@ -444,6 +444,7 @@ export type JournalStepOutcome = { result: "done"; evidence?: string } | { resul
  */
 import type { WorkOrder } from "../../journal/work.ts";
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
+import type { ReliefReading } from "../relief/relief.ts";
 import type { LanguageData } from "./language-data.ts";
 import type { LanguagesRead } from "./languages-read.ts";
 export type { WorkOrder };
@@ -723,6 +724,8 @@ export interface ShellState {
   journal: JournalData;
   /** Every component interface, as the language adapter resolved the references when the page was built. */
   componentInterfaces: InterfaceReading;
+  /** What the Structure view draws that the rest of the state does not hold: files, districts and landings (relief.ts). Absent from a page built before it. */
+  relief?: ReliefReading;
   components: ComponentsViewState;
   structure: StructureViewState;
   invariants: InvariantsViewState;

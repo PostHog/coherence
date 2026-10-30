@@ -1561,6 +1561,26 @@
         "defined_by": "owner, 2026-10-28 (session 51c38ab9, d-8ebb2e2e)",
         "owner_words": "do 7"
       }
+    },
+    {
+      "name": "connections",
+      "status": "settled",
+      "definition": "Scope's view of component interfaces rooted at one origin, a structural route or a component: its columns are hops from that origin, each chokepoint stands once at the door of the component it protects, and selecting a component shows every entrance whose reach gets to it. Its own tab beside Structure, drawn from the same flow model with no reading of its own; the reader grows it one hop at a time with +N on a card.",
+      "related": [
+        "structure",
+        "scope",
+        "structural route",
+        "component interface",
+        "chokepoint",
+        "entrance",
+        "core dependency"
+      ],
+      "not_to_be_confused_with": [
+        "a network connection, such as the warm server's HTTP connections: the ordinary word, not this view"
+      ],
+      "provenance": {
+        "defined_by": "owner, 2026-10-30, named the view (work order w-faf84c51); the entry written by session a98282e8b37e5461b from the prototype the owner reviewed (d-a314db4e, d-d4f9fea6, d-9cf51e23)"
+      }
     }
   ],
   "metaphors": {

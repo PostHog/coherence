@@ -2325,3 +2325,129 @@ a.flow-term {
 .strip-legend .cell {
   margin: 0 0.15rem 0 0.35rem;
 }
+
+/* ---------- Structure: the relief (relief/scene.ts) ---------- */
+.relief {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --line: #e1e0d9; --chip: #f0efec; --sel: #d6470f;
+  --r1: #cde2fb; --r2: #9ec5f4; --r3: #6da7ec; --r4: #3987e5; --r5: #2a78d6; --r6: #1c5cab; --r7: #0d366b;
+  --ground: #efeee9; --edge: rgba(11,11,11,.28); --plinth: #dcdad2;
+  --add: #2e9d5b; --del: #d1453b;
+}
+@media (prefers-color-scheme: dark) {
+  .relief {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --line: #2c2c2a; --chip: #2c2c2a; --sel: #ff8a4c;
+    --r1: #0d366b; --r2: #1c5cab; --r3: #2a78d6; --r4: #3987e5; --r5: #6da7ec; --r6: #9ec5f4; --r7: #cde2fb;
+    --ground: #171716; --edge: rgba(255,255,255,.22); --plinth: #2a2a28;
+    --add: #4cc47f; --del: #f0645a;
+  }
+}
+.relief, .relief * { box-sizing: border-box; }
+.relief { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.relief .wrap { max-width: 1600px; margin: 0 auto; padding: 18px 16px 40px; }
+.relief h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; letter-spacing: -.01em; }
+.relief .sub { color: var(--ink-2); margin: 0 0 14px; max-width: 1000px; }
+.relief .controls { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; margin-bottom: 12px; }
+.relief .group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.relief .group > span { color: var(--muted); font-size: 12px; margin-right: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.relief button { font: inherit; font-size: 13px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.relief button[aria-pressed="true"] { background: var(--ink); color: var(--page); border-color: var(--ink); }
+.relief button:disabled { opacity: .4; cursor: default; }
+.relief .main { display: grid; grid-template-columns: 1fr 380px; gap: 16px; }
+@media (max-width: 1000px) { .main { grid-template-columns: 1fr; } }
+.relief .stage { position: relative; height: 720px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.relief .stage canvas { display: block; }
+.relief .label { font-size: 12px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--surface) 82%, transparent); padding: 1px 6px; border-radius: 4px; white-space: nowrap; pointer-events: none; line-height: 1.3; text-align: center; }
+.relief .label small { display: block; font-weight: 400; color: var(--ink-2); font-size: 11px; opacity: .5; }
+.relief .label.dim { opacity: .35; }
+.relief .label .dl { display: block; font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.relief .label.virt { font-style: italic; font-weight: 500; color: var(--ink-2); }
+.relief .label.plat { font-size: 13px; color: var(--ink-2); }
+.relief .callouts { position: absolute; inset: 0; pointer-events: none; }
+.relief .callouts .label { position: absolute; pointer-events: auto; cursor: pointer; display: none; }
+.relief .callouts .label { text-align: left; }
+.relief .callouts .label.r { text-align: right; }
+.relief .leaders { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.relief .leaders polyline { fill: none; stroke: var(--muted); stroke-width: .75; opacity: .6; stroke-linejoin: round; }
+.relief .leaders circle { fill: var(--ink-2); }
+.relief .label.plat small { color: var(--muted); }
+.relief .crumbs { position: absolute; left: 12px; top: 10px; font-size: 13px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 85%, transparent); padding: 5px 8px; border-radius: 6px; max-width: 70%; }
+.relief .crumbs a { color: var(--ink); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.relief .crumbs b { color: var(--ink); font-weight: 650; }
+.relief .crumbs small { display: block; color: var(--muted); font-size: 11px; }
+.relief .scale { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 85%, transparent); padding: 6px 8px; border-radius: 6px; }
+.relief .scale .ramp { display: flex; margin: 4px 0 2px; }
+.relief .scale .ramp i { width: 22px; height: 10px; }
+.relief .scale .sw { display: inline-block; width: 12px; height: 10px; vertical-align: -1px; margin-right: 4px; }
+.relief .add { color: var(--add); font-variant-numeric: tabular-nums; } .del { color: var(--del); font-variant-numeric: tabular-nums; }
+.relief select { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); max-width: 330px; }
+.relief .scale .ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+.relief .tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; max-width: 340px; box-shadow: 0 6px 20px rgba(0,0,0,.12); display: none; }
+.relief .tip b { font-weight: 650; }
+.relief .tip .k { color: var(--muted); }
+.relief .tip .row { display: flex; justify-content: space-between; gap: 16px; }
+.relief aside { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px; height: 720px; overflow: auto; }
+.relief aside h2 { font-size: 16px; margin: 0 0 2px; }
+.relief aside h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 16px 0 6px; font-weight: 600; }
+.relief aside .intent { color: var(--ink-2); margin: 0 0 8px; }
+.relief .nums { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.relief .nums div { background: var(--chip); border-radius: 6px; padding: 5px 8px; }
+.relief .nums .n { font-weight: 650; font-variant-numeric: tabular-nums; }
+.relief .nums .k { font-size: 11px; color: var(--ink-2); }
+.relief .nums .cur { outline: 2px solid var(--ink); }
+.relief ul.items { list-style: none; margin: 0; padding: 0; }
+.relief ul.items li { padding: 5px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.relief ul.items li .m { color: var(--muted); font-size: 12px; }
+.relief ul.items li code { font-size: 12px; }
+.relief ul.items li.click { cursor: pointer; }
+.relief ul.items li.click:hover { background: var(--chip); }
+.relief .rank { display: grid; grid-template-columns: 1fr auto auto; gap: 2px 12px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.relief .rank > * { padding: 3px 0; border-top: 1px solid var(--line); }
+.relief .rank .h { color: var(--muted); font-size: 11px; text-transform: uppercase; border-top: 0; }
+.relief .rank .nm { cursor: pointer; }
+.relief .rank .nm:hover { text-decoration: underline; }
+.relief .note { color: var(--ink-2); font-size: 13px; max-width: 1100px; margin-top: 14px; }
+.relief .note li { margin: 3px 0; }
+.relief details { margin-top: 12px; }
+.relief summary { cursor: pointer; color: var(--ink-2); }
+.relief table { border-collapse: collapse; font-size: 13px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.relief th, .relief td { padding: 4px 10px; border-bottom: 1px solid var(--line); text-align: right; }
+.relief th:first-child, .relief td:first-child { text-align: left; }
+.relief th.cur, .relief td.cur { background: var(--chip); }
+
+/* The relief's control strip: each group one segmented control, every control one height on one baseline. */
+.relief .controls { gap: 10px 28px; padding: 2px 0 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.relief .group { gap: 0; flex-wrap: nowrap; }
+.relief .group > span:first-child { font-size: 11px; font-weight: 600; letter-spacing: .06em; margin-right: 10px; }
+.relief .group button { height: 28px; padding: 0 11px; margin-left: -1px; border-radius: 0; font-size: 12.5px; background: transparent; color: var(--ink-2); border-color: var(--line); white-space: nowrap; }
+.relief .group button:first-of-type { margin-left: 0; border-radius: 7px 0 0 7px; }
+.relief .group button:last-of-type { border-radius: 0 7px 7px 0; }
+.relief .group button:only-of-type { border-radius: 7px; }
+.relief .group button:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--chip); color: var(--ink); }
+.relief .group button[aria-pressed="true"] { position: relative; z-index: 1; background: var(--ink); color: var(--page); border-color: var(--ink); }
+.relief .group select { height: 28px; max-width: 250px; padding: 0 8px; border-radius: 7px; font-size: 12.5px; text-overflow: ellipsis; }
+.relief .group select + span { margin: 0 6px; color: var(--muted); }
+.relief [data-r="gDiff"] select ~ button:first-of-type { margin-left: 10px; }
+.relief [hidden] { display: none !important; } /* a group the page cannot use, the diff in a snapshot, stays hidden whatever its display */
+
+/* The relief sits on Scope's own page: no slab of its own, and its strip lies on the page itself, with the tool strip's spacing and rule. */
+.relief { background: transparent; }
+.relief .controls {
+  margin: 0 0 1rem;
+  padding: 0.875rem 0;
+  background: none;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.relief [data-r="gDiff"] { flex-basis: 100%; } /* the diff has the second row of the strip to itself */
+
+/* Agent activity: a callout whose component an agent is touching, and the ticker of what was touched. */
+.relief .activity { position: absolute; right: 12px; bottom: 10px; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; align-items: flex-end; pointer-events: none; max-width: 46%; }
+.relief .activity li { font-size: 12px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 88%, transparent); padding: 2px 8px; border-radius: 5px; border-left: 3px solid #7fdcff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.relief .activity li.write { border-left-color: #ffb347; }
+.relief .activity li b { color: var(--ink); font-weight: 650; }
+.relief .activity li code { font-size: 11.5px; }
+.relief .activity li.gone { animation: relief-fade .9s forwards; }
+@keyframes relief-fade { to { opacity: 0; } }
