@@ -30,7 +30,8 @@ import { gapsOf, orientGapText, structureState } from "./gaps.ts";
 import { ADOPTER_ENTRANCES, APPLE, adopterFiles } from "../../spec/covers-fixture.ts";
 import { allInvariants, flowChokepointId, flowLevelId, invariantVerdict, relianceId, resolveHash, structureId } from "./derive.ts";
 import type { EntranceGuard, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
-import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, type FlowEntrance, type FlowModel, type FlowRoute } from "./structure-flow.ts";
+import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, routeName, type FlowEntrance, type FlowModel, type FlowRoute } from "./structure-flow.ts";
+import { renderView } from "./shell.ts";
 
 let fixture: Fixture;
 let base: ShellState;
@@ -762,4 +763,222 @@ test("entrances that declare different guard: lines never share a line, so a gua
   const bare = model.routes.find((r) => r.names.includes("glance"))!;
   assert.notEqual(guarded.id, bare.id);
   assert.deepEqual([guarded.traced.map((c) => `${c.kind} ${c.name}`), guarded.noTracedControl, bare.noTracedControl], [["wrapper one door"], false, true]);
+});
+
+// The derivation halves of the map's tests, kept when the map was retired for the relief (PR #164): the routes, controls and
+// verdict are still what query structure prints and the masthead says, so the bullets that name them stay checked.
+
+test("query structure prints the structural routes, core dependencies and interface identifiers of the one flowOf derivation", () => {
+  for (const state of [projectState(), crowdedState()]) {
+    const text = answerStructure(state).text;
+    const model = flowOf(state);
+    const section = (heading: RegExp): string[] => {
+      const lines = text.split("\n");
+      const start = lines.findIndex((line) => heading.test(line));
+      assert.ok(start >= 0, `${heading} is in the text form`);
+      const out: string[] = [];
+      for (const line of lines.slice(start + 1)) {
+        if (!line.startsWith("  ")) break;
+        out.push(line.trim());
+      }
+      return out;
+    };
+    const queriedRoutes = section(/^structural routes/).map((line) => line.split(/ {2}/).slice(0, 2).join(" | "));
+    assert.ok(model.routes.length > 0);
+    assert.deepEqual(queriedRoutes, model.routes.map((r) => `${routeName(r)} | ${r.stops.join(" -> ")}${r.rail === undefined ? "" : ` -> ${r.rail} (rail)`}`), "routes: named origin and stops in order");
+    assert.deepEqual(section(/^core dependencies/).map((line) => line.split(/ {2}/)[0]), model.coreDependencies.map((c) => c.folder), "core dependencies: one each");
+    const queriedIds = section(/^interface identifiers/).flatMap((line) => {
+      const [text, , ...rest] = line.split(/ {2}/);
+      const on = rest[rest.length - 1]!.replace(/^on /, "").split(", ");
+      return on.filter((pair) => pair.includes(" -> ")).map((pair) => `${text} ${pair}`);
+    }).sort();
+    const derivedIds = model.identifiers.flatMap((i) => i.edges.map((id) => { const edge = model.edges.find((e) => e.id === id)!; return `${i.text} ${edge.from} -> ${edge.to}`; })).sort();
+    assert.deepEqual(queriedIds, derivedIds, "identifiers: each on the interfaces it stands on");
+  }
+  assert.equal(answer(projectState(), "structure", ["extra"]).code, 64);
+});
+
+test("entrances whose trust differs get their own routes, and an entrance's own chokepoint crosses on the line where work enters", () => {
+  const model = flowOf(trustState());
+  const event = model.entrances.find((e) => e.name === "hook event")!;
+  const tick = model.entrances.find((e) => e.name === "tick")!;
+  assert.deepEqual(event.trust, ["outside"], "the handler is the chokepoint of a crossing from outside");
+  assert.deepEqual(tick.trust, []);
+  const eventRoute = model.routes.find((r) => r.entrances.includes(event.id))!;
+  const tickRoute = model.routes.find((r) => r.entrances.includes(tick.id))!;
+  assert.deepEqual(eventRoute.stops, tickRoute.stops, "the same path");
+  assert.notEqual(eventRoute.id, tickRoute.id, "different trust, different routes");
+  const identifier = model.identifiers.find((i) => i.name === "the hook answers one project")!;
+  assert.deepEqual(eventRoute.entry, [identifier.text]);
+  assert.match(answerStructure(trustState()).text, new RegExp(`enters through ${identifier.text}\\b`), "the query says where it crosses");
+  // Entrances that share both path and trust share a route.
+  const shared = flowOf(sharedState()).routes.find((r) => r.entrances.includes(flowEntranceId(".", "run")))!;
+  assert.equal(shared.entrances.length, 2);
+});
+
+test("with the handler's reach read, a route follows the handler and stops where its work ends: never through a utility another component calls, never a type", () => {
+  const withReach = (reach: ReachReference[]): ShellState => {
+    const state = projectState({ symbols: [...SYMBOLS, sym("src/hooks", "src/core", "hookCore", "src/core/hook.ts", 2)] });
+    if (state.componentInterfaces.kind === "read") state.componentInterfaces.entrances = state.componentInterfaces.entrances.map((e) => (e.name === "run" ? { ...e, reach } : e));
+    return state;
+  };
+  // door is also called by the reader: a utility, so the route ends at the hooks.
+  const utility = flowOf(withReach([{ from: "src/hooks", to: "src/core", symbol: "door", file: "src/core/door.ts", sites: 3 }])).routes.find((r) => r.entrances.includes(flowEntranceId(".", "run")))!;
+  assert.deepEqual(utility.stops, [".", "src/hooks"]);
+  assert.equal(utility.followed, "reach");
+  // hookCore only the hooks call; write only the core calls: the route follows both, and no further.
+  const dedicated = flowOf(withReach([{ from: "src/hooks", to: "src/core", symbol: "hookCore", file: "src/core/hook.ts", sites: 2 }, { from: "src/core", to: "src/store", symbol: "write", file: "src/store/write.ts", sites: 1 }])).routes.find((r) => r.entrances.includes(flowEntranceId(".", "run")))!;
+  assert.deepEqual(dedicated.stops, [".", "src/hooks", "src/core", "src/store"]);
+  // Without a reach the route is reference weight, and says so.
+  assert.equal(flowOf(projectState()).routes[0]!.followed, "weight");
+});
+
+test("the masthead leads with health: one verdict in large type that links to its set, with the counts demoted beneath it", () => {
+  const verdictOf = (state: ShellState): { kind: string; href: string; text: string; page: string } => {
+    const page = renderView(state, "lexicon").text;
+    const m = /<a class="verdict" data-field="verdict" data-verdict="([a-z]+)" href="#([^"]+)">([^<]+)<\/a>/.exec(page);
+    assert.ok(m !== null, "the masthead carries a verdict");
+    return { kind: m[1]!, href: m[2]!, text: m[3]!, page };
+  };
+  const healthy = verdictOf(projectState());
+  assert.deepEqual([healthy.kind, healthy.text, healthy.href], ["verified", "All 3 invariants verified", flowHealthId("verified")]);
+  assert.ok(healthy.page.indexOf('data-field="verdict"') < healthy.page.indexOf('data-field="model-counts"'), "the verdict comes before the counts");
+  assert.doesNotMatch(/<div class="masthead">[^]*?<\/div>/.exec(healthy.page)![0], /bullets?\b/, "no implementation noun in the masthead");
+  const none = projectState({ states: { "one door": "requirement", "append-only store": "requirement", "single writer": "requirement" } });
+  none.runs.records = [];
+  const nothing = verdictOf(none);
+  assert.deepEqual([nothing.kind, nothing.text, nothing.href], ["nothing", "Nothing is enforced yet", flowHealthId("requirements")]);
+  const broken = verdictOf(healthState());
+  assert.deepEqual([broken.kind, broken.text, broken.href], ["broken", "1 broken", flowBrokenId("src/store")], "one broken component: the verdict names its broken set");
+  assert.match(broken.page, /data-field="verdict-detail">1 requirement not enforced yet/);
+  assert.equal(resolveHash(healthState(), `#${broken.href}`).view, "structure", "the link lands on the Structure view");
+  const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+  const size = (selector: string): string => new RegExp(`\\n${selector.replace(/\./g, "\\.")} \\{[^}]*font-size: ([^;]+);`).exec(css)![1]!;
+  assert.match(size(".masthead .verdict"), /clamp\(1\.375rem/, "large type");
+  assert.equal(size(".masthead .meta-counts"), "0.8125rem", "the counts are small");
+});
+
+test("no traced control marks only an untrusted route with nothing traced on it: unknown trust or a level from outside the system's control, never a trusted one", () => {
+  // The reader's route (no identifier anywhere on it) carrying each kind of trust in.
+  const look = (trust: string | undefined, outside: boolean): FlowRoute => {
+    const state = untracedState();
+    state.spec.trustLevels = state.spec.trustLevels.map((level) => ({ ...level, outside: level.name === "outside" ? outside : false }));
+    const root = state.spec.components.find((c) => c.folder === ".")!;
+    root.entrances = root.entrances.map((e) => (e.name === "look" ? { ...e, trust, trustLine: e.handlerLine + 1 } : e));
+    const route = flowOf(state).routes.find((r) => r.names.includes("look"))!;
+    assert.deepEqual(route.controls, [], "nothing stands on the reader's route");
+    return route;
+  };
+  assert.equal(look(undefined, true).noTracedControl, true, "unknown trust is untrusted (d-6df8d09a)");
+  assert.equal(look("outside", true).noTracedControl, true, "a level from outside the system's control is untrusted");
+  assert.equal(look("not-declared", false).noTracedControl, true, "a level no entry spec declares is untrusted");
+  assert.equal(look("inside", false).noTracedControl, false, "a level inside the system's control is not marked");
+  assert.equal(look("outside", false).noTracedControl, false, "nor is outside when the entry spec does not mark it outside");
+  const state = untracedState();
+  const root = state.spec.components.find((c) => c.folder === ".")!;
+  root.entrances = root.entrances.map((e) => (e.name === "look" ? { ...e, trust: "inside", trustLine: e.handlerLine + 1 } : e));
+  const query = answerStructure(state).text;
+  assert.match(query, /look {2}[^\n]*trust inside/, "the query shows the trusted route's level");
+  assert.doesNotMatch(query, /look {2}[^\n]*no traced control/, "and never marks it");
+});
+
+test("a route's controls are traced four ways, verified only: an identifier on its lines, a chokepoint its handler is registered through, a chokepoint inside a component on it whose protected thing its reach reaches, and a totality oracle on it, each but the wrapper only when its crossing enters from the route's trust or enters it", () => {
+  const look = (state: ShellState): FlowRoute => flowOf(state).routes.find((r) => r.names.includes("look"))!;
+  const kinds = (route: FlowRoute): string[] => route.traced.map((c) => `${c.kind} ${c.name}${c.declared ? " (declared)" : ""}`);
+  const bare = look(tracedState());
+  assert.deepEqual([bare.stops, bare.controls, bare.traced], [[".", "src/reader", "src/store"], [], []], "nothing stands on the reader's route");
+  assert.equal(bare.noTracedControl, true, "untrusted, and nothing traced: no traced control");
+  // A wrapper: the handler's own declaration references a verified chokepoint, wherever it stands.
+  const wrapped = look(tracedState({ guards: [{ component: "src/core", name: "one door", how: "wrapper" }] }));
+  assert.deepEqual(kinds(wrapped), ["wrapper one door"]);
+  assert.equal(wrapped.noTracedControl, false);
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/core", name: "one door", how: "declared" }] }))), ["wrapper one door (declared)"], "a guard: line the reading confirmed is a wrapper, marked declared");
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/core", name: "one door", how: "wrapper" }], states: { "one door": "requirement" } }))), [], "an unverified chokepoint is no control");
+  // Inside: a chokepoint the reach passes counts only in a component on the route.
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/store", name: "single writer", how: "reach" }] }))), ["inside single writer"], "the store is on the route");
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/journal", name: "append-only store", how: "reach" }] }))), [], "the journal is not");
+  // A control checks what crosses from the route's trust (c-9941b95e).
+  const writeLog = look(tracedState({ guards: [{ component: "src/store", name: "single writer", how: "reach" }], crossings: { "single writer": ["inside", "record"] } }));
+  assert.deepEqual([kinds(writeLog), writeLog.noTracedControl], [[], true], "a chokepoint inside whose crossing neither enters from outside nor enters it is nominal: the route reads no traced control");
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/store", name: "single writer", how: "reach" }], crossings: { "single writer": null } }))), [], "one that declares no crossing checks no trust");
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/store", name: "single writer", how: "reach" }], crossings: { "single writer": ["record", "outside"] } }))), ["inside single writer"], "one whose crossing enters the route's trust decides what reaches this caller, and counts");
+  // A wrapper is exempt: the handler is registered through it, whatever boundary its crossing names.
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/store", name: "single writer", how: "wrapper" }], crossings: { "single writer": ["inside", "record"] } }))), ["wrapper single writer"], "a wrapper counts whatever its crossing");
+  // Test-backed: an invariant enforced by a totality oracle alone on the route whose crossing enters from the trust the route carries in.
+  assert.deepEqual(kinds(look(tracedState({ totality: { from: "outside" } }))), ["totality looks stay scoped"]);
+  assert.deepEqual(kinds(look(tracedState({ totality: { from: "inside" } }))), [], "a crossing entering from another level");
+  assert.deepEqual(kinds(look(tracedState({ totality: { from: "record", to: "outside" } }))), ["totality looks stay scoped"], "a crossing entering the route's trust");
+  assert.deepEqual(kinds(look(tracedState({ totality: { from: "outside", state: "requirement" } }))), [], "an unverified totality");
+  assert.deepEqual(kinds(look(tracedState({ totality: { from: "outside", chokepoint: true } }))), [], "an invariant with a chokepoint is traced by its chokepoint, never as an totality");
+  // Every kind at once, in order, and the route is controlled.
+  const all = look(tracedState({ totality: { from: "outside" }, guards: [{ component: "src/store", name: "single writer", how: "reach" }, { component: "src/core", name: "one door", how: "wrapper" }] }));
+  assert.deepEqual(kinds(all), ["wrapper one door", "inside single writer", "totality looks stay scoped"]);
+  // The query names each control, its kind and its invariant.
+  const state = tracedState({ totality: { from: "outside" }, guards: [{ component: "src/store", name: "single writer", how: "reach" }, { component: "src/core", name: "one door", how: "declared" }], guard: "door" });
+  assert.match(answerStructure(state).text, /look {2}[^\n]*traced: structural chokepoint wrapping its handler \(declared by guard:\): one door \(src\/core\); structural chokepoint inside a component on it: single writer \(src\/store\); test-backed totality oracle: looks stay scoped \(src\/reader\)/);
+  assert.doesNotMatch(answerStructure(state).text, /look {2}[^\n]*no traced control/);
+  // A control beyond the lines is each entrance's own: one only some entrances on the route pass is listed apart, never counted.
+  const twins = tracedState({ guards: [{ component: "src/core", name: "one door", how: "wrapper" }] });
+  const rootSpec = twins.spec.components.find((c) => c.folder === ".")!;
+  rootSpec.entrances = [...rootSpec.entrances, { ...rootSpec.entrances.find((e) => e.name === "look")!, name: "glance", meaning: "a reader glances" }];
+  if (twins.componentInterfaces.kind === "read") twins.componentInterfaces.entrances = [...twins.componentInterfaces.entrances, { component: ".", name: "glance", file: "src/reader/look.ts" }];
+  const shared = look(twins);
+  assert.deepEqual([shared.names, shared.traced, shared.partial.map((c) => `${c.kind} ${c.name} ${c.entrances}`), shared.noTracedControl], [["look", "glance"], [], ["wrapper one door 1"], true], "one of two entrances wrapped: listed, not counted");
+  assert.match(answerStructure(twins).text, /look[^\n]*passed by some: one door \([^)]*\) on 1 of 2/);
+  // An identifier on its lines counts the same way: the run route, carrying outside in, crosses one door (no crossing) and the writer.
+  const lined = (crossing: [string, string] | null): ShellState => {
+    const s = projectState();
+    s.spec.trustLevels = s.spec.trustLevels.map((level) => ({ ...level, outside: level.name === "outside" }));
+    const root = s.spec.components.find((c) => c.folder === ".")!;
+    root.entrances = root.entrances.map((e) => (e.name === "run" ? { ...e, trust: "outside", trustLine: e.handlerLine + 1 } : e));
+    const writer = s.spec.components.find((c) => c.folder === "src/store")!.invariants.find((i) => i.name === "single writer")!;
+    writer.crossing = crossing === null ? undefined : { from: crossing[0], to: crossing[1], line: 7 };
+    return s;
+  };
+  const run = (s: ShellState): FlowRoute => flowOf(s).routes.find((r) => r.names.includes("run"))!;
+  const onLine = (s: ShellState): string[] => {
+    const model = flowOf(s);
+    return run(s).controls.map((text) => model.identifiers.find((i) => i.text === text)!.name).sort();
+  };
+  const interfaces = (route: FlowRoute): string[] => route.traced.filter((c) => c.kind === "interface").map((c) => c.name);
+  assert.deepEqual(onLine(lined(["outside", "inside"])), ["one door", "single writer"], "both chokepoints stand on the run route's lines");
+  assert.deepEqual(interfaces(run(lined(["outside", "inside"]))), ["single writer"], "the writer's crossing enters from outside, the route's trust: it counts; one door declares no crossing and does not");
+  assert.deepEqual(interfaces(run(lined(["record", "outside"]))), ["single writer"], "a crossing entering outside counts too");
+  const other = run(lined(["inside", "record"]));
+  assert.deepEqual([interfaces(other), other.noTracedControl], [[], true], "a crossing between two other levels checks nothing that enters from outside: the route reads no traced control");
+  assert.deepEqual(run(lined(["inside", "record"])).controls.length, 2, "the identifiers still stand on its lines");
+  // A declared guard the reading could not confirm counts for nothing.
+  const unconfirmed = tracedState({ guard: "door", unconfirmed: "no registration of the handler spells door" });
+  assert.equal(look(unconfirmed).noTracedControl, true);
+  assert.deepEqual(look(unconfirmed).traced, []);
+});
+
+test("an entrance that declares control: none with its reason is never marked no traced control: its route says no control needed, the query gives the reason, and it never shares a line with an entrance that does not declare it", () => {
+  const reason = "static files, the same bytes for every caller";
+  const waive = (state: ShellState, names: string[]): ShellState => {
+    const root = state.spec.components.find((c) => c.folder === ".")!;
+    root.entrances = root.entrances.map((e) => (names.includes(e.name) ? { ...e, noControl: reason, controlLine: e.handlerLine + 2 } : e));
+    return state;
+  };
+  const look = (state: ShellState): FlowRoute => flowOf(state).routes.find((r) => r.names.includes("look"))!;
+  assert.equal(look(tracedState()).noTracedControl, true, "untrusted and untraced: marked");
+  const state = waive(tracedState(), ["look"]);
+  const route = look(state);
+  assert.deepEqual([route.noControl, route.noTracedControl], [true, false], "declared: not marked");
+  assert.equal(flowOf(state).entrances.find((e) => e.name === "look")!.noControl, reason, "the entrance carries its reason");
+  const query = answerStructure(state).text;
+  assert.match(query, /look {2}[^\n]*no control needed/, "the query says so of the route");
+  assert.doesNotMatch(query, /look {2}[^\n]*no traced control/);
+  assert.match(query, /\.\/look {2}[^\n]*no control needed: static files, the same bytes for every caller/, "and of the entrance, with its reason");
+  // A twin on the same stops and trust that declares nothing takes its own line, which stays marked.
+  const twins = tracedState();
+  const rootSpec = twins.spec.components.find((c) => c.folder === ".")!;
+  rootSpec.entrances = [...rootSpec.entrances, { ...rootSpec.entrances.find((e) => e.name === "look")!, name: "glance", meaning: "a reader glances" }];
+  if (twins.componentInterfaces.kind === "read") twins.componentInterfaces.entrances = [...twins.componentInterfaces.entrances, { component: ".", name: "glance", file: "src/reader/look.ts" }];
+  assert.deepEqual(look(twins).names, ["look", "glance"], "undeclared, they share a line");
+  const split = flowOf(waive(twins, ["look"]));
+  const lookRoute = split.routes.find((r) => r.names.includes("look"))!;
+  const glanceRoute = split.routes.find((r) => r.names.includes("glance"))!;
+  assert.notEqual(lookRoute.id, glanceRoute.id, "declared differently, they never share a line");
+  assert.deepEqual([lookRoute.noControl, lookRoute.noTracedControl, glanceRoute.noControl, glanceRoute.noTracedControl], [true, false, false, true]);
 });
