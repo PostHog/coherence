@@ -107,8 +107,8 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   crossing: record -> reading
   refuted: withheld the retirement option from the defect section in renderDefect -> "a structural defect renders its bypass sites and both honest options" went red in check.test.ts; restored, green (2026-09-17)
   kinds: none
-- deep links resolve: Every card id on every view resolves, by its prefix, to the view that renders it, a hash naming a view alone resolves to that view, and a link into the retired Reliance view, security spine or Structure map selections opens the Structure view.
-  over: every card id every view renders for the fixture project, and every link the Invariants view carries
+- deep links resolve: Every card id on every view resolves, by its prefix, to the view that renders it, a hash naming a view alone resolves to that view, a link into the retired Reliance view, security spine or Structure map selections opens the Structure view, and a connections id opens the Structure view on the origin it names.
+  over: every card id every view renders for the fixture project, every link the Invariants view carries, and the connections id of every component of the fixture project
   via: deep links resolve: every card id on every view resolves to that view
   because: a link into a card on another view must open that view first or it lands nowhere; one id space with a prefix per view is decided in one function, and the check walks every rendered id through it
   crossing: reading -> reading
@@ -527,4 +527,39 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   via: Scope's page model and views write no closed list the tool's own modules declare; each is imported as a type
   because: model.ts copied Lack, LifecycleState, PracticeState, the practice's reach and the close's results and outcome, believing the browser could not import the tool's modules; a type import is stripped before bundling, so the copies bought nothing and a state added to the tool would compile everywhere and be unknown to the page (c-a1a77f70)
   refuted: wrote a practice's state out by hand in model.ts again, candidate or established in place of PracticeState -> "Scope's page model and views write no closed list the tool's own modules declare; each is imported as a type" went red in declared-once.test.ts on its own assertion; restored (cmp), green batched and alone (2026-10-12)
+  kinds: none
+- connections columns are hops from the origin: In Structure's connections view (connections/model.ts) a component origin stands in column 0 with every component it calls one column right and every component calling it (and not called by it) one column left; a structural route's origin is its entrance token in column 0, the component declaring it and each entrance's handler component in column 1, every component their entrances' handler's static reach enters from those at one plus its hops along that reach, and every component holding a chokepoint the work passes drawn from the start at one plus its hops; an origin the flow model lacks draws nothing.
+  over: a component origin and a route origin of a synthetic project, with and without a chokepoint traced on the route, and an origin no longer in the model
+  via: connections: columns are hops from the origin, callees right and callers left of a component, along the handler's reach from a route
+  because: the owner settled the view on depth measured from one origin (d-a314db4e): every whole-project layout failed on Coherence's 86 interfaces among 13 components, and following a route's stop order drew query as one seven-card line; the model holds which card stands in which column, the drawing only where a column is
+  kinds: none
+- a spawn adds what its +N counts: Every drawn card but a component origin carries the number of components one hop further out from it (its callees right of a component origin, its callers left, the next components along the reach from a route) that are neither drawn nor a hidden core dependency, and spawning it draws exactly those, in the next column out or, from a route, at their own hops when further.
+  over: every card of a component origin and of a route origin, before and after spawning a caller, a callee and a card along the reach
+  via: connections: +N counts what a spawn adds one hop further out, and a spawn adds exactly that
+  because: the view opens on one hop and grows only where the reader asks (d-a314db4e); a +N that counted what a spawn would not draw, or drew more than it said, would make the reader distrust the one control the view has for going further
+  kinds: none
+- connections draw every interface between drawn cards: Every component interface of the flow model whose caller and callee are both drawn is a line, with its reference sites, and no other line is drawn; from a structural route, a line is the work's own exactly when its entrances' handler's static reach references the callee through it, with the sites and symbols that reach uses, and an interface the work does not use is still drawn, never its own.
+  over: every interface of a synthetic project between the cards of a component origin, and the lines of a route origin after a spawn
+  via: connections: every component interface between drawn cards is a line, and the route's own are those its reach uses
+  because: the relief dropped the view of how components connect (d-a314db4e); a view that left out an interface between two drawn cards would hide a reliance in plain sight, and one that showed the work using an interface its reach never references would invent a flow
+  kinds: none
+- a chokepoint is one door: Each chokepoint standing on a drawn line is drawn once, at the door of the component it stands in front of (the callee of the interfaces it stands on), with its identifier, its verdict, what it protects, and every caller in the flow model whose interface it stands on, drawn or not; a crossing of its invariant marks the door, and a bypass the latest run recorded on any of those interfaces breaks it.
+  over: every door of a synthetic project from a component origin, a door whose callers are not all drawn, and a door with a recorded bypass
+  via: connections: a chokepoint is drawn once, at the door of the callee, listing every caller it stands in front of, with its crossing and its bypass
+  because: identifier pills on every interface the chokepoint stands on piled X14 and X32 on top of each other in the bundle into Journal and Spec (d-d4f9fea6); one door says the same thing once, where the work arrives, and selecting it answers who reaches the protected thing through it
+  kinds: none
+- a core dependency is a chip: A core dependency is never a card unless it is the origin or the reader asks to draw it; each drawn card that uses it, by calling it from a component origin or by its route's reach from a route origin, carries it as a chip, and once it is drawn as a card its uses are lines and no longer chips.
+  over: every card of a synthetic project whose utility every other component calls, from a component origin, from the utility itself, from a route, and with the utility asked for
+  via: connections: a core dependency is a chip on the cards that use it, and a card only as the origin or when asked
+  because: src/adapters drawn as a card took eleven incoming lines and buried every other interface (d-d4f9fea6); a chip keeps the fact that a card uses it without the lines
+  kinds: none
+- a selected card keeps only its own lines: Selecting a drawn card keeps only the lines with it at one end, and the doors those lines carry, removing the rest; and it gives one token for every structural route whose entrances' handler's reach gets to that card, with how many hops in, where its work enters and its trust, fewest hops first then by name, the origin route marked among them; a selection that is not drawn removes nothing.
+  over: a selected callee, a selected caller where a route starts, a component selected from a route origin, and a selection that is not drawn
+  via: connections: selecting a card keeps only the lines that touch it and gives a token for every route whose reach gets to it, fewest hops first
+  because: the owner asked to see every entrance that reaches a selected component and to prune the second-order connections from it, removed and not faded (d-9cf51e23); Journal is reached by 13 of 15 routes, which no route's own stops say
+  kinds: none
+- every connections origin has a deep link: Every structural route and every component of the flow model has a connections id, the view's prefix and the flow model's own id for it, that no other origin shares, that names that origin back, and that the page's one hash scheme resolves to the Structure view with that id.
+  over: every route and every component of a synthetic project with two entrances
+  via: connections: every route and component has a deep link that names it back
+  because: a link into the view must reach the origin it was copied from, or a reader shown a route by a link lands on another; the ids derive from the flow model's own, so no second naming of a route or a component can drift from it
   kinds: none

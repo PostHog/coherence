@@ -645,6 +645,8 @@ export interface StructureViewState {
   selected?: string;
   /** Component folders opened in place, one level of the tree at a time. Absent: the top level is open. */
   expanded?: string[];
+  /** What Structure shows: the relief when absent, else the connections view, by its id (CONNECTIONS_ID in derive.ts). Set by the page, never by the builder. */
+  shows?: string;
 }
 
 export interface RunsViewState {
