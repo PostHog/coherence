@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
-import type { Touch } from "../relief/relief.ts";
+import { readReliefApart, type ReliefRead, type Touch } from "../relief/relief.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { connectAdapter, serve, type Serving } from "../../enforcement/server.ts";
 import { loadJournal } from "../../journal/store.ts";
@@ -432,10 +432,19 @@ const snapshots = (events: readonly StreamEvent[]): ShellState[] => events.filte
 
 test("a spec edit sends the model at once and the relief as a snapshot of its own when it lands, and a page that loaded between them is sent the relief when its stream opens", async () => {
   const fixture = makeFixture();
-  const server = await live(fixture.root);
+  // The relief read as the server reads it, then held until the model's snapshot is in: on a slow machine it could otherwise land first, which the server allows.
+  let hold: Promise<void> | undefined;
+  let release = (): void => {};
+  const reliefReading = async (root: string, signal: AbortSignal): Promise<ReliefRead> => {
+    const read = await readReliefApart(root, signal);
+    if (hold !== undefined) await hold;
+    return read;
+  };
+  const server = await live(fixture.root, { reliefReading });
   try {
     const state = await firstLoad(server);
     const held = stampOf(state);
+    hold = new Promise((resolve) => (release = resolve));
     assert.notEqual(held, "", "the first load carries the relief");
     const stream = await openStream(server, state);
     assert.ok(await stream.until((events) => events.some((e) => e.event === "ready")));
@@ -444,8 +453,9 @@ test("a spec edit sends the model at once and the relief as a snapshot of its ow
     writeFileSync(join(fixture.root, "src/store/later.ts"), "export const later = 1;\n");
     appendFileSync(join(fixture.root, "src/store/Store.spec.md"), "\n");
     assert.ok(await stream.until((events) => snapshots(events.slice(from)).length >= 1, 20_000), "the model's snapshot arrives");
-    // A second page loads now, likely before the relief has landed; whichever, its stream must leave it holding the newest relief.
+    // A second page loads now, before the relief has landed; its stream must leave it holding the newest relief.
     const second = await firstLoad(server);
+    release();
     assert.ok(await stream.until((events) => snapshots(events.slice(from)).some((s) => stampOf(s) !== held), 20_000), "the relief's own snapshot arrives");
     const sent = snapshots(stream.events.slice(from));
     assert.equal(stampOf(sent[0]!), held, "the model's snapshot never waited on the relief: it carries the relief held until then");

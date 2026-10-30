@@ -83,6 +83,8 @@ export interface LiveOptions {
   build?: Partial<BuildOptions>;
   /** How the component interfaces are read (default on a worker thread that asks the instrument here, when `interfaces` is not false); a test gives its own reading. */
   interfaceReading?: (root: string) => Promise<InterfaceReading>;
+  /** How the relief is read (default readReliefApart, a worker thread and git's child processes); a test holds one to fix the order a rebuild and the relief land in. */
+  reliefReading?: (root: string, signal: AbortSignal) => Promise<ReliefRead>;
   /** How the whole state is read (default scopeState on a worker thread, scopeStateApart); a test holds a rebuild to see the live routes answer meanwhile. */
   load?: (options: BuildOptions) => Promise<ShellState>;
 }
@@ -321,7 +323,7 @@ class LiveReading implements HttpApp {
 
   /** The whole state with the relief read beside it, for the first load: the relief and the state each read in a worker of their own. */
   private async stateWithRelief(): Promise<ShellState> {
-    const relief = readReliefApart(this.root, this.stopping.signal);
+    const relief = (this.options.reliefReading ?? readReliefApart)(this.root, this.stopping.signal);
     const state = await this.load();
     const read = await relief;
     this.relief = read.reading;
@@ -346,7 +348,7 @@ class LiveReading implements HttpApp {
     this.reliefRunning = (async () => {
       do {
         this.reliefAgain = false;
-        const read = await readReliefApart(this.root, this.stopping.signal);
+        const read = await (this.options.reliefReading ?? readReliefApart)(this.root, this.stopping.signal);
         if (this.closed) return;
         // Landed on the chain, so it never interleaves with a refresh replacing the state it lands in; landing is quick.
         this.chain = this.chain.then(() => this.landRelief(read)).catch((error: unknown) => this.context.log(`scope: the relief did not land: ${error instanceof Error ? error.message : String(error)}`));
