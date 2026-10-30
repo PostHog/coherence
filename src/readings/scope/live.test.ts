@@ -302,8 +302,13 @@ test("the first load stays flat as the journal, the runs and the code grow, ever
       appendFileSync(join(grown.root, `.coherence/runs/s-check.jsonl`), JSON.stringify({ at: new Date(Date.UTC(2026, 8, 13) + phase * 1000).toISOString(), session: "s-check", agent: "growth", commit: "abc1234", dirty: false, instrument: { language: "typescript", server: "warm" }, latency: 3, invariants: [entry] }) + "\n");
       return recorded;
     };
+    // The coverage held unread in both loads, so neither carries a reading that happened to land first: the sizes compare the stores and the code alone.
+    const unread = (): CoverageAsk => {
+      let stop = (_: Error): void => {};
+      return { reading: new Promise((_, reject) => (stop = reject)), release: async () => stop(new Error("the live reading closed")) };
+    };
     const firstLoadBytes = async (): Promise<{ bytes: number; state: ShellState; server: Live }> => {
-      const server = await live(grown.root);
+      const server = await live(grown.root, { coverage: unread });
       const response = await fetch(`${server.base}/api/state`, { headers: { authorization: `Bearer ${server.token}` } });
       const text = await response.text();
       const first = JSON.parse(text) as { state: ShellState; version: string; history: { journal?: string; runs?: string } };
