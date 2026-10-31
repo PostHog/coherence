@@ -37,9 +37,15 @@ interface Live {
   stop: () => Promise<void>;
 }
 
-/** Serve a root with the live reading (no instrument reading, a short settle) and ask it for HTTP, as `scope` does. */
+/** A coverage reading that never lands until the server closes: a test that sizes the first load or follows the version sees no reading land at a moment of its own. */
+const unread = (): CoverageAsk => {
+  let stop = (_: Error): void => {};
+  return { reading: new Promise((_, reject) => (stop = reject)), release: async () => stop(new Error("the live reading closed")) };
+};
+
+/** Serve a root with the live reading (no instrument reading, a short settle, the coverage held unread unless the test reads it) and ask it for HTTP, as `scope` does. */
 async function live(root: string, options: LiveOptions = {}): Promise<Live> {
-  const serving = await serve(root, { idleMs: 60_000, http: scopeApp({ interfaces: false, debounceMs: 30, ...options }) });
+  const serving = await serve(root, { idleMs: 60_000, http: scopeApp({ interfaces: false, debounceMs: 30, coverage: unread, ...options }) });
   const connected = await connectAdapter(root, { spawn: false });
   const { url } = await connected.adapter.openHttp();
   await connected.adapter.close();
@@ -302,13 +308,8 @@ test("the first load stays flat as the journal, the runs and the code grow, ever
       appendFileSync(join(grown.root, `.coherence/runs/s-check.jsonl`), JSON.stringify({ at: new Date(Date.UTC(2026, 8, 13) + phase * 1000).toISOString(), session: "s-check", agent: "growth", commit: "abc1234", dirty: false, instrument: { language: "typescript", server: "warm" }, latency: 3, invariants: [entry] }) + "\n");
       return recorded;
     };
-    // The coverage held unread in both loads, so neither carries a reading that happened to land first: the sizes compare the stores and the code alone.
-    const unread = (): CoverageAsk => {
-      let stop = (_: Error): void => {};
-      return { reading: new Promise((_, reject) => (stop = reject)), release: async () => stop(new Error("the live reading closed")) };
-    };
     const firstLoadBytes = async (): Promise<{ bytes: number; state: ShellState; server: Live }> => {
-      const server = await live(grown.root, { coverage: unread });
+      const server = await live(grown.root);
       const response = await fetch(`${server.base}/api/state`, { headers: { authorization: `Bearer ${server.token}` } });
       const text = await response.text();
       const first = JSON.parse(text) as { state: ShellState; version: string; history: { journal?: string; runs?: string } };
