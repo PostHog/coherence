@@ -78,6 +78,7 @@ import { execFile } from "../../lifecycle/work-meter.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite, type ResolveHint, type Resolved } from "../../adapters/adapter.ts";
+import { RpcError } from "../../adapters/jsonrpc.ts";
 import { detectEntranceCandidates, escape, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
 import { configRecord } from "../../adapters/project-config.ts";
@@ -909,8 +910,16 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
   const referencesOf = async (definition: Definition, spelled: readonly string[], broad: boolean): Promise<ReferenceSite[] | typeof STOPPED> => {
     const kept = keep?.referenced(definition);
     if (kept !== undefined) return kept;
+    const failure = keep?.failed(definition);
+    if (failure !== undefined) throw new Error(failure);
     if ((await live()) === STOPPED) return STOPPED;
-    const answer = await within(() => adapter.references(definition));
+    let answer: ReferenceSite[] | typeof STOPPED;
+    try {
+      answer = await within(() => adapter.references(definition));
+    } catch (error) {
+      if (error instanceof RpcError) keep?.keepFailed(definition, error.message, spelled, broad);
+      throw error;
+    }
     if (answer !== STOPPED) keep?.keepReferenced(definition, answer, spelled, broad);
     return answer;
   };

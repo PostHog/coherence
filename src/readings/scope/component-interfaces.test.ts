@@ -36,6 +36,7 @@ import { loadSpecModel } from "../../spec/model.ts";
 import { parseSpec } from "../../spec/grammar.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { adapterCode, keptLine } from "./kept-answers.ts";
+import { RpcError } from "../../adapters/jsonrpc.ts";
 import { STRUCTURE_DIR, lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
 import { readInterfacesApart } from "./apart.ts";
 import type { InterfaceReading } from "./model.ts";
@@ -74,6 +75,8 @@ class TextServer implements LanguageAdapter {
   readonly stall = new Set<string>();
   /** Files it fails every question about, with its words, as gopls fails a file outside the host's build. */
   readonly fail = new Map<string, string>();
+  /** Files the server itself answers with an error, as tsserver returns its own crash on a question. */
+  readonly refuse = new Map<string, string>();
   /** How many times a reading started it. */
   started = 0;
   private readonly root: string;
@@ -102,6 +105,8 @@ class TextServer implements LanguageAdapter {
     if (this.stall.has(definition.name)) return new Promise(() => {});
     const failed = this.fail.get(definition.file);
     if (failed !== undefined) throw new Error(failed);
+    const refused = this.refuse.get(definition.file);
+    if (refused !== undefined) throw new RpcError("textDocument/references", -32603, refused);
     const sites: ReferenceSite[] = [];
     for (const file of projectFiles(this.root).filter((f) => /\.(ts|py)$/.test(f))) {
       let enclosing: string | undefined;
@@ -311,6 +316,27 @@ test("a file the language server cannot answer for is named and left unread whil
     const observed = await readInterfaceMap(root, server, loadSpecModel(root, { runs: false }), readEnforcementConfig(root), "typescript");
     assert.deepEqual(observed.unanswered, [{ file: "src/store/clock_windows.ts", reason: "no package metadata for file src/store/clock_windows.ts" }]);
     assert.ok(observed.symbols.some((s) => s.from === "src/api" && s.to === "src/store" && s.symbol === "write"), "the observation reads every other file");
+    // A failure that never came from the server (an exit, a timeout) is never kept: the next reading asks again.
+    await readComponentInterfaces(root, server);
+    const healthy = new TextServer(root);
+    await readComponentInterfaces(root, healthy);
+    assert.ok(healthy.asked.includes("tick"), "a crash is asked again");
+    // A failure the server returned is kept like an answer: the unchanged tree never starts the server for it, and still names the file.
+    const clock = join(root, "src/store/clock_windows.ts");
+    writeFileSync(clock, "export function tick(): number {\n  return 2;\n}\n");
+    const refusing = new TextServer(root);
+    refusing.refuse.set("src/store/clock_windows.ts", "Maximum call stack size exceeded");
+    await readComponentInterfaces(root, refusing);
+    const again = new TextServer(root);
+    const kept = await readComponentInterfaces(root, again);
+    assert.equal(again.started, 0, "the server is never started for a question it already refused");
+    assert.ok(kept.kind === "read" && kept.kept?.asked === 0, "nothing is asked anew");
+    assert.deepEqual(kept.kind === "read" && kept.unanswered, [{ file: "src/store/clock_windows.ts", component: "src/store", reason: "textDocument/references: Maximum call stack size exceeded (-32603)" }]);
+    // A change to that file drops the kept failure, so the server is asked again.
+    writeFileSync(clock, "export function tick(): number {\n  return 3;\n}\n");
+    const changed = new TextServer(root);
+    await readComponentInterfaces(root, changed);
+    assert.ok(changed.asked.includes("tick"), "the changed file's question is asked again");
   } finally {
     remove();
   }
