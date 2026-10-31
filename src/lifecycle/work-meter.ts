@@ -153,7 +153,9 @@ const WALKERS = /^(find|rg|fd|fdfind|du|tree|ag|ack)(\.exe)?$/i;
  */
 export function projectSized(line: string, viaShell = false): boolean {
   if (viaShell) return true;
-  if (/(^|[\\/])git(\.exe)?\s(?:.*\s)?(ls-files|grep|status|diff|ls-tree|log|rev-list|check-ignore)\b/.test(line)) return true;
+  if (/(^|[\\/])git(\.exe)?\s(?:.*\s)?(ls-files|grep|status|diff|ls-tree|log|rev-list)\b/.test(line)) return true;
+  // A check-ignore of paths named on its line costs those paths; one fed a list on its input costs the list.
+  if (/(^|[\\/])git(\.exe)?\s(?:.*\s)?check-ignore\b.*\s--stdin\b/.test(line)) return true;
   const [first = "", ...rest] = line.trim().split(/\s+/);
   const tool = first.split(/[\\/]/).pop() ?? "";
   if (SHELLS.test(tool) || WALKERS.test(tool)) return true;
