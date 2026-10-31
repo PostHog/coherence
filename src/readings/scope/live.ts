@@ -18,22 +18,27 @@
  *   /api/relief/sessions the sessions there are to replay, latest first, from the folders' listings alone
  *   /api/relief/replay   one session's replay record (session=), every tool call in the order it was made
  *
- * The state is loaded once through scopeState, whole, and kept current: the
- * journal, runs and work folders are watched, and an append is read back
- * from its store and sent as the records that are new (by id, or a run's time
- * and session); a spec, a practice file, a lexicon or the config changing
- * (whatever the spec model reads by name) reloads the state and sends it as
- * a snapshot with a new version. The relief is read apart from that chain, in
- * a worker, when the state first loads, when the model changes and when git
- * moves HEAD or a ref (a commit, a checkout, a fetch); one reading runs at a
- * time, with at most one more queued behind it, and each that lands is sent
- * as a snapshot of its own with a new version, so no refresh or history
- * answer waits on it and a page that loaded before it lands is sent it on
- * the stream. The component interfaces
- * are read through the server's own instrument (or, for a Python adoption
- * the config bounds, a bounded server the reading keeps for itself) when the
- * reading is first asked for and again when a run lands, never on every file
- * save, within the same budget as a snapshot's.
+ * The state is loaded once through scopeState, whole, on a worker thread
+ * (apart.ts), and kept current: the journal, runs and work folders are
+ * watched, and an append is read back from its store and sent as the records
+ * that are new (by id, or a run's time and session); a spec, a practice file,
+ * a lexicon or the config changing (whatever the spec model reads by name)
+ * reads the model again on a worker, apart from the update chain, one rebuild
+ * at a time with at most one more queued behind it, while every route and
+ * every store's push answers from the state held; each rebuild lands on the
+ * chain as one quick step that keeps the records the chain read, and is sent
+ * as a snapshot with a new version. The relief is read apart from that
+ * chain, in a worker, when the state first loads, when the model changes and
+ * when git moves HEAD or a ref (a commit, a checkout, a fetch); one reading
+ * runs at a time, with at most one more queued behind it, and each that lands
+ * is sent as a snapshot of its own with a new version, so no refresh or
+ * history answer waits on it and a page that loaded before it lands is sent
+ * it on the stream. The component interfaces are read on a worker too, which
+ * asks its questions of the server's own instrument here (or, for a Python
+ * adoption the config bounds, a bounded server the reading keeps for itself),
+ * when the reading is first asked for and again when a run lands, never on
+ * every file save, within the same budget as a snapshot's; each reading moves
+ * the version, so a page that opens its stream after it landed is sent it.
  *
  * A page resumes from cursors derived from what it holds. The catch-up sends
  * every record at or after a little before each cursor, since a writer whose
@@ -53,12 +58,12 @@ import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { REVISION, TraceTail, WORKTREE, folderName, gitRecords, movesRelief, readReliefApart, reliefCommits, reliefDiff, type GitRecords, type ReliefRead, type ReliefReading } from "../relief/relief.ts";
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
-import { storeOfPath, type RecordStore } from "../../journal/stores.ts";
-import { FROM_SOURCES, SOURCE_FOLDER, buildShell, forgetPageBundle, isPageSource, rootOptions, scopeState, windowState, type BuildOptions, type Shell } from "./build.ts";
-import { interfaceAdapter, interfaceBounds, readComponentInterfaces } from "./component-interfaces.ts";
-import { readAndRecord } from "./gaps.ts";
+import { STORE_NAMES, storeOfPath, type RecordStore } from "../../journal/stores.ts";
+import { FROM_SOURCES, SOURCE_FOLDER, buildShell, forgetPageBundle, isPageSource, rootOptions, windowState, type BuildOptions, type Shell } from "./build.ts";
+import { interfaceAdapter, interfaceBounds, readingAdapters } from "./component-interfaces.ts";
+import { readInterfacesApart, scopeStateApart } from "./apart.ts";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
-import { isLanguage } from "../../adapters/index.ts";
+import { isLanguage, type Language } from "../../adapters/index.ts";
 import { readByModel } from "../../spec/model.ts";
 import { DEFAULT_PROJECT_LEXICON, projectLexiconPath } from "../../lifecycle/project.ts";
 import { JOURNAL_WINDOW, RUN_WINDOW } from "./derive.ts";
@@ -79,6 +84,12 @@ export interface LiveOptions {
   debounceMs?: number;
   /** Build options beyond the root's defaults (Coherence's lexicon, the project's name). */
   build?: Partial<BuildOptions>;
+  /** How the component interfaces are read (default on a worker thread that asks the instrument here, when `interfaces` is not false); a test gives its own reading. */
+  interfaceReading?: (root: string) => Promise<InterfaceReading>;
+  /** How the relief is read (default readReliefApart, a worker thread and git's child processes); a test holds one to fix the order a rebuild and the relief land in. */
+  reliefReading?: (root: string, signal: AbortSignal) => Promise<ReliefRead>;
+  /** How the whole state is read (default scopeState on a worker thread, scopeStateApart); a test holds a rebuild to see the live routes answer meanwhile. */
+  load?: (options: BuildOptions) => Promise<ShellState>;
 }
 
 /** A record store, or the model: the specs, the config and the lexicons. */
@@ -268,6 +279,9 @@ class LiveReading implements HttpApp {
   private shellTimer: NodeJS.Timeout | undefined;
   /** Where git records what moves the relief, located when the watch starts; undefined outside a repository. */
   private git: GitRecords | undefined;
+  /** A model rebuild under way, and whether a change since it began wants one more. */
+  private rebuilding: Promise<void> | undefined;
+  private rebuildAgain = false;
 
   constructor(context: HttpContext, options: LiveOptions) {
     this.context = context;
@@ -298,16 +312,24 @@ class LiveReading implements HttpApp {
       this.git = await gitRecords(this.root);
       if (this.closed) return state;
       this.watch();
+      // What the stores gained while the state loaded, before anything watched them, is read once now: a refresh that finds nothing new sends nothing.
+      for (const store of STORE_NAMES) this.changed(store);
       this.readInterfaces();
       return state;
     })();
     return this.loading;
   }
 
-  /** The whole state with the relief read beside it, for the first load: the relief reads in a worker while the state loads here. */
+  /** The whole state, unwindowed, with the interfaces held now: read on a worker thread, which a close ends. */
+  private load(): Promise<ShellState> {
+    const options: BuildOptions = { ...this.build, window: false, componentInterfaces: this.interfaces };
+    return this.options.load === undefined ? scopeStateApart(options, this.stopping.signal) : this.options.load(options);
+  }
+
+  /** The whole state with the relief read beside it, for the first load: the relief and the state each read in a worker of their own. */
   private async stateWithRelief(): Promise<ShellState> {
-    const relief = readReliefApart(this.root, this.stopping.signal);
-    const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
+    const relief = (this.options.reliefReading ?? readReliefApart)(this.root, this.stopping.signal);
+    const state = await this.load();
     const read = await relief;
     this.relief = read.reading;
     this.reliefFiles = read.files;
@@ -331,7 +353,7 @@ class LiveReading implements HttpApp {
     this.reliefRunning = (async () => {
       do {
         this.reliefAgain = false;
-        const read = await readReliefApart(this.root, this.stopping.signal);
+        const read = await (this.options.reliefReading ?? readReliefApart)(this.root, this.stopping.signal);
         if (this.closed) return;
         // Landed on the chain, so it never interleaves with a refresh replacing the state it lands in; landing is quick.
         this.chain = this.chain.then(() => this.landRelief(read)).catch((error: unknown) => this.context.log(`scope: the relief did not land: ${error instanceof Error ? error.message : String(error)}`));
@@ -495,13 +517,67 @@ class LiveReading implements HttpApp {
       store,
       setTimeout(() => {
         this.timers.delete(store);
+        if (store === "model") return this.rebuildModel();
         this.chain = this.chain.then(() => this.refresh(store)).catch((error: unknown) => this.context.log(`scope: ${store} refresh failed: ${error instanceof Error ? error.message : String(error)}`));
       }, store === "model" ? Math.max(300, this.options.debounceMs ?? 100) : (this.options.debounceMs ?? 100)),
     );
   }
 
-  /** Read one store again and send what is new. Serialized, so two refreshes never interleave. */
-  private async refresh(store: Store): Promise<void> {
+  /**
+   * Read the model again apart from the update chain, so every live route and
+   * every store's push answers from the state held while it reads (on a large
+   * project, a minute and more). One rebuild at a time: a change while one
+   * runs asks for one more after it, and any number of changes meanwhile ask
+   * for that same one. Each rebuild lands on the chain as one quick step.
+   */
+  private rebuildModel(): void {
+    if (this.closed) return;
+    // The relief reads apart and lands as its own snapshot, whichever finishes first.
+    this.rereadRelief();
+    if (this.rebuilding !== undefined) {
+      this.rebuildAgain = true;
+      return;
+    }
+    this.rebuilding = (async () => {
+      do {
+        this.rebuildAgain = false;
+        try {
+          const state = await this.load();
+          const lexicons = await watchedLexicons(this.root, this.build);
+          if (this.closed) return;
+          this.chain = this.chain.then(() => this.landModel(state, lexicons)).catch((error: unknown) => this.context.log(`scope: the model did not land: ${error instanceof Error ? error.message : String(error)}`));
+        } catch (error) {
+          if (!this.closed) this.context.log(`scope: model refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } while (this.rebuildAgain && !this.closed);
+    })().finally(() => {
+      this.rebuilding = undefined;
+    });
+  }
+
+  /**
+   * A rebuilt model, landing: it replaces the model held and is sent as a
+   * snapshot with a new version. The stores are the chain's alone: the journal,
+   * runs and work kept are the ones the store refreshes read and sent, never
+   * the rebuild's own read of them, so a record appended while it read reaches
+   * a page once, as an append, and none the chain sent is dropped. The relief
+   * and the interfaces are the ones held now, which may have landed after the
+   * rebuild began.
+   */
+  private landModel(state: ShellState, lexicons: string[]): void {
+    if (this.closed || this.base === undefined) return;
+    state.journal = this.base.journal;
+    state.runs = this.base.runs;
+    state.relief = this.relief;
+    state.componentInterfaces = this.interfaces;
+    this.base = state;
+    this.lexicons = lexicons;
+    this.version += 1;
+    this.send("snapshot", { state: windowState(state), version: this.versionId });
+  }
+
+  /** Read one record store again and send what is new. Serialized, so two refreshes never interleave. */
+  private async refresh(store: RecordStore): Promise<void> {
     const base = this.base;
     if (base === undefined || this.closed) return;
     if (store === "journal") {
@@ -528,16 +604,6 @@ class LiveReading implements HttpApp {
       base.journal = { ...base.journal, work: { kind: "present", orders, damaged: loaded.damaged } };
       const changed = orders.filter((order) => fresh.has(order.id) || order.history.some((h) => fresh.has(h.id)));
       if (changed.length > 0) this.send("work", { orders: changed, damaged: loaded.damaged });
-    } else if (store === "model") {
-      // The relief reads apart and lands as its own snapshot: this one carries the relief held until then.
-      this.rereadRelief();
-      const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
-      state.relief = this.relief;
-      this.base = state;
-      this.remember(state);
-      this.lexicons = await watchedLexicons(this.root, this.build);
-      this.version += 1;
-      this.send("snapshot", { state: windowState(state), version: this.versionId });
     } else {
       // A store the table names and no branch above reads fails to compile here, never refreshes silently.
       const unread: never = store;
@@ -556,21 +622,52 @@ class LiveReading implements HttpApp {
       do {
         this.readAgain = false;
         try {
-          const adapter = await this.interfaceServer();
-          await adapter.forget([]);
-          // The same reading, bounds and budget (the config's) as a snapshot's: the refresh on a run is never a second rule.
-          const reading = await readAndRecord(this.root, () => readComponentInterfaces(this.root, adapter));
+          const reading = await (this.options.interfaceReading ?? ((root) => this.readApart(root)))(this.root);
           if (this.closed) return;
           this.interfaces = reading;
           if (this.base !== undefined) this.base.componentInterfaces = reading;
-          this.send("interfaces", reading);
+          // A new version: a page that loaded the state before the reading landed and opens its stream after is sent a snapshot holding it.
+          this.version += 1;
+          this.send("interfaces", { interfaces: reading, version: this.versionId });
         } catch (error) {
-          this.context.log(`scope: reading the component interfaces failed: ${error instanceof Error ? error.message : String(error)}`);
+          if (!this.closed) this.context.log(`scope: reading the component interfaces failed: ${error instanceof Error ? error.message : String(error)}`);
         }
       } while (this.readAgain && !this.closed);
     })().finally(() => {
       this.reading = undefined;
     });
+  }
+
+  /**
+   * The component interfaces, read on a worker thread and kept for the hooks,
+   * with every question for a language server asked here: the instrument's own
+   * language of the server's instrument, or the reading's own bounded server;
+   * any other language of a server of its own, started when the reading first
+   * asks it and closed when the reading moves to the next, as the reading in
+   * process starts and closes it.
+   */
+  private async readApart(root: string): Promise<InterfaceReading> {
+    const shared = await this.interfaceServer();
+    await shared.forget([]);
+    let other: { language: Language; servers: ReturnType<typeof readingAdapters> } | undefined;
+    const closing: Promise<void>[] = [];
+    const adapterOf = (language: Language): LanguageAdapter => {
+      // A question that arrives after the close starts no server the close would never end.
+      if (this.closed) throw new Error("the live reading closed");
+      if (language === shared.language) return shared;
+      if (other?.language !== language) {
+        if (other !== undefined) closing.push(other.servers.close());
+        other = { language, servers: readingAdapters(root) };
+      }
+      return other.servers.of(language)!;
+    };
+    try {
+      // The same reading, bounds and budget (the config's) as a snapshot's: the refresh on a run is never a second rule.
+      return await readInterfacesApart(root, adapterOf, this.stopping.signal);
+    } finally {
+      if (other !== undefined) closing.push(other.servers.close());
+      await Promise.allSettled(closing);
+    }
   }
 
   /**
@@ -584,6 +681,8 @@ class LiveReading implements HttpApp {
       await this.readingServer.adapter.close();
       this.readingServer = undefined;
     }
+    // Closed meanwhile: no server is started that the close would never end.
+    if (this.closed) throw new Error("the live reading closed");
     const language = this.context.adapter.language;
     this.readingServer ??= isLanguage(language) ? interfaceAdapter(this.root, language) : undefined;
     return this.readingServer?.adapter ?? this.context.adapter;
@@ -797,7 +896,8 @@ class LiveReading implements HttpApp {
    * Final: no watcher, timer, worker or git started before the close outlives
    * it. A first load under way finds the reading closed and watches nothing;
    * a relief reading is stopped, and the close returns once the first load,
-   * the update chain and the relief's worker have all ended.
+   * a model rebuild, the update chain, the interface reading and the relief's
+   * worker have all ended.
    */
   async close(): Promise<void> {
     this.closed = true;
@@ -811,9 +911,10 @@ class LiveReading implements HttpApp {
     this.traced.cancel();
     for (const client of this.clients) client.end();
     this.clients.clear();
-    void this.readingServer?.adapter.close();
+    // The reading's own server ends first, so an interface reading under way stops asking and ends with it.
+    const server = this.readingServer?.adapter.close();
     this.readingServer = undefined;
-    await Promise.allSettled([this.loading, this.chain, this.reliefRunning]);
+    await Promise.allSettled([server, this.loading, this.rebuilding, this.chain, this.reliefRunning, this.reading]);
   }
 }
 

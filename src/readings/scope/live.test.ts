@@ -12,18 +12,18 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
-import type { Touch } from "../relief/relief.ts";
+import { readReliefApart, type ReliefRead, type Touch } from "../relief/relief.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { connectAdapter, serve, type Serving } from "../../enforcement/server.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { closeWork, openWork } from "../../lifecycle/work-meter.ts";
 import { CONFIG_FILE, loadSpecModel } from "../../spec/model.ts";
-import { keptUnlessRejected, scopeState, type Shell } from "./build.ts";
+import { keptUnlessRejected, scopeState, type BuildOptions, type Shell } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { latestOf } from "./derive.ts";
-import { PageShell, scopeApp, storeOf, throttle, watchedLexicons } from "./live.ts";
-import type { JournalRecord, PageEntry, RecordedSite, RunRecord, ShellState } from "./model.ts";
+import { PageShell, scopeApp, storeOf, throttle, watchedLexicons, type LiveOptions } from "./live.ts";
+import type { InterfaceReading, JournalRecord, PageEntry, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
 import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream, runKeyOf, type StreamEvent } from "./updates.ts";
 
@@ -36,8 +36,8 @@ interface Live {
 }
 
 /** Serve a root with the live reading (no instrument reading, a short settle) and ask it for HTTP, as `scope` does. */
-async function live(root: string): Promise<Live> {
-  const serving = await serve(root, { idleMs: 60_000, http: scopeApp({ interfaces: false, debounceMs: 30 }) });
+async function live(root: string, options: LiveOptions = {}): Promise<Live> {
+  const serving = await serve(root, { idleMs: 60_000, http: scopeApp({ interfaces: false, debounceMs: 30, ...options }) });
   const connected = await connectAdapter(root, { spawn: false });
   const { url } = await connected.adapter.openHttp();
   await connected.adapter.close();
@@ -432,10 +432,19 @@ const snapshots = (events: readonly StreamEvent[]): ShellState[] => events.filte
 
 test("a spec edit sends the model at once and the relief as a snapshot of its own when it lands, and a page that loaded between them is sent the relief when its stream opens", async () => {
   const fixture = makeFixture();
-  const server = await live(fixture.root);
+  // The relief read as the server reads it, then held until the model's snapshot is in: on a slow machine it could otherwise land first, which the server allows.
+  let hold: Promise<void> | undefined;
+  let release = (): void => {};
+  const reliefReading = async (root: string, signal: AbortSignal): Promise<ReliefRead> => {
+    const read = await readReliefApart(root, signal);
+    if (hold !== undefined) await hold;
+    return read;
+  };
+  const server = await live(fixture.root, { reliefReading });
   try {
     const state = await firstLoad(server);
     const held = stampOf(state);
+    hold = new Promise((resolve) => (release = resolve));
     assert.notEqual(held, "", "the first load carries the relief");
     const stream = await openStream(server, state);
     assert.ok(await stream.until((events) => events.some((e) => e.event === "ready")));
@@ -444,8 +453,9 @@ test("a spec edit sends the model at once and the relief as a snapshot of its ow
     writeFileSync(join(fixture.root, "src/store/later.ts"), "export const later = 1;\n");
     appendFileSync(join(fixture.root, "src/store/Store.spec.md"), "\n");
     assert.ok(await stream.until((events) => snapshots(events.slice(from)).length >= 1, 20_000), "the model's snapshot arrives");
-    // A second page loads now, likely before the relief has landed; whichever, its stream must leave it holding the newest relief.
+    // A second page loads now, before the relief has landed; its stream must leave it holding the newest relief.
     const second = await firstLoad(server);
+    release();
     assert.ok(await stream.until((events) => snapshots(events.slice(from)).some((s) => stampOf(s) !== held), 20_000), "the relief's own snapshot arrives");
     const sent = snapshots(stream.events.slice(from));
     assert.equal(stampOf(sent[0]!), held, "the model's snapshot never waited on the relief: it carries the relief held until then");
@@ -460,6 +470,121 @@ test("a spec edit sends the model at once and the relief as a snapshot of its ow
     stream.close();
     back.close();
   } finally {
+    await server.stop();
+    fixture.remove();
+  }
+});
+
+test("a rebuild never holds the live routes: while the model is read again every route answers from the state held, each rebuild lands as one snapshot, edits meanwhile fold into one more, and every record appended meanwhile reaches the page once", async () => {
+  const fixture = makeFixture();
+  let held: Promise<void> | undefined;
+  let release = (): void => {};
+  let loads = 0;
+  // The model read as the server reads it, then held: whatever is appended while it is held, this read never saw.
+  const load = async (options: BuildOptions): Promise<ShellState> => {
+    loads += 1;
+    const state = await scopeState(options);
+    if (held !== undefined) await held;
+    return state;
+  };
+  const server = await live(fixture.root, { load });
+  // An answer, or 0 when none came within three seconds: a route held behind the rebuild says so on the assertion that asked it.
+  const answer = async (path: string): Promise<{ status: number; body: unknown }> => {
+    const asked = fetch(`${server.base}${path}`, { headers: { authorization: `Bearer ${server.token}` } }).then(async (response) => ({ status: response.status, body: (await response.json()) as unknown }));
+    asked.catch(() => {});
+    return Promise.race([asked, new Promise<{ status: number; body: unknown }>((r) => setTimeout(() => r({ status: 0, body: {} }), 3_000))]);
+  };
+  const spec = join(fixture.root, "src/store/Store.spec.md");
+  try {
+    const state = await firstLoad(server);
+    const first = state.connection!.version!;
+    const stream = await openStream(server, state);
+    assert.ok(await stream.until((events) => events.some((e) => e.event === "ready")));
+    const from = stream.events.length;
+    const loaded = loads;
+    held = new Promise((resolve) => (release = resolve));
+    appendFileSync(spec, "\n");
+    for (let i = 0; i < 400 && loads === loaded; i++) await new Promise((r) => setTimeout(r, 25));
+    assert.equal(loads, loaded + 1, "the spec edit began a rebuild");
+
+    // While it reads: the first load, history and a record answer at once, from the state held.
+    const during = (await answer("/api/state")) as { status: number; body: { version: string } };
+    assert.equal(during.status, 200, "the state route answered during the rebuild");
+    assert.equal(during.body.version, first, "with the state held, under its version");
+    for (const path of ["/api/journal", "/api/runs"]) assert.equal((await answer(path)).status, 200, `${path} answered during the rebuild`);
+    const appended = decision(fixture, "d-4eb00001", new Date().toISOString(), "appended while the model is read again");
+    appendJournal(fixture, appended);
+    const run = new Date(Date.now() + 1000).toISOString();
+    appendRun(fixture, run);
+    assert.ok(await stream.until((events) => events.some((e) => e.event === "journal" && e.data.includes(appended.id)) && events.some((e) => e.event === "runs" && e.data.includes(run))), "an append is pushed while the rebuild reads");
+    assert.equal((await answer(`/api/record?id=${appended.id}`)).status, 200, "and its record answers by id");
+    // Two more edits while it reads: they ask for one rebuild more between them.
+    appendFileSync(spec, "\n");
+    await new Promise((r) => setTimeout(r, 500));
+    appendFileSync(spec, "\n");
+    await new Promise((r) => setTimeout(r, 500));
+    const later = decision(fixture, "d-4eb00002", new Date(Date.now() + 2000).toISOString(), "appended after the edits that wait");
+    appendJournal(fixture, later);
+    assert.ok(await stream.until((events) => events.some((e) => e.event === "journal" && e.data.includes(later.id))));
+    assert.equal(loads, loaded + 1, "no second rebuild starts while one reads");
+    assert.equal(snapshots(stream.events.slice(from)).length, 0, "nothing lands while the rebuild reads");
+
+    held = undefined;
+    release();
+    assert.ok(await stream.until((events) => snapshots(events.slice(from)).length >= 2, 20_000), "the rebuild lands, then the one the later edits asked for");
+    await new Promise((r) => setTimeout(r, 800));
+    assert.equal(loads, loaded + 2, "the edits made during the rebuild were read once more, together");
+    const landed = snapshots(stream.events.slice(from));
+    assert.equal(landed.length, 2, "each rebuild landed as one snapshot");
+    for (const snapshot of landed) {
+      for (const record of [appended, later]) assert.ok(snapshot.journal.records.some((r) => r.id === record.id), `the landed state holds ${record.id}, which the rebuild's own read never saw`);
+      assert.ok(snapshot.runs.records.some((r) => r.at === run), "and the run");
+    }
+    const sent = (id: string): number => stream.events.filter((e) => e.event === "journal").flatMap((e) => (JSON.parse(e.data) as { records: JournalRecord[] }).records).filter((r) => r.id === id).length;
+    for (const record of [appended, later]) assert.equal(sent(record.id), 1, `${record.id} was sent once as an append, never again across the landing`);
+    const history = (await answer("/api/journal")) as { body: { records: JournalRecord[] } };
+    for (const record of [appended, later]) assert.ok(history.body.records.some((r) => r.id === record.id), `history answers ${record.id} after the landing`);
+    fold(state, stream.events);
+    for (const record of [appended, later]) assert.equal(ids(state).filter((id) => id === record.id).length, 1, `the page holds ${record.id} once`);
+    assert.equal(state.runs.records.filter((r) => r.at === run).length, 1, "and the run once");
+    const now = (await answer("/api/state")) as { body: { version: string } };
+    assert.equal(state.connection?.version, now.body.version, "the page holds the version the server now answers");
+    stream.close();
+  } finally {
+    held = undefined;
+    release();
+    await server.stop();
+    fixture.remove();
+  }
+});
+
+test("the component interfaces reach a page that loaded the state before they were read and opened its stream after: the reading moves the state's version", async () => {
+  const fixture = makeFixture();
+  let release = (): void => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const read: InterfaceReading = { kind: "unread", because: "the test's own reading, landed" };
+  const server = await live(fixture.root, { interfaces: true, interfaceReading: async () => (await held, read) });
+  try {
+    const early = await firstLoad(server);
+    const late = await firstLoad(server);
+    assert.notEqual(early.componentInterfaces.kind === "unread" ? early.componentInterfaces.because : "", read.because, "the first load goes before the reading lands");
+    const stream = await openStream(server, early);
+    assert.ok(await stream.until((events) => events.some((e) => e.event === "ready")));
+    release();
+    assert.ok(await stream.until((events) => events.some((e) => e.event === "interfaces")), "a connected page is sent the reading");
+    fold(early, stream.events);
+    assert.deepEqual(early.componentInterfaces, read);
+    const back = await openStream(server, late);
+    assert.ok(await back.until((events) => events.some((e) => e.event === "ready")));
+    assert.ok(back.events.some((e) => e.event === "snapshot"), "a page that loaded before the reading landed is sent a snapshot when its stream opens");
+    fold(late, back.events);
+    assert.deepEqual(late.componentInterfaces, read, "and holds the reading");
+    const again = await openStream(server, early);
+    assert.ok(await again.until((events) => events.some((e) => e.event === "ready")));
+    assert.ok(!again.events.some((e) => e.event === "snapshot"), "a page that merged the reading holds the version it moved to, so it is sent no snapshot again");
+    for (const s of [stream, back, again]) s.close();
+  } finally {
+    release();
     await server.stop();
     fixture.remove();
   }
@@ -564,7 +689,7 @@ test("a session's replay is served in the order its calls were made: the session
   }
 });
 
-test("a close during the first load is final: no watcher is left open and the relief's worker is stopped", async () => {
+test("a close during the first load is final: no watcher is left open, and the state's worker and the relief's are stopped", async () => {
   const fixture = makeFixture();
   const watchers = (): number => process.getActiveResourcesInfo().filter((kind) => kind === "FSEventWrap").length;
   const before = watchers();
@@ -573,10 +698,11 @@ test("a close during the first load is final: no watcher is left open and the re
   const answered: number[] = [];
   const response = { writeHead: (status: number) => answered.push(status), end: () => {} } as unknown as ServerResponse;
   try {
-    // The first load starts with the request, and the close comes while its relief is still being read.
+    // The first load starts with the request, and the close comes while its state and relief are still being read.
     const asked = app.handle({ method: "GET" } as IncomingMessage, response, new URL("http://127.0.0.1/api/state"));
     await app.close();
-    await asked;
+    // The request in flight is refused with the stop, or answered had the state been read before it.
+    await Promise.resolve(asked).catch((error: unknown) => assert.match(String(error), /was stopped/));
     assert.equal(watchers(), before, "nothing the first load would have watched is open");
     await new Promise((r) => setTimeout(r, 300));
     assert.equal(watchers(), before, "and nothing opens later");

@@ -204,6 +204,7 @@ export function readManifest(name: string, dir: string, where: string): { manife
   if (provides !== undefined && (!isRecord(provides) || (provides["language"] !== undefined && (typeof provides["language"] !== "string" || provides["language"] === "")) || (provides["declaredLanguages"] !== undefined && provides["declaredLanguages"] !== true))) problems.push(`${where}: plugin ${name}'s provides is { "language": "<name>" }`);
   problems.push(...dataProblems(raw, `${where}: plugin ${name}`, name));
   if (raw["extends"] !== undefined && (typeof raw["extends"] !== "string" || raw["extends"] === "")) problems.push(`${where}: plugin ${name}'s extends names one language`);
+  for (const key of ["title", "description"] as const) if (raw[key] !== undefined && (typeof raw[key] !== "string" || raw[key] === "" || /[\r\n]/.test(raw[key] as string))) problems.push(`${where}: plugin ${name}'s ${key} is one line of text`);
   if (raw["extensions"] !== undefined && (!strings(raw["extensions"]) || !(raw["extensions"] as string[]).every((e) => /^\.[A-Za-z0-9.+-]+$/.test(e)))) problems.push(`${where}: plugin ${name}'s extensions is a list like [".swift"]`);
   for (const key of ["module", "lexicon"] as const) if (raw[key] !== undefined && (typeof raw[key] !== "string" || raw[key] === "" || isAbsolute(raw[key] as string))) problems.push(`${where}: plugin ${name}'s ${key} is a path relative to its ${MANIFEST}`);
   const verifiers = raw["verifiers"];

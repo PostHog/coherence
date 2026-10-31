@@ -2,6 +2,8 @@
   "name": "convex",
   "version": "0.1.0",
   "pluginApi": 4,
+  "title": "Convex",
+  "description": "over TypeScript: a Convex function reached through the generated API as a reference, and a deployment's functions, HTTP routes and crons as entrances",
   "extends": "typescript",
   "module": "index.ts",
   "syntax": {

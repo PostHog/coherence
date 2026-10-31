@@ -36,7 +36,8 @@ import { loadSpecModel } from "../../spec/model.ts";
 import { parseSpec } from "../../spec/grammar.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { adapterCode, keptLine } from "./kept-answers.ts";
-import { lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
+import { STRUCTURE_DIR, lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
+import { readInterfacesApart } from "./apart.ts";
 import type { InterfaceReading } from "./model.ts";
 import { bothWays, sameMap } from "./both-ways.ts";
 import { checked, routedProject } from "./routed-fixture.ts";
@@ -445,6 +446,34 @@ function mapOf(reading: InterfaceReading): unknown {
   const { kept: _kept, ...map } = reading;
   return map;
 }
+
+test("the interface reading on a worker thread is the reading in process: each question goes to the adapter the caller holds, the reading is kept for the hooks, and a stop ends the worker", async () => {
+  const { root, remove } = routedProject();
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    const held = new TextServer(root);
+    const languages: string[] = [];
+    const apart = await readInterfacesApart(root, (language) => (languages.push(language), held));
+    assert.equal(apart.kind, "read");
+    assert.ok(held.questions.length > 0 && languages.every((l) => l === "typescript"), "the worker asked the caller's adapter, for the project's language");
+    assert.deepEqual(lastReading(root)?.reading, apart, "and the reading is kept for the hooks, as in process");
+    const here = await readComponentInterfaces(root, new TextServer(root), { keep: false });
+    assert.deepEqual(mapOf(apart), mapOf(here), "the map is the one the reading in process draws");
+
+    // A server that never answers, asked again since nothing is kept, and a stop: the reading is refused and its worker ended.
+    rmSync(join(root, STRUCTURE_DIR), { recursive: true, force: true });
+    const silent = { ...new TextServer(root), language: "typescript", ready: () => new Promise<never>(() => {}) } as unknown as LanguageAdapter;
+    const stop = new AbortController();
+    let asked = false;
+    const stopped = readInterfacesApart(root, () => ((asked = true), silent), stop.signal);
+    for (let i = 0; i < 400 && !asked; i++) await new Promise((r) => setTimeout(r, 25));
+    assert.ok(asked, "the reading asked the silent server");
+    stop.abort();
+    await assert.rejects(stopped, /was stopped/);
+  } finally {
+    remove();
+  }
+});
 
 test("a spec edit asks the language server only what no reading asked before, and rereads no source", async () => {
   const { root, remove } = routedProject();
