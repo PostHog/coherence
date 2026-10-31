@@ -38,7 +38,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
@@ -46,6 +46,7 @@ import type { Language } from "../../adapters/index.ts";
 import { closureOf } from "../../enforcement/code-fingerprint.ts";
 import { isBasisFile, languageCode, parsedOf, serverExtensions } from "../../plugins/languages.ts";
 import type { KeptReport } from "./model.ts";
+import { sharedStructureDir, writeAtomically } from "./shared-structure.ts";
 
 /** Where each language's kept answers live: transient, beside the recorded reading. */
 const KEPT_DIR = join(".coherence", "structure");
@@ -98,6 +99,12 @@ interface KeptFile {
 
 function keptPath(root: string, language: Language): string {
   return join(root, KEPT_DIR, `answers-${language}.json`);
+}
+
+/** The answers any worktree of `root`'s repository kept last, which seed a worktree that kept none of its own. */
+function sharedKeptPath(root: string, language: Language): string | undefined {
+  const shared = sharedStructureDir(root);
+  return shared === undefined ? undefined : join(shared, `answers-${language}.json`);
 }
 
 function digest(text: Buffer | string): string {
@@ -268,8 +275,10 @@ export class KeptAnswers {
 
   /** The kept file, or why nothing kept is used. */
   private load(): KeptFile | string {
-    const path = keptPath(this.root, this.language);
-    if (!existsSync(path)) return "no answers were kept for this tree yet";
+    const own = keptPath(this.root, this.language);
+    const shared = sharedKeptPath(this.root, this.language);
+    const path = existsSync(own) ? own : shared;
+    if (path === undefined || !existsSync(path)) return "no answers were kept for this tree yet";
     let kept: KeptFile;
     try {
       kept = JSON.parse(readFileSync(path, "utf8")) as KeptFile;
@@ -324,14 +333,14 @@ export class KeptAnswers {
       resolves: Object.fromEntries([...this.resolves].sort(([a], [b]) => a.localeCompare(b))),
       references: Object.fromEntries([...this.references].sort(([a], [b]) => a.localeCompare(b))),
     };
-    const path = keptPath(this.root, this.language);
-    try {
-      mkdirSync(dirname(path), { recursive: true });
-      const temporary = `${path}.${process.pid}.tmp`;
-      writeFileSync(temporary, JSON.stringify(kept), "utf8");
-      renameSync(temporary, path);
-    } catch {
-      // Answers that cannot be kept only mean the next reading asks the server again.
+    const text = JSON.stringify(kept);
+    for (const path of [keptPath(this.root, this.language), sharedKeptPath(this.root, this.language)]) {
+      if (path === undefined) continue;
+      try {
+        writeAtomically(path, text);
+      } catch {
+        // Answers that cannot be kept only mean the next reading asks the server again.
+      }
     }
   }
 }
