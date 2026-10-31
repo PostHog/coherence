@@ -15,6 +15,8 @@
  *   /api/relief/files    the files of components and districts the relief read (folder=, repeated), which the first load counts and does not list
  *   /api/relief/commits  the commits the Structure view's diff can name: the branch's own, then the trunk's recent line
  *   /api/relief/diff     the paths that changed between two commits, or a commit and the working tree (a=, b=), with lines added and deleted
+ *   /api/relief/sessions the sessions there are to replay, latest first, from the folders' listings alone
+ *   /api/relief/replay   one session's replay record (session=), every tool call in the order it was made
  *
  * The state is loaded once through scopeState, whole, on a worker thread
  * (apart.ts), and kept current: the journal, runs and work folders are
@@ -57,6 +59,7 @@ import { realpathSync, watch, type FSWatcher } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { TRACES_DIR, tracesDir } from "../../economy/trace.ts";
+import { readReplay, replaySessions, sessionName } from "../../economy/replay.ts";
 import type { HttpApp, HttpAppFactory, HttpContext } from "../../enforcement/server.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
@@ -850,6 +853,22 @@ class LiveReading implements HttpApp {
         } catch (error) {
           json(response, request, 404, { reason: `no diff between ${a} and ${b}: ${(error as Error).message.split("\n")[0]}` });
         }
+        return;
+      }
+      case "/api/relief/sessions":
+        // The sessions there are to replay, from the replay and trace folders' listings; no record is opened.
+        json(response, request, 200, { sessions: replaySessions(this.root) });
+        return;
+      case "/api/relief/replay": {
+        // One session's calls, in order; a name that could not be a session file's is refused before any path is made of it.
+        const session = url.searchParams.get("session") ?? "";
+        if (!sessionName(session)) {
+          json(response, request, 400, { reason: "session must be a session id: letters, digits, dot, dash or underscore" });
+          return;
+        }
+        const replay = readReplay(this.root, session);
+        if (replay === undefined) json(response, request, 404, { reason: `no replay record or read trace for session ${session}` });
+        else json(response, request, 200, replay);
         return;
       }
       case "/api/relief/files": {

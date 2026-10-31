@@ -188,6 +188,25 @@ export const RECORD_STORES: readonly string[] = STORE_FOLDERS;
 export const DURABLE_FOLDERS: readonly string[] = [...RECORD_STORES, "hooks"];
 
 /**
+ * The replay record's folder under .coherence: every tool call each session
+ * made (economy/replay.ts). It stays on the machine unless the config's
+ * commitReplay is true, when Coherence's ignore file keeps it too.
+ */
+export const REPLAY_FOLDER = "replay";
+
+/** The config key that commits the replay record. */
+export const COMMIT_REPLAY_KEY = "commitReplay";
+
+/** Whether the project's config commits the replay record: only a literal true does, and a config that cannot be read keeps it on the machine. */
+export function commitsReplay(root: string): boolean {
+  try {
+    return effectiveConfig(root)?.record[COMMIT_REPLAY_KEY] === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The project a command run from `cwd` acts on: the nearest folder, up to the
  * top of the git checkout it is in, that holds coherence.config.json; failing
  * that, the nearest that holds .coherence; failing both, `cwd` itself. A

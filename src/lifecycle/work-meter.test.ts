@@ -396,8 +396,8 @@ test("every way of reading a file's bytes is weighed by them, and a spawn throug
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-  for (const line of ["git grep -q x", "git ls-files -z", "sh -c git grep -q x", "/bin/bash -c ls", "grep -rq x .", "grep -R x .", "grep --recursive x .", "find . -name x", "rg x", "ls -R", "ls -laR ."]) assert.ok(projectSizedLine(line), `${line}: project-sized`);
-  for (const line of ["git rev-parse HEAD", "grep x f.txt", "ls -la", "node -v", "true"]) assert.ok(!projectSizedLine(line), `${line}: its own cost`);
+  for (const line of ["git grep -q x", "git ls-files -z", "sh -c git grep -q x", "/bin/bash -c ls", "grep -rq x .", "grep -R x .", "grep --recursive x .", "find . -name x", "rg x", "ls -R", "ls -laR .", "git check-ignore --no-index --stdin"]) assert.ok(projectSizedLine(line), `${line}: project-sized`);
+  for (const line of ["git rev-parse HEAD", "grep x f.txt", "ls -la", "node -v", "true", "git check-ignore --no-index -v -n a/x b/y"]) assert.ok(!projectSizedLine(line), `${line}: its own cost`);
   assert.ok(projectSizedLine("node -v", true), "any spawn through a shell is project-sized");
   const scope = openWork();
   try {

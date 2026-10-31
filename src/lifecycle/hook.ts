@@ -93,6 +93,7 @@ import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
 import { deadEndBlock, readDeadEnds } from "../journal/dead-ends.ts";
+import { recordCall } from "../economy/replay.ts";
 import { filesRead, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotSession, snapshotTrace, traceFile, type Snapshot } from "../economy/trace.ts";
 import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
@@ -101,7 +102,7 @@ import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.t
 import { renderCompactWithin, type Delivered, type Lexicon } from "./lexicon.ts";
 import { lastNamed } from "./lexicon-recency.ts";
 import { CONFIG_FILE, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
-import { keepStateFiles } from "./state-files.ts";
+import { keepStateFiles, replayIgnoreDisagreement } from "./state-files.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { currentReading, editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
@@ -313,6 +314,11 @@ function sessionOf(input: HookInput): string | undefined {
   return typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
 }
 
+/** The session whose replay record a call goes into: the coordinator's, which a subagent's events carry beside the subagent's own id. */
+function replayRecordOf(input: HookInput): string | undefined {
+  return typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
+}
+
 function agentOf(input: HookInput): string {
   return typeof input.agent_type === "string" && input.agent_type !== "" ? input.agent_type : MAIN_AGENT;
 }
@@ -478,6 +484,17 @@ export function languageNoticeBlock(root: string): string {
     return "";
   }
   return languages.map((language) => syntaxOf(language, "notice")?.(root) ?? "").filter((notice) => notice !== "").map((notice) => `${notice}\n\n`).join("") + staleParsesNotice() + parserNotice();
+}
+
+/**
+ * Where git's verdict on the replay record differs from the config's
+ * commitReplay because the ignore file is the adopter's: said at the start,
+ * which never edits that file. Nothing when they agree or the file is
+ * Coherence's, which the start's commit brings to the config's text.
+ */
+export function replayBlock(root: string): string {
+  const said = replayIgnoreDisagreement(root);
+  return said === undefined ? "" : `${said}\n\n`;
 }
 
 export function specBlock(root: string, now: number = Date.now()): string {
@@ -813,7 +830,7 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const { coherence, project } = await loadProjectLexicons(root);
   const commands=await cliName(root);
   // The hand lists come from the last mirror reading kept, never one taken here (recorded.ts).
-  const head = escalationBlock(root) + pluginRefusalBlock(root) + specBlock(root) + languageNoticeBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input);
+  const head = escalationBlock(root) + pluginRefusalBlock(root) + specBlock(root) + languageNoticeBlock(root) + replayBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input);
   const reading=report ?? await lexiconCoverage(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);
@@ -1422,9 +1439,11 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const session=sessionOf(input);
         const written = event === "PostToolUse" ? keepProjectFilesOf(root, writtenFiles(root, input, host)) : [];
         if (event === "PostToolUse" && session) {
-          recordReadTrace(root, session, input);
+          const read = recordReadTrace(root, session, input);
           // What this tool use wrote is the session's own patch, which the stop predicts for.
           recordWriteTrace(root, session, written);
+          // Every call goes into the replay record of the session it ran under, a subagent's into its coordinator's: one append, nothing read.
+          recordCall(root, replayRecordOf(input) ?? session, { session, agent: agentOf(input), tool: input.tool_name, toolInput: input.tool_input, read, wrote: written });
         }
         if (event === "UserPromptSubmit") options.warm?.(root);
         const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host }) : "";

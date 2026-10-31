@@ -11,7 +11,8 @@ import { storeDir } from "../journal/stores.ts";
 import { loadWork } from "../journal/work.ts";
 import type { Decision, WorkOrderRecord } from "../journal/record.ts";
 import { RECORD_STORES } from "./project.ts";
-import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, ATTRIBUTE_LINES, EARLIER_IGNORE_TEXTS, IGNORE_FILE, IGNORE_TEXT, keepAttributes, keepIgnore, keepStateFiles } from "./state-files.ts";
+import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, ATTRIBUTE_LINES, EARLIER_ATTRIBUTES_TEXTS, EARLIER_IGNORE_TEXTS, IGNORE_FILE, IGNORE_TEXT, keepAttributes, keepIgnore, keepStateFiles, removeStateFiles, REPLAY_IGNORE_TEXT, replayIgnoreDisagreement } from "./state-files.ts";
+import { replayBlock } from "./hook.ts";
 
 const fixtures: string[] = [];
 
@@ -213,4 +214,81 @@ test("a command that makes .coherence writes its git files with it, so a project
   rmSync(join(root, IGNORE_FILE));
   assert.equal((await decide("two")).status, 0);
   assert.ok(!existsSync(join(root, IGNORE_FILE)), "a folder that was already there is its adopter's: a removed ignore file stays removed");
+});
+
+/** The files under .coherence git would commit now. */
+function committable(root: string): string[] {
+  return git(root, "status", "--porcelain", "--untracked-files=all").out.split("\n").filter(Boolean).map((l) => l.slice(3)).filter((p) => p.startsWith(".coherence/")).sort();
+}
+
+const config = (root: string, value: Record<string, unknown>): void => writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "p", ...value }));
+
+test("the replay record is committed only when the config says so: Coherence's ignore file keeps it out by default, keeps it in with commitReplay, and follows the key at every session start, while an adopter's file is never rewritten", () => {
+  const root = fixture("replay-commit");
+  ok(root, "init", "-q");
+  config(root, {});
+  assert.equal(keepIgnore(root, true), "wrote");
+  assert.equal(readFileSync(join(root, IGNORE_FILE), "utf8"), IGNORE_TEXT, "the default text is the one earlier releases' upgrades reach");
+  keepAttributes(root);
+  mkdirSync(join(root, ".coherence", "replay"), { recursive: true });
+  writeFileSync(join(root, ".coherence", "replay", "s.jsonl"), "{}\n");
+  mkdirSync(join(root, ".coherence", "traces"), { recursive: true });
+  writeFileSync(join(root, ".coherence", "traces", "s.jsonl"), "{}\n");
+  assert.deepEqual(committable(root), [".coherence/.gitattributes", ".coherence/.gitignore"], "by default the replay record stays on the machine");
+
+  config(root, { commitReplay: true });
+  keepStateFiles(root);
+  assert.equal(readFileSync(join(root, IGNORE_FILE), "utf8"), REPLAY_IGNORE_TEXT, "a session start switches Coherence's file to the key");
+  assert.deepEqual(committable(root), [".coherence/.gitattributes", ".coherence/.gitignore", ".coherence/replay/s.jsonl"], "the replay record is committed, and the trace with its snapshots never");
+  const attrs = git(root, "check-attr", "merge", "linguist-generated", "--", ".coherence/replay/s.jsonl").out;
+  assert.match(attrs, /merge: union/, "a session's record merges by union, as the stores do");
+  assert.match(attrs, /linguist-generated: true/);
+  assert.equal(replayIgnoreDisagreement(root), undefined, "Coherence's own file agrees with the key");
+
+  config(root, { commitReplay: "yes" });
+  assert.equal(keepIgnore(root, false), "upgraded", "only a literal true commits; the file goes back");
+  assert.equal(readFileSync(join(root, IGNORE_FILE), "utf8"), IGNORE_TEXT);
+  assert.equal(removeStateFiles(root), true, "either text is Coherence's to remove");
+
+  // An earlier release's attributes, exactly as written, are brought up to this one's; the adopter's own ignore file is left byte for byte.
+  writeFileSync(join(root, ATTRIBUTES_FILE), EARLIER_ATTRIBUTES_TEXTS[0]!);
+  assert.equal(keepAttributes(root), "added");
+  assert.equal(readFileSync(join(root, ATTRIBUTES_FILE), "utf8"), ATTRIBUTES_TEXT);
+  const theirs = "/*\n!/journal/\n";
+  writeFileSync(join(root, IGNORE_FILE), theirs);
+  config(root, { commitReplay: true });
+  assert.equal(keepIgnore(root, true), "kept");
+  keepStateFiles(root);
+  assert.equal(readFileSync(join(root, IGNORE_FILE), "utf8"), theirs);
+});
+
+test("where the adopter's ignore files and the config disagree on the replay record, the session start and the hook check say which rule decides and what to change, and edit nothing", async () => {
+  const { cli } = await import("./cli-fixture.ts");
+  const root = fixture("replay-disagree");
+  ok(root, "init", "-q");
+  // This repository's own way: a root .gitignore that keeps .coherence out but for its record folders, and no .coherence/.gitignore.
+  const rootIgnore = ".coherence/*\n!.coherence/journal/\n";
+  writeFileSync(join(root, ".gitignore"), rootIgnore);
+  config(root, {});
+  assert.equal(replayIgnoreDisagreement(root), undefined, "kept on the machine, and git ignores it: they agree");
+  assert.equal(replayBlock(root), "");
+
+  config(root, { commitReplay: true });
+  const said = replayIgnoreDisagreement(root)!;
+  assert.match(said, /sets commitReplay, but git ignores \.coherence\/replay\/ \(\.gitignore:1:\.coherence\/\*\)/, "the rule that decides is named");
+  assert.match(said, /add !\.coherence\/replay\//);
+  assert.equal(replayBlock(root), `${said}\n\n`, "the session start says it");
+  const checked = await cli(["hooks", "--check", "--host", "codex", "--command", "npx coherence"], { cwd: root });
+  assert.ok(checked.stdout.includes(said), `the hook check says it: ${checked.stdout}`);
+  assert.equal(readFileSync(join(root, ".gitignore"), "utf8"), rootIgnore, "and nothing of the adopter's is edited");
+  assert.equal(existsSync(join(root, IGNORE_FILE)), false);
+
+  writeFileSync(join(root, ".gitignore"), `${rootIgnore}!.coherence/replay/\n`);
+  assert.equal(replayIgnoreDisagreement(root), undefined, "once the adopter keeps it, they agree");
+  config(root, {});
+  assert.match(replayIgnoreDisagreement(root)!, /does not set commitReplay, so the replay record is meant to stay on this machine, but git does not ignore \.coherence\/replay\//);
+
+  const outside = fixture("replay-no-git");
+  config(outside, { commitReplay: true });
+  assert.equal(replayIgnoreDisagreement(outside), undefined, "outside git there is nothing to commit and nothing to say");
 });
