@@ -316,7 +316,20 @@ test("a file the language server cannot answer for is named and left unread whil
     const observed = await readInterfaceMap(root, server, loadSpecModel(root, { runs: false }), readEnforcementConfig(root), "typescript");
     assert.deepEqual(observed.unanswered, [{ file: "src/store/clock_windows.ts", reason: "no package metadata for file src/store/clock_windows.ts" }]);
     assert.ok(observed.symbols.some((s) => s.from === "src/api" && s.to === "src/store" && s.symbol === "write"), "the observation reads every other file");
-    // A failure that never came from the server (an exit, a timeout) is never kept: the next reading asks again.
+  } finally {
+    remove();
+  }
+});
+
+test("a question the server refused is kept like an answer until its file changes, and a crash is asked again", async () => {
+  const { root, remove } = project({
+    ...BOUNDED,
+    "src/store/clock_windows.ts": "export function tick(): number {\n  return 1;\n}\n",
+    "src/api/api.ts": "import { write } from \"../store/rows.ts\";\nimport { tick } from \"../store/clock_windows.ts\";\nexport function go(): string {\n  tick();\n  return write(\"a\");\n}\n",
+  });
+  try {
+    const server = new TextServer(root);
+    server.fail.set("src/store/clock_windows.ts", "language server exited (SIGKILL)");
     await readComponentInterfaces(root, server);
     const healthy = new TextServer(root);
     await readComponentInterfaces(root, healthy);
