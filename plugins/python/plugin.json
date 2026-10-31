@@ -1,6 +1,6 @@
 {
   "name": "python",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "pluginApi": 4,
   "title": "Python",
   "description": "through Pyright, with tach's module boundaries where a project draws them",

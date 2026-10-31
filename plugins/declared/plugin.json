@@ -1,6 +1,6 @@
 {
   "name": "declared",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "pluginApi": 4,
   "title": "Any language with a language server",
   "description": "through the server the config declares for it under `languages`: the chokepoint check alone",
