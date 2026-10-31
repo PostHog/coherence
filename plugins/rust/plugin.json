@@ -1,6 +1,6 @@
 {
   "name": "rust",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "pluginApi": 4,
   "title": "Rust",
   "description": "through rust-analyzer",
