@@ -17,11 +17,20 @@ interface Pending {
   method: string;
 }
 
+function serverWordsWithoutStack(message: string): string {
+  return message
+    .split("\n")
+    .filter((line) => !/^\s+at\s/.test(line))
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+    .join(" ");
+}
+
 export class RpcError extends Error {
   readonly method: string;
   readonly code: number;
   constructor(method: string, code: number, message: string) {
-    super(`${method}: ${message} (${code})`);
+    super(`${method}: ${serverWordsWithoutStack(message)} (${code})`);
     this.method = method;
     this.code = code;
   }
