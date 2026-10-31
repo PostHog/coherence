@@ -6,7 +6,7 @@ The reading: one surface projecting the model for a human, in eight views: Struc
 - scope: a human opens the live reading from the root's warm server, or an agent writes a snapshot of this project or another root
   handler: scopeCommand in cli.ts
   trust: project-source
-- scope http: a browser asks the warm server for the shell, the first load, history by cursor, and the event stream
+- scope http: a browser asks the warm server for the shell, the first load, history by cursor, the event stream, and a session's replay
   handler: scopeApp in live.ts
   trust: local-caller
 
@@ -567,4 +567,25 @@ The reading: one surface projecting the model for a human, in eight views: Struc
   over: a scene maker that throws as a browser without WebGL does, across a first render, a render with the same data, a snapshot of equal data, a snapshot that changes what is drawn, and one with nothing to draw, and one that throws an error of its own
   via: a relief that cannot be built gets a line in its place saying why, blaming WebGL only when the browser could not start it, the page standing, and no second try until what it draws changes
   because: a headless Chrome without a GPU threw "Error creating WebGL context" from the scene's renderer and the page replaced everything with its fault banner, the masthead and the other seven views included (2026-10-30); a browser with WebGL switched off is ordinary, and it should lose the one view that needs it, not Scope. Each try at a WebGL context costs one, and browsers cap them, so a failed one is not tried on every render. A project with no commit threw from the scene on its empty landings and the page blamed WebGL (review of PR #164), so only the renderer's own failure is put on the browser
+  kinds: none
+- a replay plays a session's calls in order: Replay on the Structure view plays one session's calls in the order they were made, each lighting what it read and then what it wrote through the touch the live lighting uses and moving the head to it; each pause is the real gap between two calls held between 0.12 s and 2.4 s and divided by the speed; a play stops at the last call, and one asked for there starts again from the first; a seek lights the call it lands on, clamped to the session, and a play under way carries on from there.
+  over: four calls with a one-second gap, a long gap, two at one time and one that read and wrote nothing, at 2×; a seek while paused, while playing and past the end; a play at the end; a pause; a call with no readable time
+  via: a replay plays a session's calls in order through the touch path, each pause the real gap held between bounds over the speed, and a seek lights the call it lands on
+  because: the owner asked to see what the agent has been up to; the relief lit only what happened after a page connected. A replay out of order, or one that lit through another path than the live lighting, would show the reader something the session did not do, and real time would make a session of long thinking unwatchable
+  crossing: record -> reading
+  refuted: made pauseBetween leave out the speed, so every play ran at 1x (src/readings/scope/relief/replay.ts) -> "a replay plays a session's calls in order through the touch path, each pause the real gap held between bounds over the speed, and a seek lights the call it lands on" went red in replay.test.ts on its own assertion ("a one-second gap at 2×", 1000 !== 500); restored from a copy (cmp), green batched and alone (2026-10-30)
+  kinds: none
+- a replay holds the relief while it plays: While a replay plays, a live touch lights nothing on the relief; once the play is paused or has ended, live touches light it again.
+  over: a live touch before a session is picked, during its play, and after a pause
+  via: while a replay plays, a live touch lights nothing, and once it stops live touches light again
+  because: two sessions glowing on one relief cannot be told apart, and the reader chose to look at the past one; the live lighting must come back by itself, since the Structure view's default is what agents do now
+  crossing: record -> reading
+  refuted: made touchRelief light a live touch whether or not a replay plays (src/readings/scope/relief/mount.ts) -> "while a replay plays, a live touch lights nothing, and once it stops live touches light again" went red in replay.test.ts on its own assertion ("a live touch during the play lights nothing", 2 !== 1) within 5 ms; the file then waited on a 100 s pause, since the test's select held no speed, so a speed that is no positive number now plays at 1x; restored from a copy (cmp), green batched and alone (2026-10-30)
+  kinds: none
+- a replay is asked for by session id alone: The live server lists the sessions there are to replay from the replay and trace folders' listings, and serves one session's calls in the order they were made, a session older than the replay record from its read trace; a session name that could not be a session file's is refused before any path is made of it, and an unknown session is not found.
+  over: names with a path, a leading dot or dash, and none; an unknown session; a replay record written out of order with a subagent's call; a read trace with no replay record
+  via: a session's replay is served in the order its calls were made: the sessions listed latest first, an older session from its read trace, and a name that is no session's refused before any file is read
+  because: the route answers any page that reaches the warm server's port with its token, and its name becomes a file path under .coherence; a name that could climb out of the replay folder would read any file the server can
+  crossing: local-caller -> record
+  refuted: made the replay route refuse only an empty session name, so any other name reached the reader (src/readings/scope/live.ts) -> "a session's replay is served in the order its calls were made: the sessions listed latest first, an older session from its read trace, and a name that is no session's refused before any file is read" went red in live.test.ts on its own assertion ("../traces/s-old" is refused as no session, 404 !== 400); restored from a copy (cmp), green batched and alone (2026-10-30)
   kinds: none

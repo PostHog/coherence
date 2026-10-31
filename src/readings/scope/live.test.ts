@@ -535,6 +535,35 @@ test("agent activity reaches a connected page once per line, and the traces befo
   }
 });
 
+test("a session's replay is served in the order its calls were made: the sessions listed latest first, an older session from its read trace, and a name that is no session's refused before any file is read", async () => {
+  const fixture = makeFixture();
+  const at = (s: number): string => new Date(Date.UTC(2026, 9, 30, 12, 0, s)).toISOString();
+  mkdirSync(join(fixture.root, ".coherence", "replay"), { recursive: true });
+  mkdirSync(join(fixture.root, ".coherence", "traces"), { recursive: true });
+  const calls = [
+    { kind: "call", at: at(2), session: "child", agent: "Explore", tool: "Edit", summary: "src/store/write.ts", wrote: ["src/store/write.ts"] },
+    { kind: "call", at: at(1), session: "s-new", agent: "main", tool: "Read", summary: "src/store/read.ts", read: ["src/store/read.ts"] },
+  ];
+  writeFileSync(join(fixture.root, ".coherence", "replay", "s-new.jsonl"), calls.map((c) => JSON.stringify(c)).join("\n") + "\n");
+  writeFileSync(join(fixture.root, ".coherence", "traces", "s-old.jsonl"), `${JSON.stringify({ kind: "read", at: at(0), session: "s-old", file: "src/a.ts" })}\n`);
+  const server = await live(fixture.root);
+  try {
+    const status = async (query: string): Promise<number> => (await fetch(`${server.base}/api/relief/replay?${query}`, { headers: { authorization: `Bearer ${server.token}` } })).status;
+    for (const odd of ["", "../traces/s-old", "/etc/passwd", ".hidden", "a/b", "-n"]) assert.equal(await status(`session=${encodeURIComponent(odd)}`), 400, `${JSON.stringify(odd)} is refused as no session`);
+    assert.equal(await status("session=nobody"), 404);
+    const listed = (await server.get("/api/relief/sessions")) as { sessions: { session: string; from: string }[] };
+    assert.deepEqual(listed.sessions.map((s) => [s.session, s.from]).sort(), [["s-new", "replay"], ["s-old", "trace"]]);
+    const replay = (await server.get("/api/relief/replay?session=s-new")) as { session: string; from: string; calls: { tool: string; session: string }[] };
+    assert.deepEqual({ session: replay.session, from: replay.from }, { session: "s-new", from: "replay" });
+    assert.deepEqual(replay.calls.map((c) => [c.tool, c.session]), [["Read", "s-new"], ["Edit", "child"]], "in the order made, a subagent's call under its own session");
+    const old = (await server.get("/api/relief/replay?session=s-old")) as { from: string; calls: { read?: string[] }[] };
+    assert.deepEqual({ from: old.from, read: old.calls.map((c) => c.read) }, { from: "trace", read: [["src/a.ts"]] });
+  } finally {
+    await server.stop();
+    fixture.remove();
+  }
+});
+
 test("a close during the first load is final: no watcher is left open and the relief's worker is stopped", async () => {
   const fixture = makeFixture();
   const watchers = (): number => process.getActiveResourcesInfo().filter((kind) => kind === "FSEventWrap").length;

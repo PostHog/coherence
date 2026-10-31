@@ -11,6 +11,7 @@
 import type { ShellState } from "../model.ts";
 import { reliefData, reliefInputs, type ReliefData, type ReliefFileLanded } from "./data.ts";
 import { createRelief, WebGLUnavailable, type Relief, type ReliefIO, type ReliefView, type Touch } from "./scene.ts";
+import { createReplayBar, type ReplayBar } from "./replay.ts";
 
 export type { Touch };
 
@@ -152,11 +153,27 @@ export function mountRelief(root: HTMLElement, state: ShellState, io: ReliefIO, 
     if (failed !== undefined) sayUnbuilt(host, failed.why, failed.webgl);
     return;
   }
-  if (current.relief.root.parentElement !== host) host.replaceChildren(current.relief.root);
+  // The replay bar stands above the scene on a live page, kept across renders and rebuilt scenes as the scene is across renders.
+  const doc = host.ownerDocument;
+  if (io.get !== undefined && doc !== undefined && replay?.get !== io.get) {
+    replay?.bar.dispose();
+    replay = { get: io.get, bar: createReplayBar(doc, io.get, (touches) => current?.relief.touch(touches)) };
+  }
+  const wanted = replay === undefined ? [current.relief.root] : [replay.bar.root, current.relief.root];
+  if (wanted.some((child) => child.parentElement !== host)) host.replaceChildren(...wanted);
   current.relief.resume();
 }
 
-/** Light what an agent just read or wrote, when the relief has been built; activity before it was is not replayed. */
+/** The replay bar of the live page, made once per server access. */
+let replay: { get: NonNullable<ReliefIO["get"]>; bar: ReplayBar } | undefined;
+
+/**
+ * Light what an agent just read or wrote, when the relief has been built. A
+ * replay under way holds the relief for the session it plays, so a live
+ * touch meanwhile lights nothing; once it stops, live touches light again.
+ * Activity before the relief was built is what the replay bar plays back.
+ */
 export function touchRelief(touches: readonly Touch[]): void {
+  if (replay?.bar.playing() === true) return;
   current?.relief.touch(touches);
 }

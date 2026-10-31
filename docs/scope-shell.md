@@ -130,6 +130,17 @@ spec inside a component that holds others stands as a district of its own.
   session just read or wrote, from its trace lines; the scene lights those
   files and their components for a moment and lists the last few. No state
   changes, so nothing renders.
+- Replay. On a live page a bar above the scene (`relief/replay.ts`) plays
+  back one session's replay record ([economy.md](economy.md#the-replay-record)):
+  every tool call in the order it was made, each lighting what it read and
+  wrote through the same touch the activity uses, at 1× to 32× (each pause
+  the real gap, held between 0.12 s and 2.4 s), with a scrubber over the
+  calls and the call at the head said in one line: when, which agent, the
+  tool, and what it did. `/api/relief/sessions` lists the sessions from the
+  folders' listings and `/api/relief/replay` serves one by its id; a session
+  older than the record plays its read trace's reads and writes. While a
+  replay plays, live touches light nothing; paused or ended, they light
+  again. A snapshot carries no replay record, so it shows no bar.
 
 **Connections** (`connections/`) is the view of component interfaces rooted
 at one origin, a structural route or a component. `connections/model.ts` is
