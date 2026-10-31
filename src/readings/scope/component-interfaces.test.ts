@@ -16,7 +16,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,6 +36,7 @@ import { loadSpecModel } from "../../spec/model.ts";
 import { parseSpec } from "../../spec/grammar.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { adapterCode, keptLine } from "./kept-answers.ts";
+import { sharedStructureDir } from "./shared-structure.ts";
 import { STRUCTURE_DIR, lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
 import { readInterfacesApart } from "./apart.ts";
 import type { InterfaceReading } from "./model.ts";
@@ -462,6 +463,7 @@ test("the interface reading on a worker thread is the reading in process: each q
 
     // A server that never answers, asked again since nothing is kept, and a stop: the reading is refused and its worker ended.
     rmSync(join(root, STRUCTURE_DIR), { recursive: true, force: true });
+    rmSync(sharedStructureDir(root)!, { recursive: true, force: true });
     const silent = { ...new TextServer(root), language: "typescript", ready: () => new Promise<never>(() => {}) } as unknown as LanguageAdapter;
     const stop = new AbortController();
     let asked = false;
@@ -547,6 +549,30 @@ test("kept answers are never used silently: when what the server's answers rest 
     const broken = await readComponentInterfaces(root, new TextServer(root));
     assert.equal(broken.kind === "read" && broken.kept?.whole, "the kept answers are unreadable");
   } finally {
+    remove();
+  }
+});
+
+test("a new git worktree of the repository starts from the answers another worktree kept: nothing is asked and the server never starts", async () => {
+  const { root, remove } = routedProject();
+  const other = mkdtempSync(join(tmpdir(), "coherence-worktree-"));
+  const worktree = join(other, "second");
+  try {
+    const git = (...args: string[]): void => void execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: root });
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-qm", "tree");
+    git("worktree", "add", "-q", worktree);
+    await readComponentInterfaces(root, new TextServer(root));
+    const server = new TextServer(worktree);
+    const seeded = await readComponentInterfaces(worktree, server);
+    assert.equal(server.started, 0, "the server never starts");
+    assert.ok(seeded.kind === "read" && seeded.kept?.asked === 0 && seeded.kept.reused > 0, keptLine(seeded.kind === "read" ? seeded.kept : undefined));
+    const alone = await readComponentInterfaces(root, new TextServer(root), { keep: false });
+    assert.deepEqual(mapOf(seeded), mapOf(alone), "the seeded map is the one a reading asking everything draws");
+    assert.ok(existsSync(join(worktree, ".coherence", "structure", "answers-typescript.json")), "the worktree keeps its own answers from then on");
+  } finally {
+    rmSync(other, { recursive: true, force: true });
     remove();
   }
 });
