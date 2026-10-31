@@ -50,7 +50,7 @@ import type { KeptReport } from "./model.ts";
 /** Where each language's kept answers live: transient, beside the recorded reading. */
 const KEPT_DIR = join(".coherence", "structure");
 
-const KEPT_VERSION = 1;
+const KEPT_VERSION = 2;
 
 
 /** Where the language adapters are entered: every module it reaches is code an answer comes from. */
@@ -94,6 +94,7 @@ interface KeptFile {
   hashes: Record<string, string>;
   resolves: Record<string, Kept<Resolved>>;
   references: Record<string, Kept<ReferenceSite[]>>;
+  failures: Record<string, Kept<string>>;
 }
 
 function keptPath(root: string, language: Language): string {
@@ -217,6 +218,7 @@ export class KeptAnswers {
   private readonly basis: Record<string, string>;
   private readonly resolves = new Map<string, Kept<Resolved>>();
   private readonly references = new Map<string, Kept<ReferenceSite[]>>();
+  private readonly failures = new Map<string, Kept<string>>();
   private reused = 0;
   private asked = 0;
   private readonly changed: number;
@@ -258,6 +260,10 @@ export class KeptAnswers {
       if (holds(kept, changes)) this.references.set(key, kept);
       else dropped += 1;
     }
+    for (const [key, kept] of Object.entries(loaded.failures)) {
+      if (holds(kept, changes)) this.failures.set(key, kept);
+      else dropped += 1;
+    }
     this.dropped = dropped;
   }
 
@@ -276,7 +282,7 @@ export class KeptAnswers {
     } catch {
       return "the kept answers are unreadable";
     }
-    if (kept.version !== KEPT_VERSION || kept.language !== this.language || typeof kept.hashes !== "object" || typeof kept.basis !== "object") return "the kept answers are of another version";
+    if (kept.version !== KEPT_VERSION || kept.language !== this.language || typeof kept.hashes !== "object" || typeof kept.basis !== "object" || typeof kept.failures !== "object") return "the kept answers are of another version";
     return basisChange(kept.basis, this.basis) ?? kept;
   }
 
@@ -309,6 +315,20 @@ export class KeptAnswers {
     this.references.set(referencesKey(definition), { answer: sites, files, spellings: [...new Set(spellings)], module: definition.file, ...(broad ? { broad: true } : {}) });
   }
 
+  /** The reason the server gave when it failed to answer `definition`'s references, kept until a change could alter it; undefined when none is kept. */
+  failed(definition: Definition): string | undefined {
+    const kept = this.failures.get(referencesKey(definition));
+    if (kept === undefined) return undefined;
+    this.reused += 1;
+    return kept.answer;
+  }
+
+  /** Keep the server's failure to answer `definition`'s references, dropped by the same changes that would drop its answer. */
+  keepFailed(definition: Definition, reason: string, spellings: readonly string[], broad: boolean): void {
+    this.asked += 1;
+    this.failures.set(referencesKey(definition), { answer: reason, files: [definition.file], spellings: [...new Set(spellings)], module: definition.file, ...(broad ? { broad: true } : {}) });
+  }
+
   /** What this reading did with the kept answers. */
   report(): KeptReport {
     return { reused: this.reused, asked: this.asked, changed: this.changed, dropped: this.dropped, ...(this.whole === undefined ? {} : { whole: this.whole }) };
@@ -323,6 +343,7 @@ export class KeptAnswers {
       hashes: this.hashes,
       resolves: Object.fromEntries([...this.resolves].sort(([a], [b]) => a.localeCompare(b))),
       references: Object.fromEntries([...this.references].sort(([a], [b]) => a.localeCompare(b))),
+      failures: Object.fromEntries([...this.failures].sort(([a], [b]) => a.localeCompare(b))),
     };
     const path = keptPath(this.root, this.language);
     try {
