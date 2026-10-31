@@ -153,14 +153,15 @@ export function mountRelief(root: HTMLElement, state: ShellState, io: ReliefIO, 
     if (failed !== undefined) sayUnbuilt(host, failed.why, failed.webgl);
     return;
   }
-  // The replay bar stands above the scene on a live page, kept across renders and rebuilt scenes as the scene is across renders.
+  // The replay bar stands under the scene on a live page, kept across renders and rebuilt scenes as the scene is across renders.
   const doc = host.ownerDocument;
   if (io.get !== undefined && doc !== undefined && replay?.get !== io.get) {
     replay?.bar.dispose();
     replay = { get: io.get, bar: createReplayBar(doc, io.get, (touches) => current?.relief.touch(touches)) };
   }
-  const wanted = replay === undefined ? [current.relief.root] : [replay.bar.root, current.relief.root];
-  if (wanted.some((child) => child.parentElement !== host)) host.replaceChildren(...wanted);
+  // Under the scene and its side column, above the notes: a rebuilt scene is a new root, so the bar is moved into it.
+  if (replay !== undefined && replay.bar.root.parentElement !== current.relief.root) current.relief.root.insertBefore(replay.bar.root, current.relief.root.querySelector('[data-r="note"]'));
+  if (current.relief.root.parentElement !== host) host.replaceChildren(current.relief.root);
   current.relief.resume();
 }
 

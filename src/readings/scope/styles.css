@@ -1636,8 +1636,8 @@ code {
 .relief .activity li.gone { animation: relief-fade .9s forwards; }
 @keyframes relief-fade { to { opacity: 0; } }
 
-/* Replay (relief/replay.ts): one session played back on the relief, its controls on one row above the scene and the call at the head below them. */
-.relief.replay { margin: 0 0 0.75rem; }
+/* Replay (relief/replay.ts): one session played back on the relief, its controls on one row below the scene and the call at the head below them. */
+.relief.replay { margin: 0.75rem 0 0; }
 .relief.replay .replay-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 .relief.replay .replay-name { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
 .relief.replay select, .relief.replay button { height: 28px; font-size: 12.5px; border-radius: 7px; }

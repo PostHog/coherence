@@ -130,7 +130,7 @@ spec inside a component that holds others stands as a district of its own.
   session just read or wrote, from its trace lines; the scene lights those
   files and their components for a moment and lists the last few. No state
   changes, so nothing renders.
-- Replay. On a live page a bar above the scene (`relief/replay.ts`) plays
+- Replay. On a live page a bar below the scene (`relief/replay.ts`) plays
   back one session's replay record ([economy.md](economy.md#the-replay-record)):
   every tool call in the order it was made, each lighting what it read and
   wrote through the same touch the activity uses, at 1× to 32× (each pause

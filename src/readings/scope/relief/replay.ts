@@ -188,7 +188,7 @@ export interface ReplayBar {
 }
 
 /**
- * The bar above the relief: a session picker, play and pause, the speed, a
+ * The bar below the relief: a session picker, play and pause, the speed, a
  * scrubber over the session's calls, and the line for the call at the head.
  * `touch` lights the relief; `onPlaying` is told when a play starts and stops.
  */
@@ -213,6 +213,9 @@ export function createReplayBar(doc: Document, get: (path: string) => Promise<un
   const scrub = el("input");
   scrub.type = "range";
   scrub.min = "0";
+  // At the start until a session is picked: a range with no value stands at its middle.
+  scrub.max = "0";
+  scrub.value = "0";
   scrub.setAttribute("aria-label", "Call in the session");
   const count = el("span", "replay-count");
   const line = el("div", "replay-line");

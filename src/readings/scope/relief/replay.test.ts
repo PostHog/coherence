@@ -96,7 +96,9 @@ test("while a replay plays, a live touch lights nothing, and once it stops live 
   const relief: ReliefReading = { kind: "read", head: "abc1234 2026-10-30", leftOut: [], stamp: "stamp", landings: [], components: [{ folder: ".", name: "root", files: 1, lines: 10, unreached: 10 }] };
   const state = { project: "p", views: [], activeView: "structure", lexicon: { query: "", layers: [] }, spec: { components: [], trustLevels: [] }, runs: { records: [], damaged: [] }, journal: { records: [], damaged: [], work: { kind: "absent", because: "none" } }, componentInterfaces: { kind: "unread", because: "test" }, structure: { preview: [] }, relief } as unknown as ShellState;
   const lit: Touch[][] = [];
-  const scene: Relief = { root: { parentElement: null } as unknown as HTMLElement, resume() {}, touch: (t) => void lit.push([...t]), view: () => ({}) as never, dispose() {} };
+  // The scene's root takes the bar in under the scene, before its notes.
+  const sceneRoot: { parentElement: unknown; querySelector: () => null; insertBefore: (child: { parentElement: unknown }) => void } = { parentElement: null, querySelector: () => null, insertBefore: (child) => void (child.parentElement = sceneRoot) };
+  const scene: Relief = { root: sceneRoot as unknown as HTMLElement, resume() {}, touch: (t) => void lit.push([...t]), view: () => ({}) as never, dispose() {} };
   const { doc, made } = fakeDocument();
   const host = { ownerDocument: doc, replaceChildren(...children: { parentElement: unknown }[]) { for (const c of children) c.parentElement = host; } };
   const root = { querySelector: () => host } as unknown as HTMLElement;
