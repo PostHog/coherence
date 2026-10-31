@@ -40,6 +40,13 @@
  * every file save, within the same budget as a snapshot's; each reading moves
  * the version, so a page that opens its stream after it landed is sent it.
  *
+ * The vocabulary coverage is read on a worker thread (coverage-reading.ts),
+ * when the reading is first asked for and again when the model reloads: a
+ * full reading scans the whole corpus, and this loop also answers the
+ * agent's hooks. The first load and a reloaded snapshot never wait for it;
+ * they carry the coverage as being read, and the reading follows as an
+ * update.
+ *
  * A page resumes from cursors derived from what it holds. The catch-up sends
  * every record at or after a little before each cursor, since a writer whose
  * clock read earlier can append after a later record; the page merges by
@@ -60,6 +67,7 @@ import { REVISION, TraceTail, WORKTREE, folderName, gitRecords, movesRelief, rea
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
 import { STORE_NAMES, storeOfPath, type RecordStore } from "../../journal/stores.ts";
 import { FROM_SOURCES, SOURCE_FOLDER, buildShell, forgetPageBundle, isPageSource, rootOptions, windowState, type BuildOptions, type Shell } from "./build.ts";
+import { coverageOffLoop, type CoverageAsk } from "./coverage-reading.ts";
 import { interfaceAdapter, interfaceBounds, readingAdapters } from "./component-interfaces.ts";
 import { readInterfacesApart, scopeStateApart } from "./apart.ts";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
@@ -67,7 +75,7 @@ import { isLanguage, type Language } from "../../adapters/index.ts";
 import { readByModel } from "../../spec/model.ts";
 import { DEFAULT_PROJECT_LEXICON, projectLexiconPath } from "../../lifecycle/project.ts";
 import { JOURNAL_WINDOW, RUN_WINDOW } from "./derive.ts";
-import type { InterfaceReading, JournalRecord, RunRecord, ShellState, WorkOrder } from "./model.ts";
+import type { CoverageUnread, InterfaceReading, JournalRecord, LexiconCoverage, RunRecord, ShellState, WorkOrder } from "./model.ts";
 import { runKeyOf } from "./updates.ts";
 
 /** How far before a page's cursor the catch-up reaches, for a writer whose clock read earlier but appended later. */
@@ -90,6 +98,8 @@ export interface LiveOptions {
   reliefReading?: (root: string, signal: AbortSignal) => Promise<ReliefRead>;
   /** How the whole state is read (default scopeState on a worker thread, scopeStateApart); a test holds a rebuild to see the live routes answer meanwhile. */
   load?: (options: BuildOptions) => Promise<ShellState>;
+  /** How the vocabulary coverage is read (default on a worker thread, coverageOffLoop); a test holds it to see the reading go on without it. */
+  coverage?: (root: string) => CoverageAsk;
 }
 
 /** A record store, or the model: the specs, the config and the lexicons. */
@@ -259,6 +269,11 @@ class LiveReading implements HttpApp {
   private reliefFiles: ReadonlyMap<string, string> = new Map();
   private reading: Promise<void> | undefined;
   private readAgain = false;
+  /** The vocabulary coverage as last read, or why it is not yet; one reading at a time, off the loop, once more if the model reloaded meanwhile. */
+  private coverage: LexiconCoverage | CoverageUnread = { kind: "reading", because: "the warm server is reading the vocabulary coverage; this section fills when it is done" };
+  private coverageReading: Promise<void> | undefined;
+  private coverageAsk: CoverageAsk | undefined;
+  private readCoverageAgain = false;
   /** The reading's own bounded server, when the shared instrument reads a whole workspace the reading never draws. */
   private readingServer: { adapter: LanguageAdapter; bounds: string } | undefined;
   private readonly clients = new Set<ServerResponse>();
@@ -303,7 +318,10 @@ class LiveReading implements HttpApp {
   /** The state, loaded once and kept current by the watchers from then on. */
   private ensure(): Promise<ShellState> {
     this.loading ??= (async () => {
+      this.readCoverage();
       const state = await this.stateWithRelief();
+      // The coverage as it stands now: a reading that landed while the state loaded is kept, never the one asked with.
+      state.lexicon.coverage = this.coverage;
       this.base = state;
       this.remember(state);
       this.lexicons = await watchedLexicons(this.root, this.build);
@@ -322,7 +340,7 @@ class LiveReading implements HttpApp {
 
   /** The whole state, unwindowed, with the interfaces held now: read on a worker thread, which a close ends. */
   private load(): Promise<ShellState> {
-    const options: BuildOptions = { ...this.build, window: false, componentInterfaces: this.interfaces };
+    const options: BuildOptions = { ...this.build, window: false, componentInterfaces: this.interfaces, coverage: this.coverage };
     return this.options.load === undefined ? scopeStateApart(options, this.stopping.signal) : this.options.load(options);
   }
 
@@ -534,6 +552,9 @@ class LiveReading implements HttpApp {
     if (this.closed) return;
     // The relief reads apart and lands as its own snapshot, whichever finishes first.
     this.rereadRelief();
+    // A lexicon, a spec or the config moved: the coverage is read again, and said as being read until it lands.
+    this.coverage = { kind: "reading", because: "the warm server is reading the vocabulary coverage again after a change; this section fills when it is done" };
+    this.readCoverage();
     if (this.rebuilding !== undefined) {
       this.rebuildAgain = true;
       return;
@@ -562,7 +583,7 @@ class LiveReading implements HttpApp {
    * the rebuild's own read of them, so a record appended while it read reaches
    * a page once, as an append, and none the chain sent is dropped. The relief
    * and the interfaces are the ones held now, which may have landed after the
-   * rebuild began.
+   * rebuild began, and so is the vocabulary coverage.
    */
   private landModel(state: ShellState, lexicons: string[]): void {
     if (this.closed || this.base === undefined) return;
@@ -570,6 +591,7 @@ class LiveReading implements HttpApp {
     state.runs = this.base.runs;
     state.relief = this.relief;
     state.componentInterfaces = this.interfaces;
+    state.lexicon.coverage = this.coverage;
     this.base = state;
     this.lexicons = lexicons;
     this.version += 1;
@@ -635,6 +657,46 @@ class LiveReading implements HttpApp {
       } while (this.readAgain && !this.closed);
     })().finally(() => {
       this.reading = undefined;
+    });
+  }
+
+  /**
+   * Read the vocabulary coverage on a worker thread and send it when it lands.
+   * A reading asked for while one runs is taken after it, and the one it
+   * superseded is never sent: the model it read has moved.
+   */
+  private readCoverage(): void {
+    if (this.closed) return;
+    if (this.coverageReading !== undefined) {
+      this.readCoverageAgain = true;
+      return;
+    }
+    this.coverageReading = (async () => {
+      do {
+        this.readCoverageAgain = false;
+        let coverage: LexiconCoverage | CoverageUnread;
+        const ask = (this.options.coverage ?? coverageOffLoop)(this.root);
+        this.coverageAsk = ask;
+        try {
+          coverage = await ask.reading;
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          if (!this.closed) this.context.log(`scope: reading the vocabulary coverage failed: ${reason}`);
+          coverage = { kind: "failed", because: `the warm server could not read the vocabulary coverage (${reason}); coherence lexicon coverage reads it from the project's root` };
+        } finally {
+          this.coverageAsk = undefined;
+          await ask.release();
+        }
+        if (this.closed || this.readCoverageAgain) continue;
+        this.coverage = coverage;
+        if (this.base === undefined) continue;
+        // A new version: a page that loaded the state before the reading landed and opens its stream after is sent a snapshot holding it.
+        this.base.lexicon.coverage = coverage;
+        this.version += 1;
+        this.send("coverage", { coverage, version: this.versionId });
+      } while (this.readCoverageAgain && !this.closed);
+    })().finally(() => {
+      this.coverageReading = undefined;
     });
   }
 
@@ -896,8 +958,8 @@ class LiveReading implements HttpApp {
    * Final: no watcher, timer, worker or git started before the close outlives
    * it. A first load under way finds the reading closed and watches nothing;
    * a relief reading is stopped, and the close returns once the first load,
-   * a model rebuild, the update chain, the interface reading and the relief's
-   * worker have all ended.
+   * a model rebuild, the update chain, the interface reading, the relief's
+   * worker and the coverage's worker have all ended.
    */
   async close(): Promise<void> {
     this.closed = true;
@@ -914,7 +976,9 @@ class LiveReading implements HttpApp {
     // The reading's own server ends first, so an interface reading under way stops asking and ends with it.
     const server = this.readingServer?.adapter.close();
     this.readingServer = undefined;
-    await Promise.allSettled([server, this.loading, this.rebuilding, this.chain, this.reliefRunning, this.reading]);
+    // A coverage reading still running is stopped: it writes under the project, which may be removed next.
+    const coverage = this.coverageAsk?.release();
+    await Promise.allSettled([server, coverage, this.loading, this.rebuilding, this.chain, this.reliefRunning, this.reading, this.coverageReading]);
   }
 }
 
