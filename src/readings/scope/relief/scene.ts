@@ -238,11 +238,34 @@ for (const ci of C.map((_, i) => i).sort((a, b) => level[a] - level[b])) if (par
 const P = C.map((_, ci) => [at[ci][0] + own[ci][0], at[ci][1] + own[ci][1]]);
 const LAYOUT = Object.fromEntries(C.map((c, ci) => [c.folder, { own: own[ci].map((v) => +v.toFixed(3)), sub: sub[ci].map((v) => +v.toFixed(3)) }]));
 
-// Squarified treemap of a component's files inside its lines footprint.
-function treemap(items, x, y, w, h) {
+// A component's files inside its lines footprint, placed by co-change as components are: files are clustered by their
+// co-change share over landings of 40 files or fewer (average linkage), and the clusters' order, read leaf by leaf, is
+// laid out in squarified rows that keep it, so files that land together stand side by side, every file keeps its share
+// of the area by lines, and no file is cut into a sliver. Files that share no landing are paired smallest first.
+function fileMap(files, x, y, w, h) {
+  const n = files.length;
+  if (!n) return [];
+  const landed = files.map((f) => new Set((f.l ?? []).filter(([li]) => D.landings[li].n <= 40).map(([li]) => li)));
+  const node = files.map((f, i) => ({ v: Math.max(1, f.lines), leaf: i })), size = node.map(() => 1);
+  const S = files.map((_, i) => files.map((_, j) => (i === j ? 0 : jac(landed[i], landed[j]))));
+  let alive = node.map((_, i) => i);
+  while (alive.length > 1) {
+    let a = -1, b = -1, best = 0;
+    for (let p = 0; p < alive.length; p++) for (let q = p + 1; q < alive.length; q++) { const s = S[alive[p]][alive[q]]; if (s > best) { best = s; a = alive[p]; b = alive[q]; } }
+    if (best <= 0) [a, b] = [...alive].sort((i, j) => node[i].v - node[j].v);
+    for (const k of alive) if (k !== a && k !== b) S[a][k] = S[k][a] = (S[a][k] * size[a] + S[b][k] * size[b]) / (size[a] + size[b]);
+    node[a] = { v: node[a].v + node[b].v, kids: [node[a], node[b]] }; size[a] += size[b];
+    alive = alive.filter((k) => k !== b);
+  }
+  const order = [];
+  (function walk(t) { if (t.kids) { walk(t.kids[0]); walk(t.kids[1]); } else order.push(t.leaf); })(node[alive[0]]);
+  return treemap(files.map((f) => ({ v: Math.max(1, f.lines) })), x, y, w, h, order);
+}
+// Squarified treemap: rows of near-square rectangles, biggest first, or in the order given.
+function treemap(items, x, y, w, h, keep) {
   const out = new Array(items.length);
   const total = items.reduce((a, it) => a + it.v, 0) || 1;
-  const order = items.map((it, i) => [it.v, i]).sort((a, b) => b[0] - a[0]);
+  const order = keep ? keep.map((i) => [items[i].v, i]) : items.map((it, i) => [it.v, i]).sort((a, b) => b[0] - a[0]);
   let rect = { x, y, w, h }, rest = order.slice(), scale = (w * h) / total;
   while (rest.length) {
     const short = Math.min(rect.w, rect.h); let row = [], best = Infinity;
@@ -393,7 +416,7 @@ const FS = { faded: new Uint8Array(NF), cur: new Float32Array(NF * 6), to: new F
 const selBox = new THREE.LineSegments(unitEdges, new THREE.LineBasicMaterial({ color: 0xff8a4c })); selBox.visible = false; world.add(selBox);
 const fileRects = C.map((c) => null); // treemaps of each component's files in its lines footprint, relative to its centre
 function rectsOf(ci) {
-  if (!fileRects[ci]) { const s = side(C[ci], "lines"); fileRects[ci] = treemap(FL[ci].map((f) => ({ v: f.lines })), -s / 2, -s / 2, s, s); }
+  if (!fileRects[ci]) { const s = side(C[ci], "lines"); fileRects[ci] = fileMap(FL[ci], -s / 2, -s / 2, s, s); }
   return fileRects[ci];
 }
 const outlines = C.map(() => {
@@ -1103,7 +1126,7 @@ function drawNote() {
     `Footprint: ${fm.label.toLowerCase()}, ${fm.how}. Every measure shares the same total area, so a footprint is that component's share; area, not side, is the quantity.`,
     `Height and color: ${HEIGHT.map((m) => m.label.toLowerCase() + " = " + m.how).join("; ")}. ${LANDED ? `${inWin - (state.big ? 0 : bigIn.length)} landings count in this window (${w.from === "0000" ? "from " + D.landings.at(-1).date : "from " + w.from} to ${LATEST}).` : `No landing was read: the project has no commits yet, none that touch a component, or no git history here, so every block stands flat and the footprints alone carry the view.`} In component view, a landing counts toward every component it touches, tests and specs included; in file view, only the files mass counts.`,
     state.big ? `Landings over ${BIG} files are included (${bigIn.length} in this window). Bulk moves like these tower over everything else.` : `Left out of heights: the ${bigIn.length} landing${bigIn.length === 1 ? "" : "s"} in this window that touch${bigIn.length === 1 ? "es" : ""} more than ${BIG} files${bigIn.length ? " (" + bigIn.slice(0, 3).map((l) => l.subject.slice(0, 48)).join("; ") + (bigIn.length > 3 ? "; …" : "") + ")" : ""}. Bulk moves like these touch every component at once and say nothing about any one of them; ordinary merged pull requests stay in.`,
-    `Position: components that land together sit closer. Distance comes from the co-change share (landings touching both ÷ landings touching either) over all ${D.landings.length} landings with 40 or fewer files, settled by a force layout and then spaced so no footprint overlaps at its largest. Read it as neighbourhoods, not measured distances; it doesn't change with the window or measure.`,
+    `Position: components that land together sit closer. Distance comes from the co-change share (landings touching both ÷ landings touching either) over all ${D.landings.length} landings with 40 or fewer files, settled by a force layout and then spaced so no footprint overlaps at its largest. Read it as neighbourhoods, not measured distances; it doesn't change with the window or measure. Inside a block, files that land together stand together the same way, each with its share of the block's area by lines.`,
     ...(D.unrun ? [`No run has graded these specs yet, so no enforcement reaches any file: Unreached equals Lines, and Refutations and Defects are zero everywhere. Invariants and Crossings count the bullets the specs declare.`] : []),
     ...(C.some((c) => c.virtual) ? [`Folders with no spec: inside a component that holds other components, the code none of them claims is split by the folder that holds it (three code files or more), and each folder stands as a district with an italic name and a dashed survey line. A folder holding most of that code is opened into its subfolders. A district has no invariants, so on the Invariants footprint the unclaimed land disappears. Mass counts a district in its component's own files; files loose in the component's folder stay in its own block.`] : []),
     `Nesting: a component whose folder sits inside another component's folder stands on that component's platform. Platforms here: ${C.filter((_, ci) => kids[ci].length).map((c) => c.name).join(", ")}. The block marked as a component's own files holds what none of the components inside it claims. A platform spans what stands on it plus a ${MARGIN}-unit margin, so its size is not a measure.`,
