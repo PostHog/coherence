@@ -23,6 +23,7 @@ import { BUDGET_FLAG_NAMES, BUDGET_FLAGS, budgetFlags, readComponentInterfaces }
 import { readAndRecord } from "./gaps.ts";
 import { keptLine } from "./kept-answers.ts";
 import { readRelief, withSnapshotFiles } from "../relief/relief.ts";
+import { LayoutKeeper } from "./relief/layout-store.ts";
 
 export const SCOPE_USAGE = [
   "  scope [--root <dir>] [--no-open]   open the live Scope reading from the warm server (prints its address)",
@@ -88,7 +89,11 @@ async function snapshot(root: string, values: Map<string, string>, switches: Set
   }
   // Structure draws the relief: per-file lines from mass, districts, and the landings on HEAD's first-parent line. With no server
   // behind the file to load files on demand, it embeds as many folders' files as its budget holds and says how many it left out.
-  options.relief = withSnapshotFiles(await readRelief(root));
+  // The files it embeds stand in the order the warm server keeps for this checkout, and its components where the server
+  // last placed them; a snapshot reads that layout and keeps nothing of its own.
+  const layout = new LayoutKeeper(root, false);
+  options.relief = withSnapshotFiles(await readRelief(root), undefined, (folder, files, landings) => layout.files(folder, files, landings));
+  options.reliefLayout = (state) => layout.components(state);
   const domain = values.get("domain");
   if (domain !== undefined) options.domainPath = domain;
   const title = values.get("domain-title");

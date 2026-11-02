@@ -396,7 +396,7 @@ export const SNAPSHOT_FILES_BYTES = 1 << 20;
  * bytes, in the reading's order, and counts the folders holding files it left
  * out, which the Structure view says.
  */
-export function withSnapshotFiles(read: ReliefRead, budget = SNAPSHOT_FILES_BYTES): ReliefReading {
+export function withSnapshotFiles(read: ReliefRead, budget = SNAPSHOT_FILES_BYTES, order: (folder: string, files: ReliefFileLanded[], landings: readonly ReliefLanding[]) => ReliefFileLanded[] = (_, files) => files): ReliefReading {
   if (read.reading.kind !== "read") return read.reading;
   const files: Record<string, ReliefFileLanded[]> = {};
   let bytes = 0;
@@ -410,7 +410,7 @@ export function withSnapshotFiles(read: ReliefRead, budget = SNAPSHOT_FILES_BYTE
       continue;
     }
     bytes += size;
-    files[c.folder] = JSON.parse(text) as ReliefFileLanded[];
+    files[c.folder] = order(c.folder, JSON.parse(text) as ReliefFileLanded[], read.reading.landings);
   }
   return { ...read.reading, files, ...(leftOut > 0 ? { filesLeftOut: leftOut } : {}) };
 }
