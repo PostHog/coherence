@@ -354,7 +354,7 @@ test("a question the server refused is kept like an answer while the tree is unc
       [-32801, "content modified"],
       [-32802, "server cancelled"],
       [-32002, "server not initialized"],
-      [1, "<semantic> TypeScript Server Error (5.9.3)\nDebug Failure. False expression: Project is dirty\nError: Debug Failure. False expression: Project is dirty\n    at updateGraph (/tsserver.js:1:1)"],
+      [1, "<semantic> TypeScript Server Error (5.9.3)\nDebug Failure. False expression: Project is dirty\nError: Debug Failure. False expression: Project is dirty\n    at updateProjectIfDirty (/tsserver.js:1:1)"],
     ];
     for (const [code, words] of passing) {
       const first = new TextServer(root);
