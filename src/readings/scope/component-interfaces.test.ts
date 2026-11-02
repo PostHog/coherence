@@ -24,6 +24,7 @@ import { test } from "node:test";
 import type { Definition, LanguageAdapter, ReferenceSite, Resolved } from "../../adapters/adapter.ts";
 import { PythonAdapter } from "../../../plugins/python/python.ts";
 import { TypeScriptAdapter } from "../../../plugins/typescript/typescript.ts";
+import { RpcError } from "../../adapters/jsonrpc.ts";
 import { projectFiles } from "../../adapters/project-files.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { answerStructure } from "../query/query.ts";
@@ -72,8 +73,8 @@ class TextServer implements LanguageAdapter {
   /** Every question put to it, a resolve or a references, by the file it is about. */
   readonly questions: string[] = [];
   readonly stall = new Set<string>();
-  /** Files it fails every question about, with its words, as gopls fails a file outside the host's build. */
-  readonly fail = new Map<string, string>();
+  /** Files it fails every question about, with its words (or the error itself), as gopls fails a file outside the host's build. */
+  readonly fail = new Map<string, string | Error>();
   /** How many times a reading started it. */
   started = 0;
   private readonly root: string;
@@ -101,7 +102,7 @@ class TextServer implements LanguageAdapter {
     this.questions.push(definition.file);
     if (this.stall.has(definition.name)) return new Promise(() => {});
     const failed = this.fail.get(definition.file);
-    if (failed !== undefined) throw new Error(failed);
+    if (failed !== undefined) throw failed instanceof Error ? failed : new Error(failed);
     const sites: ReferenceSite[] = [];
     for (const file of projectFiles(this.root).filter((f) => /\.(ts|py)$/.test(f))) {
       let enclosing: string | undefined;
@@ -302,6 +303,14 @@ test("a file the language server cannot answer for is named and left unread whil
     assert.match(answerStructure(state).text, /^partial map: the language server could not answer for 1 file[^\n]*src\/store\/clock_windows\.ts/, "query structure leads with it");
     const whole = await readComponentInterfaces(root, new TextServer(root), { keep: false });
     assert.equal(whole.kind === "read" && whole.unanswered, undefined, "a server that answers every file leaves nothing unanswered");
+    const overflowing = new TextServer(root);
+    overflowing.fail.set("src/store/clock_windows.ts", new RpcError("textDocument/references", -32603, "<main> TypeScript Server Error (5.9.3)\nMaximum call stack size exceeded\nRangeError: Maximum call stack size exceeded\n    at trackExistingEntityName (/host/node_modules/typescript/lib/typescript.js:94992:14)\n    at isSymbolAccessible (/host/node_modules/typescript/lib/typescript.js:57448:23)"));
+    const overflowed = await readComponentInterfaces(root, overflowing, { keep: false });
+    assert.equal(overflowed.kind, "read", "one question's failure leaves the language read");
+    if (overflowed.kind !== "read") return;
+    assert.deepEqual(overflowed.unanswered, [{ file: "src/store/clock_windows.ts", component: "src/store", reason: "textDocument/references: <main> TypeScript Server Error (5.9.3) Maximum call stack size exceeded RangeError: Maximum call stack size exceeded (-32603)" }], "the server's words, never its stack");
+    assert.equal(overflowed.partial, undefined, "a question the server could not answer spends no budget");
+    assert.equal(recordReading(root, overflowed, structureFingerprint(root)), true, "kept for the hooks, as a complete reading that names the file");
     // The economy of a change to that file: the closure is said, with the file's line naming what the server could not answer.
     const economy = await predictClosure(root, ["src/store/clock_windows.ts"], { adapter: server });
     const why = Object.fromEntries(economy.entries.map((e) => [e.file, e.why]));

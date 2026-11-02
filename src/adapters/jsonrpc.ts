@@ -17,11 +17,30 @@ interface Pending {
   method: string;
 }
 
+/** The most of a server's words an error keeps: a stack in a form the frame filter misses (Python's, Go's) or a message with no frames still ends here. */
+export const SERVER_WORDS_LIMIT = 500;
+
+/**
+ * A server's error message on one line: the Node stack frames it appends to
+ * an internal error dropped, and the rest cut to SERVER_WORDS_LIMIT. A
+ * message that is not a string (a server that sends none) is said as what
+ * it is, never thrown on, since this runs inside the stdout listener.
+ */
+function serverWordsWithoutStack(message: unknown): string {
+  const words = (typeof message === "string" ? message : String(message ?? "no message"))
+    .split("\n")
+    .filter((line) => !/^\s+at\s/.test(line))
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+    .join(" ");
+  return words.length > SERVER_WORDS_LIMIT ? `${words.slice(0, SERVER_WORDS_LIMIT - 1)}…` : words;
+}
+
 export class RpcError extends Error {
   readonly method: string;
   readonly code: number;
-  constructor(method: string, code: number, message: string) {
-    super(`${method}: ${message} (${code})`);
+  constructor(method: string, code: number, message: unknown) {
+    super(`${method}: ${serverWordsWithoutStack(message)} (${code})`);
     this.method = method;
     this.code = code;
   }
@@ -165,8 +184,12 @@ export class JsonRpcClient {
     const pending = this.pending.get(id);
     if (pending === undefined) return;
     this.pending.delete(id);
-    const error = message["error"] as { code: number; message: string } | undefined;
-    if (error !== undefined) pending.reject(new RpcError(pending.method, error.code, error.message));
+    // A server's error is read loosely (no message, no code, not even an object): a malformed one still rejects its request, never the process.
+    const error = message["error"];
+    if (error !== undefined && error !== null) {
+      const { code, message: words } = typeof error === "object" ? (error as { code?: unknown; message?: unknown }) : { code: undefined, message: error };
+      pending.reject(new RpcError(pending.method, typeof code === "number" ? code : -32603, words));
+    }
     else pending.resolve(message["result"]);
   }
 }
