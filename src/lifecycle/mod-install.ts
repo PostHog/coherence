@@ -28,6 +28,7 @@
 import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { spawnSync } from "./work-meter.ts";
+import { gitPlaceOf } from "../adapters/project-config.ts";
 import { LOCAL_SETTINGS_FILE, SETTINGS_FILE } from "./project.ts";
 import { HOST_FOLDER } from "./hosts.ts";
 
@@ -55,8 +56,7 @@ export const runClaude: ClaudeRunner = (args, cwd) => {
  * worktree enables it in the main checkout and every worktree of it.
  */
 export function localSettingsPath(root: string): string {
-  const common = spawnSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" });
-  const dir = common.status === 0 ? common.stdout.trim() : "";
+  const dir = gitPlaceOf(root)?.common ?? "";
   return join(basename(dir) === ".git" ? dirname(dir) : root, LOCAL_SETTINGS_FILE.claude!);
 }
 

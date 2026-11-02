@@ -35,6 +35,39 @@ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export const CONFIG_FILE = "coherence.config.json";
 
+/** Variables a git hook sets that would point git at another index or repository than the root's own. */
+export const GIT_LOCATION_VARIABLES = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_PREFIX", "GIT_NAMESPACE"] as const;
+
+/** This process's environment less GIT_LOCATION_VARIABLES: a git call made with it answers for the folder it runs in, never for a hook's repository. */
+export function gitEnvironment(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const name of GIT_LOCATION_VARIABLES) delete env[name];
+  return env;
+}
+
+/** Where git keeps the state of the checkout `root` lies in: the common folder every worktree of its repository shares (absolute), and `root`'s folder below the checkout's top ("" at the top, else ending in "/"). */
+export interface GitPlace {
+  common: string;
+  prefix: string;
+}
+
+/**
+ * The git place of `root`, or undefined outside a checkout. Asked as every
+ * git since 2.5 answers it, the common folder resolved against `root` here:
+ * never with --path-format=absolute, which a git before 2.31 does not know
+ * and so prints back on a line of its own, exiting 0, so its answer would
+ * read as a path. Anything but the two lines asked for is no place.
+ */
+export function gitPlaceOf(root: string): GitPlace | undefined {
+  const ran = spawnSync("git", ["rev-parse", "--git-common-dir", "--show-prefix"], { cwd: root, encoding: "utf8", env: gitEnvironment(), stdio: ["ignore", "pipe", "ignore"] });
+  if (ran.status !== 0 || typeof ran.stdout !== "string") return undefined;
+  const lines = ran.stdout.split("\n");
+  if (lines.length !== 3 || lines[2] !== "") return undefined;
+  const [common = "", prefix = ""] = lines;
+  if (common === "" || common.startsWith("-") || prefix.startsWith("-")) return undefined;
+  return { common: resolve(root, common), prefix };
+}
+
 /**
  * The top of the repository holding `root`: the nearest folder at or above
  * it with a `.git` (a folder, or a worktree's file); undefined outside one.

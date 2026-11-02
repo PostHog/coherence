@@ -21,6 +21,7 @@
 import { spawnSync } from "../lifecycle/work-meter.ts";
 import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
+import { gitEnvironment } from "../adapters/project-config.ts";
 import { keepProjectFiles, nestedCheckouts } from "../adapters/project-files.ts";
 
 export type ChangeSource = "staged" | "unstaged" | "untracked" | "since";
@@ -47,14 +48,11 @@ export interface WorkingChange {
 
 export class ChangeError extends Error {}
 
-/** Variables a git hook sets that would point git at another index or repository than the root's own. */
-const GIT_LOCATION_VARIABLES = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_PREFIX", "GIT_NAMESPACE"];
 const GIT_OUTPUT_LIMIT = 256 * 1024 * 1024;
 
+/** git asked about `root`, with none of the variables a git hook sets that would point it at another index or repository (GIT_LOCATION_VARIABLES). */
 function git(root: string, args: readonly string[]): { ok: boolean; stdout: string; reason: string } {
-  const env = { ...process.env };
-  for (const name of GIT_LOCATION_VARIABLES) delete env[name];
-  const result = spawnSync("git", ["-c", "core.quotepath=off", ...args], { cwd: root, encoding: "utf8", env, maxBuffer: GIT_OUTPUT_LIMIT });
+  const result = spawnSync("git", ["-c", "core.quotepath=off", ...args], { cwd: root, encoding: "utf8", env: gitEnvironment(), maxBuffer: GIT_OUTPUT_LIMIT });
   const reason = (result.stderr ?? "").trim() || (result.error?.message ?? `exit ${result.status}`);
   return { ok: result.status === 0, stdout: result.stdout ?? "", reason };
 }

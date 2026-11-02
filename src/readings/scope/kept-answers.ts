@@ -34,11 +34,18 @@
  * used silently: the reading carries how many it reused and asked, and how
  * many files had changed.
  *
+ * Every save also keeps the answers in the repository's git common folder,
+ * which all its worktrees share, named by the project's folder within the
+ * repository and the basis; a worktree with no answers of its own that hold
+ * starts from that copy, so a new worktree asks only what its tree changed.
+ * Only a folder the repository tracks shares: one that merely lies inside
+ * some checkout writes nothing into it.
+ *
  * Node-only; the browser bundle never imports it.
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
@@ -101,10 +108,42 @@ function keptPath(root: string, language: Language): string {
   return join(root, KEPT_DIR, `answers-${language}.json`);
 }
 
-/** The answers any worktree of `root`'s repository kept last, which seed a worktree that kept none of its own. */
-function sharedKeptPath(root: string, language: Language): string | undefined {
+/** How many sets of answers the repository keeps per project and language, each for one basis: the rest, least recently saved, are removed. */
+const SHARED_KEPT = 4;
+
+/**
+ * The answers any worktree of `root`'s repository kept for this project and
+ * this basis, which seed a worktree that has none of its own that hold. Named
+ * by a digest of the project's folder within the repository and one of that
+ * folder and the basis, which a reading works out from files alone before it
+ * asks anything, so two projects of one repository, or two branches whose
+ * manifests or lockfiles differ, each keep their own and never overwrite the
+ * other's.
+ */
+function sharedKeptPath(root: string, language: Language, basis: Record<string, string>): string | undefined {
   const shared = sharedStructureDir(root);
-  return shared === undefined ? undefined : join(shared, `answers-${language}.json`);
+  if (shared === undefined) return undefined;
+  const project = digest(shared.prefix).slice(0, 8);
+  const key = digest(JSON.stringify([shared.prefix, Object.entries(basis).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))])).slice(0, 16);
+  return join(shared.dir, `answers-${language}-${project}-${key}.json`);
+}
+
+/** Remove the repository's answers for this project and language beyond the SHARED_KEPT most recently saved; `path` is the one just saved. */
+function pruneShared(path: string): void {
+  const dir = dirname(path);
+  const project = basename(path).replace(/[0-9a-f]{16}\.json$/, "");
+  const own = (file: string): boolean => file.startsWith(project) && /^[0-9a-f]{16}\.json$/.test(file.slice(project.length));
+  const kept: { file: string; at: number }[] = [];
+  for (const file of readdirSync(dir)) {
+    if (!own(file)) continue;
+    try {
+      kept.push({ file, at: statSync(join(dir, file)).mtimeMs });
+    } catch {
+      // Removed by another worktree's save meanwhile.
+    }
+  }
+  kept.sort((a, b) => b.at - a.at || a.file.localeCompare(b.file));
+  for (const { file } of kept.slice(SHARED_KEPT)) if (join(dir, file) !== path) rmSync(join(dir, file), { force: true });
 }
 
 function digest(text: Buffer | string): string {
@@ -273,12 +312,18 @@ export class KeptAnswers {
     return new KeptAnswers(root, language, files, ignore, testFolders);
   }
 
-  /** The kept file, or why nothing kept is used. */
+  /** The kept file: the worktree's own, else the repository's for this project and basis; or why nothing kept is used, the own file's reason first. */
   private load(): KeptFile | string {
-    const own = keptPath(this.root, this.language);
-    const shared = sharedKeptPath(this.root, this.language);
-    const path = existsSync(own) ? own : shared;
-    if (path === undefined || !existsSync(path)) return "no answers were kept for this tree yet";
+    const own = this.read(keptPath(this.root, this.language));
+    if (typeof own !== "string") return own;
+    const shared = sharedKeptPath(this.root, this.language, this.basis);
+    const seeded = shared === undefined ? own : this.read(shared);
+    return typeof seeded === "string" ? own : seeded;
+  }
+
+  /** One kept file, or why it is not used. */
+  private read(path: string): KeptFile | string {
+    if (!existsSync(path)) return "no answers were kept for this tree yet";
     let kept: KeptFile;
     try {
       kept = JSON.parse(readFileSync(path, "utf8")) as KeptFile;
@@ -334,10 +379,12 @@ export class KeptAnswers {
       references: Object.fromEntries([...this.references].sort(([a], [b]) => a.localeCompare(b))),
     };
     const text = JSON.stringify(kept);
-    for (const path of [keptPath(this.root, this.language), sharedKeptPath(this.root, this.language)]) {
+    const shared = sharedKeptPath(this.root, this.language, this.basis);
+    for (const path of [keptPath(this.root, this.language), shared]) {
       if (path === undefined) continue;
       try {
         writeAtomically(path, text);
+        if (path === shared) pruneShared(shared);
       } catch {
         // Answers that cannot be kept only mean the next reading asks the server again.
       }
