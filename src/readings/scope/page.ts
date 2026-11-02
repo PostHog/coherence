@@ -95,7 +95,8 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
   // The languages' entrance rules and what they miss are the plugins', carried in the state: set before anything renders them.
   if (state.spec.languages !== undefined) setLanguageData(state.spec.languages);
   // The relief is a live scene, not markup: after every render it is put back into the host the render left.
-  const io = live === undefined ? {} : { get: (path: string) => live.get(path) };
+  // A link names the diff the relief opens on by the address's own query (a=, b=; a=none for no diff), next to the token.
+  const io = live === undefined ? {} : { get: (path: string) => live.get(path), diff: location.search };
   // The Connections view is kept the same way, in the host a render leaves on its own tab.
   const mount = (): void => {
     if (state.activeView === CONNECTIONS_ID) mountConnections(root, state);
