@@ -20,10 +20,13 @@ interface Pending {
 export class RpcError extends Error {
   readonly method: string;
   readonly code: number;
+  /** The server's own words, as its error response carried them: with method and code, all a thread needs to rebuild the error. */
+  readonly detail: string;
   constructor(method: string, code: number, message: string) {
     super(`${method}: ${message} (${code})`);
     this.method = method;
     this.code = code;
+    this.detail = message;
   }
 }
 

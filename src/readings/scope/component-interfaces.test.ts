@@ -77,6 +77,8 @@ class TextServer implements LanguageAdapter {
   readonly fail = new Map<string, string>();
   /** Files the server itself answers with an error, as tsserver returns its own crash on a question. */
   readonly refuse = new Map<string, string>();
+  /** The code its refusals carry. */
+  refuseCode = -32603;
   /** How many times a reading started it. */
   started = 0;
   private readonly root: string;
@@ -106,7 +108,7 @@ class TextServer implements LanguageAdapter {
     const failed = this.fail.get(definition.file);
     if (failed !== undefined) throw new Error(failed);
     const refused = this.refuse.get(definition.file);
-    if (refused !== undefined) throw new RpcError("textDocument/references", -32603, refused);
+    if (refused !== undefined) throw new RpcError("textDocument/references", this.refuseCode, refused);
     const sites: ReferenceSite[] = [];
     for (const file of projectFiles(this.root).filter((f) => /\.(ts|py)$/.test(f))) {
       let enclosing: string | undefined;
@@ -321,35 +323,78 @@ test("a file the language server cannot answer for is named and left unread whil
   }
 });
 
-test("a question the server refused is kept like an answer until its file changes, and a crash is asked again", async () => {
+test("a question the server refused is kept like an answer while the tree is unchanged, and a crash, a transient refusal or a tsserver assertion is asked again", async () => {
   const { root, remove } = project({
     ...BOUNDED,
     "src/store/clock_windows.ts": "export function tick(): number {\n  return 1;\n}\n",
     "src/api/api.ts": "import { write } from \"../store/rows.ts\";\nimport { tick } from \"../store/clock_windows.ts\";\nexport function go(): string {\n  tick();\n  return write(\"a\");\n}\n",
   });
+  const clockFile = "src/store/clock_windows.ts";
   try {
     const server = new TextServer(root);
-    server.fail.set("src/store/clock_windows.ts", "language server exited (SIGKILL)");
+    server.fail.set(clockFile, "language server exited (SIGKILL)");
     await readComponentInterfaces(root, server);
-    const healthy = new TextServer(root);
-    await readComponentInterfaces(root, healthy);
-    assert.ok(healthy.asked.includes("tick"), "a crash is asked again");
-    // A failure the server returned is kept like an answer: the unchanged tree never starts the server for it, and still names the file.
-    const clock = join(root, "src/store/clock_windows.ts");
-    writeFileSync(clock, "export function tick(): number {\n  return 2;\n}\n");
+    // The same crash on the unchanged tree: asked again, and counted as asked anew though nothing is kept for it.
+    const crashing = new TextServer(root);
+    crashing.fail.set(clockFile, "language server exited (SIGKILL)");
+    const crashed = await readComponentInterfaces(root, crashing);
+    assert.ok(crashing.asked.includes("tick"), "a crash is asked again");
+    assert.ok(crashed.kind === "read" && crashed.kept?.asked === 1, `a question asked again that failed is asked anew: ${JSON.stringify(crashed.kind === "read" && crashed.kept)}`);
+    // A refusal that may pass on its own is never kept: each reading of the unchanged tree asks it again.
+    const passing: [number, string][] = [
+      [-32800, "request cancelled"],
+      [-32801, "content modified"],
+      [-32802, "server cancelled"],
+      [-32002, "server not initialized"],
+      [1, "<semantic> TypeScript Server Error (5.9.3)\nError processing request. Debug Failure. False expression: Project is dirty"],
+    ];
+    for (const [code, words] of passing) {
+      const first = new TextServer(root);
+      first.refuseCode = code;
+      first.refuse.set(clockFile, words);
+      await readComponentInterfaces(root, first);
+      const next = new TextServer(root);
+      next.refuseCode = code;
+      next.refuse.set(clockFile, words);
+      const read = await readComponentInterfaces(root, next);
+      assert.ok(next.asked.includes("tick"), `a refusal coded ${code} (${words.split("\n").pop()}) is asked again`);
+      assert.ok(read.kind === "read" && read.unanswered?.[0]?.reason === `textDocument/references: ${words} (${code})`, "and the file is named with the server's words");
+    }
+    // A refusal the server returned is kept like an answer: the unchanged tree never starts the server for it, and still names the file.
     const refusing = new TextServer(root);
-    refusing.refuse.set("src/store/clock_windows.ts", "Maximum call stack size exceeded");
+    refusing.refuse.set(clockFile, "Maximum call stack size exceeded");
     await readComponentInterfaces(root, refusing);
     const again = new TextServer(root);
     const kept = await readComponentInterfaces(root, again);
     assert.equal(again.started, 0, "the server is never started for a question it already refused");
     assert.ok(kept.kind === "read" && kept.kept?.asked === 0, "nothing is asked anew");
-    assert.deepEqual(kept.kind === "read" && kept.unanswered, [{ file: "src/store/clock_windows.ts", component: "src/store", reason: "textDocument/references: Maximum call stack size exceeded (-32603)" }]);
-    // A change to that file drops the kept failure, so the server is asked again.
-    writeFileSync(clock, "export function tick(): number {\n  return 3;\n}\n");
+    assert.deepEqual(kept.kind === "read" && kept.unanswered, [{ file: clockFile, component: "src/store", reason: "textDocument/references: Maximum call stack size exceeded (-32603)" }]);
+    // A change anywhere drops the kept refusal, even in a file that never spells the refused name: what the server
+    // overflowed on may be any file it read, so the server is asked again.
+    writeFileSync(join(root, "src/store/rows.ts"), readFileSync(join(root, "src/store/rows.ts"), "utf8") + "// edited\n");
     const changed = new TextServer(root);
     await readComponentInterfaces(root, changed);
-    assert.ok(changed.asked.includes("tick"), "the changed file's question is asked again");
+    assert.ok(changed.asked.includes("tick"), "an edit elsewhere in the tree asks the refused question again");
+  } finally {
+    remove();
+  }
+});
+
+test("the interface reading's worker keeps a refused question as the reading in process does: the unchanged tree never starts the server for it", async () => {
+  const { root, remove } = routedProject();
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    const refusing = new TextServer(root);
+    refusing.refuse.set("src/store/rows.ts", "Maximum call stack size exceeded");
+    const first = await readInterfacesApart(root, () => refusing);
+    const reason = "textDocument/references: Maximum call stack size exceeded (-32603)";
+    assert.deepEqual(first.kind === "read" && first.unanswered, [{ file: "src/store/rows.ts", component: "src/store", reason }], "the worker names the refused file with the server's words");
+    const again = new TextServer(root);
+    const kept = await readInterfacesApart(root, () => again);
+    assert.equal(again.started, 0, "the server is never started for a question it already refused");
+    assert.deepEqual(again.questions, [], "nothing is asked of it");
+    assert.ok(kept.kind === "read" && kept.kept?.asked === 0, "nothing is asked anew");
+    assert.deepEqual(kept.kind === "read" && kept.unanswered, [{ file: "src/store/rows.ts", component: "src/store", reason }], "and the file is still named, with the same words");
   } finally {
     remove();
   }

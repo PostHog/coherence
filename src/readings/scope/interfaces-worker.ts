@@ -7,6 +7,7 @@
 import { parentPort, workerData } from "node:worker_threads";
 import type { Definition, LanguageAdapter, ReferenceSite, Resolved, ResolveHint } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
+import { RpcError } from "../../adapters/jsonrpc.ts";
 import { startParsers } from "../../plugins/syntax-trees.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
 import { readAndRecord } from "./gaps.ts";
@@ -19,7 +20,8 @@ const waiting = new Map<number, { answered: (value: unknown) => void; failed: (e
 port.on("message", (reply: ToReading) => {
   const asked = waiting.get(reply.ask);
   waiting.delete(reply.ask);
-  if ("failed" in reply) asked?.failed(new Error(reply.failed));
+  // A refusal the server returned is rebuilt as the RpcError it was, so the reading keeps it as it does in process.
+  if ("failed" in reply) asked?.failed(reply.rpc === undefined ? new Error(reply.failed) : new RpcError(reply.rpc.method, reply.rpc.code, reply.rpc.detail));
   else asked?.answered(reply.value);
 });
 

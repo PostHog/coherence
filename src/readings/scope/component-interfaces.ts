@@ -78,14 +78,13 @@ import { execFile } from "../../lifecycle/work-meter.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite, type ResolveHint, type Resolved } from "../../adapters/adapter.ts";
-import { RpcError } from "../../adapters/jsonrpc.ts";
 import { detectEntranceCandidates, escape, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
 import { configRecord } from "../../adapters/project-config.ts";
 import { instrumentFor, type Language } from "../../adapters/index.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
-import { KeptAnswers } from "./kept-answers.ts";
+import { KeptAnswers, lastingRefusal } from "./kept-answers.ts";
 import { DECLARED_NOT_READ, languagesRead, notScannedYet, unscannedOf } from "./languages-read.ts";
 import { parsedOf, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
@@ -902,7 +901,13 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
     const kept = keep?.resolved(query, hint);
     if (kept !== undefined) return kept;
     if ((await live()) === STOPPED) return STOPPED;
-    const answer = await within(() => adapter.resolve(query, hint));
+    let answer: Resolved | typeof STOPPED;
+    try {
+      answer = await within(() => adapter.resolve(query, hint));
+    } catch (error) {
+      keep?.failedAnew();
+      throw error;
+    }
     if (answer !== STOPPED) keep?.keepResolved(query, hint, answer, name);
     return answer;
   };
@@ -917,7 +922,9 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
     try {
       answer = await within(() => adapter.references(definition));
     } catch (error) {
-      if (error instanceof RpcError) keep?.keepFailed(definition, error.message, spelled, broad);
+      // Only the server's lasting refusal is kept; an exit, a timeout or a transient refusal is asked again by the next reading.
+      if (lastingRefusal(error)) keep?.keepFailed(definition, error.message);
+      else keep?.failedAnew();
       throw error;
     }
     if (answer !== STOPPED) keep?.keepReferenced(definition, answer, spelled, broad);
