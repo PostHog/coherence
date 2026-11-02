@@ -82,10 +82,33 @@ spec inside a component that holds others stands as a district of its own.
   bulk move touches everything and says nothing about any one component.
 - Position. Components that land together stand closer: the co-change share
   over every landing of 40 files or fewer, settled by a force layout and
-  spaced so no footprint overlaps. A scene built again seeds its layout from
-  the last one, so what was settled stays where it was.
+  spaced so no footprint overlaps. Inside a block, files that land together
+  stand together: they are clustered by the same share (average linkage),
+  and that order is laid out in squarified rows, so each file keeps its
+  share of the area by lines and none is cut into a sliver. The layout is
+  kept in `.coherence/relief-layout.json`, this checkout's own and never
+  committed, and the warm server lays the relief out from it
+  (`relief/layout.ts`, `relief/layout-store.ts`). The server writes that
+  file itself; no route takes a write from a page, so its HTTP stays GET and
+  HEAD. What is kept stands where it was kept: a rebuild, a reload, a
+  restart or a checkout moves nothing, a new component is placed beside what
+  it lands with, and a file new to a block goes in after the file it lands
+  with most. The layout still follows how the code lands, a little at a
+  time: each landing new since the layout was kept nudges only the
+  components it touched, as far as the co-change of the history up to it
+  pulls them, and moves up to three of the files it touched in each block
+  beside the file each then landed with most. Up to 24 landings seen one by
+  one or arriving together move it the same way, but for the measures that
+  size the blocks; more are taken in 24 shares. A block whose kept order holds
+  fewer than half its files is laid out afresh, and removing the kept file
+  resets the whole layout. A snapshot reads the kept layout and writes
+  nothing.
 - Reading it. Double-clicking a platform steps into it as a slice, and the
-  crumbs or `Escape` step back out. Selecting a block lists its files, its
+  crumbs or `Escape` step back out. A slice of one component's files alone
+  (a component with nothing inside it, or a component's own files) names
+  its eight highest files by the height measure in its callouts, in place
+  of one callout repeating the component's name; clicking one selects that
+  file in the files view. Selecting a block lists its files, its
   landings in the window, and the components it relies on and that rely on
   it with their most used symbols. Blocks can split into one block per file.
   The notes under the scene say what each measure is read from, what is left

@@ -60,7 +60,8 @@ import { TRACES_DIR, tracesDir } from "../../economy/trace.ts";
 import type { HttpApp, HttpAppFactory, HttpContext } from "../../enforcement/server.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
-import { REVISION, TraceTail, WORKTREE, folderName, gitRecords, movesRelief, readReliefApart, reliefCommits, reliefDiff, type GitRecords, type ReliefRead, type ReliefReading } from "../relief/relief.ts";
+import { REVISION, TraceTail, WORKTREE, folderName, gitRecords, movesRelief, readReliefApart, reliefCommits, reliefDiff, type GitRecords, type ReliefFileLanded, type ReliefRead, type ReliefReading } from "../relief/relief.ts";
+import { LayoutKeeper } from "./relief/layout-store.ts";
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
 import { STORE_NAMES, storeOfPath, type RecordStore } from "../../journal/stores.ts";
 import { FROM_SOURCES, SOURCE_FOLDER, buildShell, forgetPageBundle, isPageSource, rootOptions, windowState, type BuildOptions, type Shell } from "./build.ts";
@@ -264,6 +265,10 @@ class LiveReading implements HttpApp {
   private relief: ReliefReading = { kind: "unread", because: "the warm server has not read it yet" };
   /** The relief's files by folder, as the files route sends them: read with the relief, never in the first load. */
   private reliefFiles: ReadonlyMap<string, string> = new Map();
+  /** Each folder's files as the route sends them, in the order the layout keeps, for the files read now. */
+  private reliefOrdered = new Map<string, string>();
+  /** The relief's layout, kept in .coherence so a reload or a restart opens on the places a reader learned. */
+  private readonly layout: LayoutKeeper;
   private reading: Promise<void> | undefined;
   private readAgain = false;
   /** The vocabulary coverage as last read, or why it is not yet; one reading at a time, off the loop, once more if the model reloaded meanwhile. */
@@ -301,6 +306,7 @@ class LiveReading implements HttpApp {
     this.options = options;
     this.build = { ...rootOptions(context.root), ...options.build, root: context.root };
     this.shell = new PageShell(buildShell, forgetPageBundle, (line) => context.log(line));
+    this.layout = new LayoutKeeper(context.root, true, (line) => context.log(line));
     this.interfaces =
       options.interfaces === false
         ? { kind: "unread", because: "this live reading was started without the instrument" }
@@ -348,6 +354,7 @@ class LiveReading implements HttpApp {
     const read = await relief;
     this.relief = read.reading;
     this.reliefFiles = read.files;
+    this.reliefOrdered = new Map();
     state.relief = read.reading;
     return state;
   }
@@ -379,6 +386,26 @@ class LiveReading implements HttpApp {
   }
 
   /**
+   * The state as a page is sent it: windowed, with the relief's places as the
+   * layout keeps them, laid out again only when what they are read from moved.
+   */
+  private sent(state: ShellState): ShellState {
+    const layout = this.layout.components(state);
+    // A copy carries the places: the state held is what was read, never what was last sent.
+    const { reliefLayout: _held, ...read } = state;
+    return windowState(layout === undefined ? read : { ...read, reliefLayout: layout });
+  }
+
+  /** One folder's files as JSON text, in the order the layout keeps, for the reading held now. */
+  private ordered(folder: string, landings: readonly { n: number; sha: string }[]): string {
+    const held = this.reliefOrdered.get(folder);
+    if (held !== undefined) return held;
+    const text = JSON.stringify(this.layout.files(folder, JSON.parse(this.reliefFiles.get(folder)!) as ReliefFileLanded[], landings));
+    this.reliefOrdered.set(folder, text);
+    return text;
+  }
+
+  /**
    * A relief reading that landed: held for the state and the files route, and
    * sent as a snapshot with a new version when it differs from the one held.
    * A page that loaded the state before it landed holds the older version, so
@@ -389,11 +416,12 @@ class LiveReading implements HttpApp {
     const held = this.relief;
     this.relief = read.reading;
     this.reliefFiles = read.files;
+    this.reliefOrdered = new Map();
     this.base.relief = read.reading;
     const same = held.kind === "read" && read.reading.kind === "read" ? held.stamp === read.reading.stamp : JSON.stringify(held) === JSON.stringify(read.reading);
     if (same) return;
     this.version += 1;
-    this.send("snapshot", { state: windowState(this.base), version: this.versionId });
+    this.send("snapshot", { state: this.sent(this.base), version: this.versionId });
   }
 
   /** Git moved HEAD or a ref: the landings and heights are read again once the commit, checkout or fetch settles. */
@@ -592,7 +620,7 @@ class LiveReading implements HttpApp {
     this.base = state;
     this.lexicons = lexicons;
     this.version += 1;
-    this.send("snapshot", { state: windowState(state), version: this.versionId });
+    this.send("snapshot", { state: this.sent(state), version: this.versionId });
   }
 
   /** Read one record store again and send what is new. Serialized, so two refreshes never interleave. */
@@ -780,7 +808,7 @@ class LiveReading implements HttpApp {
       case "/api/state": {
         const state = await this.ensure();
         await this.chain;
-        json(response, request, 200, { state: windowState(this.base ?? state), version: this.versionId, history: this.historyHint(this.base ?? state) });
+        json(response, request, 200, { state: this.sent(this.base ?? state), version: this.versionId, history: this.historyHint(this.base ?? state) });
         return;
       }
       case "/api/events":
@@ -869,8 +897,10 @@ class LiveReading implements HttpApp {
           json(response, request, 404, { reason: relief.kind !== "read" ? `the relief is not read: ${relief.because}` : `the relief holds no folder ${JSON.stringify(unknown)}` });
           return;
         }
-        // Each folder's text goes out as it was made, never parsed again: on a large project they are megabytes.
-        const body = `{"stamp":${JSON.stringify(relief.stamp)},"folders":{${folders.map((folder) => `${JSON.stringify(folder)}:${files.get(folder)!}`).join(",")}}}`;
+        // Each folder's files go out in the order the layout keeps, put in order once per reading: on a large project they are megabytes.
+        const body = `{"stamp":${JSON.stringify(relief.stamp)},"folders":{${folders.map((folder) => `${JSON.stringify(folder)}:${this.ordered(folder, relief.landings)}`).join(",")}}}`;
+        // What this request put in order is kept in one write, however many folders it named.
+        this.layout.flush();
         response.writeHead(200, { "content-type": "application/json; charset=utf-8", "content-length": Buffer.byteLength(body) });
         response.end(request.method === "HEAD" ? undefined : body);
         return;
@@ -899,7 +929,7 @@ class LiveReading implements HttpApp {
     const write = (event: string, data: unknown): void => {
       response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
-    if (url.searchParams.get("version") !== this.versionId) write("snapshot", { state: windowState(base), version: this.versionId });
+    if (url.searchParams.get("version") !== this.versionId) write("snapshot", { state: this.sent(base), version: this.versionId });
     const journal = parseCursor(url.searchParams.get("journal"));
     if (journal !== undefined) {
       const from = withSlack(journal);

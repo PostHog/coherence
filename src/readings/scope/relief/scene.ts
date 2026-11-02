@@ -10,6 +10,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { ReliefData, ReliefFileLanded } from "./data.ts";
+import { MARGIN, placeComponents, type ReliefLayout } from "./layout.ts";
 import type { Touch } from "../../relief/relief.ts";
 
 export type { Touch };
@@ -27,7 +28,8 @@ export interface ReliefIO {
  * so a scene built from new data opens where the old one stood.
  */
 export interface ReliefView {
-  layout: Record<string, { own: number[]; sub: number[] }>;
+  /** Each component's place, by folder, for the next build to hold. */
+  layout: ReliefLayout;
   foot: string;
   height: string;
   win: string;
@@ -139,7 +141,6 @@ const FL = C.map((c) => (c.files ? null : []));
 
 // ---------- measures ----------
 for (const c of C) for (const m of FOOT) c.v[m.key] ??= 0; // a model without a reading of this measure records none of it
-const totals = {}; for (const m of FOOT) totals[m.key] = C.reduce((a, c) => a + c.v[m.key], 0);
 function churn() {
   const from = WIN.find((w) => w.key === state.win).from;
   const out = (l) => l.date < from || (!state.big && l.n > BIG);
@@ -154,95 +155,24 @@ function churn() {
   return { comp, file };
 }
 
-// ---------- nesting: a component stands on the platform of the nearest component whose folder holds it ----------
-const holds = (outer, inner) => inner !== outer && (outer === "." || inner.startsWith(outer + "/"));
-const parent = C.map((c) => { let best = -1, len = -1; C.forEach((o, oi) => { const l = o.folder === "." ? 0 : o.folder.length; if (!o.virtual && holds(o.folder, c.folder) && l > len) { best = oi; len = l; } }); return best; });
-const kids = C.map((_, ci) => C.map((_, k) => k).filter((k) => parent[k] === ci));
-const level = C.map((_, ci) => { let n = 0; for (let p = parent[ci]; p >= 0; p = parent[p]) n++; return n; });
-const under = (ci) => [ci, ...kids[ci].flatMap(under)]; // a component and everything inside it
-const PLH = 2.4, MARGIN = 5;
+// ---------- placement: nesting, footprints and co-change positions (layout.ts, which the warm server runs too) ----------
+// Each component stands on the platform of the nearest component whose folder holds it, placed by co-change and held
+// where the server last laid it out, else where this page's last build left it: what was kept stands exactly there.
+const SEED = D.layout ?? carried?.layout ?? {};
+const { parent, kids, level, under, totals, side, ext, tops, P, layout: LAYOUT } = placeComponents(C, D.landings, SEED);
+const PLH = 2.4;
 // A slice is a component with everything inside it, or (own) just the files no component inside it claims.
 const inScope = (ci) => { if (state.own) return ci === state.scope; for (let p = ci; p >= 0; p = parent[p]) if (p === state.scope) return true; return false; };
 const base = (ci) => (level[ci] + (kids[ci].length ? 1 : 0)) * PLH; // components always stand on their parent's platform
 
-// ---------- layout: footprints and co-change positions ----------
-const AREA = 5200; // total footprint area shared by every measure, so shares compare
-const side = (c, key) => (totals[key] ? Math.sqrt((c.v[key] / totals[key]) * AREA) : 0); // a measure nothing has recorded draws nothing
-const maxSide = C.map((c) => Math.max(...FOOT.map((m) => side(c, m.key))));
-// Co-change between components over every landing that touches at most 40 files.
-const sets = C.map(() => new Set());
-D.landings.forEach((l, i) => { if (l.n <= 40) for (const [ci] of l.c) sets[ci].add(i); });
-const subSet = C.map((_, ci) => new Set(under(ci).flatMap((k) => [...sets[k]])));
-const jac = (a, b) => { let inter = 0; for (const x of a) if (b.has(x)) inter++; const uni = a.size + b.size - inter; return uni ? inter / uni : 0; };
-const GAP = 3;
-// Lay out items {hx, hz, set} by co-change, then push apart so no rectangle overlaps at its largest.
-// The last build's layout seeds this one, so the map stays familiar: what was settled starts where it was and
-// only drifts as far as its co-change has really changed; a newcomer starts beside its strongest co-change neighbour.
-const SEED = D.seed ?? carried?.layout ?? {};
-function settle(items) {
-  const n = items.length, J = items.map((a) => items.map((b) => (a === b ? 1 : jac(a.set, b.set))));
-  const rad = items.map((it) => Math.max(it.hx, it.hz));
-  const warm = items.some((it) => it.seed);
-  const P = items.map((it, i) => { if (it.seed) return [...it.seed]; const a = (i / n) * Math.PI * 2; return [Math.cos(a) * 40, Math.sin(a) * 40]; });
-  if (warm) items.forEach((it, i) => {
-    if (it.seed) return;
-    let best = -1; items.forEach((o, j) => { if (o.seed && (best < 0 || J[i][j] > J[i][best])) best = j; });
-    if (best >= 0) P[i] = [P[best][0] + rad[i] + rad[best] + GAP, P[best][1]];
-  });
-  const N = warm ? 300 : 900, heat = warm ? 0.2 : 1;
-  for (let it = 0; it < N; it++) {
-    const t = (1 - it / N) * heat;
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-      const dx = P[j][0] - P[i][0], dz = P[j][1] - P[i][1], d = Math.hypot(dx, dz) || 0.01;
-      // Strangers sit apart by up to 26, never more than half their own size, so small neighbourhoods stay tight at every depth.
-      const want = (rad[i] + rad[j]) * 1.08 + GAP + (1 - J[i][j]) * Math.min(26, (rad[i] + rad[j]) * 0.5);
-      const f = (d - want) * 0.02 * t, ux = dx / d, uz = dz / d;
-      P[i][0] += ux * f; P[i][1] += uz * f; P[j][0] -= ux * f; P[j][1] -= uz * f;
-    }
-    // A seeded item is held to where the last build left it; only a lasting pull moves it far.
-    if (warm) items.forEach((o, i) => { if (o.seed) { P[i][0] += (o.seed[0] - P[i][0]) * 0.1; P[i][1] += (o.seed[1] - P[i][1]) * 0.1; } });
-  }
-  for (let it = 0; it < 400; it++) {
-    let moved = false;
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-      const dx = P[j][0] - P[i][0], dz = P[j][1] - P[i][1];
-      const ox = items[i].hx + items[j].hx + GAP - Math.abs(dx), oz = items[i].hz + items[j].hz + GAP - Math.abs(dz);
-      if (ox > 0 && oz > 0) {
-        moved = true;
-        if (ox < oz) { const s = Math.sign(dx) || 1; P[i][0] -= s * ox / 2; P[j][0] += s * ox / 2; }
-        else { const s = Math.sign(dz) || 1; P[i][1] -= s * oz / 2; P[j][1] += s * oz / 2; }
-      }
-    }
-    if (!moved) break;
-  }
-  return P;
-}
-// Deepest first, each platform settles its own block beside its children's subtrees, and each subtree then moves as one piece.
-const own = C.map(() => [0, 0]), sub = C.map(() => [0, 0]);
-const ext = C.map((_, ci) => [maxSide[ci] / 2, maxSide[ci] / 2]);
-for (const ci of C.map((_, i) => i).sort((a, b) => level[b] - level[a])) {
-  if (!kids[ci].length) continue;
-  const items = [{ hx: maxSide[ci] / 2, hz: maxSide[ci] / 2, set: sets[ci], seed: SEED[C[ci].folder]?.own }, ...kids[ci].map((k) => ({ hx: ext[k][0], hz: ext[k][1], set: subSet[k], seed: SEED[C[k].folder]?.sub }))];
-  const Q = settle(items);
-  const box = [Infinity, Infinity, -Infinity, -Infinity];
-  items.forEach((it, i) => { box[0] = Math.min(box[0], Q[i][0] - it.hx); box[1] = Math.min(box[1], Q[i][1] - it.hz); box[2] = Math.max(box[2], Q[i][0] + it.hx); box[3] = Math.max(box[3], Q[i][1] + it.hz); });
-  const mx = (box[0] + box[2]) / 2, mz = (box[1] + box[3]) / 2;
-  own[ci] = [Q[0][0] - mx, Q[0][1] - mz];
-  kids[ci].forEach((k, i) => { sub[k] = [Q[i + 1][0] - mx, Q[i + 1][1] - mz]; });
-  ext[ci] = [(box[2] - box[0]) / 2 + MARGIN, (box[3] - box[1]) / 2 + MARGIN];
-}
-const tops = C.map((_, i) => i).filter((i) => parent[i] < 0);
-const at = C.map(() => [0, 0]); // centre of each subtree
-if (tops.length > 1) { const Q = settle(tops.map((t) => ({ hx: ext[t][0], hz: ext[t][1], set: subSet[t] }))); tops.forEach((t, i) => { at[t] = Q[i]; }); }
-for (const ci of C.map((_, i) => i).sort((a, b) => level[a] - level[b])) if (parent[ci] >= 0) at[ci] = [at[parent[ci]][0] + sub[ci][0], at[parent[ci]][1] + sub[ci][1]];
-const P = C.map((_, ci) => [at[ci][0] + own[ci][0], at[ci][1] + own[ci][1]]);
-const LAYOUT = Object.fromEntries(C.map((c, ci) => [c.folder, { own: own[ci].map((v) => +v.toFixed(3)), sub: sub[ci].map((v) => +v.toFixed(3)) }]));
-
-// Squarified treemap of a component's files inside its lines footprint.
+// A component's files inside its lines footprint, in the order they arrive: the server orders them so files that land
+// together stand side by side and a landing never reshuffles a block (layout.ts fileOrder), and rows keep that order.
+const fileMap = (files, x, y, w, h) => treemap(files.map((f) => ({ v: Math.max(1, f.lines) })), x, y, w, h);
+// Squarified treemap in the order given: rows of near-square rectangles, each row taking the next items.
 function treemap(items, x, y, w, h) {
   const out = new Array(items.length);
   const total = items.reduce((a, it) => a + it.v, 0) || 1;
-  const order = items.map((it, i) => [it.v, i]).sort((a, b) => b[0] - a[0]);
+  const order = items.map((it, i) => [it.v, i]);
   let rect = { x, y, w, h }, rest = order.slice(), scale = (w * h) / total;
   while (rest.length) {
     const short = Math.min(rect.w, rect.h); let row = [], best = Infinity;
@@ -393,7 +323,7 @@ const FS = { faded: new Uint8Array(NF), cur: new Float32Array(NF * 6), to: new F
 const selBox = new THREE.LineSegments(unitEdges, new THREE.LineBasicMaterial({ color: 0xff8a4c })); selBox.visible = false; world.add(selBox);
 const fileRects = C.map((c) => null); // treemaps of each component's files in its lines footprint, relative to its centre
 function rectsOf(ci) {
-  if (!fileRects[ci]) { const s = side(C[ci], "lines"); fileRects[ci] = treemap(FL[ci].map((f) => ({ v: f.lines })), -s / 2, -s / 2, s, s); }
+  if (!fileRects[ci]) { const s = side(C[ci], "lines"); fileRects[ci] = fileMap(FL[ci], -s / 2, -s / 2, s, s); }
   return fileRects[ci];
 }
 const outlines = C.map(() => {
@@ -428,6 +358,26 @@ const platTags = C.map((c, ci) => {
   if (!kids[ci].length) return null;
   const d = el("div", "label plat"); d.append(c.name, el("small")); return callout(d, ci, "plat");
 });
+// A slice of one component's files alone names its highest-ranking files, as the side column ranks them, in place of
+// one callout repeating the slice's own name; the selected file is named among them wherever it ranks.
+const FILE_NAMED = 8;
+const fileTags = Array.from({ length: FILE_NAMED + 1 }, () => {
+  const d = el("div", "label file"); d.append("", el("small"));
+  const o = new THREE.Object3D(); o.element = d; o.kind = "file"; o.ci = -1; o.fi = -1; o.visible = false; world.add(o); calloutBox.append(d);
+  // A click does what the side column's file list does: the files view, with that file selected.
+  d.onclick = () => { state.selected = o.ci; state.split = true; state.file = [o.ci, o.fi]; state.preview = null; sync(); retarget(); drawSide(); drawNote(); };
+  return o;
+});
+const fileTip = C.map(() => []); // each file's [x, y, z] on top of what stands for it: its own box, or its block in components view
+// The component whose files alone stand in the slice: its own files, or a component with nothing inside it.
+const alone = () => (state.own || !kids[state.scope].length ? state.scope : null);
+function topFiles(ci, hk) {
+  const ranked = FL[ci].map((_, fi) => fi).sort((a, b) => CH.file[ci][b][hk] - CH.file[ci][a][hk] || FL[ci][b].lines - FL[ci][a].lines).slice(0, FILE_NAMED);
+  if (state.file && state.file[0] === ci && !ranked.includes(state.file[1])) ranked.push(state.file[1]);
+  return ranked;
+}
+// A file's path from inside its component's folder, which the crumbs already name.
+const within = (ci, file) => (C[ci].folder !== "." && file.startsWith(C[ci].folder + "/") ? file.slice(C[ci].folder.length + 1) : file);
 
 let CH = churn(), DIFF = null;
 function ramp(t) { const i = Math.min(6, Math.max(0, Math.floor(t * 7))); return css("--r" + (i + 1)); }
@@ -470,6 +420,7 @@ function layout() {
     let top = h;
     if (state.split) top = 0;
     const rects = FL[ci] ? rectsOf(ci) : null, sl = side(c, "lines");
+    const blockTop = h + (showD ? Math.max(meter(cd[0]), meter(cd[1])) : 0);
     FL[ci]?.forEach((f, fi) => {
       const r = rects[fi], fv = CH.file[ci][fi][hk], fh = fv ? MINH + (fv / fileMax) * MAXH : MINH * 0.5;
       const k = s / sl, pad = Math.min(0.25, (r.w * k) / 6, (r.h * k) / 6), i = fileAt[ci][fi], o = i * 6;
@@ -480,6 +431,7 @@ function layout() {
       const ma = fd && IN[ci] ? meter(fd[0]) : 0, md = fd && IN[ci] ? meter(fd[1]) : 0;
       FS.capTo[i * 2] = ma; FS.capTo[i * 2 + 1] = md;
       if (state.split) top = Math.max(top, fh + Math.max(ma, md));
+      fileTip[ci][fi] = [FS.to[o], y + (state.split ? fh + Math.max(ma, md) : blockTop), FS.to[o + 2]];
     });
     if (!state.split && showD) top += Math.max(meter(cd[0]), meter(cd[1]));
     tags[ci].position.set(x, y + top, z);
@@ -490,6 +442,23 @@ function layout() {
     let dl = tags[ci].element.querySelector(".dl");
     const cdl = DIFF && IN[ci] ? DIFF.comp[ci] : null;
     if (cdl && (cdl[0] || cdl[1])) { if (!dl) { dl = el("span", "dl"); tags[ci].element.append(dl); } dl.replaceChildren(signed(cdl[0], cdl[1])); } else if (dl) dl.remove();
+  });
+  // One component's files alone: its files carry the names, once they have arrived; until then its own callout stands.
+  const solo = alone();
+  if (solo != null) need([solo]);
+  const named = solo != null && FL[solo] ? topFiles(solo, hk) : [];
+  if (named.length) tags[solo].visible = false;
+  fileTags.forEach((o, n) => {
+    const fi = named[n];
+    o.visible = fi !== undefined;
+    if (!o.visible) return;
+    o.ci = solo; o.fi = fi; o.position.set(...fileTip[solo][fi]);
+    const f = FL[solo][fi], e = o.element;
+    e.firstChild.textContent = within(solo, f.file);
+    e.querySelector("small").textContent = `${fmt(f.lines)} lines · ${fmt(CH.file[solo][fi][hk])} ${HEIGHT.find((m) => m.key === hk).unit}`;
+    let dl = e.querySelector(".dl");
+    const fd = DIFF ? DIFF.file[solo][fi] : null;
+    if (fd && (fd[0] || fd[1])) { if (!dl) { dl = el("span", "dl"); e.append(dl); } dl.replaceChildren(signed(fd[0], fd[1])); } else if (dl) dl.remove();
   });
   // A platform spans its own block and everything standing on it, plus a margin; its size is not a measure.
   const rect = RECT;
@@ -667,6 +636,7 @@ function frame() {
 // Platforms, the selection and what the pointer is on always carry a name; beyond them, only the biggest few per side.
 let hovered = null;
 const NAMED = 8;
+const pickedFile = (o) => state.file != null && state.file[0] === o.ci && state.file[1] === o.fi;
 const leaders = $("leaders"), SVGNS = "http://www.w3.org/2000/svg", LGAP = 4, EDGE = 10;
 let LH = 30;
 const _v = new THREE.Vector3();
@@ -676,13 +646,15 @@ function placeCallouts() {
   const crumbs = $("crumbs").getBoundingClientRect(), scale = $("scale").getBoundingClientRect(), sb = stage.getBoundingClientRect();
   const lane = { l: [crumbs.bottom - sb.top + 8, scale.top - sb.top - 8], r: [EDGE, H - EDGE] };
   const cand = [];
-  for (const o of [...tags, ...platTags.filter(Boolean)]) {
+  for (const [n, o] of [...tags, ...platTags.filter(Boolean), ...fileTags].entries()) {
     o.element.style.display = "none";
     if (!o.visible) continue;
     o.getWorldPosition(_v).project(camera);
     if (_v.z > 1 || Math.abs(_v.x) > 1 || Math.abs(_v.y) > 1) continue;
     const ax = (_v.x + 1) / 2 * W, ay = (1 - _v.y) / 2 * H;
-    const rank = (o.ci === state.selected ? 1e12 : 0) + (o.kind === "plat" ? 1e9 / (1 + level[o.ci]) : 0) + (C[o.ci].v[fk] || 0) / (totals[fk] || 1) * 1e6;
+    // A file keeps the rank it was named in: the selected file first, then by height.
+    const rank = o.kind === "file" ? (pickedFile(o) ? 1e12 : 0) + 1e6 - n
+      : (o.ci === state.selected ? 1e12 : 0) + (o.kind === "plat" ? 1e9 / (1 + level[o.ci]) : 0) + (C[o.ci].v[fk] || 0) / (totals[fk] || 1) * 1e6;
     // A label keeps its side until its point is well past the middle, so a block near the centre line can't judder between columns.
     if (!o.side || Math.abs(ax - W / 2) > W * 0.08) o.side = ax < W / 2 ? "l" : "r";
     cand.push({ o, ax, ay, side: o.side, rank });
@@ -692,7 +664,7 @@ function placeCallouts() {
     const [top, bottom] = lane[side], room = Math.max(0, Math.floor((bottom - top + LGAP) / (LH + LGAP)));
     const mine = cand.filter((c) => c.side === side).sort((a, b) => b.rank - a.rank);
     // What an agent is touching right now always carries its name, so the reader sees where the work is.
-    const must = (c) => c.o.kind === "plat" || c.o.ci === state.selected || (c.o.kind === "comp" && (c.o.ci === hovered || litNow.has(c.o.ci)));
+    const must = (c) => (c.o.kind === "file" ? pickedFile(c.o) : c.o.kind === "plat" || c.o.ci === state.selected || (c.o.kind === "comp" && (c.o.ci === hovered || litNow.has(c.o.ci))));
     const rest = mine.filter((c) => !must(c)).slice(0, NAMED);
     const kept = mine.filter((c) => must(c) || rest.includes(c)).slice(0, room).sort((a, b) => a.ay - b.ay);
     // Each label sits as near its point's height as the column allows: pushed down past its neighbour, then up off the floor.
@@ -702,7 +674,7 @@ function placeCallouts() {
       const e = c.o.element; e.style.display = "block"; e.classList.toggle("r", side === "r");
       e.style.top = c.y + "px"; e.style.left = side === "l" ? EDGE + "px" : ""; e.style.right = side === "r" ? EDGE + "px" : "";
       const w = e.offsetWidth, lx = side === "l" ? EDGE + w + 2 : W - EDGE - w - 2;
-      paths.push([lx, c.y + LH / 2, c.ax, c.ay, c.o.ci === (state.preview ?? state.selected), side]);
+      paths.push([lx, c.y + LH / 2, c.ax, c.ay, c.o.kind === "file" ? pickedFile(c.o) : c.o.ci === (state.preview ?? state.selected), side]);
     }
   }
   const key = paths.map((q) => q.map((v) => (typeof v === "number" ? v.toFixed(1) : v)).join(",")).join(";");
@@ -808,7 +780,7 @@ function logActivity(kind, path, c, session) {
 // Each frame: every glow fades by its age; a glow past its life is dropped.
 const _gc = new THREE.Color();
 function stepGlows() {
-  const now = performance.now(), a = fileGlow.instanceMatrix.array, lit = new Set(), pop = new Map(); // ci → [colour, strength] for its label
+  const now = performance.now(), a = fileGlow.instanceMatrix.array, lit = new Set(), pop = new Map(), popFile = new Map(); // ci, or "ci:fi" → [colour, strength] for its label
   let filesDirty = false;
   for (const ci of C.keys()) compBlocks[ci].material.emissive?.setRGB(0, 0, 0);
   for (const [key, g] of glows) {
@@ -817,6 +789,7 @@ function stepGlows() {
     // A quick flare, then a long ease out.
     const k = Math.min(1, age * 12) * Math.pow(1 - age, 1.6);
     if (!pop.has(g.ci) || pop.get(g.ci)[1] < k) pop.set(g.ci, [spec.color, k]);
+    if (g.fi >= 0) { const f = `${g.ci}:${g.fi}`; if (!popFile.has(f) || popFile.get(f)[1] < k) popFile.set(f, [spec.color, k]); }
     if (g.fi < 0) {
       lit.add(g.ci);
       const b = compBlocks[g.ci], h = haloOf(g.ci), on = b.visible && !state.split;
@@ -836,9 +809,9 @@ function stepGlows() {
   for (const [ci, h] of compGlow.entries()) if (h && !lit.has(ci)) h.visible = false;
   if (filesDirty || glows.size) { fileGlow.instanceMatrix.needsUpdate = true; fileGlow.instanceColor.needsUpdate = true; }
   fileGlow.visible = state.split;
-  // A touched component's label takes a dark shade of the glow's colour, fading with it.
-  for (const t of tags) {
-    const p = pop.get(t.ci), e = t.element;
+  // A touched component's label takes a dark shade of the glow's colour, fading with it, and so does a touched file's.
+  for (const t of [...tags, ...fileTags]) {
+    const p = t.kind === "file" ? (t.visible ? popFile.get(`${t.ci}:${t.fi}`) : undefined) : pop.get(t.ci), e = t.element;
     if (!p) { if (e.dataset.lit) { e.style.background = ""; e.style.color = ""; delete e.dataset.lit; } continue; }
     const [c, k] = p;
     e.dataset.lit = "1";
@@ -906,7 +879,9 @@ renderer.domElement.addEventListener("pointerup", (e) => {
   const u = pick(e);
   if (!u) { state.selected = null; state.file = null; }
   else { state.selected = u.ci; state.file = u.kind === "file" ? [u.ci, u.fi] : null; }
-  paint(); drawSide();
+  // Where files carry the names, a file picked in the scene is named, wherever it ranks.
+  if (alone() != null) retarget(); else paint();
+  drawSide();
 });
 
 // Double-click steps into a platform or block, so only that slice stands; double-click empty ground, or Esc, steps out.
@@ -1058,7 +1033,7 @@ function drawNote() {
     `Footprint: ${fm.label.toLowerCase()}, ${fm.how}. Every measure shares the same total area, so a footprint is that component's share; area, not side, is the quantity.`,
     `Height and color: ${HEIGHT.map((m) => m.label.toLowerCase() + " = " + m.how).join("; ")}. ${LANDED ? `${inWin - (state.big ? 0 : bigIn.length)} landings count in this window (${w.from === "0000" ? "from " + D.landings.at(-1).date : "from " + w.from} to ${LATEST}).` : `No landing was read: the project has no commits yet, none that touch a component, or no git history here, so every block stands flat and the footprints alone carry the view.`} In component view, a landing counts toward every component it touches, tests and specs included; in file view, only the files mass counts.`,
     state.big ? `Landings over ${BIG} files are included (${bigIn.length} in this window). Bulk moves like these tower over everything else.` : `Left out of heights: the ${bigIn.length} landing${bigIn.length === 1 ? "" : "s"} in this window that touch${bigIn.length === 1 ? "es" : ""} more than ${BIG} files${bigIn.length ? " (" + bigIn.slice(0, 3).map((l) => l.subject.slice(0, 48)).join("; ") + (bigIn.length > 3 ? "; …" : "") + ")" : ""}. Bulk moves like these touch every component at once and say nothing about any one of them; ordinary merged pull requests stay in.`,
-    `Position: components that land together sit closer. Distance comes from the co-change share (landings touching both ÷ landings touching either) over all ${D.landings.length} landings with 40 or fewer files, settled by a force layout and then spaced so no footprint overlaps at its largest. Read it as neighbourhoods, not measured distances; it doesn't change with the window or measure.`,
+    `Position: components that land together sit closer. Distance comes from the co-change share (landings touching both ÷ landings touching either) over all ${D.landings.length} landings with 40 or fewer files, settled by a force layout and then spaced so no footprint overlaps at its largest. Read it as neighbourhoods, not measured distances; it doesn't change with the window or measure. Inside a block, files that land together stand together the same way, each with its share of the block's area by lines.`,
     ...(D.unrun ? [`No run has graded these specs yet, so no enforcement reaches any file: Unreached equals Lines, and Refutations and Defects are zero everywhere. Invariants and Crossings count the bullets the specs declare.`] : []),
     ...(C.some((c) => c.virtual) ? [`Folders with no spec: inside a component that holds other components, the code none of them claims is split by the folder that holds it (three code files or more), and each folder stands as a district with an italic name and a dashed survey line. A folder holding most of that code is opened into its subfolders. A district has no invariants, so on the Invariants footprint the unclaimed land disappears. Mass counts a district in its component's own files; files loose in the component's folder stay in its own block.`] : []),
     `Nesting: a component whose folder sits inside another component's folder stands on that component's platform. Platforms here: ${C.filter((_, ci) => kids[ci].length).map((c) => c.name).join(", ")}. The block marked as a component's own files holds what none of the components inside it claims. A platform spans what stands on it plus a ${MARGIN}-unit margin, so its size is not a measure.`,

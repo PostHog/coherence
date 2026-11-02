@@ -10,6 +10,7 @@
 import type { ReliefFileLanded } from "../../relief/relief.ts";
 import { defectsOfJournal } from "../derive.ts";
 import type { ShellState } from "../model.ts";
+import type { ReliefLayout } from "./layout.ts";
 import { flowBoundsText, flowOf, flowPartialText } from "../structure-flow.ts";
 
 export type { ReliefFileLanded };
@@ -55,6 +56,8 @@ export interface ReliefData {
   relies: [number, number, number, number, [string, number, string][]][];
   /** What the reading of the component interfaces was bounded to, and whether it stopped short: said first in the notes. */
   notes: string[];
+  /** Where the components stood when the server last laid them out: the scene settles from it. */
+  layout?: ReliefLayout;
 }
 
 /**
@@ -91,6 +94,11 @@ export function openDefectsKey(records: ShellState["journal"]["records"]): strin
  * an append to the journal that opens or closes no defect joins nothing.
  */
 export function reliefInputs(state: ShellState): readonly unknown[] {
+  return [...placementInputs(state), state.reliefLayout];
+}
+
+/** What the relief's places are laid out from: everything its data reads but the layout it is seeded with. */
+export function placementInputs(state: ShellState): readonly unknown[] {
   return [state.project, state.relief, state.spec, state.componentInterfaces, openDefectsKey(state.journal.records)];
 }
 
@@ -175,5 +183,6 @@ export function reliefData(state: ShellState): ReliefData | { absent: string } {
     landings: reading.landings,
     notes: reliefNotes(state),
     relies: [...pairs.values()].map((p) => [p.a, p.b, p.sites, p.values, p.symbols.sort((x, y) => y[1] - x[1]).slice(0, 6)]),
+    ...(state.reliefLayout === undefined ? {} : { layout: state.reliefLayout }),
   };
 }
