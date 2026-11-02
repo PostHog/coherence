@@ -51,9 +51,9 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
 import { RpcError } from "../../adapters/jsonrpc.ts";
@@ -104,6 +104,30 @@ const SESSION_FAILURE = /Debug Failure/;
  */
 export function lastingRefusal(error: unknown): error is RpcError {
   return error instanceof RpcError && !TRANSIENT_CODES.has(error.code) && !SESSION_FAILURE.test(error.detail);
+}
+
+/**
+ * `words` with every spelling of `root` in them (its path and its real path, each also as a file URL) made
+ * project-relative: a file under it by its relative path, the root itself as ".". A refusal's words are the
+ * server's, which may name the file it was asked about by its absolute path; kept so, a worktree that reused
+ * them would name the folder of the worktree that asked.
+ */
+export function rootless(root: string, words: string): string {
+  const roots = new Set([resolve(root)]);
+  try {
+    roots.add(realpathSync(root));
+  } catch {
+    // A root that cannot be resolved is named as given.
+  }
+  let said = words;
+  for (const at of [...roots].sort((a, b) => b.length - a.length)) {
+    if (dirname(at) === at) continue;
+    for (const form of [pathToFileURL(at).href, at]) {
+      for (const separator of new Set(["/", sep])) said = said.split(`${form}${separator}`).join("");
+      said = said.split(form).join(".");
+    }
+  }
+  return said;
 }
 
 /** One kept answer and what it depends on: the files it names and the names that, spelled in a changed file, could change it. */
@@ -402,11 +426,12 @@ export class KeptAnswers {
   /**
    * Keep the server's refusal of `definition`'s references (a lastingRefusal), as broad: any change to the tree
    * drops it. A refusal names no files it rests on (a stack overflow may come from types in a file that never
-   * spells the name), so only an unchanged tree is sure to be refused again.
+   * spells the name), so only an unchanged tree is sure to be refused again. The reason is kept with this tree's
+   * root made project-relative, since another worktree of the repository may reuse it.
    */
   keepFailed(definition: Definition, reason: string): void {
     this.asked += 1;
-    this.failures.set(referencesKey(definition), { answer: reason, files: [definition.file], spellings: [], module: definition.file, broad: true });
+    this.failures.set(referencesKey(definition), { answer: rootless(this.root, reason), files: [definition.file], spellings: [], module: definition.file, broad: true });
   }
 
   /** A question asked of the server that failed and is not kept: still asked anew. */

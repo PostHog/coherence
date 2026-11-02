@@ -741,6 +741,36 @@ test("a project in a folder its surrounding repository does not track writes not
   }
 });
 
+test("a refusal the repository keeps names no worktree's folder: a new worktree of the same commit reuses it and never starts the server, and one whose tree differs asks again", async () => {
+  const { top, git, remove } = repository(ROUTED);
+  const outside = mkdtempSync(join(tmpdir(), "coherence-worktrees-"));
+  try {
+    // The server's words name the file it refused by its absolute path, as tsserver's do.
+    const refusing = new TextServer(top);
+    refusing.refuse.set("src/store/rows.ts", `Could not find source file: '${join(realpathSync(top), "src", "store", "rows.ts")}'.`);
+    await readComponentInterfaces(top, refusing);
+    const fresh = join(outside, "fresh");
+    git(top, "worktree", "add", "-q", fresh);
+    const server = new TextServer(fresh);
+    const reused = await readComponentInterfaces(fresh, server);
+    assert.equal(server.started, 0, "the refusal is reused: the server never starts");
+    assert.ok(reused.kind === "read" && reused.kept?.asked === 0, keptLine(reused.kind === "read" ? reused.kept : undefined));
+    const reason = reused.kind === "read" ? reused.unanswered?.find((u) => u.file === "src/store/rows.ts")?.reason : undefined;
+    assert.equal(reason, "textDocument/references: Could not find source file: 'src/store/rows.ts'. (-32603)", "the refused file by its project-relative path, never the asking worktree's folder");
+    // A worktree whose tree differs in any file asks the refused question again.
+    const edited = join(outside, "edited");
+    git(top, "worktree", "add", "-q", "-b", "edited", edited);
+    writeFileSync(join(edited, "src", "report", "report.ts"), `${ROUTED["src/report/report.ts"]!}// edited\n`);
+    git(edited, "commit", "-qam", "edit");
+    const asking = new TextServer(edited);
+    await readComponentInterfaces(edited, asking);
+    assert.ok(asking.started === 1 && asking.asked.includes("put"), `the changed tree asks again: ${asking.asked.join(", ")}`);
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+    remove();
+  }
+});
+
 test("a git older than 2.31, which prints --path-format back as a line, still finds the repository's kept answers", { skip: process.platform === "win32" }, async () => {
   const { top, git, remove } = repository(ROUTED);
   const outside = mkdtempSync(join(tmpdir(), "coherence-worktrees-"));

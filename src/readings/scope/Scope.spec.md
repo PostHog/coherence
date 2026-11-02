@@ -510,6 +510,12 @@ The reading: one surface projecting the model for a human, in eight views: Struc
   crossing: record -> reading
   refuted: named the repository's copy of the kept answers by the basis alone, not the project's folder (sharedKeptPath in src/readings/scope/kept-answers.ts) -> "each project and each basis of a repository keeps its own answers: two projects alike in every basis file, and a branch whose configuration differs, each start a new worktree with nothing asked" went red in component-interfaces.test.ts on its own assertion (the first project in a new worktree: 11 reused, 2 asked anew, the server started once); restored (cmp), green batched and alone (2026-11-02)
   kinds: none
+- a refusal the repository keeps names no worktree's folder: A references question the server refused, kept with the answers, keeps the server's words with the asking tree's root made project-relative (its path and real path, plain or as a file URL), so a new worktree of the same commit reuses the refusal without starting the server and names the refused file by its project-relative path, never the folder of the worktree that asked; a worktree whose tree differs in any file asks the question again.
+  over: a repository whose main checkout was read through a server that refuses one file's references in words naming that file by its absolute path, then a new worktree at the same commit and a worktree on a branch that edits another file
+  via: a refusal the repository keeps names no worktree's folder: a new worktree of the same commit reuses it and never starts the server, and one whose tree differs asks again
+  because: kept refusals (#172) joined the answers the repository's worktrees share (#173), and tsserver's words can name the file by its absolute path, so a new worktree would have named another worktree's folder as its own unanswered file (2026-11-02)
+  crossing: record -> reading
+  kinds: none
 - the kept answers never write into a repository the project is not part of: The repository's copy is kept only where the project's folder is one the checked-out commit tracks (the checkout's top, or a folder of its tree); a project in a folder that only lies inside some checkout, untracked or ignored there, keeps its answers in its own .coherence/structure and writes nothing into that repository's git folder.
   over: a repository with one commit and, inside its checkout, an untracked folder holding a project, read twice
   via: a project in a folder its surrounding repository does not track writes nothing into that repository's git folder
