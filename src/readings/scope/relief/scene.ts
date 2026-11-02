@@ -10,6 +10,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { ReliefData, ReliefFileLanded } from "./data.ts";
+import { MARGIN, placeComponents, type ReliefLayout } from "./layout.ts";
 import type { Touch } from "../../relief/relief.ts";
 
 export type { Touch };
@@ -27,8 +28,8 @@ export interface ReliefIO {
  * so a scene built from new data opens where the old one stood.
  */
 export interface ReliefView {
-  /** Each component's place, and the order its files were laid out in, by path, once they were. */
-  layout: Record<string, { own: number[]; sub: number[]; files?: string[] }>;
+  /** Each component's place, by folder, to seed the next build from. */
+  layout: ReliefLayout;
   foot: string;
   height: string;
   win: string;
@@ -140,7 +141,6 @@ const FL = C.map((c) => (c.files ? null : []));
 
 // ---------- measures ----------
 for (const c of C) for (const m of FOOT) c.v[m.key] ??= 0; // a model without a reading of this measure records none of it
-const totals = {}; for (const m of FOOT) totals[m.key] = C.reduce((a, c) => a + c.v[m.key], 0);
 function churn() {
   const from = WIN.find((w) => w.key === state.win).from;
   const out = (l) => l.date < from || (!state.big && l.n > BIG);
@@ -155,131 +155,24 @@ function churn() {
   return { comp, file };
 }
 
-// ---------- nesting: a component stands on the platform of the nearest component whose folder holds it ----------
-const holds = (outer, inner) => inner !== outer && (outer === "." || inner.startsWith(outer + "/"));
-const parent = C.map((c) => { let best = -1, len = -1; C.forEach((o, oi) => { const l = o.folder === "." ? 0 : o.folder.length; if (!o.virtual && holds(o.folder, c.folder) && l > len) { best = oi; len = l; } }); return best; });
-const kids = C.map((_, ci) => C.map((_, k) => k).filter((k) => parent[k] === ci));
-const level = C.map((_, ci) => { let n = 0; for (let p = parent[ci]; p >= 0; p = parent[p]) n++; return n; });
-const under = (ci) => [ci, ...kids[ci].flatMap(under)]; // a component and everything inside it
-const PLH = 2.4, MARGIN = 5;
+// ---------- placement: nesting, footprints and co-change positions (layout.ts, which the warm server runs too) ----------
+// Each component stands on the platform of the nearest component whose folder holds it, placed by co-change and seeded
+// from where the server last laid it out, else where this page's last build left it, so what was settled stays put.
+const SEED = D.layout ?? carried?.layout ?? {};
+const { parent, kids, level, under, totals, side, ext, tops, P, layout: LAYOUT } = placeComponents(C, D.landings, SEED);
+const PLH = 2.4;
 // A slice is a component with everything inside it, or (own) just the files no component inside it claims.
 const inScope = (ci) => { if (state.own) return ci === state.scope; for (let p = ci; p >= 0; p = parent[p]) if (p === state.scope) return true; return false; };
 const base = (ci) => (level[ci] + (kids[ci].length ? 1 : 0)) * PLH; // components always stand on their parent's platform
 
-// ---------- layout: footprints and co-change positions ----------
-const AREA = 5200; // total footprint area shared by every measure, so shares compare
-const side = (c, key) => (totals[key] ? Math.sqrt((c.v[key] / totals[key]) * AREA) : 0); // a measure nothing has recorded draws nothing
-const maxSide = C.map((c) => Math.max(...FOOT.map((m) => side(c, m.key))));
-// Co-change between components over every landing that touches at most 40 files.
-const sets = C.map(() => new Set());
-D.landings.forEach((l, i) => { if (l.n <= 40) for (const [ci] of l.c) sets[ci].add(i); });
-const subSet = C.map((_, ci) => new Set(under(ci).flatMap((k) => [...sets[k]])));
-const jac = (a, b) => { let inter = 0; for (const x of a) if (b.has(x)) inter++; const uni = a.size + b.size - inter; return uni ? inter / uni : 0; };
-const GAP = 3;
-// Lay out items {hx, hz, set} by co-change, then push apart so no rectangle overlaps at its largest.
-// The last build's layout seeds this one, so the map stays familiar: what was settled starts where it was and
-// only drifts as far as its co-change has really changed; a newcomer starts beside its strongest co-change neighbour.
-const SEED = D.seed ?? carried?.layout ?? {};
-function settle(items) {
-  const n = items.length, J = items.map((a) => items.map((b) => (a === b ? 1 : jac(a.set, b.set))));
-  const rad = items.map((it) => Math.max(it.hx, it.hz));
-  const warm = items.some((it) => it.seed);
-  const P = items.map((it, i) => { if (it.seed) return [...it.seed]; const a = (i / n) * Math.PI * 2; return [Math.cos(a) * 40, Math.sin(a) * 40]; });
-  if (warm) items.forEach((it, i) => {
-    if (it.seed) return;
-    let best = -1; items.forEach((o, j) => { if (o.seed && (best < 0 || J[i][j] > J[i][best])) best = j; });
-    if (best >= 0) P[i] = [P[best][0] + rad[i] + rad[best] + GAP, P[best][1]];
-  });
-  const N = warm ? 300 : 900, heat = warm ? 0.2 : 1;
-  for (let it = 0; it < N; it++) {
-    const t = (1 - it / N) * heat;
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-      const dx = P[j][0] - P[i][0], dz = P[j][1] - P[i][1], d = Math.hypot(dx, dz) || 0.01;
-      // Strangers sit apart by up to 26, never more than half their own size, so small neighbourhoods stay tight at every depth.
-      const want = (rad[i] + rad[j]) * 1.08 + GAP + (1 - J[i][j]) * Math.min(26, (rad[i] + rad[j]) * 0.5);
-      const f = (d - want) * 0.02 * t, ux = dx / d, uz = dz / d;
-      P[i][0] += ux * f; P[i][1] += uz * f; P[j][0] -= ux * f; P[j][1] -= uz * f;
-    }
-    // A seeded item is held to where the last build left it; only a lasting pull moves it far.
-    if (warm) items.forEach((o, i) => { if (o.seed) { P[i][0] += (o.seed[0] - P[i][0]) * 0.1; P[i][1] += (o.seed[1] - P[i][1]) * 0.1; } });
-  }
-  for (let it = 0; it < 400; it++) {
-    let moved = false;
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-      const dx = P[j][0] - P[i][0], dz = P[j][1] - P[i][1];
-      const ox = items[i].hx + items[j].hx + GAP - Math.abs(dx), oz = items[i].hz + items[j].hz + GAP - Math.abs(dz);
-      if (ox > 0 && oz > 0) {
-        moved = true;
-        if (ox < oz) { const s = Math.sign(dx) || 1; P[i][0] -= s * ox / 2; P[j][0] += s * ox / 2; }
-        else { const s = Math.sign(dz) || 1; P[i][1] -= s * oz / 2; P[j][1] += s * oz / 2; }
-      }
-    }
-    if (!moved) break;
-  }
-  return P;
-}
-// Deepest first, each platform settles its own block beside its children's subtrees, and each subtree then moves as one piece.
-const own = C.map(() => [0, 0]), sub = C.map(() => [0, 0]);
-const ext = C.map((_, ci) => [maxSide[ci] / 2, maxSide[ci] / 2]);
-for (const ci of C.map((_, i) => i).sort((a, b) => level[b] - level[a])) {
-  if (!kids[ci].length) continue;
-  const items = [{ hx: maxSide[ci] / 2, hz: maxSide[ci] / 2, set: sets[ci], seed: SEED[C[ci].folder]?.own }, ...kids[ci].map((k) => ({ hx: ext[k][0], hz: ext[k][1], set: subSet[k], seed: SEED[C[k].folder]?.sub }))];
-  const Q = settle(items);
-  const box = [Infinity, Infinity, -Infinity, -Infinity];
-  items.forEach((it, i) => { box[0] = Math.min(box[0], Q[i][0] - it.hx); box[1] = Math.min(box[1], Q[i][1] - it.hz); box[2] = Math.max(box[2], Q[i][0] + it.hx); box[3] = Math.max(box[3], Q[i][1] + it.hz); });
-  const mx = (box[0] + box[2]) / 2, mz = (box[1] + box[3]) / 2;
-  own[ci] = [Q[0][0] - mx, Q[0][1] - mz];
-  kids[ci].forEach((k, i) => { sub[k] = [Q[i + 1][0] - mx, Q[i + 1][1] - mz]; });
-  ext[ci] = [(box[2] - box[0]) / 2 + MARGIN, (box[3] - box[1]) / 2 + MARGIN];
-}
-const tops = C.map((_, i) => i).filter((i) => parent[i] < 0);
-const at = C.map(() => [0, 0]); // centre of each subtree
-if (tops.length > 1) { const Q = settle(tops.map((t) => ({ hx: ext[t][0], hz: ext[t][1], set: subSet[t] }))); tops.forEach((t, i) => { at[t] = Q[i]; }); }
-for (const ci of C.map((_, i) => i).sort((a, b) => level[a] - level[b])) if (parent[ci] >= 0) at[ci] = [at[parent[ci]][0] + sub[ci][0], at[parent[ci]][1] + sub[ci][1]];
-const P = C.map((_, ci) => [at[ci][0] + own[ci][0], at[ci][1] + own[ci][1]]);
-const LAYOUT = Object.fromEntries(C.map((c, ci) => [c.folder, { own: own[ci].map((v) => +v.toFixed(3)), sub: sub[ci].map((v) => +v.toFixed(3)) }]));
-
-// A component's files inside its lines footprint, placed by co-change as components are: files are clustered by their
-// co-change share over landings of 40 files or fewer (average linkage), and the clusters' order, read leaf by leaf, is
-// laid out in squarified rows that keep it, so files that land together stand side by side, every file keeps its share
-// of the area by lines, and no file is cut into a sliver. Files that share no landing are paired smallest first.
-// A rebuild keeps the order the last build laid out, as components keep their places: a file new to it goes in just
-// after the file it lands with most, and a file gone from it drops out, so one landing never reshuffles a block.
-function fileMap(files, x, y, w, h, seed) {
-  const n = files.length;
-  if (!n) return { rects: [], order: [] };
-  const landed = files.map((f) => new Set((f.l ?? []).filter(([li]) => D.landings[li].n <= 40).map(([li]) => li)));
-  const sized = files.map((f) => ({ v: Math.max(1, f.lines) }));
-  if (seed) {
-    const at = new Map(files.map((f, i) => [f.file, i]));
-    const order = seed.filter((p) => at.has(p)).map((p) => at.get(p)), kept = new Set(order);
-    for (const i of files.map((_, i) => i).filter((i) => !kept.has(i)).sort((a, b) => files[b].lines - files[a].lines)) {
-      let best = -1, share = 0;
-      order.forEach((j, k) => { const s = jac(landed[i], landed[j]); if (s > share) { share = s; best = k; } });
-      order.splice(best < 0 ? order.length : best + 1, 0, i);
-    }
-    return { rects: treemap(sized, x, y, w, h, order), order: order.map((i) => files[i].file) };
-  }
-  const node = files.map((f, i) => ({ v: Math.max(1, f.lines), leaf: i })), size = node.map(() => 1);
-  const S = files.map((_, i) => files.map((_, j) => (i === j ? 0 : jac(landed[i], landed[j]))));
-  let alive = node.map((_, i) => i);
-  while (alive.length > 1) {
-    let a = -1, b = -1, best = 0;
-    for (let p = 0; p < alive.length; p++) for (let q = p + 1; q < alive.length; q++) { const s = S[alive[p]][alive[q]]; if (s > best) { best = s; a = alive[p]; b = alive[q]; } }
-    if (best <= 0) [a, b] = [...alive].sort((i, j) => node[i].v - node[j].v);
-    for (const k of alive) if (k !== a && k !== b) S[a][k] = S[k][a] = (S[a][k] * size[a] + S[b][k] * size[b]) / (size[a] + size[b]);
-    node[a] = { v: node[a].v + node[b].v, kids: [node[a], node[b]] }; size[a] += size[b];
-    alive = alive.filter((k) => k !== b);
-  }
-  const order = [];
-  (function walk(t) { if (t.kids) { walk(t.kids[0]); walk(t.kids[1]); } else order.push(t.leaf); })(node[alive[0]]);
-  return { rects: treemap(sized, x, y, w, h, order), order: order.map((i) => files[i].file) };
-}
-// Squarified treemap: rows of near-square rectangles, biggest first, or in the order given.
-function treemap(items, x, y, w, h, keep) {
+// A component's files inside its lines footprint, in the order they arrive: the server orders them so files that land
+// together stand side by side and a landing never reshuffles a block (layout.ts fileOrder), and rows keep that order.
+const fileMap = (files, x, y, w, h) => treemap(files.map((f) => ({ v: Math.max(1, f.lines) })), x, y, w, h);
+// Squarified treemap in the order given: rows of near-square rectangles, each row taking the next items.
+function treemap(items, x, y, w, h) {
   const out = new Array(items.length);
   const total = items.reduce((a, it) => a + it.v, 0) || 1;
-  const order = keep ? keep.map((i) => [items[i].v, i]) : items.map((it, i) => [it.v, i]).sort((a, b) => b[0] - a[0]);
+  const order = items.map((it, i) => [it.v, i]);
   let rect = { x, y, w, h }, rest = order.slice(), scale = (w * h) / total;
   while (rest.length) {
     const short = Math.min(rect.w, rect.h); let row = [], best = Infinity;
@@ -429,10 +322,8 @@ const SETS = [[fileMesh, ghostFile], [addMesh, ghostAdd], [delMesh, ghostDel]];
 const FS = { faded: new Uint8Array(NF), cur: new Float32Array(NF * 6), to: new Float32Array(NF * 6), now: new Float32Array(NF * 6), capCur: new Float32Array(NF * 2), capTo: new Float32Array(NF * 2), capNow: new Float32Array(NF * 2), t: new Float32Array(NF), hide: false, settled: false };
 const selBox = new THREE.LineSegments(unitEdges, new THREE.LineBasicMaterial({ color: 0xff8a4c })); selBox.visible = false; world.add(selBox);
 const fileRects = C.map((c) => null); // treemaps of each component's files in its lines footprint, relative to its centre
-// The order each component's files were laid out in, by path: this build's, or, for files it never loaded, the last build's.
-const fileOrder = C.map((c) => SEED[c.folder]?.files ?? null);
 function rectsOf(ci) {
-  if (!fileRects[ci]) { const s = side(C[ci], "lines"), laid = fileMap(FL[ci], -s / 2, -s / 2, s, s, SEED[C[ci].folder]?.files); fileRects[ci] = laid.rects; fileOrder[ci] = laid.order; }
+  if (!fileRects[ci]) { const s = side(C[ci], "lines"); fileRects[ci] = fileMap(FL[ci], -s / 2, -s / 2, s, s); }
   return fileRects[ci];
 }
 const outlines = C.map(() => {
@@ -1231,7 +1122,7 @@ return {
   view() {
     const file = state.file ? [C[state.file[0]].folder, FL[state.file[0]][state.file[1]].file] : pendingFile;
     return {
-      layout: Object.fromEntries(C.map((c, ci) => [c.folder, fileOrder[ci] ? { ...LAYOUT[c.folder], files: fileOrder[ci] } : LAYOUT[c.folder]])), foot: state.foot, height: state.height, win: state.win, split: state.split, big: state.big,
+      layout: LAYOUT, foot: state.foot, height: state.height, win: state.win, split: state.split, big: state.big,
       scope: C[state.scope].folder, own: state.own, selected: state.selected == null ? null : C[state.selected].folder, file,
       camera: { view: lastView, position: camera.position.toArray(), target: controls.target.toArray() },
       diff: diffOffered ? { a: $("selA").value, b: $("selB").value } : null,

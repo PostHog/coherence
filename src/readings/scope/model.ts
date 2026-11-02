@@ -445,6 +445,7 @@ export type JournalStepOutcome = { result: "done"; evidence?: string } | { resul
 import type { WorkOrder } from "../../journal/work.ts";
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import type { ReliefReading } from "../relief/relief.ts";
+import type { ReliefLayout } from "./relief/layout.ts";
 import type { LanguageData } from "./language-data.ts";
 import type { LanguagesRead } from "./languages-read.ts";
 export type { WorkOrder };
@@ -724,6 +725,8 @@ export interface ShellState {
   componentInterfaces: InterfaceReading;
   /** What the Structure view draws that the rest of the state does not hold: files, districts and landings (relief.ts). Absent from a page built before it. */
   relief?: ReliefReading;
+  /** Where the relief's components stood when the server last laid them out (relief/layout-store.ts): the page settles from it. Absent where nothing laid it out. */
+  reliefLayout?: ReliefLayout;
   components: ComponentsViewState;
   structure: StructureViewState;
   invariants: InvariantsViewState;

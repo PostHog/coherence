@@ -41,6 +41,7 @@ import { loadSpecModel, projectPractices, type SpecModel } from "../../spec/mode
 import { KERNEL_PREFIX } from "../../spec/practices.ts";
 import { pageCoverage } from "./coverage-reading.ts";
 import type { ReliefReading } from "../relief/relief.ts";
+import type { ReliefLayout } from "./relief/layout.ts";
 import { windowJournal, windowRuns } from "./derive.ts";
 import { parseLexicon, type CoverageUnread, type Lexicon, type LexiconCoverage, type InterfaceReading, type Ladder, type PracticesData, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
 import { DEFAULT_VIEW, VIEWS } from "./shell.ts";
@@ -79,6 +80,8 @@ export interface BuildOptions {
   coverage?: LexiconCoverage | CoverageUnread;
   /** What the Structure view draws beyond the spec: files, districts and landings (readRelief); unread when absent. */
   relief?: ReliefReading;
+  /** The relief's places for the state built (relief/layout-store.ts LayoutKeeper): none when absent, and the page lays it out afresh. */
+  reliefLayout?: (state: ShellState) => ReliefLayout | undefined;
 }
 
 export const DEFAULTS = {
@@ -292,7 +295,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
       }
     }
   }
-  return {
+  const state: ShellState = {
     project: options.project,
     views: VIEWS.map((v) => ({ id: v.id, label: v.label })),
     activeView: options.structurePreview === undefined || options.structurePreview.length === 0 ? DEFAULT_VIEW : "structure",
@@ -310,6 +313,9 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     runsView: { query: "" },
     journalView: { query: "", kind: "", agent: "", session: "" },
   };
+  const layout = options.reliefLayout?.(state);
+  if (layout !== undefined) state.reliefLayout = layout;
+  return state;
 }
 
 /**
