@@ -40,19 +40,27 @@
  * used silently: the reading carries how many it reused and asked, and how
  * many files had changed.
  *
+ * Every save also keeps the answers in the repository's git common folder,
+ * which all its worktrees share, named by the project's folder within the
+ * repository and the basis; a worktree with no answers of its own that hold
+ * starts from that copy, so a new worktree asks only what its tree changed.
+ * Only a folder the repository tracks shares: one that merely lies inside
+ * some checkout writes nothing into it.
+ *
  * Node-only; the browser bundle never imports it.
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
 import { RpcError } from "../../adapters/jsonrpc.ts";
 import { closureOf } from "../../enforcement/code-fingerprint.ts";
 import { isBasisFile, languageCode, parsedOf, serverExtensions } from "../../plugins/languages.ts";
 import type { KeptReport } from "./model.ts";
+import { sharedStructureDir, writeAtomically } from "./shared-structure.ts";
 
 /** Where each language's kept answers live: transient, beside the recorded reading. */
 const KEPT_DIR = join(".coherence", "structure");
@@ -98,6 +106,30 @@ export function lastingRefusal(error: unknown): error is RpcError {
   return error instanceof RpcError && !TRANSIENT_CODES.has(error.code) && !SESSION_FAILURE.test(error.detail);
 }
 
+/**
+ * `words` with every spelling of `root` in them (its path and its real path, each also as a file URL) made
+ * project-relative: a file under it by its relative path, the root itself as ".". A refusal's words are the
+ * server's, which may name the file it was asked about by its absolute path; kept so, a worktree that reused
+ * them would name the folder of the worktree that asked.
+ */
+export function rootless(root: string, words: string): string {
+  const roots = new Set([resolve(root)]);
+  try {
+    roots.add(realpathSync(root));
+  } catch {
+    // A root that cannot be resolved is named as given.
+  }
+  let said = words;
+  for (const at of [...roots].sort((a, b) => b.length - a.length)) {
+    if (dirname(at) === at) continue;
+    for (const form of [pathToFileURL(at).href, at]) {
+      for (const separator of new Set(["/", sep])) said = said.split(`${form}${separator}`).join("");
+      said = said.split(form).join(".");
+    }
+  }
+  return said;
+}
+
 /** One kept answer and what it depends on: the files it names and the names that, spelled in a changed file, could change it. */
 interface Kept<T> {
   answer: T;
@@ -121,6 +153,44 @@ interface KeptFile {
 
 function keptPath(root: string, language: Language): string {
   return join(root, KEPT_DIR, `answers-${language}.json`);
+}
+
+/** How many sets of answers the repository keeps per project and language, each for one basis: the rest, least recently saved, are removed. */
+const SHARED_KEPT = 4;
+
+/**
+ * The answers any worktree of `root`'s repository kept for this project and
+ * this basis, which seed a worktree that has none of its own that hold. Named
+ * by a digest of the project's folder within the repository and one of the
+ * basis, which a reading works out from files alone before it
+ * asks anything, so two projects of one repository, or two branches whose
+ * manifests or lockfiles differ, each keep their own and never overwrite the
+ * other's.
+ */
+function sharedKeptPath(root: string, language: Language, basis: Record<string, string>): string | undefined {
+  const shared = sharedStructureDir(root);
+  if (shared === undefined) return undefined;
+  const project = digest(shared.prefix).slice(0, 8);
+  const key = digest(JSON.stringify(Object.entries(basis).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))).slice(0, 16);
+  return join(shared.dir, `answers-${language}-${project}-${key}.json`);
+}
+
+/** Remove the repository's answers for this project and language beyond the SHARED_KEPT most recently saved; `path` is the one just saved. */
+function pruneShared(path: string): void {
+  const dir = dirname(path);
+  const project = basename(path).replace(/[0-9a-f]{16}\.json$/, "");
+  const own = (file: string): boolean => file.startsWith(project) && /^[0-9a-f]{16}\.json$/.test(file.slice(project.length));
+  const kept: { file: string; at: number }[] = [];
+  for (const file of readdirSync(dir)) {
+    if (!own(file)) continue;
+    try {
+      kept.push({ file, at: statSync(join(dir, file)).mtimeMs });
+    } catch {
+      // Removed by another worktree's save meanwhile.
+    }
+  }
+  kept.sort((a, b) => b.at - a.at || a.file.localeCompare(b.file));
+  for (const { file } of kept.slice(SHARED_KEPT)) if (join(dir, file) !== path) rmSync(join(dir, file), { force: true });
 }
 
 function digest(text: Buffer | string): string {
@@ -294,9 +364,17 @@ export class KeptAnswers {
     return new KeptAnswers(root, language, files, ignore, testFolders);
   }
 
-  /** The kept file, or why nothing kept is used. */
+  /** The kept file: the worktree's own, else the repository's for this project and basis; or why nothing kept is used, the own file's reason first. */
   private load(): KeptFile | string {
-    const path = keptPath(this.root, this.language);
+    const own = this.read(keptPath(this.root, this.language));
+    if (typeof own !== "string") return own;
+    const shared = sharedKeptPath(this.root, this.language, this.basis);
+    const seeded = shared === undefined ? own : this.read(shared);
+    return typeof seeded === "string" ? own : seeded;
+  }
+
+  /** One kept file, or why it is not used. */
+  private read(path: string): KeptFile | string {
     if (!existsSync(path)) return "no answers were kept for this tree yet";
     let kept: KeptFile;
     try {
@@ -348,11 +426,12 @@ export class KeptAnswers {
   /**
    * Keep the server's refusal of `definition`'s references (a lastingRefusal), as broad: any change to the tree
    * drops it. A refusal names no files it rests on (a stack overflow may come from types in a file that never
-   * spells the name), so only an unchanged tree is sure to be refused again.
+   * spells the name), so only an unchanged tree is sure to be refused again. The reason is kept with this tree's
+   * root made project-relative, since another worktree of the repository may reuse it.
    */
   keepFailed(definition: Definition, reason: string): void {
     this.asked += 1;
-    this.failures.set(referencesKey(definition), { answer: reason, files: [definition.file], spellings: [], module: definition.file, broad: true });
+    this.failures.set(referencesKey(definition), { answer: rootless(this.root, reason), files: [definition.file], spellings: [], module: definition.file, broad: true });
   }
 
   /** A question asked of the server that failed and is not kept: still asked anew. */
@@ -376,14 +455,16 @@ export class KeptAnswers {
       references: Object.fromEntries([...this.references].sort(([a], [b]) => a.localeCompare(b))),
       failures: Object.fromEntries([...this.failures].sort(([a], [b]) => a.localeCompare(b))),
     };
-    const path = keptPath(this.root, this.language);
-    try {
-      mkdirSync(dirname(path), { recursive: true });
-      const temporary = `${path}.${process.pid}.tmp`;
-      writeFileSync(temporary, JSON.stringify(kept), "utf8");
-      renameSync(temporary, path);
-    } catch {
-      // Answers that cannot be kept only mean the next reading asks the server again.
+    const text = JSON.stringify(kept);
+    const shared = sharedKeptPath(this.root, this.language, this.basis);
+    for (const path of [keptPath(this.root, this.language), shared]) {
+      if (path === undefined) continue;
+      try {
+        writeAtomically(path, text);
+        if (path === shared) pruneShared(shared);
+      } catch {
+        // Answers that cannot be kept only mean the next reading asks the server again.
+      }
     }
   }
 }

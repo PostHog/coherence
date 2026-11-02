@@ -16,6 +16,7 @@ import { WRITERS } from "./host-tools.ts";
 import { IGNORE_FILE } from "./install.ts";
 import { installMod, localSettingsPath, MARKETPLACE_FILE, MOD_FOLDER, MOD_ID, MOD_REPOSITORY, modInstalled, type ClaudeRunner } from "./mod-install.ts";
 import { cli } from "./cli-fixture.ts";
+import { oldGit } from "../adapters/old-git-fixture.ts";
 
 const OWN_PACKAGE = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (path: string): unknown => JSON.parse(readFileSync(join(OWN_PACKAGE, path), "utf8"));
@@ -160,6 +161,30 @@ test("hooks install --mod --shared enables the mod in the committed settings in 
     const after = JSON.parse(await readFile(join(project, ".claude", "settings.json"), "utf8")) as { extraKnownMarketplaces?: Record<string, unknown> };
     assert.deepEqual(Object.keys(after.extraKnownMarketplaces ?? {}), ["other"], "only the declaration install wrote leaves");
   } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("the local settings of a git worktree are the main checkout's through a git older than 2.31, and a git hook's GIT_DIR never answers for them", { skip: process.platform === "win32" }, async () => {
+  const project = await mkdtemp(join(tmpdir(), "coherence-mod-git-"));
+  const restore = oldGit();
+  const hookDir = process.env["GIT_DIR"];
+  try {
+    const git = (...args: string[]) => assert.equal(spawnSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: project }).status, 0, args.join(" "));
+    git("init", "-q");
+    git("commit", "-q", "--allow-empty", "-m", "start");
+    const tree = join(project, "tree");
+    git("worktree", "add", "-q", tree);
+    const main = realpathSync(project);
+    const folderOf = (root: string): string => realpathSync(dirname(dirname(localSettingsPath(root))));
+    assert.equal(folderOf(tree), main, "the old git's echoed --path-format is never read as the common folder");
+    assert.equal(folderOf(project), main, "the main checkout's own");
+    process.env["GIT_DIR"] = join(tmpdir(), "no-such-repository.git");
+    assert.equal(folderOf(tree), main, "a hook's GIT_DIR never answers for the folder asked about");
+  } finally {
+    if (hookDir === undefined) delete process.env["GIT_DIR"];
+    else process.env["GIT_DIR"] = hookDir;
+    restore();
     await rm(project, { recursive: true, force: true });
   }
 });

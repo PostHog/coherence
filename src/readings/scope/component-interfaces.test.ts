@@ -16,7 +16,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +26,7 @@ import { PythonAdapter } from "../../../plugins/python/python.ts";
 import { TypeScriptAdapter } from "../../../plugins/typescript/typescript.ts";
 import { RpcError } from "../../adapters/jsonrpc.ts";
 import { projectFiles } from "../../adapters/project-files.ts";
+import { oldGit } from "../../adapters/old-git-fixture.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
@@ -37,11 +38,12 @@ import { loadSpecModel } from "../../spec/model.ts";
 import { parseSpec } from "../../spec/grammar.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { adapterCode, keptLine } from "./kept-answers.ts";
+import { sharedStructureDir } from "./shared-structure.ts";
 import { STRUCTURE_DIR, lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
 import { readInterfacesApart } from "./apart.ts";
 import type { InterfaceReading } from "./model.ts";
 import { bothWays, sameMap } from "./both-ways.ts";
-import { checked, routedProject } from "./routed-fixture.ts";
+import { checked, ROUTED, routedProject } from "./routed-fixture.ts";
 import { scopedUnsettled } from "./scoped-route.ts";
 import { reliefNotes } from "./relief/data.ts";
 import { flowOf } from "./structure-flow.ts";
@@ -556,6 +558,7 @@ test("the interface reading on a worker thread is the reading in process: each q
 
     // A server that never answers, asked again since nothing is kept, and a stop: the reading is refused and its worker ended.
     rmSync(join(root, STRUCTURE_DIR), { recursive: true, force: true });
+    rmSync(sharedStructureDir(root)!.dir, { recursive: true, force: true });
     const silent = { ...new TextServer(root), language: "typescript", ready: () => new Promise<never>(() => {}) } as unknown as LanguageAdapter;
     const stop = new AbortController();
     let asked = false;
@@ -641,6 +644,146 @@ test("kept answers are never used silently: when what the server's answers rest 
     const broken = await readComponentInterfaces(root, new TextServer(root));
     assert.equal(broken.kind === "read" && broken.kept?.whole, "the kept answers are unreadable");
   } finally {
+    remove();
+  }
+});
+
+test("a new git worktree of the repository starts from the answers another worktree kept: nothing is asked and the server never starts", async () => {
+  const { root, remove } = routedProject();
+  const other = mkdtempSync(join(tmpdir(), "coherence-worktree-"));
+  const worktree = join(other, "second");
+  try {
+    const git = (...args: string[]): void => void execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: root });
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-qm", "tree");
+    git("worktree", "add", "-q", worktree);
+    await readComponentInterfaces(root, new TextServer(root));
+    const server = new TextServer(worktree);
+    const seeded = await readComponentInterfaces(worktree, server);
+    assert.equal(server.started, 0, "the server never starts");
+    assert.ok(seeded.kind === "read" && seeded.kept?.asked === 0 && seeded.kept.reused > 0, keptLine(seeded.kind === "read" ? seeded.kept : undefined));
+    const alone = await readComponentInterfaces(root, new TextServer(root), { keep: false });
+    assert.deepEqual(mapOf(seeded), mapOf(alone), "the seeded map is the one a reading asking everything draws");
+    assert.ok(existsSync(join(worktree, ".coherence", "structure", "answers-typescript.json")), "the worktree keeps its own answers from then on");
+  } finally {
+    rmSync(other, { recursive: true, force: true });
+    remove();
+  }
+});
+
+/** A git repository at a fresh temporary top holding `files`, committed, with a way to run git in any of its worktrees. */
+function repository(files: Record<string, string>): { top: string; git: (cwd: string, ...args: string[]) => void; remove: () => void } {
+  const { root: top, remove } = project(files);
+  const git = (cwd: string, ...args: string[]): void => void execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd, stdio: "ignore" });
+  git(top, "init", "-q");
+  git(top, "add", "-A");
+  git(top, "commit", "-qm", "tree");
+  return { top, git, remove };
+}
+
+/** Read `root` through a fresh text server: the reading, and whether the server started. */
+async function readFresh(root: string): Promise<{ reading: InterfaceReading; started: number }> {
+  const server = new TextServer(root);
+  const reading = await readComponentInterfaces(root, server);
+  return { reading, started: server.started };
+}
+
+function allReused(what: string, read: { reading: InterfaceReading; started: number }): void {
+  const kept = read.reading.kind === "read" ? read.reading.kept : undefined;
+  assert.ok(read.started === 0 && kept?.asked === 0 && kept.reused > 0, `${what}: ${keptLine(kept)}; the server started ${read.started} times`);
+}
+
+test("each project and each basis of a repository keeps its own answers: two projects alike in every basis file, and a branch whose configuration differs, each start a new worktree with nothing asked", async () => {
+  // Two projects in one repository whose configuration is the same file for file, so their basis matches; only their code differs.
+  const files: Record<string, string> = {};
+  for (const [path, text] of Object.entries(ROUTED)) {
+    files[`one/${path}`] = text;
+    files[`two/${path}`] = path === "src/store/rows.ts" ? "export function put(v: string): string {\n  return v + v;\n}\nexport function count(): number {\n  return 2;\n}\n" : text;
+  }
+  const { top, git, remove } = repository(files);
+  const outside = mkdtempSync(join(tmpdir(), "coherence-worktrees-"));
+  try {
+    await readFresh(join(top, "one"));
+    await readFresh(join(top, "two"));
+    git(top, "worktree", "add", "-q", join(outside, "fresh"));
+    allReused("the first project in a new worktree", await readFresh(join(outside, "fresh", "one")));
+    allReused("the second project in a new worktree", await readFresh(join(outside, "fresh", "two")));
+    // A branch whose tsconfig differs: what the answers rest on differs, so it asks everything once, and keeps its own beside the main line's.
+    git(top, "worktree", "add", "-q", "-b", "strict", join(outside, "strict"));
+    writeFileSync(join(outside, "strict", "one", "tsconfig.json"), JSON.stringify({ ...JSON.parse(ROUTED["tsconfig.json"]!), exclude: ["dist"] }));
+    git(join(outside, "strict"), "commit", "-qam", "strict");
+    const branch = await readFresh(join(outside, "strict", "one"));
+    assert.ok(branch.reading.kind === "read" && branch.reading.kept?.whole !== undefined, "the branch's basis differs, so nothing kept is used");
+    git(top, "worktree", "add", "-q", join(outside, "main-again"), "HEAD");
+    allReused("a new worktree of the main line after the branch was read", await readFresh(join(outside, "main-again", "one")));
+    git(top, "worktree", "add", "-q", "--detach", join(outside, "strict-again"), "strict");
+    allReused("a new worktree of the branch", await readFresh(join(outside, "strict-again", "one")));
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+    remove();
+  }
+});
+
+test("a project in a folder its surrounding repository does not track writes nothing into that repository's git folder", async () => {
+  const { top, remove } = repository({ "README.md": "an unrelated repository\n" });
+  try {
+    const root = join(top, "scratch", "project");
+    for (const [path, text] of Object.entries(ROUTED)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), text);
+    }
+    await readFresh(root);
+    allReused("the project's own answers", await readFresh(root));
+    assert.deepEqual(readdirSync(join(top, ".git")).filter((name) => name === "coherence"), [], "nothing of the project is kept in the surrounding repository's git folder");
+  } finally {
+    remove();
+  }
+});
+
+test("a refusal the repository keeps names no worktree's folder: a new worktree of the same commit reuses it and never starts the server, and one whose tree differs asks again", async () => {
+  const { top, git, remove } = repository(ROUTED);
+  const outside = mkdtempSync(join(tmpdir(), "coherence-worktrees-"));
+  try {
+    // The server's words name the file it refused by its absolute path, as tsserver's do.
+    const refusing = new TextServer(top);
+    refusing.refuse.set("src/store/rows.ts", `Could not find source file: '${join(realpathSync(top), "src", "store", "rows.ts")}'.`);
+    await readComponentInterfaces(top, refusing);
+    const fresh = join(outside, "fresh");
+    git(top, "worktree", "add", "-q", fresh);
+    const server = new TextServer(fresh);
+    const reused = await readComponentInterfaces(fresh, server);
+    assert.equal(server.started, 0, "the refusal is reused: the server never starts");
+    assert.ok(reused.kind === "read" && reused.kept?.asked === 0, keptLine(reused.kind === "read" ? reused.kept : undefined));
+    const reason = reused.kind === "read" ? reused.unanswered?.find((u) => u.file === "src/store/rows.ts")?.reason : undefined;
+    assert.equal(reason, "textDocument/references: Could not find source file: 'src/store/rows.ts'. (-32603)", "the refused file by its project-relative path, never the asking worktree's folder");
+    // A worktree whose tree differs in any file asks the refused question again.
+    const edited = join(outside, "edited");
+    git(top, "worktree", "add", "-q", "-b", "edited", edited);
+    writeFileSync(join(edited, "src", "report", "report.ts"), `${ROUTED["src/report/report.ts"]!}// edited\n`);
+    git(edited, "commit", "-qam", "edit");
+    const asking = new TextServer(edited);
+    await readComponentInterfaces(edited, asking);
+    assert.ok(asking.started === 1 && asking.asked.includes("put"), `the changed tree asks again: ${asking.asked.join(", ")}`);
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+    remove();
+  }
+});
+
+test("a git older than 2.31, which prints --path-format back as a line, still finds the repository's kept answers", { skip: process.platform === "win32" }, async () => {
+  const { top, git, remove } = repository(ROUTED);
+  const outside = mkdtempSync(join(tmpdir(), "coherence-worktrees-"));
+  const restore = oldGit();
+  try {
+    await readFresh(top);
+    assert.deepEqual(sharedStructureDir(top), { dir: join(top, ".git", "coherence", "structure"), prefix: "" }, "the main checkout's common folder, resolved against the root");
+    git(top, "worktree", "add", "-q", join(outside, "fresh"));
+    allReused("a new worktree through the old git", await readFresh(join(outside, "fresh")));
+    assert.equal(realpathSync(sharedStructureDir(join(outside, "fresh"))!.dir), realpathSync(join(top, ".git", "coherence", "structure")));
+  } finally {
+    restore();
+    rmSync(outside, { recursive: true, force: true });
     remove();
   }
 });

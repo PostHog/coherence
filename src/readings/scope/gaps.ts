@@ -48,9 +48,9 @@
 
 import { spawn } from "../../lifecycle/work-meter.ts";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "../../lifecycle/work-meter.ts";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import { configIgnore, projectFiles } from "../../adapters/project-files.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadRuns } from "../../enforcement/record.ts";
@@ -63,6 +63,7 @@ import { loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import { loadSpec } from "./build.ts";
 import { boundsOf, withinBounds } from "./component-interfaces.ts";
 import type { InterfaceReading, ShellState } from "./model.ts";
+import { writeAtomically } from "./shared-structure.ts";
 import { flowOf, flowUntrusted, type FlowModel } from "./structure-flow.ts";
 
 /** Where the recorded reading, the refresh marker and the per-session snapshots live: transient, never committed. */
@@ -217,13 +218,6 @@ interface Recorded {
 
 function readingPath(root: string): string {
   return join(root, STRUCTURE_DIR, "reading.json");
-}
-
-function writeAtomically(path: string, text: string): void {
-  mkdirSync(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  writeFileSync(temporary, text, "utf8");
-  renameSync(temporary, path);
 }
 
 /**
