@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
+import { RpcError } from "../../adapters/jsonrpc.ts";
 import type { BuildOptions } from "./build.ts";
 import { languageServerMemory } from "./component-interfaces.ts";
 import type { InterfaceReading, ShellState } from "./model.ts";
@@ -29,8 +30,18 @@ export type Question = "ready" | "resolve" | "references" | "memory";
 /** A worker to this thread: a question for one language's adapter, or what it read once it is done. */
 export type FromReading<T> = { ask: number; language: Language; question: Question; args: unknown[] } | { done: T };
 
-/** This thread to the interface reading's worker: the answer to one question, or why it failed. */
-export type ToReading = { ask: number; value: unknown } | { ask: number; failed: string };
+/**
+ * This thread to the interface reading's worker: the answer to one question, or why it failed; a failure the
+ * server itself returned carries its method, code and words, so the worker rebuilds the same RpcError and keeps
+ * a refusal as the reading in process does.
+ */
+export type ToReading = { ask: number; value: unknown } | { ask: number; failed: string; rpc?: { method: string; code: number; detail: string } };
+
+/** A question's failure as the worker is told it. */
+function failedReply(ask: number, error: unknown): ToReading {
+  if (error instanceof RpcError) return { ask, failed: error.message, rpc: { method: error.method, code: error.code, detail: error.detail } };
+  return { ask, failed: error instanceof Error ? error.message : String(error) };
+}
 
 const own = extname(fileURLToPath(import.meta.url));
 const INTERFACES = new URL(`./interfaces-worker${own}`, import.meta.url);
@@ -66,7 +77,7 @@ function apart<T>(what: string, worker: URL, data: unknown, answer: (language: L
       }
       void answer(message.language, message.question, message.args).then(
         (value) => !ended && thread.postMessage({ ask: message.ask, value } satisfies ToReading),
-        (error: unknown) => !ended && thread.postMessage({ ask: message.ask, failed: error instanceof Error ? error.message : String(error) } satisfies ToReading),
+        (error: unknown) => !ended && thread.postMessage(failedReply(message.ask, error)),
       );
     });
     thread.once("error", (error) => (failure = error.message));
