@@ -27,7 +27,8 @@ export interface ReliefIO {
  * so a scene built from new data opens where the old one stood.
  */
 export interface ReliefView {
-  layout: Record<string, { own: number[]; sub: number[] }>;
+  /** Each component's place, and the order its files were laid out in, by path, once they were. */
+  layout: Record<string, { own: number[]; sub: number[]; files?: string[] }>;
   foot: string;
   height: string;
   win: string;
@@ -242,10 +243,23 @@ const LAYOUT = Object.fromEntries(C.map((c, ci) => [c.folder, { own: own[ci].map
 // co-change share over landings of 40 files or fewer (average linkage), and the clusters' order, read leaf by leaf, is
 // laid out in squarified rows that keep it, so files that land together stand side by side, every file keeps its share
 // of the area by lines, and no file is cut into a sliver. Files that share no landing are paired smallest first.
-function fileMap(files, x, y, w, h) {
+// A rebuild keeps the order the last build laid out, as components keep their places: a file new to it goes in just
+// after the file it lands with most, and a file gone from it drops out, so one landing never reshuffles a block.
+function fileMap(files, x, y, w, h, seed) {
   const n = files.length;
-  if (!n) return [];
+  if (!n) return { rects: [], order: [] };
   const landed = files.map((f) => new Set((f.l ?? []).filter(([li]) => D.landings[li].n <= 40).map(([li]) => li)));
+  const sized = files.map((f) => ({ v: Math.max(1, f.lines) }));
+  if (seed) {
+    const at = new Map(files.map((f, i) => [f.file, i]));
+    const order = seed.filter((p) => at.has(p)).map((p) => at.get(p)), kept = new Set(order);
+    for (const i of files.map((_, i) => i).filter((i) => !kept.has(i)).sort((a, b) => files[b].lines - files[a].lines)) {
+      let best = -1, share = 0;
+      order.forEach((j, k) => { const s = jac(landed[i], landed[j]); if (s > share) { share = s; best = k; } });
+      order.splice(best < 0 ? order.length : best + 1, 0, i);
+    }
+    return { rects: treemap(sized, x, y, w, h, order), order: order.map((i) => files[i].file) };
+  }
   const node = files.map((f, i) => ({ v: Math.max(1, f.lines), leaf: i })), size = node.map(() => 1);
   const S = files.map((_, i) => files.map((_, j) => (i === j ? 0 : jac(landed[i], landed[j]))));
   let alive = node.map((_, i) => i);
@@ -259,7 +273,7 @@ function fileMap(files, x, y, w, h) {
   }
   const order = [];
   (function walk(t) { if (t.kids) { walk(t.kids[0]); walk(t.kids[1]); } else order.push(t.leaf); })(node[alive[0]]);
-  return treemap(files.map((f) => ({ v: Math.max(1, f.lines) })), x, y, w, h, order);
+  return { rects: treemap(sized, x, y, w, h, order), order: order.map((i) => files[i].file) };
 }
 // Squarified treemap: rows of near-square rectangles, biggest first, or in the order given.
 function treemap(items, x, y, w, h, keep) {
@@ -415,8 +429,10 @@ const SETS = [[fileMesh, ghostFile], [addMesh, ghostAdd], [delMesh, ghostDel]];
 const FS = { faded: new Uint8Array(NF), cur: new Float32Array(NF * 6), to: new Float32Array(NF * 6), now: new Float32Array(NF * 6), capCur: new Float32Array(NF * 2), capTo: new Float32Array(NF * 2), capNow: new Float32Array(NF * 2), t: new Float32Array(NF), hide: false, settled: false };
 const selBox = new THREE.LineSegments(unitEdges, new THREE.LineBasicMaterial({ color: 0xff8a4c })); selBox.visible = false; world.add(selBox);
 const fileRects = C.map((c) => null); // treemaps of each component's files in its lines footprint, relative to its centre
+// The order each component's files were laid out in, by path: this build's, or, for files it never loaded, the last build's.
+const fileOrder = C.map((c) => SEED[c.folder]?.files ?? null);
 function rectsOf(ci) {
-  if (!fileRects[ci]) { const s = side(C[ci], "lines"); fileRects[ci] = fileMap(FL[ci], -s / 2, -s / 2, s, s); }
+  if (!fileRects[ci]) { const s = side(C[ci], "lines"), laid = fileMap(FL[ci], -s / 2, -s / 2, s, s, SEED[C[ci].folder]?.files); fileRects[ci] = laid.rects; fileOrder[ci] = laid.order; }
   return fileRects[ci];
 }
 const outlines = C.map(() => {
@@ -1215,7 +1231,7 @@ return {
   view() {
     const file = state.file ? [C[state.file[0]].folder, FL[state.file[0]][state.file[1]].file] : pendingFile;
     return {
-      layout: LAYOUT, foot: state.foot, height: state.height, win: state.win, split: state.split, big: state.big,
+      layout: Object.fromEntries(C.map((c, ci) => [c.folder, fileOrder[ci] ? { ...LAYOUT[c.folder], files: fileOrder[ci] } : LAYOUT[c.folder]])), foot: state.foot, height: state.height, win: state.win, split: state.split, big: state.big,
       scope: C[state.scope].folder, own: state.own, selected: state.selected == null ? null : C[state.selected].folder, file,
       camera: { view: lastView, position: camera.position.toArray(), target: controls.target.toArray() },
       diff: diffOffered ? { a: $("selA").value, b: $("selB").value } : null,
