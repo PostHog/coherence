@@ -85,10 +85,15 @@ spec inside a component that holds others stands as a district of its own.
   spaced so no footprint overlaps. Inside a block, files that land together
   stand together: they are clustered by the same share (average linkage),
   and that order is laid out in squarified rows, so each file keeps its
-  share of the area by lines and none is cut into a sliver. A scene built
-  again seeds its layout from the last one, components and each block's
-  file order alike, so what was settled stays where it was: a new file goes
-  in beside the file it lands with most.
+  share of the area by lines and none is cut into a sliver. The layout is
+  kept in `.coherence/relief-layout.json`, this checkout's own and never
+  committed, and the warm server lays the relief out from it
+  (`relief/layout.ts`, `relief/layout-store.ts`), its HTTP still read-only:
+  components are placed from the places kept, and a component's files go
+  out in the order kept, a file new to it after the file it lands with most
+  and a gone file dropped, so a landing, a reload or a restart leaves what a
+  reader learned where it was. A snapshot reads the kept layout and writes
+  nothing.
 - Reading it. Double-clicking a platform steps into it as a slice, and the
   crumbs or `Escape` step back out. A slice of one component's files alone
   (a component with nothing inside it, or a component's own files) names
