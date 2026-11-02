@@ -24,6 +24,7 @@ import { test } from "node:test";
 import type { Definition, LanguageAdapter, ReferenceSite, Resolved } from "../../adapters/adapter.ts";
 import { PythonAdapter } from "../../../plugins/python/python.ts";
 import { TypeScriptAdapter } from "../../../plugins/typescript/typescript.ts";
+import { RpcError } from "../../adapters/jsonrpc.ts";
 import { projectFiles } from "../../adapters/project-files.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { answerStructure } from "../query/query.ts";
@@ -36,7 +37,6 @@ import { loadSpecModel } from "../../spec/model.ts";
 import { parseSpec } from "../../spec/grammar.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { adapterCode, keptLine } from "./kept-answers.ts";
-import { RpcError } from "../../adapters/jsonrpc.ts";
 import { STRUCTURE_DIR, lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
 import { readInterfacesApart } from "./apart.ts";
 import type { InterfaceReading } from "./model.ts";
@@ -73,8 +73,8 @@ class TextServer implements LanguageAdapter {
   /** Every question put to it, a resolve or a references, by the file it is about. */
   readonly questions: string[] = [];
   readonly stall = new Set<string>();
-  /** Files it fails every question about, with its words, as gopls fails a file outside the host's build. */
-  readonly fail = new Map<string, string>();
+  /** Files it fails every question about, with its words (or the error itself), as gopls fails a file outside the host's build. */
+  readonly fail = new Map<string, string | Error>();
   /** Files the server itself answers with an error, as tsserver returns its own crash on a question. */
   readonly refuse = new Map<string, string>();
   /** The code its refusals carry. */
@@ -106,7 +106,7 @@ class TextServer implements LanguageAdapter {
     this.questions.push(definition.file);
     if (this.stall.has(definition.name)) return new Promise(() => {});
     const failed = this.fail.get(definition.file);
-    if (failed !== undefined) throw new Error(failed);
+    if (failed !== undefined) throw failed instanceof Error ? failed : new Error(failed);
     const refused = this.refuse.get(definition.file);
     if (refused !== undefined) throw new RpcError("textDocument/references", this.refuseCode, refused);
     const sites: ReferenceSite[] = [];
@@ -309,6 +309,14 @@ test("a file the language server cannot answer for is named and left unread whil
     assert.match(answerStructure(state).text, /^partial map: the language server could not answer for 1 file[^\n]*src\/store\/clock_windows\.ts/, "query structure leads with it");
     const whole = await readComponentInterfaces(root, new TextServer(root), { keep: false });
     assert.equal(whole.kind === "read" && whole.unanswered, undefined, "a server that answers every file leaves nothing unanswered");
+    const overflowing = new TextServer(root);
+    overflowing.fail.set("src/store/clock_windows.ts", new RpcError("textDocument/references", -32603, "<main> TypeScript Server Error (5.9.3)\nMaximum call stack size exceeded\nRangeError: Maximum call stack size exceeded\n    at trackExistingEntityName (/host/node_modules/typescript/lib/typescript.js:94992:14)\n    at isSymbolAccessible (/host/node_modules/typescript/lib/typescript.js:57448:23)"));
+    const overflowed = await readComponentInterfaces(root, overflowing, { keep: false });
+    assert.equal(overflowed.kind, "read", "one question's failure leaves the language read");
+    if (overflowed.kind !== "read") return;
+    assert.deepEqual(overflowed.unanswered, [{ file: "src/store/clock_windows.ts", component: "src/store", reason: "textDocument/references: <main> TypeScript Server Error (5.9.3) Maximum call stack size exceeded RangeError: Maximum call stack size exceeded (-32603)" }], "the server's words, never its stack");
+    assert.equal(overflowed.partial, undefined, "a question the server could not answer spends no budget");
+    assert.equal(recordReading(root, overflowed, structureFingerprint(root)), true, "kept for the hooks, as a complete reading that names the file");
     // The economy of a change to that file: the closure is said, with the file's line naming what the server could not answer.
     const economy = await predictClosure(root, ["src/store/clock_windows.ts"], { adapter: server });
     const why = Object.fromEntries(economy.entries.map((e) => [e.file, e.why]));
@@ -346,7 +354,7 @@ test("a question the server refused is kept like an answer while the tree is unc
       [-32801, "content modified"],
       [-32802, "server cancelled"],
       [-32002, "server not initialized"],
-      [1, "<semantic> TypeScript Server Error (5.9.3)\nError processing request. Debug Failure. False expression: Project is dirty"],
+      [1, "<semantic> TypeScript Server Error (5.9.3)\nDebug Failure. False expression: Project is dirty\nError: Debug Failure. False expression: Project is dirty\n    at updateGraph (/tsserver.js:1:1)"],
     ];
     for (const [code, words] of passing) {
       const first = new TextServer(root);
@@ -357,8 +365,8 @@ test("a question the server refused is kept like an answer while the tree is unc
       next.refuseCode = code;
       next.refuse.set(clockFile, words);
       const read = await readComponentInterfaces(root, next);
-      assert.ok(next.asked.includes("tick"), `a refusal coded ${code} (${words.split("\n").pop()}) is asked again`);
-      assert.ok(read.kind === "read" && read.unanswered?.[0]?.reason === `textDocument/references: ${words} (${code})`, "and the file is named with the server's words");
+      assert.ok(next.asked.includes("tick"), `a refusal coded ${code} is asked again`);
+      assert.equal(read.kind === "read" && read.unanswered?.[0]?.reason, new RpcError("textDocument/references", code, words).message, "and the file is named with the server's words, on one line");
     }
     // A refusal the server returned is kept like an answer: the unchanged tree never starts the server for it, and still names the file.
     const refusing = new TextServer(root);
@@ -385,9 +393,11 @@ test("the interface reading's worker keeps a refused question as the reading in 
   try {
     execFileSync("git", ["init", "-q"], { cwd: root });
     const refusing = new TextServer(root);
-    refusing.refuse.set("src/store/rows.ts", "Maximum call stack size exceeded");
+    const words = "<semantic> TypeScript Server Error (5.9.3)\nMaximum call stack size exceeded\nRangeError: Maximum call stack size exceeded\n    at trackExistingEntityName (/tsserver.js:1:1)";
+    refusing.refuse.set("src/store/rows.ts", words);
     const first = await readInterfacesApart(root, () => refusing);
-    const reason = "textDocument/references: Maximum call stack size exceeded (-32603)";
+    // The server's words cross the thread as the error says them, so the worker names the file exactly as the reading in process does.
+    const reason = new RpcError("textDocument/references", -32603, words).message;
     assert.deepEqual(first.kind === "read" && first.unanswered, [{ file: "src/store/rows.ts", component: "src/store", reason }], "the worker names the refused file with the server's words");
     const again = new TextServer(root);
     const kept = await readInterfacesApart(root, () => again);

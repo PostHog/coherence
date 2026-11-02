@@ -7,12 +7,13 @@
 import assert from "node:assert/strict";
 import { onlyFile } from "../journal/shard-fixture.ts";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, describe, test } from "node:test";
 import { commandMatches, firedBy, globMatches, parsePractices, type ToolUse } from "./practice.ts";
 import { loadSpecModel, projectPractices } from "./model.ts";
+import { COHERENCE_ROOT, kernelPractices } from "./practices.ts";
 import { journalVerbs, type Io } from "../journal/cli.ts";
 import { appendRecord, loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
@@ -445,4 +446,12 @@ test("in an adopter, a kernel practice a Coherence release changed asks no amend
   assert.equal(again.code, 0, `the adopter is not asked to decide for a change it did not make: ${again.err.join("\n")}`);
   const floor = loadSpecModel(root, { runs: false }).problems.filter((p) => /is gone; a practice keeps what it taught/.test(p.message));
   assert.deepEqual(floor.map((p) => p.message), [], "no floor gap is named for a kernel practice");
+});
+
+test("every doc a kernel practice sends an adopter to ships in the package", () => {
+  const shipped: string[] = JSON.parse(readFileSync(join(COHERENCE_ROOT, "package.json"), "utf8")).files;
+  const named = kernelPractices().flatMap((p) => p.steps.flatMap((s) => s.text.match(/\bdocs\/[\w./-]+\.md\b/g) ?? []));
+  assert.ok(named.length > 0, "the kernel practices name the docs an adopter reads");
+  const missing = [...new Set(named)].filter((doc) => !shipped.includes(doc) || !existsSync(join(COHERENCE_ROOT, doc)));
+  assert.deepEqual(missing, []);
 });

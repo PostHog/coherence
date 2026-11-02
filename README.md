@@ -19,6 +19,10 @@ Then run `npx --no -- coherence query practice "adopt Coherence"`, work through 
 Ask me whether pull requests should fail on Coherence's findings or get a report comment, then run `npx --no -- coherence ci install --host github --mode fail` (or `--mode comment`) with `--write`.
 ```
 
+Before asking you anything, your agent explains how Coherence works from
+[docs/how-coherence-works.md](docs/how-coherence-works.md): one page, with a
+diagram and the few words you will hear.
+
 For the full setup, adopting one folder of a monorepo, and platform requirements, see [docs/setup.md](docs/setup.md).
 
 | | |
@@ -60,6 +64,7 @@ Eject any implementation and make it your own. Or plug in your own language, fra
 
 ## Learn more
 
+- [How Coherence works](docs/how-coherence-works.md): one page with a diagram and the words you will hear, for a person new to it
 - [A tour of Coherence](docs/tour.md): each part in depth, with screenshots
 - [Setup](docs/setup.md): full setup, monorepos, platforms
 - [Telemetry](docs/telemetry.md): off until you opt in, and exactly what is sent if you do
