@@ -6,7 +6,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
@@ -417,6 +417,34 @@ test("the relief's files load by folder: a folder the relief read is answered wh
     }
     assert.notEqual(after!.stamp, relief.stamp, "the reread answers under a new stamp");
     assert.ok(after!.folders["src/store"]!.some((f) => f.file === "src/store/later.ts"), "with the files as they now stand");
+  } finally {
+    await server.stop();
+    fixture.remove();
+  }
+});
+
+test("the warm server lays the relief out from what it keeps in .coherence: the state carries the places kept, the files route sends each folder in the order kept, one request keeps its folders in one write, and a restarted server opens on the same places and orders", async () => {
+  const fixture = makeFixture();
+  const kept = join(fixture.root, ".coherence", "relief-layout.json");
+  const read = () => JSON.parse(readFileSync(kept, "utf8")) as { folders: Record<string, { sub?: number[]; on?: string; files?: string[] }> };
+  let server = await live(fixture.root);
+  try {
+    const state = await firstLoad(server);
+    assert.ok(state.reliefLayout !== undefined, "the state carries the relief's places");
+    for (const [folder, places] of Object.entries(state.reliefLayout!)) assert.deepEqual({ sub: read().folders[folder]?.sub, on: read().folders[folder]?.on }, { sub: places.sub, on: places.on }, `${folder}'s places are the ones kept`);
+    const ask = async () => (await server.get(`/api/relief/files?folder=src%2Fstore&folder=.`)) as { folders: Record<string, { file: string }[]> };
+    const answer = await ask();
+    for (const folder of ["src/store", "."]) assert.deepEqual(answer.folders[folder]!.map((f) => f.file), read().folders[folder]?.files, `${folder} is sent in the order kept`);
+    const text = readFileSync(kept, "utf8");
+    // Asked again, under the same reading, the order is the same and nothing is written.
+    assert.deepEqual(await ask(), answer);
+    assert.equal(readFileSync(kept, "utf8"), text);
+    await server.stop();
+    server = await live(fixture.root);
+    const restarted = await firstLoad(server);
+    assert.deepEqual(restarted.reliefLayout, state.reliefLayout, "a restarted server opens on the places kept, to the digit");
+    assert.deepEqual(await ask(), answer, "and sends the files in the order kept");
+    assert.equal(readFileSync(kept, "utf8"), text, "having written nothing");
   } finally {
     await server.stop();
     fixture.remove();

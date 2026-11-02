@@ -2,17 +2,30 @@
  * Where the relief places what it draws, as one module the page and the warm
  * server both run: components by co-change on their parents' platforms, and
  * each component's files in an order that keeps files that land together
- * side by side. The warm server lays it out seeded from the layout it kept
- * last (`.coherence/relief-layout.json`, layout-store.ts) and keeps the
- * result, so a reload, a restart or one more landing leaves what a reader
- * learned where it was; the page settles its components from that seed and
- * draws the files in the order the server sends them.
+ * side by side. The warm server lays it out from the layout it kept last
+ * (`.coherence/relief-layout.json`, layout-store.ts) and keeps the result.
+ * Held, what is kept stands where it stood and only what is new to it is
+ * placed, so a rebuild, a reload or a restart moves nothing; nudged, once
+ * for each new landing, what is kept moves as far as that landing's
+ * co-change pulls it, so the layout follows how the code now lands without
+ * ever reshuffling. The page holds the places the server sends and draws the
+ * files in the order the server sends them.
  *
  * Nothing here touches the DOM or node: the page's bundle carries it.
  */
 
-/** Each folder's place as the last layout left it: a component's own block and its subtree's centre, and its files in order, by path. */
-export type ReliefLayout = Record<string, { own?: number[]; sub?: number[]; files?: string[] }>;
+/**
+ * Each folder's place as the last layout left it, by path: a platform's own
+ * block on it, its subtree's centre on the platform it stands on (`on`, the
+ * folder of that platform's component, "" for the ground, where `sub` is the
+ * centre itself), and its files in order with the newest landing that order
+ * was checked against. A place kept on another platform than the one the
+ * component now stands on is no place for it, and it is placed as new.
+ */
+export type ReliefLayout = Record<string, { own?: number[]; sub?: number[]; on?: string; files?: string[]; filesAt?: string }>;
+
+/** Held: what is kept stands where it stood. Nudged: what is kept moves as far as the landings' co-change pulls it, once. */
+export type PlaceMode = "hold" | "nudge";
 
 /** The footprint measures: a block is spaced for the largest it can take, so no measure makes blocks overlap. */
 export const FOOT_KEYS = ["lines", "unreached", "invariants", "refutations", "crossings", "leaned", "defects"] as const;
@@ -69,11 +82,13 @@ interface Item {
 
 /**
  * Lay out items by co-change, then push apart so no rectangle overlaps at its
- * largest. A seeded item starts where the last layout left it and is held
- * there, so it drifts only as far as its co-change has really changed; a
- * newcomer starts beside its strongest co-change neighbour.
+ * largest. With nothing kept, the items settle from a ring. A kept item starts
+ * where the last layout left it and a newcomer beside its strongest co-change
+ * neighbour; held, kept items stay put and only newcomers settle, nudged,
+ * every item settles a little, a kept one held to its place so only a lasting
+ * pull moves it far. `moved` is false when every item stood where it was kept.
  */
-function settle(items: readonly Item[]): [number, number][] {
+function settle(items: readonly Item[], mode: PlaceMode): { P: [number, number][]; moved: boolean } {
   const n = items.length, J = items.map((a) => items.map((b) => (a === b ? 1 : jac(a.set, b.set))));
   const rad = items.map((it) => Math.max(it.hx, it.hz));
   const warm = items.some((it) => it.seed);
@@ -84,33 +99,39 @@ function settle(items: readonly Item[]): [number, number][] {
     items.forEach((o, j) => { if (o.seed && (best < 0 || J[i]![j]! > J[i]![best]!)) best = j; });
     if (best >= 0) P[i] = [P[best]![0] + rad[i]! + rad[best]! + GAP, P[best]![1]];
   });
+  // How freely each item moves: held, a kept item not at all.
+  const free = items.map((it) => (warm && mode === "hold" && it.seed ? 0 : 1));
+  let moved = free.some((f) => f > 0);
   const N = warm ? 300 : 900, heat = warm ? 0.2 : 1;
-  for (let it = 0; it < N; it++) {
+  if (moved) for (let it = 0; it < N; it++) {
     const t = (1 - it / N) * heat;
     for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      if (free[i]! + free[j]! === 0) continue;
       const dx = P[j]![0] - P[i]![0], dz = P[j]![1] - P[i]![1], d = Math.hypot(dx, dz) || 0.01;
       // Strangers sit apart by up to 26, never more than half their own size, so small neighbourhoods stay tight at every depth.
       const want = (rad[i]! + rad[j]!) * 1.08 + GAP + (1 - J[i]![j]!) * Math.min(26, (rad[i]! + rad[j]!) * 0.5);
       const f = (d - want) * 0.02 * t, ux = dx / d, uz = dz / d;
-      P[i]![0] += ux * f; P[i]![1] += uz * f; P[j]![0] -= ux * f; P[j]![1] -= uz * f;
+      P[i]![0] += ux * f * free[i]!; P[i]![1] += uz * f * free[i]!; P[j]![0] -= ux * f * free[j]!; P[j]![1] -= uz * f * free[j]!;
     }
-    // A seeded item is held to where the last build left it; only a lasting pull moves it far.
-    if (warm) items.forEach((o, i) => { if (o.seed) { P[i]![0] += (o.seed[0]! - P[i]![0]) * 0.1; P[i]![1] += (o.seed[1]! - P[i]![1]) * 0.1; } });
+    // Nudged, a kept item is held to where the last layout left it; only a lasting pull moves it far.
+    if (warm && mode === "nudge") items.forEach((o, i) => { if (o.seed) { P[i]![0] += (o.seed[0]! - P[i]![0]) * 0.1; P[i]![1] += (o.seed[1]! - P[i]![1]) * 0.1; } });
   }
   for (let it = 0; it < 400; it++) {
-    let moved = false;
+    let overlapped = false;
     for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
       const dx = P[j]![0] - P[i]![0], dz = P[j]![1] - P[i]![1];
       const ox = items[i]!.hx + items[j]!.hx + GAP - Math.abs(dx), oz = items[i]!.hz + items[j]!.hz + GAP - Math.abs(dz);
       if (ox > 0 && oz > 0) {
-        moved = true;
-        if (ox < oz) { const s = Math.sign(dx) || 1; P[i]![0] -= (s * ox) / 2; P[j]![0] += (s * ox) / 2; }
-        else { const s = Math.sign(dz) || 1; P[i]![1] -= (s * oz) / 2; P[j]![1] += (s * oz) / 2; }
+        overlapped = moved = true;
+        // The one that may move gives way; two kept ones that grew into each other share it.
+        const wi = free[i]! + free[j]! === 0 ? 0.5 : free[i]! / (free[i]! + free[j]!), wj = 1 - wi;
+        if (ox < oz) { const s = Math.sign(dx) || 1; P[i]![0] -= s * ox * wi; P[j]![0] += s * ox * wj; }
+        else { const s = Math.sign(dz) || 1; P[i]![1] -= s * oz * wi; P[j]![1] += s * oz * wj; }
       }
     }
-    if (!moved) break;
+    if (!overlapped) break;
   }
-  return P;
+  return { P, moved };
 }
 
 /** Where every component stands, and what the page needs to draw it there. */
@@ -128,7 +149,7 @@ export interface ComponentPlaces {
   tops: number[];
   /** Each component's own block's centre. */
   P: [number, number][];
-  /** The places, by folder, to keep and to seed the next layout from. */
+  /** The places, by folder, to keep and to lay the next layout out from. */
   layout: ReliefLayout;
 }
 
@@ -136,9 +157,10 @@ export interface ComponentPlaces {
  * Place every component: deepest first, each platform settles its own block
  * beside its children's subtrees by co-change over landings of CO_CHANGE_MAX
  * files or fewer, and each subtree then moves as one piece; the top-level
- * subtrees settle against each other the same way.
+ * subtrees settle against each other the same way. Held, a layout placed from
+ * its own places is those places, to the digit.
  */
-export function placeComponents(C: readonly Placed[], landings: readonly Landed[], seed: ReliefLayout = {}): ComponentPlaces {
+export function placeComponents(C: readonly Placed[], landings: readonly Landed[], seed: ReliefLayout = {}, mode: PlaceMode = "hold"): ComponentPlaces {
   const { parent, kids, level, under } = nesting(C);
   const value = (c: Placed, key: (typeof FOOT_KEYS)[number]) => c.v[key] ?? 0;
   const totals = Object.fromEntries(FOOT_KEYS.map((k) => [k, C.reduce((a, c) => a + value(c, k), 0)])) as Record<(typeof FOOT_KEYS)[number], number>;
@@ -150,13 +172,17 @@ export function placeComponents(C: readonly Placed[], landings: readonly Landed[
   const subSet = C.map((_, ci) => new Set(under(ci).flatMap((k) => [...sets[k]!])));
   const own = C.map((): [number, number] => [0, 0]), sub = C.map((): [number, number] => [0, 0]);
   const ext = C.map((_, ci): [number, number] => [maxSide[ci]! / 2, maxSide[ci]! / 2]);
+  const on = (ci: number) => (parent[ci]! < 0 ? "" : C[parent[ci]!]!.folder);
+  // A subtree's kept centre counts only on the platform it was kept on.
+  const keptSub = (ci: number) => { const kept = seed[C[ci]!.folder]; return kept?.on === on(ci) ? kept.sub : undefined; };
   for (const ci of C.map((_, i) => i).sort((a, b) => level[b]! - level[a]!)) {
     if (!kids[ci]!.length) continue;
-    const items: Item[] = [{ hx: maxSide[ci]! / 2, hz: maxSide[ci]! / 2, set: sets[ci]!, seed: seed[C[ci]!.folder]?.own }, ...kids[ci]!.map((k) => ({ hx: ext[k]![0], hz: ext[k]![1], set: subSet[k]!, seed: seed[C[k]!.folder]?.sub }))];
-    const Q = settle(items);
+    const items: Item[] = [{ hx: maxSide[ci]! / 2, hz: maxSide[ci]! / 2, set: sets[ci]!, seed: seed[C[ci]!.folder]?.own }, ...kids[ci]!.map((k) => ({ hx: ext[k]![0], hz: ext[k]![1], set: subSet[k]!, seed: keptSub(k) }))];
+    const { P: Q, moved } = settle(items, mode);
     const box = [Infinity, Infinity, -Infinity, -Infinity];
     items.forEach((it, i) => { box[0] = Math.min(box[0]!, Q[i]![0] - it.hx); box[1] = Math.min(box[1]!, Q[i]![1] - it.hz); box[2] = Math.max(box[2]!, Q[i]![0] + it.hx); box[3] = Math.max(box[3]!, Q[i]![1] + it.hz); });
-    const mx = (box[0]! + box[2]!) / 2, mz = (box[1]! + box[3]!) / 2;
+    // Centred on its platform; a platform where nothing moved was centred when it was kept, and centring it again would only round it away.
+    const [mx, mz] = moved ? [(box[0]! + box[2]!) / 2, (box[1]! + box[3]!) / 2] : [0, 0];
     own[ci] = [Q[0]![0] - mx, Q[0]![1] - mz];
     kids[ci]!.forEach((k, i) => { sub[k] = [Q[i + 1]![0] - mx, Q[i + 1]![1] - mz]; });
     ext[ci] = [(box[2]! - box[0]!) / 2 + MARGIN, (box[3]! - box[1]!) / 2 + MARGIN];
@@ -164,13 +190,13 @@ export function placeComponents(C: readonly Placed[], landings: readonly Landed[
   const tops = C.map((_, i) => i).filter((i) => parent[i]! < 0);
   const at = C.map((): [number, number] => [0, 0]); // centre of each subtree
   if (tops.length > 1) {
-    const Q = settle(tops.map((t) => ({ hx: ext[t]![0], hz: ext[t]![1], set: subSet[t]!, seed: seed[C[t]!.folder]?.sub })));
+    const { P: Q } = settle(tops.map((t) => ({ hx: ext[t]![0], hz: ext[t]![1], set: subSet[t]!, seed: keptSub(t) })), mode);
     tops.forEach((t, i) => { at[t] = Q[i]!; });
   }
   for (const ci of C.map((_, i) => i).sort((a, b) => level[a]! - level[b]!)) if (parent[ci]! >= 0) at[ci] = [at[parent[ci]!]![0] + sub[ci]![0], at[parent[ci]!]![1] + sub[ci]![1]];
   const P = C.map((_, ci): [number, number] => [at[ci]![0] + own[ci]![0], at[ci]![1] + own[ci]![1]]);
-  // A top-level subtree keeps its centre as its sub, so a layout of several roots seeds its own next layout.
-  const layout: ReliefLayout = Object.fromEntries(C.map((c, ci) => [c.folder, { own: own[ci]!.map(round), sub: (parent[ci]! < 0 ? at[ci]! : sub[ci]!).map(round) }]));
+  // A top-level subtree keeps its centre as its sub, so a layout of several roots lays out its own next layout; only a platform has an own block to keep.
+  const layout: ReliefLayout = Object.fromEntries(C.map((c, ci) => [c.folder, { ...(kids[ci]!.length ? { own: own[ci]!.map(round) } : {}), sub: (parent[ci]! < 0 ? at[ci]! : sub[ci]!).map(round), on: on(ci) }]));
   return { parent, kids, level, under, totals, side, ext, tops, P, layout };
 }
 
@@ -183,6 +209,11 @@ interface FileLanded {
   l?: readonly (readonly [number, number])[];
 }
 
+/** How many files one new landing may move in a block's kept order: a landing nudges a block, never reshuffles it. */
+export const MOVES_PER_LANDING = 3;
+/** The least share of landings a file must have with another to be moved beside it. */
+export const MOVE_SHARE = 0.25;
+
 /**
  * The order a component's files are laid out in, by path. Unseeded, files are
  * clustered by co-change share over landings of CO_CHANGE_MAX files or fewer
@@ -193,22 +224,21 @@ interface FileLanded {
  * smallest first, so the tree stays balanced. Seeded with the last order, the
  * order is kept: a file new to it goes in just after the file it lands with
  * most, or at the end when it lands with none, and a file gone from it drops
- * out, so one landing never reshuffles a block.
+ * out. Each landing in `fresh` (indices into `landings`, the landings since
+ * the order was last checked) may then move up to MOVES_PER_LANDING of the
+ * files it touched beside the file each now lands with most, when that file
+ * shares at least MOVE_SHARE of their landings and twice what either
+ * neighbour does: the order follows how the code now lands, a few files a
+ * landing. A seed that holds fewer than half the files is what another
+ * checkout learned, and the order is laid out afresh.
  */
-export function fileOrder(files: readonly FileLanded[], landings: readonly { n: number }[], seed?: readonly string[]): string[] {
+export function fileOrder(files: readonly FileLanded[], landings: readonly { n: number }[], seed?: readonly string[], fresh: ReadonlySet<number> = new Set()): string[] {
   const n = files.length;
   if (n === 0) return [];
   const landed = files.map((f) => new Set((f.l ?? []).filter(([li]) => (landings[li]?.n ?? Infinity) <= CO_CHANGE_MAX).map(([li]) => li)));
-  if (seed !== undefined) {
-    const at = new Map(files.map((f, i) => [f.file, i]));
-    const order = seed.filter((p) => at.has(p)).map((p) => at.get(p)!), kept = new Set(order);
-    for (const i of files.map((_, i) => i).filter((i) => !kept.has(i)).sort((a, b) => files[b]!.lines - files[a]!.lines || (files[a]!.file < files[b]!.file ? -1 : 1))) {
-      let best = -1, share = 0;
-      order.forEach((j, k) => { const s = jac(landed[i]!, landed[j]!); if (s > share) { share = s; best = k; } });
-      order.splice(best < 0 ? order.length : best + 1, 0, i);
-    }
-    return order.map((i) => files[i]!.file);
-  }
+  const at = new Map(files.map((f, i) => [f.file, i]));
+  const kept = seed === undefined ? [] : [...new Set(seed)].filter((p) => at.has(p)).map((p) => at.get(p)!);
+  if (seed !== undefined && kept.length * 2 >= n) return seeded(files, landed, kept, fresh).map((i) => files[i]!.file);
   // Similarities, sparse: only pairs that share a landing hold one, so a pair that shares none is never visited or kept.
   const S = files.map(() => new Map<number, number>());
   const byLanding = new Map<number, number[]>();
@@ -267,5 +297,60 @@ export function fileOrder(files: readonly FileLanded[], landings: readonly { n: 
   const order: string[] = [];
   const walk = (t: Node): void => { if (t.kids) { walk(t.kids[0]); walk(t.kids[1]); } else order.push(files[t.leaf!]!.file); };
   walk(rest[0]!);
+  return order;
+}
+
+/** The files sharing a landing with i, each with the share of landings they have in common, through the landings (each holds CO_CHANGE_MAX files at most). */
+function sharesOf(i: number, landed: readonly ReadonlySet<number>[], byLanding: ReadonlyMap<number, readonly number[]>, among: (j: number) => boolean): Map<number, number> {
+  const common = new Map<number, number>();
+  for (const li of landed[i]!) for (const j of byLanding.get(li) ?? []) if (j !== i && among(j)) common.set(j, (common.get(j) ?? 0) + 1);
+  for (const [j, k] of common) common.set(j, k / (landed[i]!.size + landed[j]!.size - k));
+  return common;
+}
+
+/** A kept order with the new files put in and the fresh landings' few moves made, as indices into the files. */
+function seeded(files: readonly FileLanded[], landed: readonly ReadonlySet<number>[], kept: readonly number[], fresh: ReadonlySet<number>): number[] {
+  const byLanding = new Map<number, number[]>();
+  landed.forEach((set, i) => { for (const li of set) (byLanding.get(li) ?? byLanding.set(li, []).get(li)!).push(i); });
+  const placed = new Set(kept);
+  // Each new file goes in after the placed file it lands with most (the lowest index on a tie), largest first; the newest put in after a file stands nearest it.
+  const after = new Map<number, number[]>(), atEnd: number[] = [];
+  const newcomers = files.map((_, i) => i).filter((i) => !placed.has(i)).sort((a, b) => files[b]!.lines - files[a]!.lines || (files[a]!.file < files[b]!.file ? -1 : 1));
+  for (const i of newcomers) {
+    let best = -1, share = 0;
+    for (const [j, s] of sharesOf(i, landed, byLanding, (j) => placed.has(j))) if (s > share || (s === share && j < best)) { share = s; best = j; }
+    if (best < 0) atEnd.push(i);
+    else (after.get(best) ?? after.set(best, []).get(best)!).unshift(i);
+    placed.add(i);
+  }
+  const order: number[] = [];
+  const emit = (root: number) => {
+    for (const stack = [root]; stack.length; ) {
+      const i = stack.pop()!;
+      order.push(i);
+      const next = after.get(i);
+      if (next) for (let k = next.length - 1; k >= 0; k--) stack.push(next[k]!);
+    }
+  };
+  for (const i of [...kept, ...atEnd]) emit(i);
+  if (fresh.size === 0) return order;
+  // The fresh landings' moves: each file they touched, in the order it stands, beside the file it now lands with most, a few a landing.
+  const touching = [...fresh].filter((li) => byLanding.has(li));
+  let moves = touching.length * MOVES_PER_LANDING;
+  const touched = new Set(touching.flatMap((li) => byLanding.get(li)!));
+  const candidates = order.filter((i) => touched.has(i));
+  for (const i of candidates) {
+    if (moves === 0) break;
+    const shares = sharesOf(i, landed, byLanding, () => true);
+    let best = -1, share = 0;
+    for (const [j, s] of shares) if (s > share || (s === share && j < best)) { share = s; best = j; }
+    if (best < 0 || share < MOVE_SHARE) continue;
+    const k = order.indexOf(i);
+    const beside = Math.max(shares.get(order[k - 1]!) ?? 0, shares.get(order[k + 1]!) ?? 0);
+    if (share < beside * 2 || order[k - 1] === best || order[k + 1] === best) continue;
+    order.splice(k, 1);
+    order.splice(order.indexOf(best) + 1, 0, i);
+    moves--;
+  }
   return order;
 }

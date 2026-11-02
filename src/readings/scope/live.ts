@@ -397,7 +397,7 @@ class LiveReading implements HttpApp {
   }
 
   /** One folder's files as JSON text, in the order the layout keeps, for the reading held now. */
-  private ordered(folder: string, landings: readonly { n: number }[]): string {
+  private ordered(folder: string, landings: readonly { n: number; sha: string }[]): string {
     const held = this.reliefOrdered.get(folder);
     if (held !== undefined) return held;
     const text = JSON.stringify(this.layout.files(folder, JSON.parse(this.reliefFiles.get(folder)!) as ReliefFileLanded[], landings));
@@ -899,6 +899,8 @@ class LiveReading implements HttpApp {
         }
         // Each folder's files go out in the order the layout keeps, put in order once per reading: on a large project they are megabytes.
         const body = `{"stamp":${JSON.stringify(relief.stamp)},"folders":{${folders.map((folder) => `${JSON.stringify(folder)}:${this.ordered(folder, relief.landings)}`).join(",")}}}`;
+        // What this request put in order is kept in one write, however many folders it named.
+        this.layout.flush();
         response.writeHead(200, { "content-type": "application/json; charset=utf-8", "content-length": Buffer.byteLength(body) });
         response.end(request.method === "HEAD" ? undefined : body);
         return;

@@ -88,12 +88,15 @@ spec inside a component that holds others stands as a district of its own.
   share of the area by lines and none is cut into a sliver. The layout is
   kept in `.coherence/relief-layout.json`, this checkout's own and never
   committed, and the warm server lays the relief out from it
-  (`relief/layout.ts`, `relief/layout-store.ts`), its HTTP still read-only:
-  components are placed from the places kept, and a component's files go
-  out in the order kept, a file new to it after the file it lands with most
-  and a gone file dropped, so a landing, a reload or a restart leaves what a
-  reader learned where it was. A snapshot reads the kept layout and writes
-  nothing.
+  (`relief/layout.ts`, `relief/layout-store.ts`), its HTTP still read-only.
+  What is kept stands where it was kept: a rebuild, a reload or a restart
+  moves nothing, a new component is placed beside what it lands with, and a
+  file new to a block goes in after the file it lands with most. The layout
+  still follows how the code lands, a little at a time: each new landing
+  nudges the components once, as far as its co-change pulls them, and moves
+  up to three of the files it touched in each block beside the file each now
+  lands with most. A block whose kept order holds fewer than half its files
+  is laid out afresh. A snapshot reads the kept layout and writes nothing.
 - Reading it. Double-clicking a platform steps into it as a slice, and the
   crumbs or `Escape` step back out. A slice of one component's files alone
   (a component with nothing inside it, or a component's own files) names

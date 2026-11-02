@@ -28,7 +28,7 @@ export interface ReliefIO {
  * so a scene built from new data opens where the old one stood.
  */
 export interface ReliefView {
-  /** Each component's place, by folder, to seed the next build from. */
+  /** Each component's place, by folder, for the next build to hold. */
   layout: ReliefLayout;
   foot: string;
   height: string;
@@ -156,8 +156,8 @@ function churn() {
 }
 
 // ---------- placement: nesting, footprints and co-change positions (layout.ts, which the warm server runs too) ----------
-// Each component stands on the platform of the nearest component whose folder holds it, placed by co-change and seeded
-// from where the server last laid it out, else where this page's last build left it, so what was settled stays put.
+// Each component stands on the platform of the nearest component whose folder holds it, placed by co-change and held
+// where the server last laid it out, else where this page's last build left it: what was kept stands exactly there.
 const SEED = D.layout ?? carried?.layout ?? {};
 const { parent, kids, level, under, totals, side, ext, tops, P, layout: LAYOUT } = placeComponents(C, D.landings, SEED);
 const PLH = 2.4;
