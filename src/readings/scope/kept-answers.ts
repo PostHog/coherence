@@ -114,8 +114,8 @@ const SHARED_KEPT = 4;
 /**
  * The answers any worktree of `root`'s repository kept for this project and
  * this basis, which seed a worktree that has none of its own that hold. Named
- * by a digest of the project's folder within the repository and one of that
- * folder and the basis, which a reading works out from files alone before it
+ * by a digest of the project's folder within the repository and one of the
+ * basis, which a reading works out from files alone before it
  * asks anything, so two projects of one repository, or two branches whose
  * manifests or lockfiles differ, each keep their own and never overwrite the
  * other's.
@@ -124,7 +124,7 @@ function sharedKeptPath(root: string, language: Language, basis: Record<string, 
   const shared = sharedStructureDir(root);
   if (shared === undefined) return undefined;
   const project = digest(shared.prefix).slice(0, 8);
-  const key = digest(JSON.stringify([shared.prefix, Object.entries(basis).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))])).slice(0, 16);
+  const key = digest(JSON.stringify(Object.entries(basis).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))).slice(0, 16);
   return join(shared.dir, `answers-${language}-${project}-${key}.json`);
 }
 
