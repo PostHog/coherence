@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { onlyFile } from "../journal/shard-fixture.ts";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, describe, test } from "node:test";
@@ -452,5 +452,6 @@ test("every doc a kernel practice sends an adopter to ships in the package", () 
   const shipped: string[] = JSON.parse(readFileSync(join(COHERENCE_ROOT, "package.json"), "utf8")).files;
   const named = kernelPractices().flatMap((p) => p.steps.flatMap((s) => s.text.match(/\bdocs\/[\w./-]+\.md\b/g) ?? []));
   assert.ok(named.length > 0, "the kernel practices name the docs an adopter reads");
-  assert.deepEqual([...new Set(named)].filter((doc) => !shipped.includes(doc)), []);
+  const missing = [...new Set(named)].filter((doc) => !shipped.includes(doc) || !existsSync(join(COHERENCE_ROOT, doc)));
+  assert.deepEqual(missing, []);
 });
