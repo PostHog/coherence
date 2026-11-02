@@ -26,6 +26,12 @@
  * without starting the server; what was dropped is asked again. One source
  * edit rereads only what that file touches.
  *
+ * A references question the server refused with an error of its own is kept
+ * too, so an unchanged tree never starts the server only to be refused again;
+ * a refusal names no files it rests on, so any change to the tree drops it. A
+ * failure that may pass on its own (an exit, a timeout, a transient protocol
+ * code, a tsserver assertion) is never kept: see lastingRefusal.
+ *
  * What the server's answers rest on beyond the project's source (the
  * project's language configuration, manifests and lockfiles, the config's
  * bounds and test folders, and the adapter's own code and Coherence's
@@ -50,6 +56,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
+import { RpcError } from "../../adapters/jsonrpc.ts";
 import { closureOf } from "../../enforcement/code-fingerprint.ts";
 import { isBasisFile, languageCode, parsedOf, serverExtensions } from "../../plugins/languages.ts";
 import type { KeptReport } from "./model.ts";
@@ -58,7 +65,7 @@ import { sharedStructureDir, writeAtomically } from "./shared-structure.ts";
 /** Where each language's kept answers live: transient, beside the recorded reading. */
 const KEPT_DIR = join(".coherence", "structure");
 
-const KEPT_VERSION = 1;
+const KEPT_VERSION = 2;
 
 
 /** Where the language adapters are entered: every module it reaches is code an answer comes from. */
@@ -84,6 +91,21 @@ function keptModules(language: Language, file: string, text: string): string[] {
   return parsedOf(language, "interfaces")?.wildcardModules(file, text) ?? [];
 }
 
+/** Protocol codes that mean "ask again", never "this question has no answer": request cancelled, content modified, server cancelled, server not initialized. */
+const TRANSIENT_CODES = new Set([-32800, -32801, -32802, -32002]);
+
+/** A tsserver assertion: it fires on the session's history (what was opened and asked before), which a later reading does not repeat. */
+const SESSION_FAILURE = /Debug Failure/;
+
+/**
+ * Whether a failure is the server refusing the question as the tree stands, so an unchanged tree would be
+ * refused again: an error the server itself returned (never an exit, a spawn failure or a timeout), with
+ * no transient protocol code and no tsserver assertion in its words.
+ */
+export function lastingRefusal(error: unknown): error is RpcError {
+  return error instanceof RpcError && !TRANSIENT_CODES.has(error.code) && !SESSION_FAILURE.test(error.detail);
+}
+
 /** One kept answer and what it depends on: the files it names and the names that, spelled in a changed file, could change it. */
 interface Kept<T> {
   answer: T;
@@ -102,6 +124,7 @@ interface KeptFile {
   hashes: Record<string, string>;
   resolves: Record<string, Kept<Resolved>>;
   references: Record<string, Kept<ReferenceSite[]>>;
+  failures: Record<string, Kept<string>>;
 }
 
 function keptPath(root: string, language: Language): string {
@@ -263,6 +286,7 @@ export class KeptAnswers {
   private readonly basis: Record<string, string>;
   private readonly resolves = new Map<string, Kept<Resolved>>();
   private readonly references = new Map<string, Kept<ReferenceSite[]>>();
+  private readonly failures = new Map<string, Kept<string>>();
   private reused = 0;
   private asked = 0;
   private readonly changed: number;
@@ -304,6 +328,10 @@ export class KeptAnswers {
       if (holds(kept, changes)) this.references.set(key, kept);
       else dropped += 1;
     }
+    for (const [key, kept] of Object.entries(loaded.failures)) {
+      if (holds(kept, changes)) this.failures.set(key, kept);
+      else dropped += 1;
+    }
     this.dropped = dropped;
   }
 
@@ -330,7 +358,7 @@ export class KeptAnswers {
     } catch {
       return "the kept answers are unreadable";
     }
-    if (kept.version !== KEPT_VERSION || kept.language !== this.language || typeof kept.hashes !== "object" || typeof kept.basis !== "object") return "the kept answers are of another version";
+    if (kept.version !== KEPT_VERSION || kept.language !== this.language || typeof kept.hashes !== "object" || typeof kept.basis !== "object" || typeof kept.failures !== "object") return "the kept answers are of another version";
     return basisChange(kept.basis, this.basis) ?? kept;
   }
 
@@ -363,6 +391,29 @@ export class KeptAnswers {
     this.references.set(referencesKey(definition), { answer: sites, files, spellings: [...new Set(spellings)], module: definition.file, ...(broad ? { broad: true } : {}) });
   }
 
+  /** The reason the server gave when it refused `definition`'s references, kept while the tree is unchanged; undefined when none is kept. */
+  failed(definition: Definition): string | undefined {
+    const kept = this.failures.get(referencesKey(definition));
+    if (kept === undefined) return undefined;
+    this.reused += 1;
+    return kept.answer;
+  }
+
+  /**
+   * Keep the server's refusal of `definition`'s references (a lastingRefusal), as broad: any change to the tree
+   * drops it. A refusal names no files it rests on (a stack overflow may come from types in a file that never
+   * spells the name), so only an unchanged tree is sure to be refused again.
+   */
+  keepFailed(definition: Definition, reason: string): void {
+    this.asked += 1;
+    this.failures.set(referencesKey(definition), { answer: reason, files: [definition.file], spellings: [], module: definition.file, broad: true });
+  }
+
+  /** A question asked of the server that failed and is not kept: still asked anew. */
+  failedAnew(): void {
+    this.asked += 1;
+  }
+
   /** What this reading did with the kept answers. */
   report(): KeptReport {
     return { reused: this.reused, asked: this.asked, changed: this.changed, dropped: this.dropped, ...(this.whole === undefined ? {} : { whole: this.whole }) };
@@ -377,6 +428,7 @@ export class KeptAnswers {
       hashes: this.hashes,
       resolves: Object.fromEntries([...this.resolves].sort(([a], [b]) => a.localeCompare(b))),
       references: Object.fromEntries([...this.references].sort(([a], [b]) => a.localeCompare(b))),
+      failures: Object.fromEntries([...this.failures].sort(([a], [b]) => a.localeCompare(b))),
     };
     const text = JSON.stringify(kept);
     const shared = sharedKeptPath(this.root, this.language, this.basis);

@@ -39,10 +39,14 @@ function serverWordsWithoutStack(message: unknown): string {
 export class RpcError extends Error {
   readonly method: string;
   readonly code: number;
+  /** The server's words as this error says them (one line, capped): with method and code, all a thread needs to rebuild the same error. */
+  readonly detail: string;
   constructor(method: string, code: number, message: unknown) {
-    super(`${method}: ${serverWordsWithoutStack(message)} (${code})`);
+    const words = serverWordsWithoutStack(message);
+    super(`${method}: ${words} (${code})`);
     this.method = method;
     this.code = code;
+    this.detail = words;
   }
 }
 
