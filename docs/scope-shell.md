@@ -85,7 +85,11 @@ spec inside a component that holds others stands as a district of its own.
   spaced so no footprint overlaps. A scene built again seeds its layout from
   the last one, so what was settled stays where it was.
 - Reading it. Double-clicking a platform steps into it as a slice, and the
-  crumbs or `Escape` step back out. Selecting a block lists its files, its
+  crumbs or `Escape` step back out. A slice of one component's files alone
+  (a component with nothing inside it, or a component's own files) names
+  its eight highest files by the height measure in its callouts, in place
+  of one callout repeating the component's name; clicking one selects that
+  file in the files view. Selecting a block lists its files, its
   landings in the window, and the components it relies on and that rely on
   it with their most used symbols. Blocks can split into one block per file.
   The notes under the scene say what each measure is read from, what is left
