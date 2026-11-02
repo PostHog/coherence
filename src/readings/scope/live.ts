@@ -391,9 +391,9 @@ class LiveReading implements HttpApp {
    */
   private sent(state: ShellState): ShellState {
     const layout = this.layout.components(state);
-    if (layout === undefined) delete state.reliefLayout;
-    else state.reliefLayout = layout;
-    return windowState(state);
+    // A copy carries the places: the state held is what was read, never what was last sent.
+    const { reliefLayout: _held, ...read } = state;
+    return windowState(layout === undefined ? read : { ...read, reliefLayout: layout });
   }
 
   /** One folder's files as JSON text, in the order the layout keeps, for the reading held now. */

@@ -88,15 +88,21 @@ spec inside a component that holds others stands as a district of its own.
   share of the area by lines and none is cut into a sliver. The layout is
   kept in `.coherence/relief-layout.json`, this checkout's own and never
   committed, and the warm server lays the relief out from it
-  (`relief/layout.ts`, `relief/layout-store.ts`), its HTTP still read-only.
-  What is kept stands where it was kept: a rebuild, a reload or a restart
-  moves nothing, a new component is placed beside what it lands with, and a
-  file new to a block goes in after the file it lands with most. The layout
-  still follows how the code lands, a little at a time: each new landing
-  nudges the components once, as far as its co-change pulls them, and moves
-  up to three of the files it touched in each block beside the file each now
-  lands with most. A block whose kept order holds fewer than half its files
-  is laid out afresh. A snapshot reads the kept layout and writes nothing.
+  (`relief/layout.ts`, `relief/layout-store.ts`). The server writes that
+  file itself; no route takes a write from a page, so its HTTP stays GET and
+  HEAD. What is kept stands where it was kept: a rebuild, a reload, a
+  restart or a checkout moves nothing, a new component is placed beside what
+  it lands with, and a file new to a block goes in after the file it lands
+  with most. The layout still follows how the code lands, a little at a
+  time: each landing new since the layout was kept nudges only the
+  components it touched, as far as the co-change of the history up to it
+  pulls them, and moves up to three of the files it touched in each block
+  beside the file each then landed with most. Up to 24 landings seen one by
+  one or arriving together move it the same way, but for the measures that
+  size the blocks; more are taken in 24 shares. A block whose kept order holds
+  fewer than half its files is laid out afresh, and removing the kept file
+  resets the whole layout. A snapshot reads the kept layout and writes
+  nothing.
 - Reading it. Double-clicking a platform steps into it as a slice, and the
   crumbs or `Escape` step back out. A slice of one component's files alone
   (a component with nothing inside it, or a component's own files) names

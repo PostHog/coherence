@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileOrder, MOVES_PER_LANDING, placeComponents } from "./layout.ts";
-import { LayoutKeeper, layoutPath, readLayout } from "./layout-store.ts";
+import { LayoutKeeper, layoutPath, readLayout, writeLayout } from "./layout-store.ts";
 import type { ReliefReading } from "../../relief/relief.ts";
 import type { ShellState } from "../model.ts";
 
@@ -49,14 +49,27 @@ test("each new landing moves a few of the files it touched beside the file each 
   assert.deepEqual(fileOrder(files, landings(10), kept, new Set([9])), ["b.ts", "new.ts", "d.ts", "a.ts", "lone.ts"]);
   // A landing that touched b only moves nothing: b already stands beside new.ts, the file it lands with most.
   assert.deepEqual(fileOrder(files, landings(10), kept, new Set([1])), kept);
-  // One landing moves at most MOVES_PER_LANDING files, however many it pulled away from their neighbours.
-  const many = Array.from({ length: 10 }, (_, i) => file(`m${i}.ts`, 10, i % 2 ? [0, 1] : [0, 2]));
-  const order = many.map((f) => f.file);
-  const nudged = fileOrder(many, landings(3, 10), order, new Set([0, 1, 2]));
-  const moved = order.filter((f, i) => nudged[i] !== f).length;
-  assert.ok(nudged.join() !== order.join(), "the landings moved some");
-  assert.ok(new Set(nudged).size === order.length, "every file once");
-  assert.ok(moved <= 2 * 3 * MOVES_PER_LANDING, `moved ${moved}`);
+  // One landing moves at most MOVES_PER_LANDING files, however many it pulled away from their neighbours: ten x files that
+  // land together stand each between two y files that never land; the fewest moves that turn one order into another is
+  // its length less the longest run it keeps in order.
+  const xs = Array.from({ length: 10 }, (_, i) => file(`x${i}.ts`, 10, [0]));
+  const ys = Array.from({ length: 11 }, (_, i) => file(`y${i}.ts`, 10, []));
+  const order = ys.flatMap((y, i) => (i < xs.length ? [y.file, xs[i]!.file] : [y.file]));
+  const movesBetween = (from: string[], to: string[]) => {
+    const rank = to.map((f) => from.indexOf(f)), tails: number[] = [];
+    for (const r of rank) { let lo = 0, hi = tails.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (tails[mid]! < r) lo = mid + 1; else hi = mid; } tails[lo] = r; }
+    return from.length - tails.length;
+  };
+  const one = fileOrder([...xs, ...ys], landings(2, 10), order, new Set([0]));
+  assert.equal(new Set(one).size, order.length, "every file once");
+  assert.equal(movesBetween(order, one), MOVES_PER_LANDING, "one landing moves its share, and no more");
+  // Two landings, each its own ten, move a share each: a budget never pools across landings.
+  const zs = Array.from({ length: 10 }, (_, i) => file(`z${i}.ts`, 10, [1]));
+  const both = [...order, ...zs.flatMap((z, i) => [z.file, `w${i}.ts`])];
+  const ws = Array.from({ length: 10 }, (_, i) => file(`w${i}.ts`, 10, []));
+  const two = fileOrder([...xs, ...ys, ...zs, ...ws], landings(2, 10), both, new Set([0, 1]));
+  assert.equal(movesBetween(both.filter((f) => f.startsWith("x") || f.startsWith("y")), two.filter((f) => f.startsWith("x") || f.startsWith("y"))), MOVES_PER_LANDING);
+  assert.equal(movesBetween(both.filter((f) => f.startsWith("z") || f.startsWith("w")), two.filter((f) => f.startsWith("z") || f.startsWith("w"))), MOVES_PER_LANDING);
   // A kept order that holds fewer than half the files is another checkout's: the files are laid out afresh, by co-change.
   assert.deepEqual(fileOrder(files, landings(10), ["a.ts", "gone1.ts", "gone2.ts"]), fileOrder(files, landings(10)));
 });
@@ -92,9 +105,16 @@ test("components held stand exactly where they were kept however often they are 
   for (let i = 0; i < 400; i++) held = placeComponents(C, landed, held.layout);
   assert.deepEqual(held.layout, first.layout, "400 placements later, to the digit");
   assert.deepEqual(held.P, once.P);
-  const nudged = placeComponents(C, landed, first.layout, "nudge");
+  // A nudge by landing 0, which touched src/a and src/b, moves what it touched a hair and leaves docs, which it did not touch, to the digit.
+  const nudged = placeComponents(C, landed, first.layout, new Set([0]));
   const moved = Math.max(...nudged.P.map((p, i) => Math.hypot(p[0] - first.P[i]![0], p[1] - first.P[i]![1])));
   assert.ok(moved < 0.5, `moved ${moved}`);
+  assert.deepEqual(nudged.layout["docs"], first.layout["docs"]);
+  // A landing that touched nothing moves nothing, however many land.
+  let quiet = first;
+  const busy = [...landed, ...Array.from({ length: 200 }, () => ({ n: 1, c: [] as [number, number][] }))];
+  for (let i = 0; i < 200; i++) quiet = placeComponents(C, busy, quiet.layout, new Set([landed.length + i]));
+  assert.deepEqual(quiet.layout, first.layout);
   // Laid out afresh, with nothing kept, the same inputs land where they did the first time.
   assert.deepEqual(placeComponents(C, landed).P, first.P);
   // A new component is placed beside what it lands with; what was kept stays put, its platform only centred again round the newcomer.
@@ -145,12 +165,16 @@ test("the relief's layout is kept in .coherence and laid out from: files keep th
     const again = new LayoutKeeper(root);
     for (let i = 0; i < 50; i++) assert.deepEqual(again.components(stateOf([{ n: 2, c: [[1, 1], [2, 1]] }, { n: 1, c: [[0, 1]] }])), placed, "rebuilt, they stand where they were kept");
     assert.equal(readFileSync(layoutPath(root), "utf8"), text, "and nothing is written");
-    // One more landing nudges them, once, a hair; the files' order is untouched by it.
+    // A checkout to a branch whose landings the places were not laid out against is no landing: nothing moves.
+    const branch = stateOf([{ n: 2, c: [[1, 1], [2, 1]] }, { n: 1, c: [[0, 1]] }]);
+    if (branch.relief?.kind === "read") branch.relief.landings = branch.relief.landings.map((l, i) => ({ ...l, sha: `b${i}` }));
+    assert.deepEqual(new LayoutKeeper(root).components(branch), placed, "a checkout moves nothing");
+    // Back on the branch kept, one more landing nudges what it touched, docs, a hair, and nothing else; the files' order is untouched by it.
+    writeFileSync(layoutPath(root), text);
     const nudged = new LayoutKeeper(root).components(stateOf([{ n: 1, c: [[2, 1]] }, { n: 2, c: [[1, 1], [2, 1]] }, { n: 1, c: [[0, 1]] }]))!;
-    for (const folder of [".", "src", "docs"]) {
-      const [a, b] = [placed[folder]!.sub!, nudged[folder]!.sub!];
-      assert.ok(Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!) < 0.5, `${folder} stayed close: ${a} then ${b}`);
-    }
+    const [a, b] = [placed["docs"]!.sub!, nudged["docs"]!.sub!];
+    assert.ok(Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!) < 0.5, `docs stayed close: ${a} then ${b}`);
+    assert.deepEqual(nudged["src"], placed["src"], "what the landing did not touch stands to the digit");
     assert.equal(readLayout(root).at, "s2", "laid out against the newest landing");
     assert.deepEqual(readLayout(root).folders["src"]?.files, expected, "placing components keeps the files' order");
     // A snapshot reads what is kept and keeps nothing of its own.
@@ -161,6 +185,20 @@ test("the relief's layout is kept in .coherence and laid out from: files keep th
     assert.deepEqual(snapshot.components(stateOf([{ n: 1, c: [[2, 1]] }, { n: 2, c: [[1, 1], [2, 1]] }, { n: 1, c: [[0, 1]] }])), nudged, "and its components where they were kept");
     snapshot.flush();
     assert.equal(readFileSync(layoutPath(root), "utf8"), before);
+    // One request's folders are kept in one write, and a request that changes nothing writes nothing.
+    let writes = 0;
+    const counted = new LayoutKeeper(root, true, () => {}, (r, l) => { writes++; writeLayout(r, l); });
+    counted.files("lib", files, lands(4));
+    counted.files("tests", files, lands(4));
+    counted.flush();
+    counted.files("lib", files, lands(4));
+    counted.flush();
+    assert.equal(writes, 1);
+    // Removing the kept file resets the layout: the keeper reads it again and lays the components out afresh.
+    rmSync(layoutPath(root));
+    const reset = counted.components(stateOf([{ n: 1, c: [[2, 1]] }, { n: 2, c: [[1, 1], [2, 1]] }, { n: 1, c: [[0, 1]] }]))!;
+    assert.deepEqual(reset, new LayoutKeeper(join(root, "elsewhere"), false).components(stateOf([{ n: 1, c: [[2, 1]] }, { n: 2, c: [[1, 1], [2, 1]] }, { n: 1, c: [[0, 1]] }])), "laid out afresh");
+    assert.equal(readLayout(root).folders["lib"], undefined, "with nothing of what was removed");
     // A kept file of another shape is read as far as it holds: what is malformed is dropped, a path kept twice is kept once, the rest kept.
     mkdirSync(join(root, ".coherence"), { recursive: true });
     writeFileSync(layoutPath(root), JSON.stringify({ at: 3, folders: { src: { files: ["a.ts", 3], own: [1, 2] }, lib: { files: ["x.ts", "x.ts"], filesAt: "s1" }, docs: "no", ".": { sub: [0, Number.MAX_VALUE * 2], on: "" }, tests: { sub: [1, 1] } } }));

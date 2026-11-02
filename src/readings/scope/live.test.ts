@@ -423,7 +423,7 @@ test("the relief's files load by folder: a folder the relief read is answered wh
   }
 });
 
-test("the warm server lays the relief out from what it keeps in .coherence: the state carries the places kept, the files route sends each folder in the order kept, one request keeps its folders in one write, and a restarted server opens on the same places and orders", async () => {
+test("the warm server lays the relief out from what it keeps in .coherence: the state carries the places kept, the files route sends each folder in the order kept, asked again writes nothing, and a restarted server opens on the same places and orders", async () => {
   const fixture = makeFixture();
   const kept = join(fixture.root, ".coherence", "relief-layout.json");
   const read = () => JSON.parse(readFileSync(kept, "utf8")) as { folders: Record<string, { sub?: number[]; on?: string; files?: string[] }> };
