@@ -12,7 +12,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
 - UserPromptSubmit: a human sends a prompt; the peer feed injects what peers recorded since the last look
   handler: runHook in hook.ts
   trust: harness
-- PostToolUse: a tool finished; the edit is checked, a written spec's problems said, the read trace recorded, and the peer feed and vocabulary changes injected
+- PostToolUse: a tool finished; the edit is checked, a written spec's problems said, the read trace and the replay record written, and the peer feed and vocabulary changes injected
   handler: runHook in hook.ts
   trust: harness
 - Stop: the session is about to stop; regulate reports what it owes
@@ -390,6 +390,20 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: a session start in a project that adopted an earlier release writes the attributes file its records merge by and brings the earlier ignore file up so git commits it
   because: an upgrade is the adopter's next npm install and nothing more; the session start is the first thing of Coherence's that runs after it, so it is where an adopter that never reinstalls the hooks receives the merge rule
   refuted: made the session start's commit skip keepStateFiles -> "a session start in a project that adopted an earlier release writes the attributes file its records merge by and brings the earlier ignore file up so git commits it" went red in hook.test.ts; restored, green (2026-10-09)
+  kinds: none
+- the replay record is committed only as the config says: Coherence's .coherence/.gitignore keeps the replay record out of git unless the config's commitReplay is literally true, and keeps it in, beside the record stores, when it is; install and every session start bring a file in either of Coherence's texts to the one the key asks for, the read trace staying out either way; .gitattributes merges the replay record's files by union and marks them generated, whatever the key; and an ignore file of the adopter's is never rewritten.
+  over: a git project with no commitReplay, then true, then a value that is not true, a replay record and a read trace in it; an earlier release's attributes text; and an adopter's ignore file with the key true
+  via: the replay record is committed only when the config says so: Coherence's ignore file keeps it out by default, keeps it in with commitReplay, and follows the key at every session start, while an adopter's file is never rewritten
+  because: the owner asked for a project config deciding whether the replay record is committed, defaulting to not: it holds every command an agent ran, so committing it is the adopter's choice, never a default; the trace beside it holds machine-local snapshots and must never be committed with it
+  crossing: project-source -> record
+  refuted: made keepIgnore write the default ignore text whatever commitReplay says (src/lifecycle/state-files.ts) -> "the replay record is committed only when the config says so: Coherence's ignore file keeps it out by default, keeps it in with commitReplay, and follows the key at every session start, while an adopter's file is never rewritten" went red in state-files.test.ts on its own assertion ("a session start switches Coherence's file to the key"); restored from a copy (cmp), green batched and alone (2026-10-30)
+  kinds: none
+- a disagreement on the replay record is said, never written: Where the adopter's ignore files decide the replay record and git's verdict differs from commitReplay (ignored while the key commits it, or not ignored while the key keeps it out and the read trace is ignored), the session start and the hook check say so in one line naming the rule git applied and what to change, and neither edits a file of the adopter's; where they agree, where the ignore file is Coherence's, or outside git, nothing is said.
+  over: a root .gitignore keeping .coherence out but for its record folders with the key unset and then true, the same with the replay folder kept, a project outside git, and the hook check's output
+  via: where the adopter's ignore files and the config disagree on the replay record, the session start and the hook check say which rule decides and what to change, and edit nothing
+  because: Coherence never writes a file the adopter wrote, so an adopter who keeps their own ignore rules (as this repository does, in its root .gitignore) would otherwise turn commitReplay on and see nothing committed, or keep it off and commit every command an agent ran, with nothing said
+  crossing: project-source -> reading
+  refuted: made replayIgnoreDisagreement say nothing where .coherence/.gitignore is absent, so a root .gitignore that decides the replay record went unsaid (src/lifecycle/state-files.ts) -> "where the adopter's ignore files and the config disagree on the replay record, the session start and the hook check say which rule decides and what to change, and edit nothing" went red in state-files.test.ts on its own assertion ("the rule that decides is named"); restored from a copy (cmp), green batched and alone (2026-10-30)
   kinds: none
 - the command that makes the folder writes its git files: A command that makes .coherence in a project (a first run or journal record, with no hooks installed) writes .coherence/.gitignore and .gitattributes with it, so git never offers the regenerated state, the warm server's token among it, for a commit; a .coherence that was already there keeps whatever its adopter left, a removed ignore file staying removed.
   over: a git project with a config and no .coherence, two decide commands with the ignore file removed between them

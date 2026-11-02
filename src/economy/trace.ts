@@ -16,7 +16,8 @@
  * the two call sites live in the hook, not here. Traces are not committed:
  * git ignores .coherence/* except the listed record folders, and traces are
  * per session and larger than a journal, so they stay on the machine the
- * session ran on.
+ * session ran on. Every tool call, whatever it read or wrote, goes into the
+ * replay record beside the trace (replay.ts), which the config may commit.
  */
 
 import { execFileSync } from "../lifecycle/work-meter.ts";

@@ -1581,6 +1581,21 @@
       "provenance": {
         "defined_by": "owner, 2026-10-30, named the view (work order w-faf84c51); the entry written by session a98282e8b37e5461b from the prototype the owner reviewed (d-a314db4e, d-d4f9fea6, d-9cf51e23)"
       }
+    },
+    {
+      "name": "replay",
+      "definition": "The ordered record of every tool call a session made, one line per call (when, which session and agent, the tool, a bounded summary of what it did, and the files it read or wrote), and Scope's playing of it back on the Structure view. A subagent's calls go into its coordinator's record. It stays on the machine unless the config's commitReplay is true; the summary never holds a tool's output.",
+      "related": [
+        "read trace",
+        "structure",
+        "scope",
+        "config",
+        "attribution"
+      ],
+      "provenance": {
+        "evidence": "The relief lit only what agents read and wrote from the moment a page connected; activity before it, and every call that read or wrote nothing, could not be seen.",
+        "defined_by": "owner, 2026-10-30"
+      }
     }
   ],
   "metaphors": {

@@ -39,7 +39,7 @@
 // First, before any other module loads: every spawn this process makes is counted from here on (lifecycle/work-meter.ts).
 import "./lifecycle/work-meter.ts";
 import { existsSync, realpathSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEXICON_WORK_USAGE, lexiconWorkCommand } from "./lifecycle/lexicon-cli.ts";
 import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
@@ -62,7 +62,7 @@ import { scopeApp } from "./readings/scope/live.ts";
 import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
 import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 import { nestedFolder, repositoryTop } from "./adapters/project-files.ts";
-import { keepAttributes, keepIgnore, STATE_DIR } from "./lifecycle/state-files.ts";
+import { keepAttributes, keepIgnore, replayIgnoreDisagreement, STATE_DIR } from "./lifecycle/state-files.ts";
 import { installMod, modInstalled, ownModLinked, uninstallMod, MOD_ID, MOD_REPOSITORY, OWN_MOD_LINK, type ModStep } from "./lifecycle/mod-install.ts";
 import { registryOf } from "./adapters/project-config.ts";
 import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
@@ -447,6 +447,12 @@ async function hooksCommand(call: CommandCall, args: string[], root: string): Pr
       }
       call.stdout.write(formatCheck(result));
       drifted ||= result.drift.length > 0;
+    }
+    // The replay record's git verdict against the config, per project: said, never fixed, since the ignore file that decides is the adopter's.
+    const registry = registryOf(root);
+    for (const dir of registry === undefined ? [root] : registry.leaves) {
+      const said = replayIgnoreDisagreement(dir);
+      if (said !== undefined) call.stdout.write(`${registry === undefined ? "" : `${relative(registry.top, dir)}: `}${said}\n`);
     }
     return drifted ? 1 : 0;
   }

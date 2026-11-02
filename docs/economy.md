@@ -55,6 +55,25 @@ patch: its mark keeps the fingerprint either way, as the structure refresh's
 does, and the next edit or read starts a new one. Traces are not committed: per session and larger than the journal, while the labels
 calibrate needs come from the journal and the runs, which are.
 
+## The replay record
+
+Beside the read trace, every PostToolUse appends one `call` line to
+`.coherence/replay/<session>.jsonl`: the time, the session and agent that
+made the call, the tool, a short summary of what it did, and the files it
+read or wrote. A subagent's calls go into its coordinator's file, each line
+naming the subagent's own session and agent, so one session's record holds
+everything done under it. The summary comes from the tool's input alone,
+never its output: a shell command's first line with words shaped like a
+secret masked, a file's project path, a search's pattern and where it
+looked, a URL's host, a query or a subagent's task, at most 160 characters.
+Nothing is read to write it, so the hook's cost stays one append.
+
+It is a file of its own, not more lines in the trace, because git keeps or
+ignores whole files: the trace's snapshots are machine-local, while the
+replay record is what `commitReplay` in the config may commit
+([config.md](config.md)). Scope plays it back on the Structure view; a
+session older than the record plays its trace's reads and writes.
+
 ## Calibrate
 
 For every trace with a snapshot, calibrate reports the predicted closure of
