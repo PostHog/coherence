@@ -11,6 +11,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileOrder, placeComponents } from "./layout.ts";
 import { LayoutKeeper, layoutPath, readLayout } from "./layout-store.ts";
+import type { ReliefReading } from "../../relief/relief.ts";
+import type { ShellState } from "../model.ts";
 
 const file = (name: string, lines: number, landed: number[]) => ({ file: name, lines, reached: 0, l: landed.map((li) => [li, 1] as [number, number]) });
 const landings = (count: number, n = 3) => Array.from({ length: count }, () => ({ n }));
@@ -64,18 +66,43 @@ test("components open where the kept layout left them: placed again from their o
   assert.deepEqual(placeComponents(C, landed).P, first.P);
 });
 
-test("the keeper keeps the order in .coherence, a restart lays out from it, and a snapshot's keeper writes nothing", () => {
+/** The least of a state the relief's data reads: a read relief of three components, no spec, runs, records or interfaces. */
+function stateOf(landings: { n: number; c: [number, number][] }[]): ShellState {
+  const relief: ReliefReading = {
+    kind: "read", head: "abc1234 2026-11-02", leftOut: [], stamp: `stamp-${landings.length}`,
+    landings: landings.map((l, i) => ({ sha: `s${i}`, date: "2026-11-02", subject: "land", ...l })),
+    components: [{ folder: ".", name: "root", files: 4, lines: 100, unreached: 0 }, { folder: "src", name: "Src", files: 4, lines: 400, unreached: 0 }, { folder: "docs", name: "Docs", files: 1, lines: 50, unreached: 0 }],
+  };
+  return { project: "p", spec: { components: [], trustLevels: [] }, runs: { records: [], damaged: [] }, journal: { records: [], damaged: [], work: { kind: "absent", because: "none" } }, componentInterfaces: { kind: "unread", because: "test" }, relief } as unknown as ShellState;
+}
+
+test("the relief's layout is kept in .coherence and laid out from: files keep their order through a landing and a restart, components their places, and a snapshot writes nothing", () => {
   const root = mkdtempSync(join(tmpdir(), "coherence-relief-layout-"));
   try {
-    const files = [file("a1.ts", 10, [0, 1]), file("b1.ts", 10, [2]), file("a2.ts", 10, [0, 1]), file("b2.ts", 10, [2])];
+    const files = [file("src/a1.ts", 10, [0, 1]), file("src/b1.ts", 10, [2]), file("src/a2.ts", 10, [0, 1]), file("src/b2.ts", 10, [2])];
     const first = new LayoutKeeper(root).files("src", files, landings(4)).map((f) => f.file);
     assert.deepEqual(readLayout(root)["src"]?.files, first, "kept as laid out");
-    // After a restart a landing joins a1 with b2; the kept order holds, and the order sent is the order kept.
-    const later = files.map((f) => (f.file === "a1.ts" || f.file === "b2.ts" ? { ...f, l: [...f.l, [3, 1] as [number, number]] } : f));
-    assert.deepEqual(new LayoutKeeper(root).files("src", later, landings(4)).map((f) => f.file), first);
+    // After a restart a landing joins a1 with b2, b1 is gone and new.ts lands with a2: the kept order holds around them.
+    const later = [...files.filter((f) => f.file !== "src/b1.ts").map((f) => (f.file === "src/a1.ts" || f.file === "src/b2.ts" ? { ...f, l: [...f.l, [3, 1] as [number, number]] } : f)), file("src/new.ts", 5, [0])];
+    const expected = first.filter((f) => f !== "src/b1.ts");
+    expected.splice(expected.indexOf("src/a2.ts") + 1, 0, "src/new.ts");
+    assert.deepEqual(new LayoutKeeper(root).files("src", later, landings(4)).map((f) => f.file), expected);
+    assert.deepEqual(readLayout(root)["src"]?.files, expected, "the order sent is the order kept");
+    // Components: placed, kept, and placed again from what was kept after a restart, where they stood.
+    const state = stateOf([{ n: 2, c: [[1, 1], [2, 1]] }, { n: 1, c: [[0, 1]] }]);
+    const placed = new LayoutKeeper(root).components(state)!;
+    assert.deepEqual(readLayout(root)["docs"]?.sub, placed["docs"]?.sub, "the places are kept");
+    const again = new LayoutKeeper(root).components(stateOf([{ n: 2, c: [[1, 1], [2, 1]] }, { n: 1, c: [[0, 1]] }, { n: 1, c: [[2, 1]] }]))!;
+    for (const folder of [".", "src", "docs"]) {
+      const [a, b] = [placed[folder]!.sub!, again[folder]!.sub!];
+      assert.ok(Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!) < 0.5, `${folder} stayed: ${a} then ${b}`);
+    }
+    assert.deepEqual(readLayout(root)["src"]?.files, expected, "placing components keeps the files' order");
     // A snapshot reads what is kept and keeps nothing of its own.
     const before = readFileSync(layoutPath(root), "utf8");
-    new LayoutKeeper(root, false).files("lib", files, landings(4));
+    const snapshot = new LayoutKeeper(root, false);
+    snapshot.files("lib", files, landings(4));
+    snapshot.components(stateOf([{ n: 1, c: [[2, 1]] }]));
     assert.equal(readFileSync(layoutPath(root), "utf8"), before);
     // A kept file of another shape is read as far as it holds: what is malformed is dropped, the rest kept.
     mkdirSync(join(root, ".coherence"), { recursive: true });
