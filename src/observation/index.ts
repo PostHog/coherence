@@ -7,7 +7,7 @@
 import { spawnSync } from "../lifecycle/work-meter.ts";
 import { realpathSync } from "node:fs";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
-import { primaryOnly } from "../readings/scope/languages-read.ts";
+import { DECLARED_NOT_READ, primaryOnly } from "../readings/scope/languages-read.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
 import { workBinding } from "../journal/work.ts";
 import type { SpecModel } from "../spec/model.ts";
@@ -50,7 +50,7 @@ export interface RecordInput {
  * after the first run of a session would be dirty, and so stale.
  */
 export function codeDirty(root: string): boolean {
-  const status = spawnSync("git", ["status", "--porcelain", "--", ".", ":(exclude).coherence"], { cwd: root, encoding: "utf8" });
+  const status = spawnSync("git", ["--no-optional-locks", "status", "--porcelain", "--", ".", ":(exclude).coherence"], { cwd: root, encoding: "utf8" });
   return status.status === 0 && status.stdout.trim() !== "";
 }
 
@@ -63,11 +63,14 @@ export async function recordObservation(input: RecordInput): Promise<Observation
 
   if (input.adapter !== undefined && reason === undefined) {
     const ready = await input.adapter.ready();
-    if (ready.ok) map = await readInterfaceMap(input.root, input.adapter, input.model, input.config, language);
+    // A project that names only languages its config declares has no built-in to read interfaces through: said, never skipped.
+    if (language === undefined) reason = `the project names no built-in language: ${DECLARED_NOT_READ}`;
+    else if (ready.ok) map = await readInterfaceMap(input.root, input.adapter, input.model, input.config, language);
     else reason = ready.reason;
   }
   const unread = reason ?? (input.adapter === undefined ? "no adapter" : undefined);
-  const capture: Capture = unread === undefined ? input.capture : { ...input.capture, note: `${input.capture.note}; component interfaces and entrances not read: instrument unavailable (${unread})` };
+  const failed = map.unanswered === undefined ? "" : `; component interfaces through ${map.unanswered.map((u) => u.file).join(", ")} not read: the instrument could not answer for them (${[...new Set(map.unanswered.map((u) => u.reason))].join("; ")})`;
+  const capture: Capture = unread === undefined ? { ...input.capture, note: `${input.capture.note}${failed}` } : { ...input.capture, note: `${input.capture.note}; component interfaces and entrances not read: instrument unavailable (${unread})` };
   let realRoot = input.root;
   try {
     realRoot = realpathSync(input.root);

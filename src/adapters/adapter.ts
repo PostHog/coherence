@@ -23,6 +23,8 @@
  * as conventions enforced by nobody.
  */
 
+import { testByLanguageFolder, testByLanguageName } from "../plugins/languages.ts";
+
 /** A position as the protocol counts it: zero-based line and character. */
 export interface Position {
   line: number;
@@ -77,6 +79,21 @@ export interface ReferenceSite {
   symbol: string | undefined;
   /** The syntactic form the adapter read at the site, when the site has one. */
   form?: SiteForm;
+  /**
+   * Set when the adapter read the site as test code that its path alone does
+   * not show: a test module inside a source file, as Rust's `#[cfg(test)]`
+   * keeps one. The check classes it a test reference wherever it stands, the
+   * chokepoint's own file included.
+   */
+  test?: true;
+  /**
+   * Set when the adapter cannot tell whether the site reaches the thing: a
+   * use it does not read through (a value passed on, a name by string), said
+   * in why. The check classes it as any other site, so one outside the
+   * chokepoint keeps it from passing, and names it as not read through
+   * rather than as a reference it read.
+   */
+  unread?: string;
 }
 
 /**
@@ -188,6 +205,9 @@ export interface Ladder {
   whenVacuous?: ChokedGrade;
 }
 
+/** Who asks for a refutation: the check at an edit, or a run (a full or scoped run, refute, plugin check). */
+export type Occasion = "edit" | "run";
+
 export interface LanguageAdapter {
   readonly language: string;
   readonly ladder: Ladder;
@@ -202,8 +222,10 @@ export interface LanguageAdapter {
    * Open an unsaved document outside `outsideOf` that references `protected`, ask for references, report the site the instrument named, close.
    * With `exempt`, the folder whose references the chokepoint does not govern, the same-module site is not staged where the folder holds
    * the chokepoint, and a use from an unsaved document outside the folder is staged instead, so the classifier's exemption is put to the test.
+   * `occasion` says who asks: "edit" for the check at an edit, inside the hook's latency budget, "run" for a run, a refutation or plugin
+   * check; an adapter may take a cheaper honest path at an edit (a warm scratch copy, an index kept between edits), never a guess.
    */
-  refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string): Promise<Refutation>;
+  refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string, occasion?: Occasion): Promise<Refutation>;
   /**
    * Drop what is cached about file contents and make the instrument see the current disk text of every
    * document it may have open and of the named files, resolving only once the instrument has acknowledged
@@ -213,6 +235,20 @@ export interface LanguageAdapter {
   close(): Promise<void>;
   /** The language server's process id while it runs, so a reading can bound that server's memory; absent where the adapter cannot say. */
   serverPid?(): number | undefined;
+  /**
+   * The symbols the language server says a file declares at its top level,
+   * each with its one-based line and LSP symbol kind: the independent account
+   * the text readings are calibrated against (plugin check's server agrees
+   * duty, coherence plugin calibrate). Absent where the adapter cannot ask.
+   */
+  topLevelSymbols?(file: string): Promise<ServerSymbol[]>;
+}
+
+/** A symbol as the language server reports it: its name, the one-based line its name stands on, and its LSP SymbolKind. */
+export interface ServerSymbol {
+  name: string;
+  line: number;
+  kind: number;
 }
 
 /**
@@ -281,6 +317,16 @@ export function withinFolder(file: string, folder: string): boolean {
   return folder === "." || file === folder || file.startsWith(`${folder}/`);
 }
 
+/**
+ * The files a name's file hint (`Name in <hint>`) names: the file whose project-relative path is the hint, when one is, else
+ * every file whose path ends with `/<hint>`. An exact path never also takes a copy of the file under another folder (a
+ * fixture's), which would make the name ambiguous.
+ */
+export function hintedFiles(files: readonly string[], hint: string): string[] {
+  const path = hint.replace(/^\.\//, "");
+  return files.includes(path) ? [path] : files.filter((rel) => rel.endsWith(`/${path}`));
+}
+
 /** Where a refutation stages its use from outside an exempted folder: beside the folder, in its parent; undefined when the folder is the root, which leaves no outside. */
 export function outsideOfFolder(folder: string): string | undefined {
   if (folder === ".") return undefined;
@@ -288,10 +334,11 @@ export function outsideOfFolder(folder: string): string | undefined {
   return parent === "." ? "" : `${parent}/`;
 }
 
-/** Whether a project-relative path lies in a test folder or is a test file by name (`.test.ts`, `.spec.ts`, pytest's `test_*.py` and `*_test.py`). */
+/** Whether a project-relative path lies in a test folder (the config's, or a language plugin's own: SwiftPM's `Tests`) or is a test file by name (`.test.ts`, `.spec.ts`, or a language plugin's own naming: pytest's `test_*.py` and `*_test.py`). */
 export function isTestPath(file: string, testFolders: readonly string[]): boolean {
   const parts = file.split("/");
   if (parts.some((part) => testFolders.includes(part))) return true;
+  if (parts.slice(0, -1).some(testByLanguageFolder)) return true;
   const base = parts[parts.length - 1] ?? "";
-  return /\.(test|spec)\.[a-z]+$/.test(base) || /^test_.*\.py$/.test(base) || /_test\.py$/.test(base);
+  return /\.(test|spec)\.[a-z]+$/.test(base) || testByLanguageName(base);
 }

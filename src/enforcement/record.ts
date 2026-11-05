@@ -1,6 +1,6 @@
 /**
- * The run: the primary record of one verification pass. One JSONL file per
- * session under .coherence/runs, one line per run, append only. Each run
+ * The run: the primary record of one verification pass. Sealed shards per
+ * session under .coherence/runs (shards.ts), one record per run, append only. Each run
  * carries one entry per enforcement checked (component, invariant, form).
  * The latest verdict per enforcement is a view derived from every run file
  * when it is asked for; it is never stored, and an enforcement a later run
@@ -30,9 +30,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node
 import { availableParallelism, loadavg } from "node:os";
 import { basename, join } from "node:path";
 import { appendWhole, storeLines } from "../journal/append.ts";
+import { shardFor } from "../journal/shards.ts";
+import { isStoreFile, storeDir } from "../journal/stores.ts";
 import { heldSites, noteRunAppend, noteSitesAppend, runFileIdentity, type HeldSites } from "./run-index.ts";
 
-export const RUNS_DIR = join(".coherence", "runs");
+export const RUNS_DIR = storeDir("runs");
 
 export type Form = "chokepoint" | "totality oracle";
 export type Verdict = "pass" | "fail" | "not run";
@@ -69,6 +71,8 @@ export interface Bypass {
   symbol: string;
   /** The checker that refuses this import, with its error, when one does (tach). */
   checker?: string;
+  /** Why the instrument could not tell whether this site reaches the protected thing, when it could not: a gap that keeps the chokepoint from passing. */
+  unread?: string;
 }
 
 /** What a persisted reference site points at. */
@@ -170,6 +174,10 @@ export interface RunEntry {
   enforces?: string[];
   /** Set on an edit's check, which derives no state (run.ts, grade: false): the invariant floor does not count the entry. */
   ungraded?: true;
+  /** The plugins that answered (src/plugins): a chokepoint graded through a plugin's adapter, or a via a plugin proved; absent when the core answered alone. */
+  plugins?: { name: string; version: string }[];
+  /** Totality oracle form, a via a plugin proved: what kind of evidence its pass is, as the plugin's manifest labels the form. */
+  evidence?: string;
 }
 
 export interface RunRecord {
@@ -324,20 +332,21 @@ function appendLine(root: string, file: string, line: string, updates: ReadonlyM
 export function appendRun(root: string, record: RunRecord): string {
   if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
   mkdirSync(runsDir(root), { recursive: true });
-  const name = `${record.session}.jsonl`;
-  const file = join(runsDir(root), name);
-  const written = compactRecord(root, name, record);
-  appendLine(root, file, `${JSON.stringify(written)}\n`, sitesUpdates(written));
-  return file;
+  const shard = shardFor(root, "runs", record.session);
+  const written = compactRecord(root, shard.name, record);
+  appendLine(root, shard.file, `${JSON.stringify(written)}\n`, sitesUpdates(written));
+  shard.kept();
+  return shard.file;
 }
 
 /** Append one refutation as one line, beside the runs of the same session. */
 export function appendRefutation(root: string, record: RefutationRecord): string {
   if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
   mkdirSync(runsDir(root), { recursive: true });
-  const file = join(runsDir(root), `${record.session}.jsonl`);
-  appendLine(root, file, `${JSON.stringify(record)}\n`, new Map());
-  return file;
+  const shard = shardFor(root, "runs", record.session);
+  appendLine(root, shard.file, `${JSON.stringify(record)}\n`, new Map());
+  shard.kept();
+  return shard.file;
 }
 
 export interface LoadedRuns {
@@ -353,7 +362,7 @@ export function loadRuns(root: string): LoadedRuns {
   if (!existsSync(dir)) return loaded;
   const where = new Map<RunRecord, { file: string; line: number }>();
   const seen = new Set<string>();
-  for (const name of readdirSync(dir).filter((n) => n.endsWith(".jsonl")).sort()) {
+  for (const name of readdirSync(dir).filter(isStoreFile).sort()) {
     for (const { line, number } of storeLines(readFileSync(join(dir, name), "utf8"), seen)) {
       const parsed = parseLine(line);
       if (typeof parsed === "string") loaded.damaged.push({ file: join(RUNS_DIR, name), line: number, reason: parsed });

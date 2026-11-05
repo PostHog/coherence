@@ -16,14 +16,17 @@ import { renderPracticesResults, renderPracticesTools } from "./practices-view.t
 import type { ShellState } from "./model.ts";
 import { renderRunsResults, renderRunsTools } from "./runs-view.ts";
 import { flowOf, flowVerdict } from "./structure-flow.ts";
-import { renderStructureResults, renderStructureTools } from "./structure-view.ts";
+import { renderConnectionsResults, renderStructureResults } from "./structure-view.ts";
+import { CONNECTIONS_ID, CONNECTIONS_LABEL } from "./derive.ts";
 
 /**
- * The views in strip order: Structure first, then Lexicon, then the rest (the owner's ruling, d-bf90cb79). The builder
+ * The views in strip order: Structure first, Connections beside it, then Lexicon, then the rest (the owner's rulings, d-bf90cb79,
+ * 2026-10-30). The builder
  * embeds this list; the page reads it from state.
  */
 export const VIEWS = [
   { id: "structure", label: "Structure" },
+  { id: CONNECTIONS_ID, label: CONNECTIONS_LABEL },
   { id: "lexicon", label: "Lexicon" },
   { id: "components", label: "Components" },
   { id: "invariants", label: "Invariants" },
@@ -70,14 +73,15 @@ export function renderConnection(state: ShellState): Markup | null {
 }
 
 /**
- * The masthead leads with health: one verdict in large type, the link to its
- * set on the Structure map (the broken component's mark when one component
- * holds everything broken), and what else the verdict leaves out beneath it.
+ * The masthead leads with health: one verdict in large type, linking to
+ * Structure (its href still names the verdict's set, which resolveHash sends
+ * to the Structure view), and what else the verdict leaves out beneath it,
+ * the undeclared entrances among it as a neutral count.
  * The lexicon and the record counts are demoted to one small line.
  */
 export function renderMasthead(state: ShellState): Markup {
   // The project's own lexicon when it has one: the masthead counts the project, not the tool.
-  const first = state.lexicon.layers.find((layer) => layer.id !== "coherence" && layer.kind === "present") ?? state.lexicon.layers[0];
+  const first = state.lexicon.layers.find((layer) => layer.id === "domain" && layer.kind === "present") ?? state.lexicon.layers[0];
   const counts =
     first !== undefined && first.kind === "present"
       ? lexiconCounts(first.lexicon)
@@ -89,6 +93,8 @@ export function renderMasthead(state: ShellState): Markup {
     verdict.kind === "broken" && requirements > 0 ? `${requirements} ${requirements === 1 ? "requirement" : "requirements"} not enforced yet` : "",
     verdict.kind === "nothing" ? `${requirements} ${requirements === 1 ? "requirement" : "requirements"} declared, none enforced` : "",
     model.health.uncovered.length > 0 ? plural(model.health.uncovered.length, "component not covered", "components not covered") : "",
+    // Undeclared is the normal state of a detected entrance, never a gap: a neutral count, kept in view so it is never a quiet place to leave routes (d-a1095ef2).
+    model.coverage !== undefined && model.coverage.uncovered.length > 0 ? `${model.coverage.uncovered.length} of ${plural(model.coverage.detected, "entrance", "entrances")} undeclared` : "",
   ].filter(Boolean).join(" · ");
   return html`<div class="masthead">
     <p class="reading-name">Scope</p>
@@ -129,6 +135,8 @@ export function renderViewResults(state: ShellState): Markup {
       return renderComponentsResults(state);
     case "structure":
       return renderStructureResults(state);
+    case CONNECTIONS_ID:
+      return renderConnectionsResults(state);
     case "invariants":
       return renderInvariantsResults(state);
     case "practices":
@@ -153,8 +161,6 @@ function renderViewTools(state: ShellState): Markup | null {
       </div>`;
     case "components":
       return renderComponentsTools(state);
-    case "structure":
-      return renderStructureTools(state);
     case "invariants":
       return renderInvariantsTools(state);
     case "practices":

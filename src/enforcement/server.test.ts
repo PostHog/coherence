@@ -11,9 +11,12 @@ import { createConnection, createServer, type Socket } from "node:net";
 import { networkInterfaces, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
+import { budget } from "./test-budgets.ts";
 import { CODE_SALT_ENV, QUICK_REQUEST_MS, REQUEST_MS, codeFingerprint, connectAdapter, openLineClient, serve, serverPaths, type HttpAppFactory, type Serving } from "./server.ts";
 import { performRun } from "./run.ts";
 import { stopWarmServers } from "./server-fixture.ts";
+import type { LanguageAdapter } from "../adapters/adapter.ts";
+import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 
 let root: string;
 let started: Promise<Serving> | undefined;
@@ -75,6 +78,25 @@ test("two clients ask the same questions; the second finds the server warm", asy
   await second.adapter.close();
 });
 
+test("a served refutation stages what the adapter in process stages, the exempt folder and the occasion carried", async () => {
+  await warm();
+  const served = await connectAdapter(root, { spawn: false });
+  const local = new TypeScriptAdapter(root);
+  try {
+    const hint = { component: ".", testFolders: ["__tests__"] };
+    const open = await served.adapter.resolve("open", hint);
+    assert.ok(open.ok, JSON.stringify(open));
+    const staged = async (adapter: Pick<LanguageAdapter, "refute">): Promise<string[]> => (await adapter.refute(open.definition, undefined, "src", "edit")).staged.map((s) => s.what.replace(/coherence-refutation-[0-9a-f]+/, "<doc>"));
+    const there = await staged(served.adapter);
+    assert.deepEqual(there, await staged(local), "the server stages what the adapter does, outside the exempt folder");
+    const unexempt = (await served.adapter.refute(open.definition, undefined)).staged.map((s) => s.what.replace(/coherence-refutation-[0-9a-f]+/, "<doc>"));
+    assert.notDeepEqual(there, unexempt, "the exempt folder changed what was staged, so it reached the adapter");
+  } finally {
+    await local.close();
+    await served.adapter.close();
+  }
+});
+
 test("a client with spawning off fails plainly when nothing listens", async () => {
   const other = mkdtempSync(join(tmpdir(), "coherence-noserver-"));
   try {
@@ -84,7 +106,8 @@ test("a client with spawning off fails plainly when nothing listens", async () =
   }
 });
 
-test("the run keeps the instrument alive across the test pass, and a run whose instrument died exits non-zero with the reason", async () => {
+test("the run keeps the instrument alive across the test pass, and a run whose instrument died exits non-zero with the reason", async (t) => {
+  budget(t, 15, "d-4d6efcf9");
   // The totality pass runs the whole suite before the first question, and the warm server's idle timer only
   // resets on a request line. Reviewer A: a suite longer than the idle killed the instrument, every chokepoint
   // recorded not run, and the run exited 0.
@@ -310,7 +333,11 @@ function rawLine(socketPath: string, line: string): Promise<{ answer: string; cl
       clearTimeout(timer);
       resolve({ answer, closed: true });
     });
-    socket.on("error", reject);
+    // A refused connection is ended by the server; this side's own end can then meet the closed peer as EPIPE or
+    // ECONNRESET, which is the close the test asks for, not a failure of it.
+    socket.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code !== "EPIPE" && error.code !== "ECONNRESET") reject(error);
+    });
     socket.on("connect", () => socket.write(line + "\n"));
   });
 }

@@ -53,7 +53,7 @@ export function findingDigest(file: string, name: string, line: string): string 
 
 /** A rejected-name finding the baseline may hold: an editable finding the check would fail on. */
 export function baselinable(f: RejectedFinding): boolean {
-  return f.repair === "edit" && f.advisory !== true;
+  return f.repair === "edit";
 }
 
 function parse(id: string, json: string): Omit<Baseline, "id"> {

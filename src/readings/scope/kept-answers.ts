@@ -26,6 +26,12 @@
  * without starting the server; what was dropped is asked again. One source
  * edit rereads only what that file touches.
  *
+ * A references question the server refused with an error of its own is kept
+ * too, so an unchanged tree never starts the server only to be refused again;
+ * a refusal names no files it rests on, so any change to the tree drops it. A
+ * failure that may pass on its own (an exit, a timeout, a transient protocol
+ * code, a tsserver assertion) is never kept: see lastingRefusal.
+ *
  * What the server's answers rest on beyond the project's source (the
  * project's language configuration, manifests and lockfiles, the config's
  * bounds and test folders, and the adapter's own code and Coherence's
@@ -34,42 +40,95 @@
  * used silently: the reading carries how many it reused and asked, and how
  * many files had changed.
  *
+ * Every save also keeps the answers in the repository's git common folder,
+ * which all its worktrees share, named by the project's folder within the
+ * repository and the basis; a worktree with no answers of its own that hold
+ * starts from that copy, so a new worktree asks only what its tree changed.
+ * Only a folder the repository tracks shares: one that merely lies inside
+ * some checkout writes nothing into it.
+ *
  * Node-only; the browser bundle never imports it.
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
-import { resolveDotted } from "../../adapters/python.ts";
-import { resolveSpecifier } from "../../adapters/typescript.ts";
+import { RpcError } from "../../adapters/jsonrpc.ts";
+import { closureOf } from "../../enforcement/code-fingerprint.ts";
+import { isBasisFile, languageCode, parsedOf, serverExtensions } from "../../plugins/languages.ts";
 import type { KeptReport } from "./model.ts";
+import { sharedStructureDir, writeAtomically } from "./shared-structure.ts";
 
 /** Where each language's kept answers live: transient, beside the recorded reading. */
 const KEPT_DIR = join(".coherence", "structure");
 
-const KEPT_VERSION = 1;
+const KEPT_VERSION = 2;
 
-/** The extensions a server can report a site in or resolve a name to, per language: the files whose change an answer can depend on. */
-const KEPT_EXTENSIONS: Record<Language, readonly string[]> = {
-  typescript: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
-  python: [".py", ".pyi"],
-};
 
-/** The project files besides source that a server's answers rest on: language configuration, manifests and lockfiles, by base name. */
-const BASIS_FILE = /^(?:tsconfig(?:\.[\w-]+)*\.json|jsconfig\.json|package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|bun\.lockb?|pyproject\.toml|pyrightconfig\.json|setup\.cfg|uv\.lock|poetry\.lock|requirements[\w.-]*\.txt|coherence\.config\.json)$/;
+/** Where the language adapters are entered: every module it reaches is code an answer comes from. */
+const ADAPTER_ENTRY = "adapters/index.ts";
 
-/** The adapter code an answer comes from: a change to it may change any answer. */
-const ADAPTER_SOURCES = ["adapter.ts", "index.ts", "jsonrpc.ts", "project-files.ts", "python.ts", "typescript.ts"];
+/**
+ * The adapter code an answer comes from, a change to any of which may change
+ * any answer: every module the adapters' entry imports and every module the
+ * language plugins answer from, followed to the end, as this installation
+ * holds them (the sources in a checkout, the compiled modules in the
+ * published package, which ships no sources).
+ */
+export function adapterCode(): string[] {
+  return closureOf([ADAPTER_ENTRY, ...languageCode()]);
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..", "..");
 
 const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
-const TS_WILDCARD = /^export\s+(?:type\s+)?\*(?:\s+as\s+[A-Za-z_$][A-Za-z0-9_$]*)?\s+from\s*["']([^"']+)["']/gm;
-const PY_STAR = /^from\s+(\.*)([A-Za-z0-9_.]*)\s+import\s+\*/gm;
+/** The module files a changed file star-imports or wildcard re-exports, as the component interface reading reads them (the parsed interfaces reading's wildcardModules). */
+function keptModules(language: Language, file: string, text: string): string[] {
+  return parsedOf(language, "interfaces")?.wildcardModules(file, text) ?? [];
+}
+
+/** Protocol codes that mean "ask again", never "this question has no answer": request cancelled, content modified, server cancelled, server not initialized. */
+const TRANSIENT_CODES = new Set([-32800, -32801, -32802, -32002]);
+
+/** A tsserver assertion: it fires on the session's history (what was opened and asked before), which a later reading does not repeat. */
+const SESSION_FAILURE = /Debug Failure/;
+
+/**
+ * Whether a failure is the server refusing the question as the tree stands, so an unchanged tree would be
+ * refused again: an error the server itself returned (never an exit, a spawn failure or a timeout), with
+ * no transient protocol code and no tsserver assertion in its words.
+ */
+export function lastingRefusal(error: unknown): error is RpcError {
+  return error instanceof RpcError && !TRANSIENT_CODES.has(error.code) && !SESSION_FAILURE.test(error.detail);
+}
+
+/**
+ * `words` with every spelling of `root` in them (its path and its real path, each also as a file URL) made
+ * project-relative: a file under it by its relative path, the root itself as ".". A refusal's words are the
+ * server's, which may name the file it was asked about by its absolute path; kept so, a worktree that reused
+ * them would name the folder of the worktree that asked.
+ */
+export function rootless(root: string, words: string): string {
+  const roots = new Set([resolve(root)]);
+  try {
+    roots.add(realpathSync(root));
+  } catch {
+    // A root that cannot be resolved is named as given.
+  }
+  let said = words;
+  for (const at of [...roots].sort((a, b) => b.length - a.length)) {
+    if (dirname(at) === at) continue;
+    for (const form of [pathToFileURL(at).href, at]) {
+      for (const separator of new Set(["/", sep])) said = said.split(`${form}${separator}`).join("");
+      said = said.split(form).join(".");
+    }
+  }
+  return said;
+}
 
 /** One kept answer and what it depends on: the files it names and the names that, spelled in a changed file, could change it. */
 interface Kept<T> {
@@ -89,10 +148,49 @@ interface KeptFile {
   hashes: Record<string, string>;
   resolves: Record<string, Kept<Resolved>>;
   references: Record<string, Kept<ReferenceSite[]>>;
+  failures: Record<string, Kept<string>>;
 }
 
 function keptPath(root: string, language: Language): string {
   return join(root, KEPT_DIR, `answers-${language}.json`);
+}
+
+/** How many sets of answers the repository keeps per project and language, each for one basis: the rest, least recently saved, are removed. */
+const SHARED_KEPT = 4;
+
+/**
+ * The answers any worktree of `root`'s repository kept for this project and
+ * this basis, which seed a worktree that has none of its own that hold. Named
+ * by a digest of the project's folder within the repository and one of the
+ * basis, which a reading works out from files alone before it
+ * asks anything, so two projects of one repository, or two branches whose
+ * manifests or lockfiles differ, each keep their own and never overwrite the
+ * other's.
+ */
+function sharedKeptPath(root: string, language: Language, basis: Record<string, string>): string | undefined {
+  const shared = sharedStructureDir(root);
+  if (shared === undefined) return undefined;
+  const project = digest(shared.prefix).slice(0, 8);
+  const key = digest(JSON.stringify(Object.entries(basis).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))).slice(0, 16);
+  return join(shared.dir, `answers-${language}-${project}-${key}.json`);
+}
+
+/** Remove the repository's answers for this project and language beyond the SHARED_KEPT most recently saved; `path` is the one just saved. */
+function pruneShared(path: string): void {
+  const dir = dirname(path);
+  const project = basename(path).replace(/[0-9a-f]{16}\.json$/, "");
+  const own = (file: string): boolean => file.startsWith(project) && /^[0-9a-f]{16}\.json$/.test(file.slice(project.length));
+  const kept: { file: string; at: number }[] = [];
+  for (const file of readdirSync(dir)) {
+    if (!own(file)) continue;
+    try {
+      kept.push({ file, at: statSync(join(dir, file)).mtimeMs });
+    } catch {
+      // Removed by another worktree's save meanwhile.
+    }
+  }
+  kept.sort((a, b) => b.at - a.at || a.file.localeCompare(b.file));
+  for (const { file } of kept.slice(SHARED_KEPT)) if (join(dir, file) !== path) rmSync(join(dir, file), { force: true });
 }
 
 function digest(text: Buffer | string): string {
@@ -113,17 +211,25 @@ function basisOf(root: string, language: Language, files: readonly string[], ign
     // An unreadable package.json is one more basis value, never a reason to reuse answers it might have changed.
   }
   basis["Coherence's version"] = version;
-  basis["the language adapter's code"] = digest(
-    ADAPTER_SOURCES.map((file) => {
-      try {
-        return readFileSync(join(COHERENCE_ROOT, "src", "adapters", file), "utf8");
-      } catch {
-        return `${file}: unreadable`;
-      }
-    }).join("\u0000"),
-  );
+  const code = adapterCode();
+  // No module found is never an empty basis that holds: the key says so, and differs from any reading that found its code.
+  basis["the language adapter's code"] =
+    code.length === 0
+      ? `unread: no module found from ${ADAPTER_ENTRY}`
+      : digest(
+          code
+            .map((file) => {
+              const name = relative(COHERENCE_ROOT, file);
+              try {
+                return `${name}\u0000${readFileSync(file, "utf8")}`;
+              } catch {
+                return `${name}: unreadable`;
+              }
+            })
+            .join("\u0000"),
+        );
   for (const file of files) {
-    if (!BASIS_FILE.test(basename(file))) continue;
+    if (basename(file) !== "coherence.config.json" && !isBasisFile(basename(file))) continue;
     try {
       basis[file] = digest(readFileSync(join(root, file)));
     } catch {
@@ -178,21 +284,7 @@ function changesOf(root: string, language: Language, was: Record<string, string>
       continue;
     }
     for (const token of text.match(TOKEN) ?? []) tokens.add(token);
-    if (language === "typescript") {
-      for (const [, specifier] of text.matchAll(TS_WILDCARD)) {
-        const target = resolveSpecifier(file, specifier!);
-        if (target === undefined) continue;
-        const stripped = target.replace(/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/, "");
-        for (const candidate of [target, `${stripped}.ts`, `${stripped}.tsx`, `${stripped}.mts`, `${stripped}.cts`, `${stripped}.js`, `${stripped}/index.ts`]) modules.add(candidate);
-      }
-    } else {
-      for (const [, dots, dotted] of text.matchAll(PY_STAR)) {
-        const target = resolveDotted(file, dots!, dotted!);
-        if (target === undefined) continue;
-        modules.add(`${target}.py`);
-        modules.add(`${target}/__init__.py`);
-      }
-    }
+    for (const module of keptModules(language, file, text)) modules.add(module);
   }
   return { files, tokens, modules };
 }
@@ -218,6 +310,7 @@ export class KeptAnswers {
   private readonly basis: Record<string, string>;
   private readonly resolves = new Map<string, Kept<Resolved>>();
   private readonly references = new Map<string, Kept<ReferenceSite[]>>();
+  private readonly failures = new Map<string, Kept<string>>();
   private reused = 0;
   private asked = 0;
   private readonly changed: number;
@@ -229,7 +322,7 @@ export class KeptAnswers {
   private constructor(root: string, language: Language, files: readonly string[], ignore: readonly string[], testFolders: readonly string[]) {
     this.root = root;
     this.language = language;
-    const extensions = KEPT_EXTENSIONS[language];
+    const extensions = serverExtensions(language);
     this.hashes = {};
     for (const file of files) {
       if (!extensions.some((ext) => file.endsWith(ext))) continue;
@@ -259,6 +352,10 @@ export class KeptAnswers {
       if (holds(kept, changes)) this.references.set(key, kept);
       else dropped += 1;
     }
+    for (const [key, kept] of Object.entries(loaded.failures)) {
+      if (holds(kept, changes)) this.failures.set(key, kept);
+      else dropped += 1;
+    }
     this.dropped = dropped;
   }
 
@@ -267,9 +364,17 @@ export class KeptAnswers {
     return new KeptAnswers(root, language, files, ignore, testFolders);
   }
 
-  /** The kept file, or why nothing kept is used. */
+  /** The kept file: the worktree's own, else the repository's for this project and basis; or why nothing kept is used, the own file's reason first. */
   private load(): KeptFile | string {
-    const path = keptPath(this.root, this.language);
+    const own = this.read(keptPath(this.root, this.language));
+    if (typeof own !== "string") return own;
+    const shared = sharedKeptPath(this.root, this.language, this.basis);
+    const seeded = shared === undefined ? own : this.read(shared);
+    return typeof seeded === "string" ? own : seeded;
+  }
+
+  /** One kept file, or why it is not used. */
+  private read(path: string): KeptFile | string {
     if (!existsSync(path)) return "no answers were kept for this tree yet";
     let kept: KeptFile;
     try {
@@ -277,7 +382,7 @@ export class KeptAnswers {
     } catch {
       return "the kept answers are unreadable";
     }
-    if (kept.version !== KEPT_VERSION || kept.language !== this.language || typeof kept.hashes !== "object" || typeof kept.basis !== "object") return "the kept answers are of another version";
+    if (kept.version !== KEPT_VERSION || kept.language !== this.language || typeof kept.hashes !== "object" || typeof kept.basis !== "object" || typeof kept.failures !== "object") return "the kept answers are of another version";
     return basisChange(kept.basis, this.basis) ?? kept;
   }
 
@@ -310,6 +415,30 @@ export class KeptAnswers {
     this.references.set(referencesKey(definition), { answer: sites, files, spellings: [...new Set(spellings)], module: definition.file, ...(broad ? { broad: true } : {}) });
   }
 
+  /** The reason the server gave when it refused `definition`'s references, kept while the tree is unchanged; undefined when none is kept. */
+  failed(definition: Definition): string | undefined {
+    const kept = this.failures.get(referencesKey(definition));
+    if (kept === undefined) return undefined;
+    this.reused += 1;
+    return kept.answer;
+  }
+
+  /**
+   * Keep the server's refusal of `definition`'s references (a lastingRefusal), as broad: any change to the tree
+   * drops it. A refusal names no files it rests on (a stack overflow may come from types in a file that never
+   * spells the name), so only an unchanged tree is sure to be refused again. The reason is kept with this tree's
+   * root made project-relative, since another worktree of the repository may reuse it.
+   */
+  keepFailed(definition: Definition, reason: string): void {
+    this.asked += 1;
+    this.failures.set(referencesKey(definition), { answer: rootless(this.root, reason), files: [definition.file], spellings: [], module: definition.file, broad: true });
+  }
+
+  /** A question asked of the server that failed and is not kept: still asked anew. */
+  failedAnew(): void {
+    this.asked += 1;
+  }
+
   /** What this reading did with the kept answers. */
   report(): KeptReport {
     return { reused: this.reused, asked: this.asked, changed: this.changed, dropped: this.dropped, ...(this.whole === undefined ? {} : { whole: this.whole }) };
@@ -324,15 +453,18 @@ export class KeptAnswers {
       hashes: this.hashes,
       resolves: Object.fromEntries([...this.resolves].sort(([a], [b]) => a.localeCompare(b))),
       references: Object.fromEntries([...this.references].sort(([a], [b]) => a.localeCompare(b))),
+      failures: Object.fromEntries([...this.failures].sort(([a], [b]) => a.localeCompare(b))),
     };
-    const path = keptPath(this.root, this.language);
-    try {
-      mkdirSync(dirname(path), { recursive: true });
-      const temporary = `${path}.${process.pid}.tmp`;
-      writeFileSync(temporary, JSON.stringify(kept), "utf8");
-      renameSync(temporary, path);
-    } catch {
-      // Answers that cannot be kept only mean the next reading asks the server again.
+    const text = JSON.stringify(kept);
+    const shared = sharedKeptPath(this.root, this.language, this.basis);
+    for (const path of [keptPath(this.root, this.language), shared]) {
+      if (path === undefined) continue;
+      try {
+        writeAtomically(path, text);
+        if (path === shared) pruneShared(shared);
+      } catch {
+        // Answers that cannot be kept only mean the next reading asks the server again.
+      }
     }
   }
 }

@@ -22,12 +22,18 @@
  * in a family is never a guard failure.
  */
 
-import { spawnSync } from "../lifecycle/work-meter.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JournalError } from "./args.ts";
-import { CAUGHT, type Caught, type Decision, type Defect, type DefectOrigin, type JournalRecord, type Resolution } from "./record.ts";
+import { coreLanguageOfExtension, LANGUAGES } from "../adapters/language-files.ts";
+import { readPlugins } from "../plugins/registry.ts";
+import { effectiveConfig } from "../adapters/project-config.ts";
+import { missingCommits } from "./commits.ts";
+import { CAUGHT, type Caught, type DefectOrigin } from "./record.ts";
+import type { DefectState } from "./defect-states.ts";
+
+export { defectStates, type DefectState } from "./defect-states.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_LEXICON = resolve(here, "..", "..", "docs", "lexicon.json");
@@ -53,37 +59,42 @@ function classesIn(path: string, families = false): string[] {
   }
 }
 
-/** The project's own lexicon: the config's lexicon key, else lexicon.json at the root. */
-function projectLexiconPath(root: string): string | undefined {
+/**
+ * The lexicon stack's files, in order: Coherence's, each plugin's layer
+ * (src/plugins/lexicon.ts), then the project's own (the config's lexicon key,
+ * else lexicon.json at the root). The config is read once for both keys.
+ */
+function stackFiles(root: string, strict: boolean): string[] {
+  let config: Record<string, unknown> = {};
   try {
-    const config = JSON.parse(readFileSync(join(root, "coherence.config.json"), "utf8")) as { lexicon?: unknown };
-    if (typeof config.lexicon === "string") return isAbsolute(config.lexicon) ? config.lexicon : join(root, config.lexicon);
+    // Through the registry merge every other reader of the config takes; lexicon and plugins are the project's own keys there.
+    config = effectiveConfig(root)?.record ?? {};
   } catch {
-    // No config, or one that cannot be read: the default place.
+    // A config that will not parse: the default place, and no plugins; the commands that read the config say why.
   }
   const fallback = join(root, "lexicon.json");
-  return existsSync(fallback) ? fallback : undefined;
+  const named = config["lexicon"];
+  const project = typeof named === "string" ? (isAbsolute(named) ? named : join(root, named)) : existsSync(fallback) ? fallback : undefined;
+  const { plugins, problems } = readPlugins(root, config["plugins"], "coherence.config.json", LANGUAGES, coreLanguageOfExtension);
+  // A refused plugin is said, never dropped with every other plugin's classes in silence: by a refusal here, or by the reader that already reports it.
+  if (problems.length > 0 && strict) throw new JournalError(`the lexicon stack's defect classes cannot be read: ${problems.join("; ")}`);
+  const layers = plugins.flatMap((p) => (p.manifest.lexicon === undefined ? [] : [resolve(p.dir, p.manifest.lexicon)]));
+  return [COHERENCE_LEXICON, ...layers, ...(project === undefined ? [] : [project])];
 }
 
-/** Every declared defect class, families included, from Coherence's lexicon and the project's own. */
-export function declaredClasses(root: string): Set<string> {
-  const project = projectLexiconPath(root);
-  return new Set([...classesIn(COHERENCE_LEXICON), ...(project === undefined ? [] : classesIn(project))]);
+/**
+ * Every declared defect class, families included, from every layer of the
+ * lexicon stack. With plugins the config refuses, a write that takes a class
+ * is refused naming why (strict, the default); the spec model, which reports
+ * the refusal as its own problem, reads the layers it can (strict false).
+ */
+export function declaredClasses(root: string, strict = true): Set<string> {
+  return new Set(stackFiles(root, strict).flatMap((path) => classesIn(path)));
 }
 
 /** The declared classes that are families: too broad for one guard, so none stands for the rest. */
-export function declaredFamilies(root: string): Set<string> {
-  const project = projectLexiconPath(root);
-  return new Set([...classesIn(COHERENCE_LEXICON, true), ...(project === undefined ? [] : classesIn(project, true))]);
-}
-
-/** Whether git holds a commit by this name; undefined when git cannot be asked. */
-function commitExists(root: string, sha: string): boolean | undefined {
-  const result = spawnSync("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: root, encoding: "utf8" });
-  if (result.error !== undefined) return undefined;
-  if (result.status === 0) return true;
-  const inside = spawnSync("git", ["rev-parse", "--git-dir"], { cwd: root, encoding: "utf8" });
-  return inside.status === 0 ? false : undefined;
+export function declaredFamilies(root: string, strict = true): Set<string> {
+  return new Set(stackFiles(root, strict).flatMap((path) => classesIn(path, true)));
 }
 
 /**
@@ -109,7 +120,7 @@ export function originFields(given: { class?: string | undefined; introduced?: s
     const value = given.introduced.trim();
     if (value === "pre-existing" || value === "unknown" || PULL.test(value)) out.introduced = value;
     else if (COMMIT.test(value)) {
-      if (commitExists(root, value) === false) throw new JournalError(`--introduced ${value}: no commit by that name in this repository`);
+      if (missingCommits(root, [value])?.has(value)) throw new JournalError(`--introduced ${value}: no commit by that name in this repository`);
       out.introduced = value;
     } else throw new JournalError(`--introduced "${given.introduced}" reads a commit, PR #<n>, pre-existing or unknown`);
   }
@@ -118,56 +129,6 @@ export function originFields(given: { class?: string | undefined; introduced?: s
     out.caught = given.caught as Caught;
   }
   return out;
-}
-
-/** One defect as the journal now has it: its fields folded from every later record, and the resolution that closed it. */
-export interface DefectState {
-  id: string;
-  at: string;
-  what: string;
-  class?: string;
-  introduced?: string;
-  caught?: Caught;
-  /** The resolution that closed it, unretracted; absent while it is open. */
-  resolution?: Resolution;
-}
-
-/** Records some retraction points at. */
-function retracted(records: readonly JournalRecord[]): Set<string> {
-  return new Set(records.flatMap((r) => (r.kind === "retraction" ? [r.of] : [])));
-}
-
-function fold(into: DefectOrigin, from: DefectOrigin): void {
-  if (from.class !== undefined) into.class = from.class;
-  if (from.introduced !== undefined) into.introduced = from.introduced;
-  if (from.caught !== undefined) into.caught = from.caught;
-}
-
-/** Every defect in the journal, oldest first, with its class, origin and catch folded and its close, if any. */
-export function defectStates(records: readonly JournalRecord[]): DefectState[] {
-  const gone = retracted(records);
-  const ordered = [...records].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
-  const states = new Map<string, DefectState>();
-  for (const record of ordered) {
-    if (record.kind === "defect") {
-      const d = record as Defect;
-      const state: DefectState = { id: d.id, at: d.at, what: d.what };
-      fold(state, d);
-      states.set(d.id, state);
-    } else if (gone.has(record.id)) {
-      continue;
-    } else if (record.kind === "decision") {
-      const c = (record as Decision).classifies;
-      const state = c === undefined ? undefined : states.get(c.of);
-      if (state !== undefined) fold(state, c!);
-    } else if (record.kind === "resolution") {
-      const state = states.get(record.of);
-      if (state === undefined) continue;
-      fold(state, record);
-      state.resolution = record;
-    }
-  }
-  return [...states.values()];
 }
 
 /** How a guard stands: the invariant exists and its refutation is witnessed, or not. */

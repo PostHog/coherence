@@ -24,7 +24,7 @@ import { readFileSync } from "node:fs";
 import { posix, resolve } from "node:path";
 import { parseName } from "../adapters/adapter.ts";
 import { configIgnore, exclusionSummary, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
-import { allLanguagesRead, languagesReadLine, type LanguagesRead } from "../readings/scope/languages-read.ts";
+import { languagesReadLine, scannedLanguagesRead, type LanguagesRead } from "../readings/scope/languages-read.ts";
 import { languageOfFile, readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest, sourceFiles } from "./source.ts";
@@ -52,6 +52,8 @@ export interface ComponentMass {
    * folded into this component only because no spec sits there.
    */
   unspecced: { folder: string; total: Numbers }[];
+  /** Folders of the same weight that the component's spec declares folded into it (## folded): decided, so never named as possible units. */
+  folded: { folder: string; total: Numbers }[];
 }
 
 /** Code files a folder must hold directly before mass names it as a possible component of its own. */
@@ -131,8 +133,8 @@ function reachOf(invariant: ModelInvariant, files: readonly { file: string; name
 export function computeMass(rootGiven: string, options: MassOptions = {}): MassReport {
   const root = resolve(rootGiven);
   const config = readEnforcementConfig(root);
-  // Every declared language, each file read in its own: a multi-language project's mass is the mass of all its code.
-  const languages = allLanguagesRead(config);
+  // Every declared language a scan reads, each file read in its own: a multi-language project's mass is the mass of all its code, and a language no scan reads yet is named as not read.
+  const languages = scannedLanguagesRead(config);
   const model = options.model ?? loadSpecModel(root);
   const ignore = configIgnore(root);
   const all = languages.read.length === 1 ? sourceFiles(root, languages.read[0]!, ignore) : [...new Set(languages.read.flatMap((l) => sourceFiles(root, l, ignore)))].sort();
@@ -177,11 +179,18 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
         if (folder === component.folder) continue;
         byFolder.set(folder, [...(byFolder.get(folder) ?? []), f]);
       }
-      const unspecced = [...byFolder]
+      const weighty = [...byFolder]
         .filter(([, held]) => held.length >= UNIT_FILES)
         .map(([folder, held]) => ({ folder, total: sum(held) }))
         .sort((a, b) => b.total.lines - a.total.lines || a.folder.localeCompare(b.folder));
-      return { folder: component.folder, total: sum(mine), unreached: sum(unreached), unreachedFiles: unreached.map((f) => f.file).sort(), unspecced };
+      const isFolded = (folder: string): boolean =>
+        component.folded.some((f) => {
+          const at = component.folder === "." ? f.folder : `${component.folder}/${f.folder}`;
+          return folder === at || (f.subtree && folder.startsWith(at + "/"));
+        });
+      const unspecced = weighty.filter((u) => !isFolded(u.folder));
+      const folded = weighty.filter((u) => isFolded(u.folder));
+      return { folder: component.folder, total: sum(mine), unreached: sum(unreached), unreachedFiles: unreached.map((f) => f.file).sort(), unspecced, folded };
     })
     .sort((a, b) => a.folder.localeCompare(b.folder));
 
@@ -214,7 +223,11 @@ const SHOWN = 6;
 
 export function formatMass(report: MassReport): string {
   const lines: string[] = [];
-  lines.push(`unreached mass: ${numbers(report.unreached)} (${share(report.unreached.lines, report.total.lines)} of lines)`);
+  // Nothing read is no coverage: a 0% over no files must never read as every line reached.
+  if (report.total.files === 0) {
+    const unread = report.languages.unread.map((u) => u.language);
+    lines.push(`unreached mass: not measured, since no source file was read${unread.length === 0 ? "" : ` (${unread.join(" and ")} NOT READ; see the languages line below)`}`);
+  } else lines.push(`unreached mass: ${numbers(report.unreached)} (${share(report.unreached.lines, report.total.lines)} of lines)`);
   lines.push(`  in no component: ${numbers(report.outside.total)}${report.outside.files.length === 0 ? "" : ` — ${report.outside.files.slice(0, SHOWN).join(", ")}${report.outside.files.length > SHOWN ? `, and ${report.outside.files.length - SHOWN} more` : ""}`}`);
   for (const c of report.components) {
     if (c.unreached.files === 0) continue;
@@ -225,6 +238,11 @@ export function formatMass(report: MassReport): string {
     lines.push(`folders with no spec of their own, folded into a component above them (${UNIT_FILES} or more code files each; give each that is a unit its own spec): ${unspecced.length}`);
     for (const u of unspecced.slice(0, SHOWN)) lines.push(`  ${u.folder}: ${numbers(u.total)}, inside ${u.within}`);
     if (unspecced.length > SHOWN) lines.push(`  and ${unspecced.length - SHOWN} more`);
+  }
+  const folded = report.components.flatMap((c) => c.folded);
+  if (folded.length > 0) {
+    const weight = folded.reduce((acc, f) => add(acc, f.total), ZERO);
+    lines.push(`folders their component's spec declares folded into it (## folded): ${folded.length}, ${numbers(weight)}`);
   }
   lines.push(`total mass: ${numbers(report.total)}`);
   for (const c of report.components) lines.push(`  ${c.folder}: ${numbers(c.total)}; unreached ${numbers(c.unreached)}`);

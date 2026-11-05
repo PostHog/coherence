@@ -507,6 +507,9 @@
       "provenance": {
         "reference_note": "The reference split one invariant across four sections (invariants, works when, refutations, why) and let works-when hold claims with no invariant behind them. Here the invariant is the unit and the sections collapse into it.",
         "defined_by": "owner, 2026-09-17 (assembled from settled decisions)"
+      },
+      "properties": {
+        "mirror": "A hand list a spec declares under ## mirrors beside what it must equal: the value-import closure of some files, the keys of an object literal, or another literal. The hook reads both again at an edit to a file they span and names a disagreement as advice, never a block; a list or partner that is gone is a spec problem."
       }
     },
     {
@@ -550,6 +553,9 @@
       "provenance": {
         "owner_words": "the journal exists as COMPRESSION, not just memory. it is compression of possibly millions of subagent session tokens into a handful of durable, comprehensible outcomes. it is a signaling system so that subagents can compare notes. and it is a means of escalation for humans.",
         "defined_by": "owner, 2026-09-17"
+      },
+      "properties": {
+        "shard": "One of a session's files in a record store, <session>.<token>.jsonl, or .jsonseq when packed on one line. A writer starts a new shard whenever HEAD or the branch moves, so a commit seals it and no file is written from two branches."
       }
     },
     {
@@ -598,28 +604,33 @@
         "guard": "The invariant a defect's close names, as <component folder>/<name>, to protect the defect's whole class; it counts once its refutation is witnessed. A close names a guard or a decision saying why fixing the instance suffices; spec --check names a close with neither.",
         "guard failure": "A defect recorded in a class a close had already guarded, after that close: the protection was weaker than claimed. spec --check and orient name it; the convergence reading counts it as a repeat of its class, which should fall to zero.",
         "escape": "A defect whose introduced points into a release's range and that was recorded after the release's tag: it shipped.",
-        "convergence": "The reading of whether discoveries repay, over a window: defects arriving by origin and catch, escapes per release, the share closed with a guard, repeats per class, bullets over time, hotspot churn, and hook latency per Coherence version (query convergence).",
+        "convergence": "The reading of whether discoveries repay, over a window: defects arriving by origin and catch, escapes per release, the share closed with a guard, repeats per class, dead ends, bullets over time, hotspot churn, and hook latency per Coherence version (query convergence).",
         "class path-identity": "One file or folder spelled two ways (through a symbolic link, against another base, from the repository top instead of the project root) compares as two.",
-        "class silent-skip": "A reading or walk leaves part of its population out and says nothing about it.",
-        "class cost": "Work out of proportion to the answer: a hook or reading that reads far more than it needs, past the latency budget.",
         "class ownership": "One party's thing treated as another's: Coherence's lexicon, practice or decision demanded of or read as an adopter's, or the reverse.",
         "class structure-drift": "What a spec, the lexicon or a document says has drifted from what the code or the files do, and no check sees it.",
         "class bypassed-door": "A reference reaches a protected thing outside its chokepoint.",
-        "class parse-gap": "A reader of source, shell or spec text misses a shape its language allows.",
         "class root-resolution": "The tool settled on the wrong project root, so it read, wrote or answered for the wrong tree.",
         "class overmatch": "A pattern or check matches more than it means, so an unrelated thing satisfies or triggers it.",
         "class self-clearing": "A check the very record or edit it guards can clear on its own.",
         "class exposure": "Private state written where it is published or committed.",
         "class uninterpolated": "Template text reaches a reader literally instead of the value it stands for.",
         "class load-flake": "A test that fails under machine load whatever the change under test.",
-        "class duplicated-fact": "One fact kept in two places written apart, so one copy drifts from the other and a reader takes the stale one.",
-        "class over-claim": "A reading credits more than its evidence shows: a control, a coverage or a verification counted where nothing checks it, so a gap reads closed.",
         "class hand-built-path": "A file of an installed package located by a path spelled by hand (a node_modules folder joined to a root) instead of asked of the package resolver, so a package manager that lays its packages out otherwise (pnpm's store, a package's exports) leaves it naming nothing.",
-        "class version-skew": "The Coherence that runs is not the one the adopter installed or meant: another copy shadows it, or a package manager resolved an older release than the project needs, and nothing says which version answers.",
         "class missing-entry-point": "A way of reaching the tool that users expect is absent or answers wrongly: a conventional flag or verb (--version, --help) that is not recognized or is taken by the program in front of it.",
         "class false-alarm": "A check reports a problem on input that is valid, such as a config, spec or lexicon an adopter wrote correctly or an earlier release wrote for it, so it fails CI or refuses a stop for nothing; guarded by the upgrade fixture carrying what adopters write.",
         "class merge-collision": "Two branches' ordinary writes to a store Coherence commits conflict when the branches are merged or rebased, so people resolve by hand what git could have merged; guarded by the stack test that merges two branches' appends to every committed store.",
-        "family audience": "A reader is told the wrong thing for that reader, or not told what it needs: a message naming the wrong subject, guidance missing from what ships or from a practice. A family: too broad for one guard, so each defect closes with its own guard or a decision, and a later one is no guard failure."
+        "family audience": "A reader is told the wrong thing for that reader, or not told what it needs: a message naming the wrong subject, guidance missing from what ships or from a practice. A family: too broad for one guard, so each defect closes with its own guard or a decision, and a later one is no guard failure.",
+        "family hand-list": "A list kept by hand that must mirror something defined elsewhere (files, imports, events, tools, keys), so the two drift and nothing fails: a module, an event or a tool silently left out. A family: each list is removed by deriving it from what it mirrors, one guard per list.",
+        "family silent-skip": "A reading, walk or command leaves part of what it was given out and says nothing about it. A family: every reader and command can skip in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure.",
+        "mirror reading": "The reading that finds hand lists: literal collections of names matched by overlap against each other and against what code derives (a folder's files, the import closure of a list of files, a module's exports, the keys a file reads), from git objects at one revision, with history naming the commit that grew one side alone (query mirrors). Advisory and never taken in a hook: orient names the groups worth a look from the last reading kept, and the reading proposes pairs for the edit-time alarm to watch.",
+        "family version-skew": "The Coherence that runs is not the one the adopter installed or meant: another copy shadows it, a package manager resolved an older release than the project needs, or a plugin's import reaches another copy than the running one, and nothing says which version answers. A family: every place that picks a copy (which launches, which installs, which a plugin imports) picks it in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure.",
+        "family parse-gap": "A reader of source, shell or spec text misses a shape its language allows. A family: every hand-written reader (entrance rules, the shell reader, a plugin's import reader) misses shapes in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure; a reader moved onto a parser leaves it for that parser's guards.",
+        "family cost": "Work out of proportion to the answer: a hook or reading that reads far more than it needs, past the latency budget. A family: every hook, reading and store pays its own way (the dead-trigger check's triggers, a parse store kept per leaf of a registry), so each defect closes with its own guard or a decision, and a later one is no guard failure.",
+        "family duplicated-fact": "One fact kept in two places written apart, so one copy drifts from the other and a reader takes the stale one. A family: every fact can be kept twice in its own way (the project's name in the config and a lexicon, a parse's inputs in a manifest and a fingerprint), so each defect closes with its own guard or a decision, and a later one is no guard failure.",
+        "family over-claim": "A reading credits more than its evidence shows: a control, a coverage, a verification or a defense counted where nothing checks it, so a gap reads closed. A family: every reading, test and claimed defense can over-claim in its own way (a scope's test-backed control, a parse store's signature and its untested clauses), so each defect closes with its own guard or a decision, and a later one is no guard failure.",
+        "component": "The component a defect belongs to, as its folder: given with --component, or settled when the defect is written as the one component whose folder holds every file it names. A record written before the field, or whose files lie in several components, carries none; the dead-end reading then places it by its files, else by its guard's component, and says how many it placed that way and how many it could not.",
+        "dead end": "A component that keeps collecting defects after its first guard, across classes and families, over several rounds (the commits they were recorded at), with defects coming back through guards it already had, within the convergence window: its guards are narrowing doors in a design that is wrong. spec --check, orient and the convergence reading name it with its defects, classes, rounds and window, read from every worktree's journal; the remedy is to stop adding guards there, review its representation, record the choice as a decision, and escalate it to a human, whose acknowledgement restarts the count.",
+        "class internals-as-answer": "A server or tool's own debugging output (a stack, a log line) carried into a reading's reason, a note or a report as if it were its answer, so host paths and frames stand where the words belong."
       }
     },
     {
@@ -782,7 +793,7 @@
     {
       "name": "scope",
       "status": "settled",
-      "definition": "The reading. One surface projecting the model (components, invariants with enforcement, grade, crossing, refutation and because, references, reliance, runs, journal records, work orders) for a human, in views. A fixed shell loads the state from the warm server and follows the stores as they change; a snapshot carries one state whole in a file. Replaces every other render.",
+      "definition": "The one surface projecting the model (components, invariants with enforcement, grade, crossing, refutation and because, references, reliance, runs, journal records, work orders) for a human, in views. A fixed shell loads the state from the warm server and follows the stores as they change; a snapshot carries one state whole in a file. Replaces every other render.",
       "rejected": [
         {
           "alternative": "panel (live TUI)",
@@ -924,7 +935,7 @@
     {
       "name": "orient",
       "status": "settled",
-      "definition": "The start-of-cycle reading. Before acting, the session sees where the project stands and what heading follows from it: escalations awaiting a human, structural defects, requirements stuck short of invariant, unreached mass, the session's own work order, and what peers recorded. One heading, derived from state; it also names the spec gaps beyond the adoption baseline.",
+      "definition": "The start-of-cycle reading. Before acting, the session sees where the project stands and what heading follows from it. It shows escalations awaiting a human, structural defects, dead ends and guard failures, requirements stuck short of invariant, unreached mass, the session's own work order, and what peers recorded. One heading, derived from state; it also names the spec gaps beyond the adoption baseline.",
       "rejected": [
         {
           "alternative": "orient and regulate as two competing machines over the same ledgers",
@@ -1167,10 +1178,10 @@
         "anti_fragile": "Every attempt to introduce a name makes the lexicon stronger: a new noun in a spec, journal entry, or identifier is caught at regulate and must be declared as a new concept, mapped as an alias, or fixed if it is a rejected name. Rejected names accumulate as the record of what drift was refused.",
         "two_layers": "Coherence's own lexicon (the tool vocabulary) and each project's domain lexicon share one shape and one mechanism; scaffold for a new project begins by asking for the domain lexicon.",
         "growth": "Asymmetric, like invariants: agents propose and announce new concepts; only a human retires or renames one. Each definition change is a decision with a rejected alternative.",
-        "injection": "Compact: name, one-line definition, rejected names. Full entries through agent query.",
+        "injection": "Compact: name, first sentence, aliases, rejected names; full entries through agent query. The lexicon has no token ceiling; its presentation at session start holds 2,000 tokens, keeping the concepts the journal named most recently whole and letting the rest decay, to their names and then out; a concept marked protected heads the order, the last to lose its line or its name. In an adopter the window is the project's: Coherence's own concepts are one line of names in their file's order, never ranked, kept only while every ranked concept is whole.",
         "naming_check": "Identifiers are checked against rejected names and misused concept names by word, not by address.",
         "baseline": "What was already here when work began, remembered so only what is new speaks. In an adopter, the findings its lexicon check held at adoption, recorded as a journal decision (lexicon baseline) the check then fails only beyond; every later baseline record is intersected with the earlier ones, so it only shrinks. For a session, the vocabulary uses observed at its start. Coherence's own repository keeps no lexicon check baseline: its text is enforced whole.",
-        "where_rejected_names_bind": "Coherence's rejected names bind only where Coherence's concepts are named: everywhere in Coherence's own repository; in an adopter, only in the text written to Coherence (records, spec grammar, coherence.config.json), and there as advisory. A project's own rejected names bind in all of its text, and a word the project declares in its own lexicon is its own inside it."
+        "where_rejected_names_bind": "Coherence's rejected names bind only in Coherence's own repository, where they bind everywhere; in an adopter they are never read, and a word Coherence also uses is the project's word in the project's sense wherever the project writes it, records, specs and the config included. A project's own rejected names bind in all of its text, and a word the project declares in its own lexicon is its own inside it."
       },
       "rejected": [
         {
@@ -1234,11 +1245,13 @@
       "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler (a symbol, or a module file whose top-level script receives the work) must resolve and be reachable, so a declared entrance cannot rot unseen. It declares the trust level it carries in with a trust: line; without one, its trust is derived from the crossings on its handler. A guard: line names the chokepoint its handler is registered through, counted once the reading confirms the registration. A control: none line with its reason says it needs no control: a stated claim Scope shows for a human to challenge, never beside a guard:.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-0db9b17b)",
-        "owner_words": "Declared and checked for entrypoints is good."
+        "owner_words": "Declared and checked for entrypoints is good.",
+        "rank_defined_by": "agent entrances (session a7848c2f8d980a77f), 2026-10-28, on the direction the owner approved for first adoptions (journal d-a37af46f, d-2fe050e9)"
       },
       "properties": {
-        "entrance coverage": "How much of the surface the reading detects the declared entrances cover: each detected entrance is covered individually (an entrance's handler names it and nothing else), through a grouped entrance (one entrance stands for every detected entrance registered through its handler or detected in its module), or undeclared. A spec-gap count speaks only for the covered part.",
-        "detected entrance": "An entrance the reading finds by one of the rules its language lists (a server function, a server route, a URL pattern, a package script, a top-level script), with the rule and why it matched; never a guess presented as fact."
+        "entrance coverage": "How much of the surface the reading detects the declared entrances cover: each detected entrance is covered individually (an entrance's handler names it and nothing else), through a grouped entrance (one entrance stands for every detected entrance registered through its handler or detected in its module), or undeclared. Undeclared is the normal state of a detected entrance and never a spec gap: orient, Scope and the CI report count it neutrally against what is detected. A spec-gap count speaks only for the covered part.",
+        "detected entrance": "An entrance the reading finds by one of the rules its language lists (a server function, a server route, a URL pattern, a package script, a top-level script), with the rule and why it matched; never a guess presented as fact.",
+        "rank": "The order scaffold entrances lists the undeclared entrances in, and by which the Stop hook names the first one a session touched, so the few whose declaration pays most are declared first: one that skips the handler of a grouped entrance standing for its siblings, then outside trust (its rule is one a request from off the machine reaches), then a handler that writes, then the things a chokepoint protects that its file reaches by static import, then the components those imports reach."
       }
     },
     {
@@ -1338,7 +1351,7 @@
     },
     {
       "name": "spec gap",
-      "definition": "An untrusted entrance with no traced control. Its trust is a level from outside the system's control, or unknown, no control is traced on its structural route, and it declares no control: none. It closes three ways: a guard: line, an invariant whose crossing enters from its trust and whose entrances: line names it, or control: none with a reason. Orient names the gaps beyond the adoption baseline, and how many lost a control an invariant gave by its crossing alone; regulate names the ones a session touched; neither is a demonstrated bypass.",
+      "definition": "An untrusted declared entrance with no traced control. Its trust is a level from outside the system's control, or unknown, no control is traced on its structural route, and it declares no control: none. Only a declared entrance can be one: a detected entrance no spec declares is undeclared, the normal state of a detected entrance, which entrance coverage counts and the gap count says nothing of. It closes three ways: a guard: line, an invariant whose crossing enters from its trust and whose entrances: line names it, or control: none with a reason. Orient names the gaps beyond the adoption baseline, and how many lost a control an invariant gave by its crossing alone; regulate names the ones a session touched; neither is a demonstrated bypass.",
       "provenance": {
         "defined_by": "agent gaps (session a3238ebe9efd46ba5), 2026-09-25 (journal d-a1095ef2)",
         "owner_words": "let's do 1-3, and then test the results on a pre-Coherence commit from both of those projects to see if the behavior change is effective"
@@ -1509,6 +1522,65 @@
       "provenance": {
         "defined_by": "agent proposal, 2026-10-09 (session aba22a9624563d104), for an adopter's request that Coherence offer to run itself on pull requests with the mode presented to the user (df-7b885044, d-d0d83f59)",
         "because": "ci install, ci report, the hooks install offer and the adoption step need one name for what runs on a pull request"
+      }
+    },
+    {
+      "name": "plugin",
+      "definition": "What a project adds to Coherence through its config's plugins key: a folder whose plugin.json declares a language adapter, syntax tables, a verifier or a lexicon layer. The registry reads the manifest as data and imports the module only where its code runs; a plugin may take a built-in language's place or extend it, and docs/plugins.md is the author's guide.",
+      "not_to_be_confused_with": [
+        "Claude Code plugin: the agent host's extension, which the mod is"
+      ],
+      "related": [
+        "language adapter",
+        "config",
+        "lexicon",
+        "totality oracle"
+      ],
+      "status": "settled",
+      "provenance": {
+        "owner_words": "all language support is handled via plugins that ship with the product. if someone finds the existing language support wanting, they can pull it out and enhance it, swapping their enhancement for our implementation. then we ship other plugins, like Convex, Quint, etc.",
+        "defined_by": "owner, 2026-10-21 (session 8efd6465, d-5ec9a20a); the entry written by plugins1 (session aa8d6a63c971fba29)"
+      }
+    },
+    {
+      "name": "reading",
+      "definition": "What the core computes from a project to answer one question about it: mass, imports, component interfaces, entrances, the mirrors, the gaps, Scope's model. A reading is derived, never kept by hand, and says which languages it could not read; a language plugin owes every reading of its language's text, and plugin check holds it to each (d-6569dec0).",
+      "provenance": {
+        "defined_by": "owner, 2026-10-23",
+        "owner_words": "broad reading is fine"
+      }
+    },
+    {
+      "name": "folded folder",
+      "definition": "A folder inside a component, with no spec of its own, that the component's spec declares under ## folded as belonging to it, so mass stops naming it as a unit still to decide.",
+      "related": [
+        "mass",
+        "component",
+        "spec"
+      ],
+      "provenance": {
+        "defined_by": "owner, 2026-10-28 (session 51c38ab9, d-8ebb2e2e)",
+        "owner_words": "do 7"
+      }
+    },
+    {
+      "name": "connections",
+      "status": "settled",
+      "definition": "Scope's view of component interfaces rooted at one origin, a structural route or a component: its columns are hops from that origin, each chokepoint stands once at the door of the component it protects, and selecting a component shows every entrance whose reach gets to it. Its own tab beside Structure, drawn from the same flow model with no reading of its own; the reader grows it one hop at a time with +N on a card.",
+      "related": [
+        "structure",
+        "scope",
+        "structural route",
+        "component interface",
+        "chokepoint",
+        "entrance",
+        "core dependency"
+      ],
+      "not_to_be_confused_with": [
+        "a network connection, such as the warm server's HTTP connections: the ordinary word, not this view"
+      ],
+      "provenance": {
+        "defined_by": "owner, 2026-10-30, named the view (work order w-faf84c51); the entry written by session a98282e8b37e5461b from the prototype the owner reviewed (d-a314db4e, d-d4f9fea6, d-9cf51e23)"
       }
     }
   ],

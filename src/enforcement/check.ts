@@ -61,15 +61,16 @@
  * as refused by the checker.
  */
 
-import { isTestPath, rangeContains, withinFolder, type CheckerBoundary, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
+import { isTestPath, rangeContains, withinFolder, type CheckerBoundary, type Definition, type LanguageAdapter, type Occasion, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
 import { horizonSites, projectSites, searchedHorizon } from "../adapters/project-files.ts";
+import { moduleFolderOf } from "../plugins/languages.ts";
 import { fromText, type ChokepointFrom } from "../spec/grammar.ts";
 import type { Bypass, Governed, Grade, ReferenceTarget, RefutationState, SiteClass, Verdict } from "./record.ts";
 
-export interface ClassifiedSite extends ReferenceSite {
+export interface ClassifiedSite extends Omit<ReferenceSite, "test"> {
   class: SiteClass;
   of: ReferenceTarget;
-  /** Test location is an orthogonal fact, not a claim about how the chokepoint is used. */
+  /** Test location is an orthogonal fact, not a claim about how the chokepoint is used: a test path, or a site the adapter marks as test. */
   test: boolean;
   /** The checker that refuses this import, with its error, when one does. */
   checker?: string;
@@ -113,6 +114,8 @@ export interface ChokepointInput {
   from?: ChokepointFrom | undefined;
   /** Who said it: the bullet's own from: line, or the config's chokepointFrom; absent is the default. */
   fromBy?: "bullet" | "config" | undefined;
+  /** Who asks, handed to the adapter's refutation: the check at an edit, or a run; absent is a run. */
+  occasion?: Occasion | undefined;
 }
 
 /** Which references a check governs, and the folder it exempts: the component's for `outside the component`, the named one for `outside <folder>`. */
@@ -127,6 +130,8 @@ export function classifySite(site: ReferenceSite, protectedThing: Definition, ch
   const position = { line: site.line - 1, character: site.character };
   // A re-export widens the thing's reach with no call at all, so it is a bypass wherever it stands.
   if (site.form === "re-export") return "bypass";
+  // A site the adapter read as test code is a test before any range: a test module in the chokepoint's own file is not inside it.
+  if (site.test === true) return "test";
   // A plain import specifier is how the chokepoint's own module reaches the thing, not a place the thing is used.
   const inChokepointModule = chokepoint.kind === "module" ? withinModule(site.file, chokepoint.file) : site.file === chokepoint.file;
   if (site.form === "import" && inChokepointModule) return "inside";
@@ -159,11 +164,11 @@ function ownedBy(boundary: CheckerBoundary, file: string): boolean {
   return boundary.owns.some(under) && !boundary.except.some(under);
 }
 
-/** Whether a file is the module, or, when the module is a package's __init__, one of the package's own files. */
+/** Whether a file is the module, or one of the files of the folder the module owns, as its language's plugin says (moduleFolders). */
 function withinModule(file: string, moduleFile: string): boolean {
   if (file === moduleFile) return true;
-  const init = /^(.*)\/__init__\.py$/.exec(moduleFile);
-  return init !== null && file.startsWith(init[1] + "/");
+  const owned = moduleFolderOf(moduleFile);
+  return owned !== undefined && file.startsWith(owned + "/");
 }
 
 const NOT_CHOKEABLE_NOTE = "the totality oracle form (over + via) is the compromise where structure is unavailable";
@@ -267,8 +272,8 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
     return found === "bypass" && boundary !== undefined && site.form !== "re-export" && ownedBy(boundary, site.file) ? "inside" : found;
   };
   const sites: ClassifiedSite[] = [
-    ...protectedReferences.map((site) => ({ ...site, of: "protected" as const, test: isTestPath(site.file, input.testFolders), class: protectedClass(site) })),
-    ...chokepointReferences.map((site) => ({ ...site, of: "chokepoint" as const, test: isTestPath(site.file, input.testFolders), class: classifyChokepointSite(site, chokepoint) })),
+    ...protectedReferences.map((site) => ({ ...site, of: "protected" as const, test: site.test === true || isTestPath(site.file, input.testFolders), class: protectedClass(site) })),
+    ...chokepointReferences.map((site) => ({ ...site, of: "chokepoint" as const, test: site.test === true || isTestPath(site.file, input.testFolders), class: classifyChokepointSite(site, chokepoint) })),
   ];
   // Every import the checker refused is a bypass, on the site the instrument reported on its line or as a site of its own.
   for (const refused of boundary?.violations ?? []) {
@@ -280,11 +285,11 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
   sites.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character || a.of.localeCompare(b.of));
   const counts: Record<Exclude<SiteClass, "chokepoint-reference">, number> = { inside: 0, test: 0, exempt: 0, bypass: 0 };
   for (const site of sites) if (site.of === "protected" && site.class !== "chokepoint-reference") counts[site.class] += 1;
-  const bypasses: Bypass[] = sites.filter((s) => s.of === "protected" && s.class === "bypass").map((s) => ({ file: s.file, line: s.line, symbol: s.symbol ?? "module top level", ...(s.checker === undefined ? {} : { checker: s.checker }) }));
+  const bypasses: Bypass[] = sites.filter((s) => s.of === "protected" && s.class === "bypass").map((s) => ({ file: s.file, line: s.line, symbol: s.symbol ?? "module top level", ...(s.checker === undefined ? {} : { checker: s.checker }), ...(s.unread === undefined ? {} : { unread: s.unread }) }));
   const files = [...new Set([protectedThing.file, chokepoint.file, ...sites.map((s) => s.file)])].sort();
 
   const earned = rungFor(adapter, visibility);
-  const refutation = await adapter.refute(protectedThing, chokepoint, governed.exempt);
+  const refutation = await adapter.refute(protectedThing, chokepoint, governed.exempt, input.occasion ?? "run");
   const classified = refutation.staged.map((staged) => ({
     what: staged.what,
     class: staged.site === undefined ? undefined : classifySite(staged.site, protectedThing, chokepoint, input.testFolders, governed.exempt),
@@ -297,14 +302,18 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
   // Otherwise every staged site must be one this check's own classification calls a bypass (ruling d-7abd1ba8).
   const short = classified.filter((site) => site.class !== "bypass");
   const fired = classified.length > 0 && refutation.seen && short.length === 0;
-  const refutationState: RefutationState = languageRefused ? "refused by the language" : checkerRefused ? "refused by the checker" : fired ? "automatic" : "missing";
+  // A refusal holds whether or not a reference exists; staged sites prove the check fires, but over no real reference there was nothing for it to fire on.
+  const unreached = !languageRefused && !checkerRefused && !sites.some((s) => s.of === "protected");
+  const refutationState: RefutationState = languageRefused ? "refused by the language" : checkerRefused ? "refused by the checker" : fired && !unreached ? "automatic" : "missing";
   const refutationAccount = languageRefused || checkerRefused
     ? `${refutation.account}; the ${earned.grade} rung is enforced by ${earned.enforcer}, and its refusal is the refutation`
     : !refutation.seen || classified.length === 0
       ? refutation.account
-      : fired
-        ? `${refutation.account}, and the check classified each one a bypass`
-        : `${refutation.account}, but the check classified ${short.map((s) => `${s.what} ${nameOf(s.class)}`).join(" and ")}, not a bypass; the refutation is vacuous`;
+      : fired && unreached
+        ? `${refutation.account}, and the check classified each one a bypass, but the instrument found no reference to ${protectedThing.name} to check, so the staged sites witness nothing about the code that reaches it`
+        : fired
+          ? `${refutation.account}, and the check classified each one a bypass`
+          : `${refutation.account}, but the check classified ${short.map((s) => `${s.what} ${nameOf(s.class)}`).join(" and ")}, not a bypass; the refutation is vacuous`;
 
   if (bypasses.length > 0) {
     return {
@@ -322,7 +331,7 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
       visibility: visibility.evidence,
       files,
       governed,
-      reason: `${bypasses.length} reference${bypasses.length === 1 ? "" : "s"} to ${protectedThing.name} outside ${chokepoint.name}: ${bypasses.map((b) => `${b.file}:${b.line} in ${b.symbol}${b.checker === undefined ? "" : ` (${b.checker})`}`).join(", ")}${governedClause(governed, counts.exempt)}`,
+      reason: `${bypasses.length} reference${bypasses.length === 1 ? "" : "s"} to ${protectedThing.name} outside ${chokepoint.name}: ${bypasses.map((b) => `${b.file}:${b.line} in ${b.symbol}${b.checker === undefined ? "" : ` (${b.checker})`}${b.unread === undefined ? "" : ` (not read through: ${b.unread})`}`).join(", ")}${governedClause(governed, counts.exempt)}`,
     };
   }
   // When the instrument could not see the synthetic site, Coherence's own check enforces nothing: a ladder may name the rung that is left.
@@ -330,8 +339,9 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
   const vacuousRung = !languageRefused && !checkerRefused && !refutation.seen && adapter.ladder.whenVacuous !== undefined ? rungsOf(adapter).find((r) => r.grade === adapter.ladder.whenVacuous) : undefined;
   const graded: Rung = vacuousRung === undefined ? earned : { ...vacuousRung, fact: `the instrument could not see the synthetic reference, so Coherence's check enforces nothing here and only the convention stands (${visibility.evidence})` };
   const tests = counts.test > 0 ? `; ${counts.test} test reference${counts.test === 1 ? "" : "s"}` : "";
-  const proved = languageRefused || checkerRefused || fired;
-  const vacuous = proved ? "" : `; refutation missing: ${refutationAccount}`;
+  const proved = refutationState !== "missing";
+  const vacuous = proved || (unreached && fired) ? "" : `; refutation missing: ${refutationAccount}`;
+  const claim = unreached ? `${nothingToCheckNote(protectedThing, chokepoint)} (${visibility.evidence})` : `${protectedThing.name} is ${graded.grade}, enforced by ${graded.enforcer}: ${graded.fact}${tests}`;
   return {
     input,
     verdict: proved ? "pass" : "not run",
@@ -348,8 +358,13 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
     visibility: visibility.evidence,
     files,
     governed,
-    reason: `${protectedThing.name} is ${graded.grade}, enforced by ${graded.enforcer}: ${graded.fact}${tests}${governedClause(governed, counts.exempt)}${vacuous}`,
+    reason: `${claim}${governedClause(governed, counts.exempt)}${vacuous}`,
   };
+}
+
+/** Why a protected thing with no reference anywhere is not a pass: either nothing uses it, or what uses it does so where the instrument cannot see. */
+function nothingToCheckNote(protectedThing: Definition, chokepoint: Definition): string {
+  return `the instrument found no reference to ${protectedThing.name} anywhere, not even inside ${chokepoint.name}: nothing to check. Code that reaches it through a path the instrument cannot follow (a generated API, a registry, a name in a string) is invisible to this check, so the chokepoint is not shown to hold`;
 }
 
 /** The ladder's rungs; a warm server started before ladders carried rungs answers with none, and the check must not crash on it. */

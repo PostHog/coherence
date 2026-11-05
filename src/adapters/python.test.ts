@@ -23,7 +23,7 @@ import { readEnforcementConfig } from "../enforcement/config.ts";
 import { performRun } from "../enforcement/run.ts";
 import { combinedFilter, reportFromJunit, verdictsFromReport } from "../enforcement/totality.ts";
 import type { Definition } from "./adapter.ts";
-import { PythonAdapter, locateServer, type PythonLanguageClient } from "./python.ts";
+import { PythonAdapter, locateServer, type PythonLanguageClient } from "../../plugins/python/python.ts";
 
 const INIT = `from pkg.store import seal, peek
 

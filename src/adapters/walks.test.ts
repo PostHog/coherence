@@ -4,7 +4,9 @@
  * folders a name list once skipped (api/public, dist, build, public) beside
  * the folders a rule does leave out: the config's ignore list, a hidden
  * folder, a host's folder, a dependency install, an interpreter's cache and
- * a virtual environment. Every walker must read exactly what the one rule
+ * a virtual environment, Cargo's build folder (a target beside a
+ * Cargo.toml; a folder named target elsewhere is code) and wasm-pack's
+ * output (a pkg beside a Cargo.toml; a pkg elsewhere is code). Every walker must read exactly what the one rule
  * leaves in, narrowed only by kind, and the rule must account for every
  * project file it leaves out.
  */
@@ -16,7 +18,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { after, before, test } from "node:test";
 import { projectFiles, walkBounds, walkedProjectFiles } from "./project-files.ts";
-import { pythonFiles } from "./python.ts";
+import { pythonFiles } from "../../plugins/python/python.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { sourceFiles } from "../economy/source.ts";
 import { collectFiles } from "../lifecycle/check.ts";
@@ -28,7 +30,7 @@ import { detectedEntrances } from "../readings/scope/component-interfaces.ts";
 const IGNORE = ["vendor"];
 
 /** Code a folder-name list once skipped: every walk must read it. */
-const NAMED_FOLDER_CODE = ["api/public/urls.py", "api/public/views.py", "dist/tool.py", "build/steps.py", "public/page.ts"];
+const NAMED_FOLDER_CODE = ["api/public/urls.py", "api/public/views.py", "dist/tool.py", "build/steps.py", "public/page.ts", "target/plan.py", "pkg/plan.py"];
 
 /** Files a rule leaves out, with the rule that must name it. */
 const LEFT_OUT: Record<string, string> = {
@@ -38,6 +40,8 @@ const LEFT_OUT: Record<string, string> = {
   "node_modules/pkg/index.ts": "environment folder: node_modules",
   "pkg/__pycache__/cached.py": "environment folder: pkg/__pycache__",
   "env/lib/site.py": "virtual environment: env",
+  "crate/target/debug/generated.py": "Cargo build folder: crate/target",
+  "crate/pkg/crate.ts": "wasm-pack output: crate/pkg",
 };
 
 let root: string;
@@ -57,6 +61,9 @@ before(() => {
   write("dist/tool.py", "def tool():\n    return None\n");
   write("build/steps.py", "def steps():\n    return None\n");
   write("public/page.ts", "export const page = 1;\n");
+  write("target/plan.py", "def plan():\n    return None\n");
+  write("pkg/plan.py", "def plan():\n    return None\n");
+  write("crate/Cargo.toml", '[package]\nname = "crate"\nversion = "0.1.0"\n');
   write("env/pyvenv.cfg", "home = /usr/bin\n");
   for (const file of Object.keys(LEFT_OUT)) write(file, file.endsWith(".ts") ? "export const x = 1;\n" : "def x():\n    return None\n");
 });

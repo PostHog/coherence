@@ -15,7 +15,9 @@
     "erasableSyntaxOnly": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "plugins/**/*.ts"],
+  "exclude": ["src/plugins/fixtures/ejected-1.10.1"]
 }

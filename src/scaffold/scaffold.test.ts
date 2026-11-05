@@ -5,7 +5,6 @@
 
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
@@ -13,6 +12,7 @@ import type { Io } from "../journal/cli.ts";
 import { KEYS } from "../spec/grammar.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { applicableShapes, loadSeed } from "../spec/seed.ts";
+import { cli } from "../lifecycle/cli-fixture.ts";
 import { scaffoldCommand } from "./cli.ts";
 import { componentDir, scaffoldComponent } from "./scaffold.ts";
 import { renderInvariant } from "./scaffold.ts";
@@ -85,8 +85,9 @@ test("scaffold invariant prints every slot and only the applicable checklist sha
   assert.deepEqual(shapes, expected);
   assert.ok(expected.length > 0 && expected.length < seed.shapes.length);
   for (const key of KEYS) {
-    if (key === "over" || key === "via" || key === "entrances") {
-      assert.doesNotMatch(bullet, new RegExp(`^  ${key}:`, "m"), `the chokepoint form has no ${key}`);
+    if (key === "over" || key === "via" || key === "entrances" || key === "unless") {
+      // unless: is named by hand only where a chokepoint's callers can switch its check off.
+      assert.doesNotMatch(bullet, new RegExp(`^  ${key}:`, "m"), `the chokepoint form prints no ${key}`);
     } else {
       assert.match(bullet, new RegExp(`^  ${key}:`, "m"), `slot ${key} is present`);
     }
@@ -286,10 +287,11 @@ function embeddedState(html: string): Record<string, unknown> {
   return JSON.parse(match[1]!) as Record<string, unknown>;
 }
 
-test("scaffold invariant --preview writes only an ephemeral proposed, dashed, unverified Structure edge", async () => {
+test("scaffold invariant --preview writes a self-contained page outside the project carrying the proposal ungraded in its state, changes no spec, and gives identical bytes for identical inputs", async () => {
   const { root, specPath, original } = previewFixture();
   try {
-    const run = await runAsync(root, "invariant", "./vault", "A thing crosses.", "--kinds", "none", "--crossing", "a -> b", "--preview");
+    const argv = ["invariant", "./vault", "A thing crosses.", "--kinds", "none", "--crossing", "a -> b", "--preview"];
+    const run = await runAsync(root, ...argv);
     assert.equal(run.code, 0, run.err.join("\n"));
     assert.equal(readFileSync(specPath, "utf8"), original, "preview alone does not write the proposal into the spec");
     const outPath = writtenPreview(run);
@@ -297,6 +299,7 @@ test("scaffold invariant --preview writes only an ephemeral proposed, dashed, un
     assert.equal(outPath.startsWith(tmpdir()), true, "the generated reading is in the system temporary area");
     const html = readFileSync(outPath, "utf8");
     const state = embeddedState(html);
+    assert.doesNotMatch(html, /<script[^>]*\ssrc=|<link[^>]*\shref=/, "the page loads nothing from outside itself");
     assert.equal(state.activeView, "structure");
     const proposal = ((state.structure as { preview: Record<string, unknown>[] }).preview)[0]!;
     assert.deepEqual(proposal, { component: "vault", name: "<name>", crossing: { from: "a", to: "b" } });
@@ -304,10 +307,10 @@ test("scaffold invariant --preview writes only an ephemeral proposed, dashed, un
     assert.equal("state" in proposal, false, "a proposal has no fabricated lifecycle state");
     assert.equal("verdict" in proposal, false, "a proposal has no fabricated verdict");
     assert.equal("reliance" in proposal, false, "a proposal has no fabricated evidence");
-    assert.match(html, /structure-edge\.structure-proposed \{[^}]*stroke-dasharray: 9 6;/, "the proposed edge is dashed");
-    assert.match(html, /proposed preview ·/, "the edge is visibly labeled as a proposal");
-    assert.match(html, /verdict: "unverified"/, "the renderer fixes proposals as unverified");
-    assert.match(html, /This dashed edge exists only in the ephemeral preview\./);
+    const again = await runAsync(root, ...argv);
+    assert.equal(again.code, 0, again.err.join("\n"));
+    assert.notEqual(writtenPreview(again), outPath, "each preview gets a private temporary directory");
+    assert.deepEqual(readFileSync(writtenPreview(again)), readFileSync(outPath), "identical inputs give identical page bytes");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -420,23 +423,14 @@ test("scaffold command types and runtime distinguish synchronous shapes from asy
 });
 
 
-test("the root CLI awaits scaffold preview and propagates its asynchronous exit code", () => {
+test("the root CLI awaits scaffold preview and propagates its asynchronous exit code", async () => {
   const { root } = previewFixture();
   try {
-    const cli = join(import.meta.dirname, "..", "cli.ts");
-    const success = spawnSync(
-      process.execPath,
-      ["--disable-warning=ExperimentalWarning", cli, "scaffold", "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> b", "--preview"],
-      { cwd: root, encoding: "utf8" },
-    );
+    const success = await cli(["scaffold", "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> b", "--preview"], { cwd: root });
     assert.equal(success.status, 0, success.stderr);
     assert.match(success.stdout, /preview wrote .*scope\.html/);
 
-    const invalid = spawnSync(
-      process.execPath,
-      ["--disable-warning=ExperimentalWarning", cli, "scaffold", "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> missing", "--preview"],
-      { cwd: root, encoding: "utf8" },
-    );
+    const invalid = await cli(["scaffold", "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> missing", "--preview"], { cwd: root });
     assert.equal(invalid.status, 1, invalid.stdout);
     assert.match(invalid.stderr, /crossing names trust level missing/);
   } finally {

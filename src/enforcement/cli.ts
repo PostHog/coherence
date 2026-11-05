@@ -15,8 +15,8 @@
 
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
-import { relative, resolve, sep } from "node:path";
-import { adapterFor } from "../adapters/index.ts";
+import { basename, relative, resolve, sep } from "node:path";
+import { instrumentFor } from "../adapters/index.ts";
 import { registryOf, type Registry } from "../adapters/project-config.ts";
 import { JournalError, parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
@@ -25,8 +25,8 @@ import { verdictText } from "../spec/report.ts";
 import { governedBy } from "./check.ts";
 import { readEnforcementConfig } from "./config.ts";
 import { latencyLines } from "./latency.ts";
-import { RUNS_DIR, appendRefutation, latestByEnforcement, loadRuns, type Form, type RefutationRecord } from "./record.ts";
-import { performRun, type EachOutcome, type EntryDetail, type RunOutcome } from "./run.ts";
+import { RUNS_DIR, appendRefutation, entryKey, latestByEnforcement, loadRuns, type Form, type RefutationRecord, type RunEntry, type RunRecord } from "./record.ts";
+import { performRun, UnknownInvariants, type EachOutcome, type EntryDetail, type RunOutcome } from "./run.ts";
 import { DEFAULT_IDLE_MS, serve, type ServeOptions } from "./server.ts";
 import { gitState } from "../journal/store.ts";
 import { formatObservationSummary } from "../observation/observed.ts";
@@ -85,7 +85,7 @@ export function formatRun(outcome: RunOutcome): string {
   const passes = r.invariants.filter((e) => e.verdict === "pass").length;
   const notRun = r.invariants.length - fails - passes;
   lines.push(
-    `run recorded in ${RUNS_DIR}/${r.session}.jsonl: ${r.invariants.length} enforcement${r.invariants.length === 1 ? "" : "s"}, ${passes} pass, ${fails} fail, ${notRun} not run; instrument ${r.instrument.language} (${r.instrument.server}); ${ms(r.latency)}`,
+    `run recorded in ${RUNS_DIR}/${outcome.file === undefined ? `${r.session}.jsonl` : basename(outcome.file)}: ${r.invariants.length} enforcement${r.invariants.length === 1 ? "" : "s"}, ${passes} pass, ${fails} fail, ${notRun} not run; instrument ${r.instrument.language} (${r.instrument.server}); ${ms(r.latency)}`,
   );
   if (outcome.instrumentReason !== undefined) lines.push(`instrument unavailable: ${outcome.instrumentReason}`);
   if (outcome.observation !== undefined) lines.push(formatObservationSummary(outcome.observation.record));
@@ -109,7 +109,7 @@ function formatEach(each: EachOutcome): string[] {
     }
   }
   const passes = each.details.filter((d) => d.entry.verdict === "pass").length;
-  lines.push(`per-test run recorded in ${RUNS_DIR}/${each.record.session}.jsonl: ${each.details.length} alone, ${passes} pass; ${ms(each.record.latency)}`);
+  lines.push(`per-test run recorded in ${RUNS_DIR}/${basename(each.file)}: ${each.details.length} alone, ${passes} pass; ${ms(each.record.latency)}`);
   if (each.hidden.length > 0) {
     lines.push(`passed batched but fail alone (${each.hidden.length}): each passed on what another test left behind`);
     for (const d of each.hidden) lines.push(`  ✕ ${d.entry.component}/${d.entry.name}`);
@@ -144,6 +144,27 @@ export function formatStatus(root: string, model: SpecModel): string {
   }
   lines.push(`latest run ${latestRun.at} by ${latestRun.agent} (${latestRun.session}) at ${latestRun.commit ?? "no commit"}${latestRun.dirty ? ", dirty" : ""}; ${loaded.records.length} run${loaded.records.length === 1 ? "" : "s"}; ${defects} structural defect${defects === 1 ? "" : "s"}`);
   if (loaded.damaged.length > 0) for (const d of loaded.damaged) lines.push(`damaged ${d.file}:${d.line}: ${d.reason}`);
+  return lines.join("\n");
+}
+
+/** Per enforcement, the latest verdict a run could reach (pass or fail) and when; an enforcement never checked is absent. */
+export function lastChecked(runs: readonly RunRecord[]): Map<string, { verdict: "pass" | "fail"; at: string }> {
+  const checked = new Map<string, { verdict: "pass" | "fail"; at: string }>();
+  for (const run of runs) for (const e of run.invariants) if (e.verdict === "pass" || e.verdict === "fail") checked.set(entryKey(e.component, e.name, e.form), { verdict: e.verdict, at: run.at });
+  return checked;
+}
+
+/** The entries a run could not check whose enforcement an earlier run did check: each has lapsed, whatever the reason now. */
+export function lapsedOf(entries: readonly RunEntry[], checked: ReadonlyMap<string, { verdict: "pass" | "fail"; at: string }>): { entry: RunEntry; before: { verdict: "pass" | "fail"; at: string } }[] {
+  return entries.flatMap((entry) => {
+    const before = entry.verdict === "not run" ? checked.get(entryKey(entry.component, entry.name, entry.form)) : undefined;
+    return before === undefined ? [] : [{ entry, before }];
+  });
+}
+
+function lapsedText(lapsed: ReturnType<typeof lapsedOf>): string {
+  const lines = [`${lapsed.length} enforcement${lapsed.length === 1 ? "" : "s"} an earlier run checked could not be checked now; a check that lapsed is no pass:`];
+  for (const { entry, before } of lapsed) lines.push(`  ○ ${entry.component}/${entry.name} (${entry.form}): ${before.verdict} at ${before.at}, not run now: ${entry.reason}`);
   return lines.join("\n");
 }
 
@@ -226,9 +247,11 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
   const session = parsed.one.get("session") ?? randomUUID();
   const agent = parsed.one.get("agent") ?? "main";
   const invariants = parsed.many.get("invariant");
-  const languages = readEnforcementConfig(root).languages;
+  const config = readEnforcementConfig(root);
+  // Every language a check may be written in, built-in or declared: a declared one left out would read not run in CI, where --no-server is the norm.
+  const languages = config.enforced;
   // In process, one adapter per language: each starts its server only when a check first asks it.
-  const directs = parsed.switches.has("no-server") ? languages.map((language) => adapterFor(language, root)) : [];
+  const directs = parsed.switches.has("no-server") ? languages.map((language) => instrumentFor(language, root, config)) : [];
   const direct = languages.length === 1 ? directs[0] : undefined;
   const adapters = languages.length > 1 && directs.length > 0 ? Object.fromEntries(directs.map((a) => [a.language, a])) : undefined;
   try {
@@ -238,7 +261,17 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
       io.err("run: --each confirms totality oracles one at a time; --form chokepoint runs none");
       return 64;
     }
-    const outcome = await performRun(root, { session, agent, form, invariants, adapter: direct, adapters, server: directs.length === 0, observe, each });
+    // What each enforcement last read when a run could check it: one checked before and not run now has lapsed, never a clean run.
+    const checked = lastChecked(loadRuns(root).records);
+    let outcome: Awaited<ReturnType<typeof performRun>>;
+    try {
+      outcome = await performRun(root, { session, agent, form, invariants, adapter: direct, adapters, server: directs.length === 0, observe, each });
+    } catch (error) {
+      if (!(error instanceof UnknownInvariants)) throw error;
+      io.err(error.message);
+      return 64;
+    }
+    const lapsed = lapsedOf(outcome.record.invariants, checked);
     if (parsed.switches.has("json")) {
       io.out(
         JSON.stringify(
@@ -248,6 +281,7 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
             instrumentReason: outcome.instrumentReason ?? null,
             instrumentDied: outcome.instrumentDied,
             latency: outcome.latency ?? null,
+            lapsed: lapsed.map(({ entry, before }) => ({ component: entry.component, name: entry.name, form: entry.form, before: before.verdict, beforeAt: before.at, reason: entry.reason })),
             ...(each
               ? {
                   each: outcome.each === undefined ? null : { ...outcome.each.record, file: outcome.each.file, hidden: outcome.each.hidden.map((d) => `${d.entry.component}/${d.entry.name}`), unconfirmed: outcome.each.unconfirmed.map((d) => `${d.entry.component}/${d.entry.name}`) },
@@ -260,12 +294,14 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
           2,
         ),
       );
+    } else {
+      io.out(formatRun(outcome));
+      if (lapsed.length > 0) io.out(lapsedText(lapsed));
     }
-    else io.out(formatRun(outcome));
-    // A run whose instrument never answered proved nothing; it must never read as a clean pass.
+    // A run whose instrument never answered proved nothing; it must never read as a clean pass, nor one that lost a check it could make before.
     // With --each, a test that cannot pass alone (or cannot run alone) is not confirmed either.
     const eachFailed = outcome.each !== undefined && outcome.each.details.some((d) => d.entry.verdict !== "pass");
-    return outcome.record.invariants.some((e) => e.verdict === "fail") || outcome.instrumentDied || eachFailed ? 1 : 0;
+    return outcome.record.invariants.some((e) => e.verdict === "fail") || outcome.instrumentDied || eachFailed || lapsed.length > 0 ? 1 : 0;
   } finally {
     for (const a of directs) await a.close();
   }
@@ -375,6 +411,7 @@ export async function refuteCommand(argv: string[], io: Io): Promise<number> {
   const agent = parsed.one.get("agent") ?? "main";
   const { commit, dirty } = gitState(root);
   const written: RefutationRecord[] = [];
+  const files = new Map<RefutationRecord, string>();
   // The verdict comes from the pass itself, so refute asks the same question a run asks, through the same
   // door: performRun stays the only site that reaches the batched runner, and the runner that can report per
   // test is the one consulted, so a suite exiting non-zero for a reason that is not this test cannot record a
@@ -421,7 +458,7 @@ export async function refuteCommand(argv: string[], io: Io): Promise<number> {
       commit,
       dirty,
     };
-    appendRefutation(root, record);
+    files.set(record, appendRefutation(root, record));
     written.push(record);
   }
   if (parsed.switches.has("json")) {
@@ -431,7 +468,7 @@ export async function refuteCommand(argv: string[], io: Io): Promise<number> {
   for (const record of written) {
     io.out(`refuted ${folder}/${name} (${record.form}): ${record.broke}`);
     io.out(`  the detector went red: ${record.reason}`);
-    io.out(`  recorded in ${RUNS_DIR}/${session}.jsonl at ${record.at}`);
+    io.out(`  recorded in ${RUNS_DIR}/${basename(files.get(record) ?? `${session}.jsonl`)} at ${record.at}`);
   }
   io.out("now restore the code and run: run — the refutation counts as witnessed once a later run finds the same totality oracle passing");
   return 0;

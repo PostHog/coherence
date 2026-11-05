@@ -22,40 +22,32 @@
  */
 
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
+import { derived, type CandidateRule } from "./language-data.ts";
 import type { SpecComponent } from "./model.ts";
 
-/** The rules, per language, each with what it detects: the documentation the query prints and the spec states. */
-export const CANDIDATE_RULES: Record<string, readonly { rule: string; detects: string }[]> = {
-  typescript: [
-    { rule: "server function", detects: "an exported const created by createServerFn (TanStack Start)" },
-    { rule: "wrapped export", detects: "an exported const created by calling a symbol a declared entrance names as its handler or guard" },
-    { rule: "server route", detects: "an exported route created by createFileRoute with server handlers, createServerFileRoute or createAPIFileRoute" },
-    { rule: "route handler", detects: "a GET, POST, PUT, PATCH, DELETE, HEAD or OPTIONS a Next.js app/**/route file exports, declared there, in an export list or re-export, or destructured; a default export under pages/api; or an exported loader or action under app/routes" },
-    { rule: "request proxy", detects: "the proxy a Next.js proxy.ts exports, or the middleware a middleware.ts exports, at the root or under src/: declared, in an export list or re-export, or as the default export" },
-    { rule: "page route", detects: "the default export of a Next.js app/**/page file, the page as a whole" },
-    { rule: "server action", detects: "an exported function of a file that opens with 'use server'" },
-    { rule: "route table", detects: "an object literal naming a path or pattern that starts with / and a handler, on one line" },
-    { rule: "route method", detects: "a call like app.get('/path', handler) whose first argument is a path starting with /" },
-    { rule: "package bin", detects: "a file package.json's bin names" },
-    { rule: "package script", detects: "a project file a package.json script runs with node, tsx, ts-node, bun, deno, vite-node or python" },
-    { rule: "script", detects: "a file directly under a top-level scripts/ or bin/ folder that no project file imports" },
-  ],
-  python: [
-    { rule: "url pattern", detects: "a path(), re_path() or url() in a urls.py that routes to a view (include() is delegation, not an entrance)" },
-    { rule: "viewset", detects: "a router.register('prefix', ViewSet) registration" },
-    { rule: "route decorator", detects: "a function decorated @x.get/post/put/patch/delete/route/api_route/websocket('/path')" },
-    { rule: "management command", detects: "a Command class in a management/commands/ module" },
-    { rule: "task", detects: "a function decorated @shared_task or @<app>.task (Celery), or @activity.defn / @workflow.defn (Temporal)" },
-    { rule: "console script", detects: "a function pyproject.toml's [project.scripts] or [tool.poetry.scripts] names" },
-    { rule: "script", detects: "a file directly under a top-level scripts/ folder with an if __name__ == \"__main__\" block" },
-  ],
-};
+/**
+ * The rules, per language, each with its plural and what it detects: the
+ * documentation the query prints and the spec states, and the one place a
+ * rule's plural is said. Each language plugin's manifest declares its own
+ * (its `entrances`); a language whose plugin lists none detects nothing, and
+ * NOT_DETECTED says so.
+ */
+export const CANDIDATE_RULES: Readonly<Record<string, readonly CandidateRule[]>> = derived((data) => Object.fromEntries(Object.entries(data).map(([language, said]) => [language, said.rules])));
 
 /** What the rules do not see, per language: said wherever the coverage is, so an absence is never read as none. */
-export const NOT_DETECTED: Record<string, string> = {
-  typescript: "file routes outside a Next.js app/**/page without server handlers (their work enters through server functions), hand-written dispatchers, message consumers, workers and host callbacks are not detected",
-  python: "views reached only through include(), hand-written dispatchers, message consumers and signal handlers are not detected",
-};
+export const NOT_DETECTED: Readonly<Record<string, string>> = derived((data) => Object.fromEntries(Object.entries(data).flatMap(([language, said]) => (said.notDetected === undefined ? [] : [[language, said.notDetected]]))));
+
+/** A recorded reading's language, by name: its rules, or none for a name no language goes by. */
+export function candidateRulesOf(language: string): readonly { rule: string; plural: string; detects: string }[] {
+  const rules: Partial<Record<string, readonly { rule: string; plural: string; detects: string }[]>> = CANDIDATE_RULES;
+  return rules[language] ?? [];
+}
+
+/** A recorded reading's language, by name: what its rules do not see, or nothing for a name no language goes by. */
+export function notDetectedOf(language: string): string | undefined {
+  const said: Partial<Record<string, string>> = NOT_DETECTED;
+  return said[language];
+}
 
 export interface CoverageGroup {
   /** The folder of the component whose spec declares it. */
@@ -152,24 +144,21 @@ export function coverageLine(coverage: EntranceCoverage): string {
   return `entrances: ${coverage.declared} declared, covering ${covered} of ${coveragePlural(coverage.detected, "detected entrance")}${grouping}; ${coverage.uncovered.length} undeclared`;
 }
 
-export const RULE_PLURALS: Record<string, string> = {
-  "server function": "server functions",
-  "wrapped export": "wrapped exports",
-  "server route": "server routes",
-  "route handler": "route handlers",
-  "server action": "server actions",
-  "route table": "route table entries",
-  "route method": "registered routes",
-  "package bin": "package bins",
-  "package script": "package scripts",
-  script: "scripts",
-  "url pattern": "URL patterns",
-  viewset: "viewsets",
-  "route decorator": "decorated routes",
-  "management command": "management commands",
-  task: "tasks",
-  "console script": "console scripts",
-};
+/** Each rule's plural, read off the rules themselves, so a rule added there is never counted as "<rule>s" (df-5c6288f3). */
+export const RULE_PLURALS: Readonly<Record<string, string>> = derived((data) => Object.fromEntries(Object.values(data).flatMap((said) => said.rules.map((r) => [r.rule, r.plural]))));
+
+/** The rules a request from off the machine reaches, read off the rules themselves (their plugin marks each remote). */
+const REMOTE_RULES: Readonly<Record<string, true>> = derived((data) => Object.fromEntries(Object.values(data).flatMap((said) => said.rules.flatMap((r) => (r.remote === true ? [[r.rule, true as const]] : [])))));
+
+/** Whether a request from off the machine reaches what the rule detects: what the rank of undeclared entrances reads as outside trust. */
+export function ruleIsRemote(rule: string): boolean {
+  return REMOTE_RULES[rule] === true;
+}
+
+/** A count of entrances detected by one rule, in words: "1 request proxy", "3 request proxies". */
+export function ruleCount(n: number, rule: string): string {
+  return `${n} ${n === 1 ? rule : (RULE_PLURALS[rule] ?? "detected entrances")}`;
+}
 
 /** One grouped entrance in words: `"server function mutations" (mutationRpc) stands for 36 server functions`. */
 export function groupLine(group: CoverageGroup): string {

@@ -1,0 +1,20 @@
+{
+  "concepts": [
+    {
+      "name": "quint model",
+      "definition": "A .qnt file stating a system's state and the actions that change it, beside the spec whose bullets prove its properties; a bullet names it, or its folder's one model is read.",
+      "aliases": ["model file"]
+    },
+    {
+      "name": "quint property",
+      "definition": "A boolean definition of a quint model a bullet proves with via: [quint] or [quint run]: it must hold in every state quint reaches, or the bullet fails with the states that break it.",
+      "aliases": ["quint invariant"],
+      "rejected": [{ "alternative": "quint prop", "because": "the abbreviation reads as a test helper; say the property" }]
+    },
+    {
+      "name": "bounded model check",
+      "definition": "What [quint] adds over simulation: Apalache checks every behaviour of the model up to a number of steps, a bound and not every reachable state; it needs a Java runtime, and without one the bullet is not run.",
+      "aliases": ["quint verify"]
+    }
+  ]
+}

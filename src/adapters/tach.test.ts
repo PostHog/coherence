@@ -17,8 +17,8 @@ import { after, before, test } from "node:test";
 import { checkChokepoint } from "../enforcement/check.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { editContext } from "../lifecycle/hook.ts";
-import { PythonAdapter } from "./python.ts";
-import { findTachConfig, locateTach, readTachConfig, tachGovernance, type TachConfig } from "./tach.ts";
+import { PythonAdapter } from "../../plugins/python/python.ts";
+import { findTachConfig, locateTach, readTachConfig, tachGovernance, type TachConfig } from "../../plugins/python/tach.ts";
 
 const TACH_TOML = `exclude = ["**/tests", "**/__pycache__"]
 source_roots = ["."]

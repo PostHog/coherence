@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
-import { TypeScriptAdapter } from "../adapters/typescript.ts";
+import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { parseSpec } from "../spec/grammar.ts";
 import { checkChokepoint } from "./check.ts";
 import { formatRun } from "./cli.ts";

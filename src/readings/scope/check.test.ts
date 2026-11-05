@@ -10,29 +10,31 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { loadRuns } from "../../enforcement/record.ts";
-import { loadJournal } from "../../journal/store.ts";
-import { loadSpecModel } from "../../spec/model.ts";
-import { DEFAULTS, STATE_SLOT, buildScopePage, buildShell, scopeState, snapshotOf, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
+import { DEFAULTS, STATE_SLOT, buildScopePage, buildShell, scopeState, snapshotOf, windowState, writeStructurePreview, type BuildOptions } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
-import { CITED_WINDOW, windowJournal, windowRuns, allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
+import { CITED_WINDOW, SITE_WINDOW, componentOfFile, defectsOfJournal, sitesLeftCount, windowJournal, windowRuns, allReliance, componentId, defectsOf, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
-import type { Lexicon, LexiconCoverage, RecordedSite, RunRecord, ShellState, StructurePreview, WorkOrder } from "./model.ts";
+import type { Lexicon, LexiconCoverage, PageEntry, RecordedSite, RunRecord, ShellState, SiteTally, StructurePreview, WorkOrder } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
+import { flowOf } from "./structure-flow.ts";
+import { connectionsOriginId } from "./connections/model.ts";
+import { mergeSites } from "./updates.ts";
 
-const options: BuildOptions = {
-  lexiconPath: DEFAULTS.lexiconPath,
-  project: DEFAULTS.project,
-};
-
-
-const THREE_MB = 3 * 1024 * 1024;
+/**
+ * Coherence's lexicon over the fixture's tree. The page over Coherence's own
+ * tree (its size, every record embedded or counted, the site window over its
+ * own runs) is the bench job's (bench/scope/own-tree.ts): it reads the whole
+ * tree and every record, so it costs more with every merge, and no unit test
+ * reads Coherence's whole tree (enforcement/test-budgets.ts).
+ */
+let options: BuildOptions;
 
 let fixture: Fixture;
 let fixtureState: ShellState;
 
 before(async () => {
   fixture = makeFixture();
+  options = { root: fixture.root, lexiconPath: DEFAULTS.lexiconPath, project: DEFAULTS.project };
   ({ state: fixtureState } = await buildScopePage({ root: fixture.root, lexiconPath: DEFAULTS.lexiconPath, project: "Fixture" }));
 });
 
@@ -67,16 +69,6 @@ function embeddedState(html: string): ShellState {
   assert.ok(match !== null && match[1] !== undefined, "the page embeds its state");
   return JSON.parse(match[1]) as ShellState;
 }
-
-test("the page builds to the default path and stays under 3 MB with Coherence's own data", async () => {
-  const { bytes, state } = await writeScopePage(options, DEFAULTS.outPath);
-  const onDisk = await readFile(DEFAULTS.outPath, "utf8");
-  assert.equal(Buffer.byteLength(onDisk, "utf8"), bytes);
-  assert.ok(bytes < THREE_MB, `page is ${bytes} bytes, must be under ${THREE_MB}`);
-  assert.equal(state.spec.components.length, loadSpecModel(process.cwd()).components.length, "every component of Coherence's own tree is in the state");
-  assert.equal(state.runs.records.length + (state.runs.omitted ?? 0), loadRuns(process.cwd()).records.length, "every run record is embedded or counted");
-  assert.equal(state.journal.records.length + (state.journal.omitted ?? 0), loadJournal(process.cwd()).records.length, "every journal record is embedded or counted");
-});
 
 test("a snapshot is the shell with one inline state and loads nothing from outside: no external src, href, url() or @import", async () => {
   const { html, state } = await buildScopePage(options);
@@ -217,19 +209,19 @@ function stringsIn(value: unknown): string[] {
   return [];
 }
 
-test("the render has one view strip with the seven views in order", async () => {
+test("the render has one view strip with the eight views in order", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
   const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ["structure", "lexicon", "components", "invariants", "practices", "runs", "journal"]);
-  for (const label of ["Structure", "Lexicon", "Components", "Invariants", "Practices", "Runs", "Journal"]) {
+  assert.deepEqual(tabs, ["structure", "connections", "lexicon", "components", "invariants", "practices", "runs", "journal"]);
+  for (const label of ["Structure", "Connections", "Lexicon", "Components", "Invariants", "Practices", "Runs", "Journal"]) {
     assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
   }
 });
 
-test("Structure is the first view: the strip leads with Structure then Lexicon, and a page whose address names no view opens on it", () => {
+test("Structure is the first view: the strip leads with Structure, then Connections, then Lexicon, and a page whose address names no view opens on it", () => {
   const state = fresh();
-  assert.deepEqual(state.views.map((v) => v.id), ["structure", "lexicon", "components", "invariants", "practices", "runs", "journal"], "Structure, then Lexicon, then the rest in their order");
+  assert.deepEqual(state.views.map((v) => v.id), ["structure", "connections", "lexicon", "components", "invariants", "practices", "runs", "journal"], "Structure, then Connections, then Lexicon, then the rest in their order");
   assert.equal(state.activeView, state.views[0]!.id, "the state opens on the first view");
   assert.equal(state.activeView, "structure");
   const rendered = renderShell(state).text;
@@ -467,16 +459,11 @@ test("every view renders from state: every component, invariant, run, and journa
   assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId("src/store", "read shape")], "the search narrows by sentence");
   state.invariants.query = "";
 
-  state.structure.selected = flowChokepointId("src/store", "single writer");
-  const reliance = renderView(state, "structure").text;
-  assert.ok(reliance.includes('data-kind="chokepoint"') && reliance.includes("reliance unknown: run carries no sites"), "a legacy run is explicitly incomplete on the chokepoint's selection");
-  assert.ok(reliance.includes('data-field="evidence"'), "the evidence boundary is said on the map");
-  delete state.structure.selected;
-
+  const reliance = relianceOn(state);
+  assert.ok(reliance.includes('data-reliance="unknown"') && reliance.includes("reliance unknown: run carries no sites"), "a legacy run is explicitly incomplete on the chokepoint invariant's reliance listing");
   const relied = allReliance(state.spec.components, state.runs.records).find((reading) => reading.invariant.name === "single writer");
   assert.ok(relied !== undefined && relied.evidence.status === "unknown");
   assert.match(relied.evidence.reason, /run carries no sites/);
-
 
   const runs = renderView(state, "runs").text;
   const runIds = cardIds(runs).filter((id) => id.startsWith("run-"));
@@ -523,11 +510,20 @@ test("a structural defect renders its bypass sites and both honest options", () 
   assert.ok(bypasses.includes(`<code>${n.bypass.file}:${n.bypass.line}</code>`) && bypasses.includes(`<code>${n.bypass.symbol}</code>`), "file, line, symbol");
   assert.ok(c.includes('data-option="route"') && c.includes("Route through the chokepoint") && c.includes(`<code>${n.chokepoint}</code>`), "option one");
   assert.ok(c.includes('data-option="retire"') && c.includes("Escalate a retirement") && c.includes(`href="#${relianceId("src/store", "single writer")}"`), "option two links the reliance listing");
+  assert.ok(c.includes(`id="${relianceId("src/store", "single writer")}"`), "and the listing it links is on the card");
   for (const { component, name, state: lifecycle } of n.invariants) {
     if (lifecycle === "structural defect") continue;
     assert.ok(!card(renderView(state, "invariants").text, invariantId(component, name)).includes('data-field="defect"'), `${name} shows no defect section`);
   }
 });
+
+/** The single writer's reliance listing, on its card in the Invariants view. */
+function relianceOn(state: ShellState): string {
+  const c = card(renderView(state, "invariants").text, invariantId("src/store", "single writer"));
+  const at = c.indexOf(`id="${relianceId("src/store", "single writer")}"`);
+  assert.ok(at >= 0, "the chokepoint invariant's card carries its reliance listing");
+  return c.slice(c.lastIndexOf("<details", at), c.indexOf("</details>", at));
+}
 
 function setSingleWriterSites(state: ShellState, sites: RecordedSite[] | undefined): void {
   const entry = state.runs.records.at(-1)?.invariants.find((candidate) => candidate.name === "single writer" && candidate.form === "chokepoint");
@@ -535,28 +531,6 @@ function setSingleWriterSites(state: ShellState, sites: RecordedSite[] | undefin
   if (sites === undefined) delete entry.sites;
   else entry.sites = sites;
 }
-
-/** The Structure view with one selection made: the one map's reading of it. */
-function selectedOn(state: ShellState, selected: string): string {
-  return renderView({ ...state, structure: { ...state.structure, selected } }, "structure").text;
-}
-
-test("a scaffold preview is drawn dashed and unverified on its component in the one map", () => {
-  const state = fresh();
-  const preview: StructurePreview = {
-    component: "src/store",
-    name: "preview writer",
-    crossing: { from: "outside", to: "inside" },
-    chokepoints: [{ chokepoint: "write", protects: "writeRow" }],
-  };
-  state.structure.preview = [preview];
-  const proposed = renderView(state, "structure").text;
-  assert.match(proposed, /proposed preview · preview writer/);
-  assert.match(proposed, /data-proposed="true"/);
-  assert.match(proposed, /class="structure-edge structure-proposed"/);
-  assert.match(proposed, /Reliance unknown: a proposal has no run evidence\. This dashed edge exists only in the ephemeral preview\./);
-  assert.equal(proposed, renderView(JSON.parse(JSON.stringify(state)) as ShellState, "structure").text, "the same state renders the same bytes");
-});
 
 test("reliance reads both protected and chokepoint endpoint sites, owner first, without calling a bypass a legal door reference", () => {
   const state = fresh();
@@ -569,28 +543,47 @@ test("reliance reads both protected and chokepoint endpoint sites, owner first, 
   const reading = allReliance(state.spec.components, state.runs.records).find((candidate) => candidate.invariant.name === "single writer");
   assert.ok(reading !== undefined && reading.evidence.status === "complete");
   assert.deepEqual(reading.evidence.sites.map((site) => site.file), ["src/store/write.ts", "src/api/door.test.ts", "src/api/door.ts", "src/api/handler.ts"], "owner component is first and sites are stable");
-  const rendered = selectedOn(state, flowChokepointId("src/store", "single writer"));
+  const rendered = relianceOn(state);
+  assert.ok(rendered.indexOf("src/store/write.ts:4") < rendered.indexOf("src/api/door.test.ts:9") && rendered.indexOf("src/api/door.ts:7") < rendered.indexOf("src/api/handler.ts:12"), "the listing keeps the reading's order, owner first");
+  assert.match(rendered, /<code>src\/api\/door\.ts:7<\/code> in <code>save<\/code>/, "each site with its file, line and symbol");
   assert.match(rendered, /protected thing · inside chokepoint/);
   assert.match(rendered, /chokepoint · reference \(runtime call not established\)/);
   assert.match(rendered, /protected thing · bypass \(not a legal chokepoint reference\)/);
+  assert.match(rendered, /<span class="label">import<\/span>/, "the syntax form when known");
   assert.match(rendered, /data-test="true"/);
 
   const protectedOnly = fresh();
   setSingleWriterSites(protectedOnly, [{ file: "src/api/handler.ts", line: 12, symbol: "handle", class: "bypass", of: "protected", test: false }]);
-  assert.match(selectedOn(protectedOnly, flowChokepointId("src/store", "single writer")), /protected thing · bypass/);
+  assert.match(relianceOn(protectedOnly), /protected thing · bypass/);
   const doorOnly = fresh();
   setSingleWriterSites(doorOnly, [{ file: "src/api/door.ts", line: 7, symbol: "save", class: "chokepoint-reference", of: "chokepoint", test: false }]);
-  assert.match(selectedOn(doorOnly, flowChokepointId("src/store", "single writer")), /chokepoint · reference/);
+  assert.match(relianceOn(doorOnly), /chokepoint · reference/);
+});
+
+test("a reliance listing is folded on its card until a link lands on it or the reader opens it, which the state keeps", () => {
+  const state = fresh();
+  const id = relianceId("src/store", "single writer");
+  assert.match(relianceOn(state), new RegExp(`<details class="record reliance" id="${id}" data-field="reliance" >`), "folded by default");
+  state.invariants.reliance = id;
+  assert.match(relianceOn(state), new RegExp(`<details class="record reliance" id="${id}" data-field="reliance" open>`), "open when the state names it");
+  assert.match(relianceOn(state), new RegExp(`<summary data-reliance-toggle="${id}">`), "its summary opens and folds it through the state");
+  assert.equal((renderView(state, "invariants").text.match(/data-field="reliance" open>/g) ?? []).length, 1, "only the one named is open");
 });
 
 test("legacy site absence stays unknown while a complete empty site list confirms zero", () => {
+  const writer = (state: ShellState) => allReliance(state.spec.components, state.runs.records).find((reading) => reading.invariant.name === "single writer");
   const legacy = fresh();
   setSingleWriterSites(legacy, undefined);
-  assert.match(selectedOn(legacy, flowChokepointId("src/store", "single writer")), /reliance unknown: run carries no sites; evidence is incomplete/);
+  const unknown = writer(legacy);
+  assert.ok(unknown !== undefined && unknown.evidence.status === "unknown", "a run that carries no sites leaves reliance unknown");
+  assert.match(unknown.evidence.reason, /run carries no sites/);
+  assert.match(relianceOn(legacy), /reliance unknown: run carries no sites; evidence is incomplete/);
 
   const empty = fresh();
   setSingleWriterSites(empty, []);
-  assert.match(selectedOn(empty, flowChokepointId("src/store", "single writer")), /Complete run site evidence records 0 references/);
+  const confirmed = writer(empty);
+  assert.ok(confirmed !== undefined && confirmed.evidence.status === "complete" && confirmed.evidence.sites.length === 0, "a complete empty list confirms zero references");
+  assert.match(relianceOn(empty), /Complete run site evidence records 0 references/);
 });
 
 test("the Structure preview bridge validates crossings, selects Structure, and writes deterministic generated pages only", async () => {
@@ -668,13 +661,60 @@ test("the journal window keeps what kept records and work orders cite, one hop, 
   assert.ok(cappedIds.has(id(149)) && cappedIds.has(id(150 - CITED_WINDOW)) && !cappedIds.has(id(149 - CITED_WINDOW)), "the latest citers are served first");
 });
 
+test("the journal window keeps every open defect whatever its age, and the resolution of every defect it keeps", () => {
+  type Record = ShellState["journal"]["records"][number];
+  const head = (id: string, i: number) => ({ id, at: new Date(Date.UTC(2026, 8, 12) + i * 1000).toISOString(), session: "s", agent: "a", commit: null, dirty: false });
+  const defect = (id: string, i: number): Record => ({ ...head(id, i), kind: "defect", what: id, evidence: "e", files: ["src/a.ts"] });
+  const records: Record[] = [
+    defect("df-open", 0),
+    defect("df-closed", 1),
+    defect("df-cited", 2),
+    { ...head("rs-old", 3), kind: "resolution", of: "df-closed", because: "fixed" },
+    { ...head("rs-cited", 4), kind: "resolution", of: "df-cited", because: "fixed" },
+    ...Array.from({ length: 300 }, (_, i): Record => ({ ...head(`d-${i}`, 10 + i), kind: "decision", chose: "c", over: [], because: "b", ...(i === 299 ? { cites: ["df-cited"] } : {}) })),
+  ];
+  const kept = new Set(windowJournal(records, 150).records.map((r) => r.id));
+  assert.ok(kept.has("df-open"), "an old open defect is kept: the Structure view counts it");
+  assert.ok(!kept.has("df-closed") && !kept.has("rs-old"), "an old closed defect nothing cites is left out");
+  assert.ok(kept.has("df-cited") && kept.has("rs-cited"), "a closed defect kept for a citation keeps its resolution, so it never reads as open");
+});
+
+test("the journal window keeps the retraction of every record it keeps, so a retracted defect kept for a citation never reads as open", () => {
+  type Record = ShellState["journal"]["records"][number];
+  const head = (id: string, i: number) => ({ id, at: new Date(Date.UTC(2026, 8, 12) + i * 1000).toISOString(), session: "s", agent: "a", commit: null, dirty: false });
+  const records: Record[] = [
+    { ...head("df-withdrawn", 0), kind: "defect", what: "df-withdrawn", evidence: "e", files: ["src/a.ts"] },
+    { ...head("rt-old", 1), kind: "retraction", of: "df-withdrawn", because: "not a defect" },
+    { ...head("df-quiet", 2), kind: "defect", what: "df-quiet", evidence: "e", files: ["src/b.ts"] },
+    { ...head("rt-quiet", 3), kind: "retraction", of: "df-quiet", because: "not a defect" },
+    ...Array.from({ length: 300 }, (_, i): Record => ({ ...head(`d-${i}`, 10 + i), kind: "decision", chose: "c", over: [], because: "b", ...(i === 299 ? { cites: ["df-withdrawn"] } : {}) })),
+  ];
+  const window = windowJournal(records, 150).records;
+  const kept = new Set(window.map((r) => r.id));
+  assert.ok(kept.has("df-withdrawn") && kept.has("rt-old"), "a retracted defect kept for a citation keeps its retraction");
+  assert.ok(!kept.has("df-quiet") && !kept.has("rt-quiet"), "a retracted defect nothing cites is left out with its retraction");
+  assert.deepEqual(defectsOfJournal(window).map((d) => d.id), [], "so the window holds no open defect the whole journal does not");
+});
+
 test("deep links resolve: every card id on every view resolves to that view", () => {
   const state = fresh();
   for (const view of state.views) {
+    // Structure is the relief, a scene with no cards: its hash names the view alone.
+    if (view.id === "structure") {
+      assert.deepEqual(resolveHash(state, "#structure"), { view: "structure", id: undefined }, "#structure names the view alone");
+      continue;
+    }
+    // Connections draws its cards in the browser: its hash names the view alone, and every origin it can be rooted at, a route or a component, has an id.
+    if (view.id === "connections") {
+      assert.deepEqual(resolveHash(state, "#connections"), { view: "connections", id: undefined }, "#connections names the view alone");
+      const model = flowOf(state);
+      const origins = [...model.routes.map((r) => connectionsOriginId({ kind: "route", id: r.id })), ...model.nodes.map((n) => connectionsOriginId({ kind: "component", folder: n.folder }))];
+      assert.ok(model.nodes.length > 0, "the fixture has components to start from");
+      for (const id of origins) assert.deepEqual(resolveHash(state, `#${id}`), { view: "connections", id }, `#${id} opens Connections on its origin`);
+      continue;
+    }
     const rendered = renderView(state, view.id).text;
-    const ids = view.id === "structure"
-      ? [...rendered.matchAll(/ id="(structure--[^"]+)"/g)].map((match) => match[1]!)
-      : cardIds(rendered).filter((id) => !id.startsWith("pinned-"));
+    const ids = cardIds(rendered).filter((id) => !id.startsWith("pinned-"));
     assert.ok(ids.length > 0, `${view.id} renders cards`);
     for (const id of ids) {
       const target = resolveHash(state, `#${id}`);
@@ -684,8 +724,18 @@ test("deep links resolve: every card id on every view resolves to that view", ()
   }
   assert.equal(resolveHash(state, "#nothing-here"), undefined);
   assert.equal(resolveHash(state, ""), undefined);
-  const links = [...renderView(state, "invariants").text.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
+  const invariants = renderView(state, "invariants").text;
+  const links = [...invariants.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
   for (const link of links) assert.ok(resolveHash(state, `#${link}`) !== undefined, `link #${link} resolves`);
+  // A reliance id lands on the listing on its invariant's card, the retired Reliance view on Invariants, and the retired map's selections on Structure.
+  const reliance = links.filter((link) => link.startsWith("reliance-"));
+  assert.ok(reliance.length > 0, "the Invariants view links a reliance listing");
+  for (const link of reliance) {
+    assert.deepEqual(resolveHash(state, `#${link}`), { view: "invariants", id: link }, `#${link} opens Invariants on its listing`);
+    assert.ok(invariants.includes(`id="${link}"`), `the listing #${link} is on the Invariants view`);
+  }
+  assert.deepEqual(resolveHash(state, "#reliance"), { view: "invariants", id: undefined }, "the retired Reliance view opens Invariants");
+  assert.deepEqual(resolveHash(state, `#${structureId("src/store", "single writer")}`), { view: "structure", id: undefined }, "a retired map selection opens Structure");
 });
 
 test("another project's tree builds as a second root: its lexicon is the domain layer and its run records show its structural defects", async () => {
@@ -715,19 +765,77 @@ test("another project's tree builds as a second root: its lexicon is the domain 
   }
 });
 
-test("the page's run window keeps every latest entry whole and drops reference sites only from superseded entries", async () => {
-  const windowed = (await buildScopePage(options)).state;
-  const whole = (await buildScopePage({ ...options, window: false })).state;
-  for (const invariant of windowed.spec.components.flatMap((c) => c.invariants)) {
-    assert.deepEqual(latestOf(invariant, windowed.runs.records), latestOf(invariant, whole.runs.records), `${invariant.name}: the latest entries, sites included, are the same over the window`);
-  }
-  const holders = new Map<string, number>();
-  windowed.runs.records.forEach((run, index) => { for (const e of run.invariants) holders.set(`${e.component}\u0000${e.name}\u0000${e.form}`, index); });
-  windowed.runs.records.forEach((run, index) => {
-    for (const e of run.invariants) if (holders.get(`${e.component}\u0000${e.name}\u0000${e.form}`) !== index) assert.equal(e.sites, undefined, `${e.name}: a superseded entry carries no sites`);
-  });
-});
+test("the first load carries at most the site window's reference sites however many chokepoints and sites the runs record, counts every site it leaves out, and derives every site count unchanged", async () => {
+  const components = fixtureState.spec.components;
+  // An entry's sites by the keys the window counts them by, carried and counted alike.
+  const keyed = (sites: readonly RecordedSite[], left: readonly SiteTally[] = []): [string, number][] => {
+    const counts = new Map<string, number>();
+    const add = (key: string, n: number): void => void counts.set(key, (counts.get(key) ?? 0) + n);
+    for (const s of sites) add(`${componentOfFile(s.file, components)?.folder ?? ""} ${s.of} ${s.class} ${s.test}`, 1);
+    for (const t of left) add(`${t.component ?? ""} ${t.of} ${t.class} ${t.test}`, t.count);
+    return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
+  };
+  const files = ["src/api/handler.ts", "src/api/route.ts", "src/store/write.ts", "src/store/cache/hot.ts", "src/api/handler.test.ts", "bin/main.ts"];
+  const siteAt = (i: number): RecordedSite => {
+    const file = files[i % files.length]!;
+    const test = file.endsWith(".test.ts");
+    return { file, line: i + 1, symbol: `s${i}`, class: file.startsWith("src/store/") ? "inside" : test ? "test" : file.startsWith("bin/") ? "exempt" : "chokepoint-reference", of: i % 2 === 0 ? "chokepoint" : "protected", test };
+  };
+  const bypass = (i: number): RecordedSite => ({ file: "src/api/handler.ts", line: 9000 + i, symbol: "handle", class: "bypass", of: "protected", test: false });
 
+  // However many chokepoints: the window is the page's, not each entry's.
+  for (const chokepoints of [5, 60]) {
+    const entries = Array.from({ length: chokepoints }, (_, c) => ({ component: "src/store", name: `door ${c}`, form: "chokepoint", grade: "reference-choked", verdict: "pass", refutation: "automatic", bypasses: [], testReferences: 0, files: [], latency: 1, reason: "r", sites: [...Array.from({ length: 400 }, (_, i) => siteAt(i)), bypass(2 * c), bypass(2 * c + 1)] }));
+    const few = { ...entries[0]!, name: "small door", sites: [siteAt(1), siteAt(2), siteAt(3)] };
+    const run = { at: "2026-10-01T00:00:00.000Z", session: "s-sites", agent: "a", commit: null, dirty: false, instrument: { language: "typescript", server: "warm" }, latency: 1, invariants: [...entries, few] } as unknown as RunRecord;
+    const window = windowRuns([run], undefined, components);
+    const carried = window.records[0]!.invariants as PageEntry[];
+    const listed = carried.reduce((sum, e) => sum + e.sites!.filter((s) => s.class !== "bypass").length, 0);
+    assert.ok(listed <= SITE_WINDOW, `${chokepoints} chokepoints: ${listed} sites carried, at most the window's ${SITE_WINDOW}`);
+    assert.ok(listed >= SITE_WINDOW - 2 * chokepoints - chokepoints, `${chokepoints} chokepoints: the window is used, not left idle (${listed})`);
+    assert.equal(carried.reduce((sum, e) => sum + e.sites!.filter((s) => s.class === "bypass").length, 0), 2 * chokepoints, "every bypass site is carried");
+    carried.forEach((entry, i) => {
+      const whole = run.invariants[i]!.sites!;
+      assert.deepEqual(keyed(entry.sites!, entry.sitesLeft), keyed(whole), `${entry.name}: every site is carried or counted by its keys`);
+      assert.equal(entry.sites!.length + sitesLeftCount(entry), whole.length);
+      assert.ok(entry.sites!.every((s) => whole.includes(s)), `${entry.name}: what is carried is the run's own sites`);
+    });
+    assert.equal(carried.at(-1)!.sitesLeft, undefined, "an entry within its share carries every site and counts none");
+    assert.equal(carried.at(-1)!.sites!.length, 3);
+  }
+
+  // Every count derived from sites is the one every site gives: map weights, bypass sites, exempt references, reliance totals.
+  const whole = fresh();
+  const sites = [...Array.from({ length: 2000 }, (_, i) => siteAt(i)), bypass(0)];
+  setSingleWriterSites(whole, sites);
+  const last = whole.runs.records.at(-1)!;
+  last.invariants.find((e) => e.name === "single writer" && e.form === "chokepoint")!.from = { value: "outside bin", by: "bullet", exempt: "bin" };
+  const windowed = windowState(whole);
+  const writer = windowed.spec.components.flatMap((c) => c.invariants).find((i) => i.name === "single writer")!;
+  const carried = latestOf(writer, windowed.runs.records).find((e) => e.form === "chokepoint")!;
+  assert.ok(carried.sites!.length < sites.length && sitesLeftCount(carried) === sites.length - carried.sites!.length, "the window carries part of the sites and counts the rest");
+  const weights = (state: ShellState) => flowOf(state).edges.map((edge) => [edge.id, edge.sites]);
+  assert.ok(weights(whole).length > 0, "the run sites draw interfaces");
+  assert.deepEqual(weights(windowed), weights(whole), "the map's reference weights are unchanged");
+  assert.deepEqual(flowOf(windowed).nodes.map((n) => n.defects), flowOf(whole).nodes.map((n) => n.defects), "every bypass site is unchanged");
+  const governs = (state: ShellState) => /data-field="from"[\s\S]*?<\/p>/.exec(renderView(state, "invariants").text)?.[0];
+  assert.match(governs(whole) ?? "", /\d+ references from inside it exempt/);
+  assert.equal(governs(windowed), governs(whole), "the exempt references are counted the same");
+  // The reliance listing on the chokepoint invariant's card says how many sites there are, how many it lists, and where the rest are.
+  const left = sites.length - carried.sites!.length;
+  const snapshot = relianceOn(windowed);
+  assert.ok(snapshot.includes(`${sites.length} recorded reference sites to the chokepoint or protected thing; owner component first. This page lists ${carried.sites!.length} of them.`), "the listing says how many sites there are and how many it lists");
+  assert.equal((snapshot.match(/<li data-class=/g) ?? []).length, carried.sites!.length, "and lists every site the page carries");
+  assert.match(snapshot, new RegExp(`data-field="sites-left" data-left="${left}">${left} more sites are counted and not listed \\([^)]*in src/api[^)]*\\): <code>query relies-on write</code> lists every one`), "a snapshot says where the rest are");
+  const live = { ...windowed, connection: { mode: "live", status: "live", version: "v" } } as ShellState;
+  assert.match(relianceOn(live), new RegExp(`data-load-sites="${last.at}~${last.session}" data-component="src/store" data-name="single writer">Load the other ${left}</button>`), "a live page offers the rest");
+  assert.ok(mergeSites(live, `${last.at}~${last.session}`, "src/store", "single writer", sites), "the fetched sites replace the share");
+  const loaded = relianceOn(live);
+  assert.doesNotMatch(loaded, /data-field="sites-left"/, "and nothing is left counted");
+  assert.ok(loaded.includes(`${sites.length} recorded reference sites to the chokepoint or protected thing; owner component first.</p>`));
+  assert.equal((loaded.match(/<li data-class=/g) ?? []).length, sites.length, "every site is listed once loaded");
+  // The same over Coherence's own runs is the bench job's (bench/scope/own-tree.ts): it reads every run Coherence recorded.
+});
 
 test("an older run kept for the verdicts it holds carries only those, and its totals stay true on the Runs view", () => {
   const entry = (name: string, verdict: "pass" | "fail" | "not run") =>

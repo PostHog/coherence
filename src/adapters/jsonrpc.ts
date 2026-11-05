@@ -17,13 +17,36 @@ interface Pending {
   method: string;
 }
 
+/** The most of a server's words an error keeps: a stack in a form the frame filter misses (Python's, Go's) or a message with no frames still ends here. */
+export const SERVER_WORDS_LIMIT = 500;
+
+/**
+ * A server's error message on one line: the Node stack frames it appends to
+ * an internal error dropped, and the rest cut to SERVER_WORDS_LIMIT. A
+ * message that is not a string (a server that sends none) is said as what
+ * it is, never thrown on, since this runs inside the stdout listener.
+ */
+function serverWordsWithoutStack(message: unknown): string {
+  const words = (typeof message === "string" ? message : String(message ?? "no message"))
+    .split("\n")
+    .filter((line) => !/^\s+at\s/.test(line))
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+    .join(" ");
+  return words.length > SERVER_WORDS_LIMIT ? `${words.slice(0, SERVER_WORDS_LIMIT - 1)}…` : words;
+}
+
 export class RpcError extends Error {
   readonly method: string;
   readonly code: number;
-  constructor(method: string, code: number, message: string) {
-    super(`${method}: ${message} (${code})`);
+  /** The server's words as this error says them (one line, capped): with method and code, all a thread needs to rebuild the same error. */
+  readonly detail: string;
+  constructor(method: string, code: number, message: unknown) {
+    const words = serverWordsWithoutStack(message);
+    super(`${method}: ${words} (${code})`);
     this.method = method;
     this.code = code;
+    this.detail = words;
   }
 }
 
@@ -41,16 +64,18 @@ export class JsonRpcClient {
   constructor(child: ChildProcess) {
     this.child = child;
     child.stdout!.on("data", (chunk: Buffer) => this.receive(chunk));
-    child.on("exit", (code, signal) => {
-      this.exited = new Error(`language server exited (${code ?? signal})`);
-      for (const p of this.pending.values()) p.reject(this.exited);
-      this.pending.clear();
+    child.on("exit", (code, signal) => this.fail(new Error(`language server exited (${code ?? signal})`)));
+    child.on("error", (error) => this.fail(error));
+    child.stdin!.on("error", (error) => {
+      this.fail(error);
+      this.kill();
     });
-    child.on("error", (error) => {
-      this.exited = error;
-      for (const p of this.pending.values()) p.reject(error);
-      this.pending.clear();
-    });
+  }
+
+  private fail(error: Error): void {
+    this.exited ??= error;
+    for (const p of this.pending.values()) p.reject(error);
+    this.pending.clear();
   }
 
   static spawn(command: string, args: string[], cwd: string, env?: Record<string, string>): JsonRpcClient {
@@ -163,8 +188,12 @@ export class JsonRpcClient {
     const pending = this.pending.get(id);
     if (pending === undefined) return;
     this.pending.delete(id);
-    const error = message["error"] as { code: number; message: string } | undefined;
-    if (error !== undefined) pending.reject(new RpcError(pending.method, error.code, error.message));
+    // A server's error is read loosely (no message, no code, not even an object): a malformed one still rejects its request, never the process.
+    const error = message["error"];
+    if (error !== undefined && error !== null) {
+      const { code, message: words } = typeof error === "object" ? (error as { code?: unknown; message?: unknown }) : { code: undefined, message: error };
+      pending.reject(new RpcError(pending.method, typeof code === "number" ? code : -32603, words));
+    }
     else pending.resolve(message["result"]);
   }
 }

@@ -8,11 +8,13 @@
  */
 
 import { spawnSync } from "./work-meter.ts";
+import { perProcess } from "./process-caches.ts";
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadLexicon, rejectedNames, type Lexicon } from "./lexicon.ts";
+import { STORE_FOLDERS } from "../journal/stores.ts";
 import { DEFAULT_PROJECT_LEXICON, configuredName, effectiveConfig, leafOf, projectName, registryOf, under, type Registry } from "../adapters/project-config.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -23,27 +25,11 @@ export const COHERENCE_LEXICON = resolve(here, "..", "..", "docs", "lexicon.json
 export const CONFIG_FILE = "coherence.config.json";
 export { DEFAULT_PROJECT_LEXICON };
 
-export const HOSTS = ["claude", "codex"] as const;
-export type Host = (typeof HOSTS)[number];
-
-export function isHost(name: string): name is Host {
-  return (HOSTS as readonly string[]).includes(name);
-}
-
-/** The settings file each host reads, relative to the project root. */
-export const SETTINGS_FILE: Record<Host, string> = {
-  claude: ".claude/settings.json",
-  codex: ".codex/hooks.json",
-};
-
-/**
- * The personal settings file a host reads beside the shared one, relative to
- * the folder holding it, for a host that has one: Claude Code's is never
- * committed, and launched in a subfolder it reads the one at the git root.
- */
-export const LOCAL_SETTINGS_FILE: Partial<Record<Host, string>> = {
-  claude: ".claude/settings.local.json",
-};
+import { LOCAL_SETTINGS_FILE, SETTINGS_FILE } from "./hosts.ts";
+import { coreLanguageOfExtension, LANGUAGES } from "../adapters/language-files.ts";
+import { composeStack, pluginLayers, type LayerClash } from "../plugins/lexicon.ts";
+import { readPlugins } from "../plugins/registry.ts";
+export { HOST_FOLDER, HOSTS, isHost, LOCAL_SETTINGS_FILE, SETTINGS_FILE, type Host } from "./hosts.ts";
 
 /** The harness's own name for the project directory, honored when it agrees with where the process runs. */
 export const PROJECT_DIR_VAR = "CLAUDE_PROJECT_DIR";
@@ -90,9 +76,12 @@ export function installedRoot(fallback: string, env: NodeJS.ProcessEnv = process
 
 export interface ProjectLexicons {
   root: string;
+  /** Coherence's layer, with each plugin's composed into it (each such concept carries its layer). */
   coherence: Lexicon;
   /** Absent when the project declares none; identical to `coherence` is folded away. */
   project: Lexicon | undefined;
+  /** The plugin concepts left out because another layer holds their name, for the project to settle. */
+  clashes?: LayerClash[];
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -106,8 +95,17 @@ async function exists(path: string): Promise<boolean> {
 
 /** The project lexicon path the config names, or the default when present, or undefined. */
 export async function projectLexiconPath(root: string): Promise<string | undefined> {
+  return (await lexiconPlace(root)).path;
+}
+
+/**
+ * Where the project's lexicon is, and the config's plugins value, from one
+ * read of the project's own config: both keys are the project's own, never
+ * inherited from a registry, so only its own file is read here.
+ */
+async function lexiconPlace(root: string): Promise<{ path: string | undefined; plugins: unknown }> {
   const configPath = resolve(root, CONFIG_FILE);
-  // The lexicon key is the project's own, never inherited from a registry, so only its own file is read here.
+  let plugins: unknown;
   if (await exists(configPath)) {
     let config: unknown;
     try {
@@ -120,10 +118,16 @@ export async function projectLexiconPath(root: string): Promise<string | undefin
       for (const old of await retiredLexiconNames()) {
         if (old in record) throw new Error(`${configPath}: the key "${old}" names the project lexicon under its retired name; rename the key to "lexicon"`);
       }
+      plugins = record["plugins"];
       const named = record["lexicon"];
-      if (typeof named === "string") return resolve(root, named);
+      if (typeof named === "string") return { path: resolve(root, named), plugins };
     }
   }
+  return { path: await fallbackLexiconPath(root), plugins };
+}
+
+/** The default project lexicon when present, refusing a retired file name; undefined when there is none. */
+async function fallbackLexiconPath(root: string): Promise<string | undefined> {
   const fallback = resolve(root, DEFAULT_PROJECT_LEXICON);
   if (await exists(fallback)) return fallback;
   for (const old of await retiredLexiconNames()) {
@@ -172,12 +176,13 @@ export async function vocabularyFacts(root: string): Promise<VocabularyFacts> {
 }
 
 /**
- * The record stores under .coherence: one append-only JSONL file per session,
- * whose readers order and fold records by their content, never by line. Two
- * branches append to the same session's file, so git merges each with the
- * union of both sides' lines (state-files.ts).
+ * The record stores' folders under .coherence: one append-only JSONL file per
+ * session, whose readers order and fold records by their content, never by
+ * line. Two branches append to the same session's file, so git merges each
+ * with the union of both sides' lines (state-files.ts). The stores are named
+ * once, in journal/stores.ts; this is that table's folders.
  */
-export const RECORD_STORES: readonly string[] = ["journal", "runs", "work"];
+export const RECORD_STORES: readonly string[] = STORE_FOLDERS;
 
 /** The folders under .coherence a project commits: the record stores, and the project's own hook voice. Everything else there is regenerated. */
 export const DURABLE_FOLDERS: readonly string[] = [...RECORD_STORES, "hooks"];
@@ -278,7 +283,7 @@ export function nestedProjects(dir: string): string[] {
 
 /** How long one listing of the projects below a folder answers again within a process. */
 const NESTED_LISTING_MS = 2_000;
-const nestedListings = new Map<string, { at: number; projects: string[] }>();
+const nestedListings = perProcess(new Map<string, { at: number; projects: string[] }>());
 
 function listNestedProjects(base: string): string[] {
   const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", `:(glob)**/${CONFIG_FILE}`], { cwd: base, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
@@ -352,13 +357,21 @@ export async function isCoherenceItself(root: string): Promise<boolean> {
   }
 }
 
-/** Both layers for a project root. */
+/**
+ * The lexicon stack for a project root: Coherence's layer with each plugin's
+ * composed into it in the config's order (src/plugins/lexicon.ts), then the
+ * project's. A project that runs no plugins reads exactly what it did before.
+ */
 export async function loadProjectLexicons(root: string): Promise<ProjectLexicons> {
-  const coherence = await loadLexicon(COHERENCE_LEXICON);
-  coherence.project ??= "coherence";
-  const path = await projectLexiconPath(root);
+  const own = await loadLexicon(COHERENCE_LEXICON);
+  own.project ??= "coherence";
+  const { path, plugins: value } = await lexiconPlace(root);
   const project = path === undefined || path === COHERENCE_LEXICON ? undefined : await loadLexicon(path);
   // The project's name is the config's (projectName); a name the file stored is read only where the config gives none.
   if (project !== undefined) project.project = projectName(root, project.project);
-  return { root, coherence, project };
+  if (value === undefined) return { root, coherence: own, project, clashes: [] };
+  // A config whose plugins are refused composes none here: the spec check and every command that reads the config say why.
+  const { plugins } = readPlugins(root, value, CONFIG_FILE, LANGUAGES, coreLanguageOfExtension);
+  const { coherence, clashes } = composeStack(own, pluginLayers(plugins), project);
+  return { root, coherence, project, clashes };
 }

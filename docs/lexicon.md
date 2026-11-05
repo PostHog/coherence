@@ -54,7 +54,8 @@ question.
 ## What exists and what is owed
 
 Exists: the lexicon shape (vocabulary injected; detail and provenance shown in
-Scope only), the compact injection at session start, the vocabulary check at
+Scope only), the compact injection at session start (most recently named first,
+see below), the vocabulary check at
 regulate, the Scope lexicon view with two layers, and the ruling records in
 Mnemion's lexicon.
 
@@ -65,6 +66,33 @@ half, and they rank ahead of any spine work that would reintroduce the class the
 catch.
 
 Anti-rot holds throughout: the lexicon names things and never points at code.
+
+## Recency, not a ceiling
+
+The lexicon has no token ceiling; what the start injection presents of it does,
+2,000 tokens. The injection orders every concept by the latest journal record
+that names it (its name, an alias or an instance, in a record's prose), and
+that bound, or the host's budget when it leaves less room, decides how far
+down that order the injection reaches: the most recently named concepts keep their whole lines,
+the next keep only their names, and the rest are counted and left to
+`coherence lexicon`. A concept the work stops naming decays on its own. A
+lexicon change is itself a record that names the concept, so a touched
+concept rises with a used one.
+
+A concept a human wants kept however obscure it gets carries
+`"protected": true` in the lexicon file; protected concepts head the order,
+so they are the first to keep their whole lines and the last to lose them or
+their names.
+
+In an adopter the window is the project's. Coherence's own concepts are not
+ranked there (an adopter's records name them in nearly every record, so
+recency would put the tool's vocabulary ahead of the project's): they are one
+line of names in their file's order, after everything ranked, kept only while
+every project and plugin concept keeps its whole line, and otherwise counted
+out. That line costs about 220 tokens; the full entries are one
+`coherence lexicon` away, and the practices and hook messages that need
+Coherence's terms carry them. In Coherence's own repository its concepts are
+the project's and are ranked with the rest.
 
 ## Coverage-first work orders
 

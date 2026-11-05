@@ -23,28 +23,27 @@
  * conjunction, determiner, pronoun, or auxiliary) never is, however written.
  *
  * Sense review is asked only where meaning is at risk: a name with more than
- * one recorded sense, a use on or beside a prose line carrying a name
- * rejected for that same concept, or a Coherence concept an adopter's code
- * declares, written in text Coherence reads as its own: the journal's and
- * work's records, and a spec's or practice's grammar (its headings, property
- * keys and checklist shapes, check.ts's specGrammar). An adopter's code and
- * its domain prose are the project's words, so a Coherence name declared
- * there is the project's sense and asks nothing; only where Coherence's
- * grammar also speaks can the two senses meet. Such a context's ruling is
- * keyed to the term and the component, not the content, so a new use of the
- * same name does not reopen it.
+ * one recorded sense, or a use on or beside a prose line carrying a name
+ * rejected for that same concept. In an adopter only the project's own
+ * senses and rejected names count: a word Coherence also uses is the
+ * project's word wherever the project writes it, records and spec grammar
+ * included, and Coherence's lexicon there only says what Coherence's own
+ * terms mean.
  */
 import { existsSync, realpathSync } from "node:fs";
 import { exclusionOf, projectFilesEnding, walkBounds } from "../adapters/project-files.ts";
+import type { Language } from "../adapters/index.ts";
+import { languageOfFile } from "../adapters/language-files.ts";
+import { memberScanOf } from "../plugins/languages.ts";
 import { readFile } from "node:fs/promises";
 import { createHash, type Hash } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { loadJournal } from "../journal/store.ts";
+import { recordWords } from "../journal/record.ts";
 import { countWork } from "./work-meter.ts";
 import {
   corpusFiles,
   readCorpus,
-  specGrammar,
   type UnreadablePath,
 } from "./check.ts";
 import {
@@ -57,6 +56,7 @@ import {
 import { isCoherenceItself, loadProjectLexicons, vocabularyFacts, within } from "./project.ts";
 import { BASELINE_CHOSE } from "./lexicon-baseline.ts";
 import { FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
+import { singularForms } from "./inflection.ts";
 import { clean, proseNominations, type Nomination } from "./nomination.ts";
 
 export { proseNominations };
@@ -78,6 +78,9 @@ export interface VocabularyContext {
   /** Why this context's sense is at risk; absent when nothing puts it at risk, and then no review is asked. */
   risk?: string;
 }
+/** The lexicon stack's layers a term's meaning can come from: Coherence's, a plugin's (src/plugins/lexicon.ts), or the project's. */
+export type LexiconLayer = "coherence" | "project" | `plugin ${string}`;
+
 export interface VocabularyTerm {
   term: string;
   state:
@@ -88,14 +91,14 @@ export interface VocabularyTerm {
     | "rejected"
     | "unresolved";
   concept: string | null;
-  layer: "coherence" | "project" | null;
+  layer: LexiconLayer | null;
   definition: string | null;
   properties: Record<string, unknown>;
   confusables: string[];
   /** Present when one observed spelling names properties owned by multiple concepts. */
   meaningAlternatives?: {
     concept: string;
-    layer: "coherence" | "project";
+    layer: LexiconLayer;
     definition: string;
     properties: Record<string, unknown>;
     confusables: string[];
@@ -181,15 +184,15 @@ function rulings(
 interface KnownMeaning {
   state: VocabularyTerm["state"];
   concept: Concept | null;
-  layer: "coherence" | "project";
-  propertyOwners?: { concept: Concept; layer: "coherence" | "project" }[];
+  layer: LexiconLayer;
+  propertyOwners?: { concept: Concept; layer: LexiconLayer }[];
 }
 
 function table(
   lexicon: Lexicon,
-  layer: "coherence" | "project",
+  given: LexiconLayer,
   into: Map<string, KnownMeaning>,
-  properties: Map<string, { concept: Concept; layer: "coherence" | "project" }[]>,
+  properties: Map<string, { concept: Concept; layer: LexiconLayer }[]>,
   senses: Map<string, Set<string>>,
 ): void {
   const sense = (name: string, c: Concept): void => {
@@ -200,8 +203,10 @@ function table(
   };
   // Project/trust-level declarations have no owning concept; property declarations are attached below.
   for (const name of acceptedNames(lexicon))
-    if (!into.has(clean(name))) into.set(clean(name), { state: "declared", concept: null, layer });
+    if (!into.has(clean(name))) into.set(clean(name), { state: "declared", concept: null, layer: given });
   for (const c of lexicon.concepts) {
+    // A plugin's concept, composed into the tool layer, answers as its own plugin's layer.
+    const layer = c.layer === undefined ? given : (`plugin ${c.layer}` as const);
     into.set(clean(c.name), { state: "concept", concept: c, layer });
     sense(clean(c.name), c);
     for (const name of c.instances ?? []) {
@@ -223,18 +228,9 @@ function table(
   }
 }
 
-/** The singulars a word may be the plural of, as the reading merges a plural into its singular. */
-export function singularForms(word: string): string[] {
-  return singular(word);
-}
-
-function singular(word: string): string[] {
-  const out: string[] = [];
-  if (word.endsWith("ies") && word.length > 4) out.push(word.slice(0, -3) + "y");
-  if (/(?:ss|sh|ch|x|z)es$/.test(word)) out.push(word.slice(0, -2));
-  if (word.endsWith("s") && !word.endsWith("ss") && word.length > 3) out.push(word.slice(0, -1));
-  return out;
-}
+/** The singulars a word may be the plural of, as the reading merges a plural into its singular: the check's own rules (inflection.ts). */
+export { singularForms };
+const singular = singularForms;
 
 /** Inflection is accepted only when its conservative singular is an already-known complete name. */
 function knownMeaning(term: string, known: Map<string, KnownMeaning>): KnownMeaning | undefined {
@@ -271,6 +267,20 @@ function isLexiconDecision(line: string): boolean {
  */
 const ELIGIBLE = /^[a-z]{2,}(?: [a-z]{2,}){0,2}$/;
 
+/**
+ * Normalized, space-padded text with every occurrence of each phrase blanked,
+ * so a shorter name inside a longer one is not read as itself. A pass splits on
+ * the phrase with its spaces, so two occurrences sharing a space leave the
+ * second standing; masking repeats until none is left.
+ */
+function maskPhrases(text: string, phrases: readonly string[]): string {
+  return phrases.reduce((line, p) => {
+    let masked = line;
+    while (masked.includes(" " + p + " ")) masked = masked.split(" " + p + " ").join("   ");
+    return masked;
+  }, text);
+}
+
 function allCommon(term: string): boolean {
   return term.split(" ").every((w) => STOPLIST.has(w) || singular(w).some((s) => STOPLIST.has(s)));
 }
@@ -298,15 +308,21 @@ function declaredName(line: string): string | undefined {
   return undefined;
 }
 
+/** How a code file's exported type bodies read, per language (languageOfFile), as its plugin's manifest says: the line that opens a body, the line that closes it, and a field inside. A file no language claims, or whose plugin says nothing, has no type bodies read. */
+export interface MemberScan {
+  opens: RegExp;
+  closes: RegExp;
+  field: RegExp;
+}
+
 /**
  * A field an exported type declares: a member of an exported TypeScript
  * interface, type or class, or an annotated field of a top-level Python
  * class. The file's own locals never match.
  */
-function memberName(line: string, inside: boolean, python: boolean): string | undefined {
-  if (!inside) return undefined;
-  const match = python ? /^ {4}([a-z][A-Za-z0-9_]*)\s*:\s*[A-Za-z"'[]/.exec(line) : /^\s+(?:readonly\s+)?([a-z][A-Za-z0-9]*)\??:\s*[^=]/.exec(line);
-  return match?.[1];
+function memberName(line: string, inside: boolean, scan: MemberScan | undefined): string | undefined {
+  if (!inside || scan === undefined) return undefined;
+  return scan.field.exec(line)?.[1];
 }
 
 interface Word {
@@ -342,9 +358,12 @@ function wordRuns(text: string): Word[][] {
   return runs;
 }
 
-/** The fields of a journal or work record that are written prose; ids, sessions, commits and flags are not words. */
-const RECORD_METADATA = new Set(["id", "at", "session", "agent", "commit", "dirty", "binding", "kind", "work", "files", "file", "evidence", "cursor", "target", "owner", "state"]);
-
+/**
+ * The written prose of a journal or work record line: every field its role
+ * table (journal/record.ts) calls prose, and a decision's over, whose refused
+ * name is still a use of the words; ids, sessions, commits, paths and states
+ * are not words. A line that will not parse is read whole.
+ */
 export function recordProse(line: string): string[] {
   let value: unknown;
   try {
@@ -352,15 +371,7 @@ export function recordProse(line: string): string[] {
   } catch {
     return [line];
   }
-  const out: string[] = [];
-  const walk = (v: unknown, key: string | undefined): void => {
-    if (key !== undefined && RECORD_METADATA.has(key)) return;
-    if (typeof v === "string") out.push(v);
-    else if (Array.isArray(v)) for (const item of v) walk(item, undefined);
-    else if (v !== null && typeof v === "object") for (const [k, item] of Object.entries(v)) walk(item, k);
-  };
-  walk(value, undefined);
-  return out;
+  return recordWords(value, (role) => role !== "meta");
 }
 
 interface Pool {
@@ -531,14 +542,18 @@ export async function lexiconReading(
       ? { files: await corpusFiles({ root, coherence, project }, scope.files), listed: [] as string[], unreadable: [] as UnreadablePath[], excluded: [] as UnreadablePath[] }
       : await readCorpus({ root, coherence, project }, select);
   const known = new Map<string, KnownMeaning>();
-  const senses = new Map<string, Set<string>>();
-  const propertyOwners = new Map<string, { concept: Concept; layer: "coherence" | "project" }[]>();
-  table(coherence, "coherence", known, propertyOwners, senses);
+  const coherenceSenses = new Map<string, Set<string>>();
+  const projectSenses = new Map<string, Set<string>>();
+  const propertyOwners = new Map<string, { concept: Concept; layer: LexiconLayer }[]>();
+  table(coherence, "coherence", known, propertyOwners, coherenceSenses);
+  // Coherence's rejected names bind only in its own repository: in an adopter they are ordinary words of the project's, never read as refusals.
   const rejected = new Map(
-    rejectedNames(coherence).map((r) => [clean(r.name), r]),
+    (own ? rejectedNames(coherence) : []).map((r) => [clean(r.name), r]),
   );
+  // In an adopter they are no candidates either: the project's words, unremarked.
+  const unremarked = new Set(own ? [] : rejectedNames(coherence).map((r) => clean(r.name)));
   if (project) {
-    table(project, "project", known, propertyOwners, senses);
+    table(project, "project", known, propertyOwners, projectSenses);
     for (const r of rejectedNames(project)) rejected.set(clean(r.name), r);
   }
   for (const [name, owners] of propertyOwners) {
@@ -553,10 +568,6 @@ export async function lexiconReading(
     ? new Set([...acceptedNames(project)].map(clean))
     : new Set<string>();
   for (const name of projectNames) rejected.delete(name);
-  // Only a name that binds here marks a sense at risk beside it: Coherence's rejected names bind in an adopter's prose never, the project's own always (check.ts).
-  const binding = new Set(
-    own ? rejected.keys() : (project ? rejectedNames(project) : []).map((r) => clean(r.name)).filter((n) => rejected.has(n)),
-  );
   // The lexicon's "not:" entries name things it already knows are something else (Pyright, Python): never candidates.
   const confusables = new Set<string>();
   for (const g of [coherence, project])
@@ -595,10 +606,6 @@ export async function lexiconReading(
   };
   /** Rejected names on each line, keyed by file then line: sense is at risk beside them. */
   const rejectedLines = new Map<string, Map<number, string[]>>();
-  /** Names code declares, by their words: a Coherence concept an adopter declares carries the adopter's sense there. */
-  const declarations = new Map<string, VocabularyUse[]>();
-  /** Each use's words in text Coherence reads as its own (a record's prose, a spec's or practice's grammar), normalized: where an adopter's declared sense can meet Coherence's. */
-  const grammarOf = new Map<VocabularyUse, string>();
   const pool = new Map<string, Pool>();
   /** The files whose code declares each nominated name. */
   const declaredBy = new Map<string, Set<string>>();
@@ -611,7 +618,7 @@ export async function lexiconReading(
       if (site && !known.has(term) && !rejected.has(term)) add(term, site);
       return;
     }
-    if (confusables.has(term) || isWellKnown(famous, term, n.spelling)) return;
+    if (confusables.has(term) || unremarked.has(term) || isWellKnown(famous, term, n.spelling)) return;
     // Grammar, never a name: a phrase made only of function words is refused even capitalized ("Via", "And Or").
     if (term.split(" ").every((w) => FUNCTION_WORD_SET.has(w))) return;
     // A proper noun is a name even when the word is common; any other source must not be common words alone.
@@ -641,7 +648,8 @@ export async function lexiconReading(
     );
     let fenced = false;
     let exported = false;
-    const python = f.rel.endsWith(".py");
+    const language = languageOfFile(f.rel);
+    const scan = language === undefined ? undefined : memberScanOf(language);
     for (let n = 0; n < f.lines.length; n++) {
       const source = f.lines[n]!;
       // Review/maintenance decisions are outcomes, not fresh source-language observations of themselves.
@@ -680,23 +688,11 @@ export async function lexiconReading(
           spans.push(phrase);
         }
       }
-      // A record's prose is written to Coherence whole; a spec or practice only in its grammar, while its sentences are the project's.
-      if (!own && project) {
-        const grammar =
-          f.kind === "record"
-            ? recordProse(observed).join(" ")
-            : f.kind === "prose" && /\.(spec|practice)\.md$/.test(f.rel)
-              ? specGrammar(observed)
-              : "";
-        if (grammar.trim() !== "") grammarOf.set(use, " " + clean(grammar).replace(/[^a-z0-9 ]/g, " ") + " ");
-      }
-      const refused = spans.filter((p) => binding.has(p));
+      const refused = spans.filter((p) => rejected.has(p));
       // Only prose a person can still edit puts a sense at risk: code shares words with the language (Promise), and a record is history.
       if (refused.length && f.kind === "prose") {
         // A rejected word inside a longer known name on the same line is that name, not the refusal.
-        const masked = spans
-          .filter((p) => !rejected.has(p))
-          .reduce((line, p) => line.split(" " + p + " ").join("   "), normalized);
+        const masked = maskPhrases(normalized, spans.filter((p) => !rejected.has(p)));
         const standing = refused.filter((p) => masked.includes(" " + p + " "));
         if (standing.length) {
           const byLine = rejectedLines.get(f.rel) ?? new Map<number, string[]>();
@@ -707,17 +703,13 @@ export async function lexiconReading(
       if (f.kind === "code") {
         const name = declaredName(observed);
         if (name !== undefined && !name.startsWith("_")) {
-          const term = clean(name);
-          const sites = declarations.get(term) ?? [];
-          sites.push(use);
-          declarations.set(term, sites);
-          nominate({ term, spelling: name, proper: false }, use, true);
+          nominate({ term: clean(name), spelling: name, proper: false }, use, true);
         }
-        const member = memberName(observed, exported, python);
+        const member = memberName(observed, exported, scan);
         if (member !== undefined) nominate({ term: clean(member), spelling: member, proper: false }, use, true);
         // A body opened by an exported type (or a top-level Python class) holds declared fields until it closes at the margin.
-        if (python ? /^class\s/.test(observed) : /^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:interface|type|class)\s.*\{\s*$/.test(observed)) exported = true;
-        else if (python ? /^\S/.test(observed) : /^[}\]]/.test(observed)) exported = false;
+        if (scan?.opens.test(observed)) exported = true;
+        else if (scan?.closes.test(observed)) exported = false;
         continue;
       }
       if (f.kind === "data") continue;
@@ -879,27 +871,17 @@ export async function lexiconReading(
         propertyOwners: alternatives ?? null,
         rejected: refused ?? null,
       });
-      const recorded = senses.get(term);
-      const multiple =
-        alternatives && alternatives.length > 1
-          ? `more than one recorded sense: ${alternatives.map((a) => `${a.concept} (${a.layer})`).join(", ")}`
-          : recorded && recorded.size > 1
-            ? `more than one recorded sense: ${[...recorded].join(", ")}`
-            : undefined;
-      // Why a context's sense is at risk, and whether that reason is the declared sense alone, whose ruling is keyed to the term and component.
-      const atRisk = (here: VocabularyUse[]): { risk: string; declared: boolean } | undefined => {
+      // In an adopter only the project's own senses can differ: Coherence's sense of a word the project also uses is the tool's, and inside the project the project's sense wins.
+      const senses = own ? alternatives : alternatives?.filter((a) => a.layer === "project");
+      const recorded = (own ? coherenceSenses : projectSenses).get(term) ?? new Set<string>();
+      const multiple = (): string | undefined => {
+        if (senses && senses.length > 1) return `more than one recorded sense: ${senses.map((a) => `${a.concept} (${a.layer})`).join(", ")}`;
+        return recorded.size > 1 ? `more than one recorded sense: ${[...recorded].join(", ")}` : undefined;
+      };
+      // Why a context's sense is at risk, if it is.
+      const atRisk = (here: VocabularyUse[]): string | undefined => {
         if (candidate || refused || !item || (!item.concept && !alternatives?.length)) return undefined;
-        if (multiple) return { risk: multiple, declared: false };
-        const beside = item.concept ? near(here, item.concept.name) : undefined;
-        if (beside) return { risk: beside, declared: false };
-        // In an adopter a Coherence name its code declares is the project's sense: at risk only where Coherence's grammar writes it too.
-        if (!own && project && item.layer === "coherence") {
-          const declared = declarations.get(term)?.[0];
-          const written = declared ? here.find((u) => grammarOf.get(u)?.includes(" " + term + " ")) : undefined;
-          if (declared && written)
-            return { risk: `declared in this project's code (${declared.file}:${declared.line}) with its own sense, and written in text Coherence reads as its own (${written.file}:${written.line}), where the definition is Coherence's`, declared: true };
-        }
-        return undefined;
+        return multiple() ?? (item.concept ? near(here, item.concept.name) : undefined);
       };
       const contexts = [...new Set(locations.map((u) => u.component))]
         .sort()
@@ -907,21 +889,18 @@ export async function lexiconReading(
           const here = locations.filter((u) => u.component === component);
           const risk = atRisk(here);
           // Content, not line numbers, identifies a context; moving a line does not erase a human's answer.
-          // A declared sense is one question per term and component, whichever uses raise it: a new use does not reopen its ruling.
-          const evidence = risk?.declared
-            ? digest({ fingerprint, component, declared: term })
-            : digest({
-                fingerprint,
-                component,
-                uses: [...new Set(here.map((u) => u.fingerprint + ":" + u.text))].sort(),
-              });
+          const evidence = digest({
+            fingerprint,
+            component,
+            uses: [...new Set(here.map((u) => u.fingerprint + ":" + u.text))].sort(),
+          });
           const ruling = decisions.get(evidence);
           return {
             component,
             fingerprint: evidence,
             disposition: ruling?.disposition ?? "unreviewed",
             because: ruling?.because ?? null,
-            ...(risk ? { risk: risk.risk } : {}),
+            ...(risk ? { risk } : {}),
           };
         });
       return {
@@ -959,7 +938,7 @@ export async function lexiconReading(
     limits: [
       "No exhaustive extraction or automatic proof of meaning.",
       "SQL/data/notebook bodies are text, not resolved language symbols; unsupported/binary files and symlinks are reported as excluded.",
-      "Sense review is asked only where meaning is at risk: more than one recorded sense, a use on or beside a line with a name rejected for that concept, or a Coherence concept the project's code declares with its own sense written in a record or a spec's or practice's grammar. A matched spelling elsewhere is not a confirmed meaning either.",
+      "Sense review is asked only where meaning is at risk: more than one recorded sense, or a use on or beside a line with a name rejected for that concept; in an adopter only the project's own senses and rejected names count. A matched spelling elsewhere is not a confirmed meaning either.",
       "Unknowns and deferred reviews are not covered. Journal review decisions do not nominate themselves.",
       "Totals are population facts about this reading, not a to-do count.",
     ],
@@ -992,9 +971,14 @@ export interface Attention {
   senses: { term: string; component: string; reason: string; evidence: string; state: string }[];
 }
 
+/** What a sense review may rule about a context. */
+export const DISPOSITIONS = ["confirmed", "not-domain", "deferred", "defect"] as const;
+/** The rulings that settle a context: confirmed in the concept's sense, or dismissed as not the domain's word. */
+const SETTLING: ReadonlySet<string> = new Set<(typeof DISPOSITIONS)[number]>(["confirmed", "not-domain"]);
+
 /** Whether a review has settled a context: confirmed in the concept's sense, or dismissed as not the domain's word. */
 export function isSettled(disposition: string): boolean {
-  return disposition === "confirmed" || disposition === "not-domain";
+  return SETTLING.has(disposition);
 }
 
 /**

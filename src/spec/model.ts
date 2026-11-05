@@ -16,8 +16,8 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { countWork, readProjectText, spawnSync } from "../lifecycle/work-meter.ts";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { isModuleHandler, parseSpec, type Entrance, type FoldedFolder, type Invariant, type Mirror, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { creditedByCrossingAlone, crossingChecksTrust, resolveCovered } from "./covers.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
@@ -25,6 +25,15 @@ import { latestSeeing } from "../enforcement/run-index.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
 import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles, type Walked } from "../adapters/project-files.ts";
 import { configuredName, effectiveConfig, lexiconFileOf, readConfigFile } from "../adapters/project-config.ts";
+import { coreLanguageOfExtension, LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
+import { parsedOf } from "../plugins/languages.ts";
+import type { LoadedPlugin } from "../plugins/plugin.ts";
+import { readPlugins } from "../plugins/registry.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
+import { viaFormProblem } from "../plugins/verify.ts";
+import { clashText, composeStack, pluginLayers } from "../plugins/lexicon.ts";
+import { parseLexicon } from "../lifecycle/lexicon.ts";
+import { COHERENCE_LEXICON } from "../lifecycle/project.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
 import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
 import { declaredClasses, declaredFamilies, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
@@ -32,6 +41,26 @@ import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPr
 
 export const SPEC_SUFFIX = ".spec.md";
 export const CONFIG_FILE = "coherence.config.json";
+
+/**
+ * The project files the spec model finds by their names, each kind by the
+ * suffix that marks it. The model's walk selects its specs and practice files
+ * through modelFileKind, and so does every watcher that refreshes what the
+ * model drew, so a kind of file the model begins to read is watched with it.
+ */
+export const MODEL_FILES = { spec: SPEC_SUFFIX, practice: PRACTICE_SUFFIX } as const;
+
+export type ModelFileKind = keyof typeof MODEL_FILES;
+
+/** Which of the model's files a path is, by its name, or undefined when the model's walk never reads it. */
+export function modelFileKind(rel: string): ModelFileKind | undefined {
+  return (Object.keys(MODEL_FILES) as ModelFileKind[]).find((kind) => rel.endsWith(MODEL_FILES[kind]));
+}
+
+/** Whether the spec model reads this project path: one of its files by name, or the config. */
+export function readByModel(rel: string): boolean {
+  return modelFileKind(rel) !== undefined || rel === CONFIG_FILE;
+}
 
 export interface ModelInvariant extends Invariant {
   /** The folder of the component the bullet lives in. */
@@ -61,6 +90,10 @@ export interface Component {
   trustLevels: TrustLevel[] | undefined;
   /** Where work enters through this component, as its spec declares; each handler was found declared in the code. */
   entrances: ModelEntrance[];
+  /** The hand lists this component declares as mirrors, each with the files it was found in. */
+  mirrors: ModelMirror[];
+  /** The folders its spec declares folded into it, each still a folder of this component. */
+  folded: FoldedFolder[];
   invariants: ModelInvariant[];
   /** The practice file paired with the spec, when there is one. */
   practicePath: string | undefined;
@@ -75,6 +108,17 @@ export interface ModelEntrance extends Entrance {
   component: string;
   /** The project-relative file whose top level declares the handler, when one was found. */
   file: string | undefined;
+}
+
+export interface ModelMirror extends Mirror {
+  /** The folder of the component whose spec declares it. */
+  component: string;
+  /** The project-relative spec that declares it. */
+  spec: string;
+  /** The project-relative file whose top level declares the list, when it was found. */
+  listFile: string | undefined;
+  /** The project-relative files the recipe names (the closure's starting files, or the partner literal's file), those found. */
+  sources: string[];
 }
 
 export interface Counts {
@@ -113,23 +157,41 @@ export interface SpecModel {
 interface Config {
   ignore: string[];
   entryDir: string;
+  /** The plugins the config runs (src/plugins), for the via forms they prove; empty when it runs none or names one it refuses. */
+  plugins: LoadedPlugin[];
+  /** Why the config's plugins were refused, each a problem on the config file. */
+  configProblems: string[];
 }
 
 function readConfig(root: string): Config {
-  const config: Config = { ignore: [], entryDir: "." };
+  const config: Config = { ignore: [], entryDir: ".", plugins: [], configProblems: [] };
   // The project's own config over its registry's keys (project-config.ts); a malformed file is refused with its path.
   const found = effectiveConfig(root);
   if (found === undefined) return config;
   const record = found.record;
   if (Array.isArray(record["ignore"])) config.ignore = record["ignore"].filter((v): v is string => typeof v === "string");
   if (typeof record["entryDir"] === "string") config.entryDir = record["entryDir"];
+  // Only the manifests are read here: what a plugin proves is data. A syntax slot's module loads only where a reading asks for that slot
+  // (the check that a handler is declared at a file's top level), as every reading of a language does.
+  const plugins = readPlugins(root, record["plugins"], CONFIG_FILE, LANGUAGES, coreLanguageOfExtension);
+  config.plugins = plugins.plugins;
+  config.configProblems = plugins.problems;
+  // The config as a run reads it: a language key it refuses is the spec check's problem too, never passed here and refused there.
+  // Read once the plugins are, it registers them, so a file of a language a plugin adds is read by that plugin's syntax slots.
+  if (plugins.problems.length === 0) {
+    try {
+      readEnforcementConfig(root);
+    } catch (error) {
+      config.configProblems = [error instanceof Error ? error.message : String(error)];
+    }
+  }
   return config;
 }
 
 /**
  * The project's own ignore entries that name nothing: no file or folder at
- * that path from the root, for a bare name no folder of that name on any
- * project file's way down, and nothing git ignores by it. Such an entry
+ * that path from the root, for a bare name no folder or file of that name
+ * on any project file's path, and nothing git ignores by it. Such an entry
  * leaves nothing out, so a typo or a path that moved would bound nothing and
  * say nothing. An entry git ignores (dist, build: output absent from a fresh
  * checkout, or present only in a package) bounds that output whenever it
@@ -141,15 +203,18 @@ function ignoreProblems(root: string, walked: Walked): Problem[] {
   const path = join(root, CONFIG_FILE);
   const own = readConfigFile(path)?.["ignore"];
   if (!Array.isArray(own)) return [];
+  const all = (): string[] => [...walked.files, ...walked.excluded.map((e) => e.file)];
   let folders: Set<string> | undefined;
-  const folderSet = (): Set<string> =>
-    (folders ??= new Set([...walked.files, ...walked.excluded.map((e) => e.file)].flatMap((rel) => rel.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/")))));
+  const folderSet = (): Set<string> => (folders ??= new Set(all().flatMap((rel) => rel.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/")))));
+  // Every name on every project file's path, the file's own among them: a bare entry names something when it is one of them.
+  let names: Set<string> | undefined;
+  const nameSet = (): Set<string> => (names ??= new Set(all().flatMap((rel) => rel.split("/"))));
   const missing: { entry: string; key: string }[] = [];
   for (const entry of own) {
     if (typeof entry !== "string") continue;
     const key = entry.split(sep).join("/").replace(/^(\.\/)+/, "").replace(/\/+$/, "");
     if (key === "" || existsSync(join(root, key))) continue;
-    if (!key.includes("/") && [...folderSet()].some((folder) => folder === key || folder.endsWith("/" + key))) continue;
+    if (!key.includes("/") && nameSet().has(key)) continue;
     missing.push({ entry, key });
   }
   if (missing.length === 0) return [];
@@ -160,14 +225,14 @@ function ignoreProblems(root: string, walked: Walked): Problem[] {
     .map(({ entry }) => ({
       file: CONFIG_FILE,
       line: Math.max(text.findIndex((line) => line.includes(JSON.stringify(entry))) + 1, 1),
-      message: `ignore entry "${entry}" names no file or folder in the project and nothing git ignores, so it leaves nothing out: a typo, or a path that moved? A folder is named by its name or its path from the root, a file by its path from the root`,
+      message: `ignore entry "${entry}" names no file or folder in the project and nothing git ignores, so it leaves nothing out: a typo, or a path that moved? A folder or a file is named by its name, which matches it anywhere, or by its path from the root`,
     }));
 }
 
 /**
  * The entries git ignores, asked in one git check-ignore: a path entry as a
- * file and as a folder at its path, a bare name as a folder at the root and
- * under every folder the project holds (a package's own .gitignore). Outside
+ * file and as a folder at its path, a bare name as a file and as a folder at
+ * the root and under every folder the project holds (a package's own .gitignore). Outside
  * a repository nothing is ignored.
  */
 function gitIgnoredEntries(root: string, keys: readonly string[], folders: ReadonlySet<string>): Set<string> {
@@ -207,6 +272,41 @@ function storedNameProblems(root: string): Problem[] {
   if (typeof stored !== "string" || stored.trim().toLowerCase() === name.toLowerCase()) return [];
   const line = readFileSync(path, "utf8").split("\n").findIndex((text) => text.includes('"project"')) + 1;
   return [{ file: relative(root, path).split(sep).join("/"), line: Math.max(line, 1), message: `the lexicon stores project "${stored}" and the config names the project "${name}"; the config's name is the one read, so drop the lexicon's project field or make it agree` }];
+}
+
+/**
+ * The lexicon stack's clashes, as problems on the config: a plugin concept
+ * whose name Coherence or another plugin already declares stays out of the
+ * stack until the project lexicon settles the name (src/plugins/lexicon.ts).
+ * Read only when the config runs a plugin with a lexicon layer.
+ */
+function lexiconStackProblems(root: string, plugins: readonly LoadedPlugin[]): Problem[] {
+  if (!plugins.some((p) => p.manifest.lexicon !== undefined)) return [];
+  try {
+    const own = parseLexicon(JSON.parse(readFileSync(COHERENCE_LEXICON, "utf8")), COHERENCE_LEXICON);
+    const path = lexiconFileOf(root);
+    const project = existsSync(path) && path !== COHERENCE_LEXICON ? parseLexicon(JSON.parse(readFileSync(path, "utf8")), path) : undefined;
+    return composeStack(own, pluginLayers(plugins), project).clashes.map((clash) => ({ file: CONFIG_FILE, line: 1, message: clashText(clash) }));
+  } catch (error) {
+    return [{ file: CONFIG_FILE, line: 1, message: error instanceof Error ? error.message : String(error) }];
+  }
+}
+
+/**
+ * The project's component folders, "." for the root's: each folder holding a
+ * spec the walk reads. The light way a journal write can afford: one walk and
+ * no spec parsed. A config that will not parse walks with no ignore list; the
+ * spec check says why.
+ */
+export function componentFolders(rootGiven: string): string[] {
+  const root = resolve(rootGiven);
+  let ignore: readonly string[] = [];
+  try {
+    ignore = readConfig(root).ignore;
+  } catch {
+    ignore = [];
+  }
+  return [...new Set(findSpecs(root, ignore).map((path) => folderOf(root, path)))].sort();
 }
 
 /** Every spec file under the root, sorted by path. */
@@ -289,6 +389,32 @@ export function chokepointIndex(rootGiven: string, written: readonly string[] = 
   return entries;
 }
 
+/**
+ * Every mirror the specs declare, read the light way chokepointIndex reads
+ * them: a listing of the specs and a parse of each, never the whole model.
+ * A name or file that is gone leaves listFile or a source unfound; the model's
+ * problems say so, and the alarm says so at the edit.
+ */
+export function declaredMirrors(rootGiven: string): ModelMirror[] {
+  const root = resolve(rootGiven);
+  const config = readConfig(root);
+  const bounds = walkBounds(root, config.ignore);
+  const seen = new Set<string>();
+  const mirrors: ModelMirror[] = [];
+  for (const rel of projectFilesEnding(root, SPEC_SUFFIX).filter((file) => exclusionOf(file, bounds) === undefined).sort()) {
+    const specPath = join(root, rel);
+    const folder = folderOf(root, specPath);
+    if (seen.has(folder)) continue;
+    seen.add(folder);
+    const text = readProjectText(specPath, "spec");
+    // Most specs declare none: the section heading is looked for before the spec is parsed.
+    if (!/^##\s*mirrors\s*$/im.test(text)) continue;
+    const specRel = relative(root, specPath).split(sep).join("/");
+    for (const mirror of parseSpec(text, specRel).mirrors) mirrors.push(modelMirror(root, folder, specRel, mirror));
+  }
+  return mirrors;
+}
+
 export interface LoadOptions {
   seed?: Seed | undefined;
   /** Read .coherence/runs and derive run-informed state (default true). */
@@ -325,9 +451,11 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   // One walk of the project serves the specs, the practice files and the ignore list's check.
   const walked = walkedProjectFiles(walkBounds(root, config.ignore));
   problems.push(...ignoreProblems(root, walked));
+  for (const message of config.configProblems) problems.push({ file: CONFIG_FILE, line: 1, message });
+  problems.push(...lexiconStackProblems(root, config.plugins));
   const storedName = storedNameProblems(root)[0];
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
-  for (const specPath of walked.files.filter((rel) => rel.endsWith(SPEC_SUFFIX)).map((rel) => join(root, rel)).sort()) {
+  for (const specPath of walked.files.filter((rel) => modelFileKind(rel) === "spec").map((rel) => join(root, rel)).sort()) {
     const folder = folderOf(root, specPath);
     const rel = relative(root, specPath).split(sep).join("/");
     const existing = byFolder.get(folder);
@@ -342,7 +470,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
 
   // A practice file stands beside its folder's spec, with the spec's stem (d-861e8319).
   const practiceFiles = new Map<string, { file: string; parsed: ReturnType<typeof parsePractices> }>();
-  for (const rel of walked.files.filter((f) => f.endsWith(PRACTICE_SUFFIX)).sort()) {
+  for (const rel of walked.files.filter((f) => modelFileKind(f) === "practice").sort()) {
     const folder = folderOf(root, join(root, rel));
     const spec = byFolder.get(folder);
     if (spec === undefined) {
@@ -390,6 +518,12 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
         problems.push({ file: specPath, line: invariant.line, message: `invariant ${invariant.name} declared twice in this component` });
       }
       seen.add(invariant.name);
+      // A via that names a form ([form] name) is proved by the plugin that declares it; a form none declares is never run as a test title.
+      for (const e of invariant.enforcements) {
+        if (e.form !== "totality oracle") continue;
+        const refused = viaFormProblem(e.via, config.plugins);
+        if (refused !== undefined) problems.push({ file: specPath, line: e.line, message: `invariant ${invariant.name}: ${refused}` });
+      }
       if (invariant.crossing !== undefined) {
         for (const end of [invariant.crossing.from, invariant.crossing.to]) {
           if (levelNames.has(end)) continue;
@@ -422,6 +556,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       }
       return { ...entrance, component: folder, file: found };
     });
+    const mirrors = (parsed.mirrors ?? []).map((mirror) => modelMirror(root, folder, specPath, mirror, problems));
+    const folded = (parsed.folded ?? []).filter((f) => foldedHolds(root, folder, specPath, f, folders, problems));
     const paired = practiceFiles.get(folder);
     const practices = (paired?.parsed.practices ?? []).map((practice) => modelPractice(practice, `${folder}/${practice.name}`, folder, paired!.file, enactments));
     components.push({
@@ -432,6 +568,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       ...(parsed.owners === undefined ? {} : { owners: parsed.owners }),
       trustLevels: parsed.trustLevels,
       entrances,
+      mirrors,
+      folded,
       invariants,
       practicePath: paired?.file,
       practices,
@@ -453,6 +591,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       invariantsByFolder: new Map(components.map((c) => [c.folder, new Set(c.invariants.map((i) => i.name))])),
       coherenceTree: practiceFiles.size === 0 ? true : isCoherenceTree(root),
       records,
+      classes: () => declaredClasses(root, false),
     }),
   );
   const byName = new Map(components.map((c) => [c.folder, c]));
@@ -464,7 +603,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const counts = countModel(components, problems);
   // The journal is read for defects even where no practice file asked for it; a project with no spec reads none.
   const journal = practiceFiles.size === 0 && components.length > 0 ? journalRecords(root) : records;
-  const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root), declaredFamilies(root));
+  const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root, false), declaredFamilies(root, false));
   const crossingAlone = crossingAloneCredits(components, trustLevels);
   return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects, ...(crossingAlone.length === 0 ? {} : { crossingAlone }), ...(storedName === undefined ? {} : { storedName }) };
 }
@@ -477,6 +616,21 @@ export function guardStanding(components: readonly Component[]): (guard: string)
     if (slash === -1 || invariant === undefined) return "missing";
     return invariant.enforcements.length > 0 && !invariant.lacks.includes("refutation") ? "witnessed" : "unwitnessed";
   };
+}
+
+/**
+ * A file a record names, as the project-relative path its owner is decided
+ * by: an absolute path made relative to the root, separators made forward,
+ * and every "." and ".." segment resolved, so gadget/../widget/knob.ts is
+ * widget/knob.ts; undefined for the root itself and for a path that leaves
+ * the project. Every reader that asks which component holds a named file
+ * passes it through here first.
+ */
+export function projectFile(root: string, named: string): string | undefined {
+  const relativeTo = isAbsolute(named) ? relative(root, named) : named;
+  const file = posix.normalize(relativeTo.split(sep).join("/").split("\\").join("/"));
+  if (file === "." || file === "" || file === ".." || file.startsWith("../") || posix.isAbsolute(file) || isAbsolute(file)) return undefined;
+  return file.replace(/\/+$/, "");
 }
 
 /** The component whose folder holds a project-relative file: the deepest component folder above it. */
@@ -627,10 +781,10 @@ function entranceGuardProblems(root: string, components: readonly Component[]): 
       const named = chokepoints.some(({ component: owner, value }) => {
         const symbol = HANDLER.exec(value)?.[1];
         if (symbol !== undefined) return symbol === name;
-        if (!SOURCE.test(value)) return false;
+        if (!isDeclaringSource(value)) return false;
         return [owner.folder === "." ? value : `${owner.folder}/${value}`, value].some((path) => {
           const at = resolve(root, path);
-          return existsSync(at) && statSync(at).isFile() && declaresAtTop(readProjectText(at, "source"), name);
+          return existsSync(at) && statSync(at).isFile() && declaresAtTop(readProjectText(at, "source"), name, path);
         });
       });
       if (!named) {
@@ -641,63 +795,25 @@ function entranceGuardProblems(root: string, components: readonly Component[]): 
   }
   return problems;
 }
-const SOURCE = /\.(?:[cm]?[jt]sx?|py)$/;
+/** Whether a file is source the spec model reads for a declaration: a file of a language whose plugin names a parser that says what its top level declares. */
+function isDeclaringSource(file: string): boolean {
+  const language = languageOfFile(file);
+  return language !== undefined && parsedOf(language, "topLevel") !== undefined;
+}
 
 /**
- * Whether a source text declares the name at its top level (TypeScript,
- * JavaScript, or Python). A destructured binding counts, on one line or
- * across several and however deeply nested, as a factory's products are
- * exported (export const { handlers: { GET, POST }, auth } = NextAuth(...));
- * so does an export list, with or without a from, under the name it exports
- * (export { GET, POST } from "./auth", export { handle as GET }): the
- * re-exporting file is where a framework finds the name, and the source is
- * not followed (d-7155e46f).
+ * Whether a source file's text declares the name at its top level, as the
+ * file's language is read through its plugin's parser (the topLevel
+ * reading): false for a file of no language, or one whose plugin names none.
  */
-export function declaresAtTop(text: string, name: string): boolean {
-  const escaped = name.replace(/\$/g, "\\$");
-  const typescript = new RegExp(`^(?:export\\s+)?(?:default\\s+)?(?:declare\\s+)?(?:abstract\\s+)?(?:async\\s+)?(?:function\\*?|const|let|var|class|interface|type|enum|namespace)\\s+${escaped}\\b`, "m");
-  if (destructuredAtTop(text).has(name) || exportListed(text).has(name)) return true;
-  const python = new RegExp(`^(?:async\\s+)?(?:def|class)\\s+${escaped}\\b|^${escaped}\\s*(?::[^=\\n]+)?=`, "m");
-  return typescript.test(text) || python.test(text);
-}
-
-/** The text of the braces opening at `open`, through its matching close, or undefined when it never closes. */
-function braced(text: string, open: number): string | undefined {
-  let depth = 0;
-  for (let i = open; i < text.length; i++) {
-    if (text[i] === "{") depth += 1;
-    else if (text[i] === "}" && --depth === 0) return text.slice(open, i + 1);
-  }
-  return undefined;
-}
-
-/** The names a top-level object destructuring binds, on one line or several, nested or not: a name followed by , } or = (a key followed by : binds nothing). */
-function destructuredAtTop(text: string): Set<string> {
-  const names = new Set<string>();
-  for (const m of text.matchAll(/^(?:export\s+)?(?:const|let|var)\s*(?=\{)/gm)) {
-    const open = m.index + m[0].length;
-    const pattern = braced(text, open);
-    if (pattern === undefined || !/^\s*(?::[^=]+)?=/.test(text.slice(open + pattern.length))) continue;
-    for (const b of pattern.matchAll(/(?<=[\s,{:])([A-Za-z_$][\w$]*)(?=\s*[,}=])/g)) names.add(b[1]!);
-  }
-  return names;
-}
-
-/** The names a top-level export list exports, with or without a from: export { a, b as c } from "x" exports a and c. */
-function exportListed(text: string): Set<string> {
-  const names = new Set<string>();
-  for (const m of text.matchAll(/^export\s+(?:type\s+)?\{([^}]*)\}/gm)) {
-    for (const item of m[1]!.split(",")) {
-      const named = /^\s*(?:type\s+)?([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?\s*$/.exec(item.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ""));
-      if (named !== null) names.add(named[2] ?? named[1]!);
-    }
-  }
-  return names;
+export function declaresAtTop(text: string, name: string, file: string): boolean {
+  const language = languageOfFile(file);
+  return language !== undefined && (parsedOf(language, "topLevel")?.(text, name) ?? false);
 }
 
 /** Source files under a folder, sorted, never into the folders no walk enters. */
 function sourcesUnder(root: string, folder: string, ignore: readonly string[]): string[] {
-  return walkedFiles(root, folder, ignore).filter((rel) => SOURCE.test(rel));
+  return walkedFiles(root, folder, ignore).filter(isDeclaringSource);
 }
 
 /**
@@ -711,7 +827,7 @@ function handlerFile(root: string, folder: string, handler: string, ignore: read
   if (isModuleHandler(handler)) {
     // A module file: its top-level script is the handler. It must be a source file that exists, under the component or the root.
     const file = handler.trim();
-    if (!SOURCE.test(file)) return { reason: `handler ${file} names a file that is not source code` };
+    if (!isDeclaringSource(file)) return { reason: `handler ${file} names a file that is not source code` };
     const candidates = [folder === "." ? file : `${folder}/${file}`, file].filter((path, index, all) => all.indexOf(path) === index && !path.split("/").includes(".."));
     for (const candidate of candidates) {
       const path = resolve(root, candidate);
@@ -729,7 +845,7 @@ function handlerFile(root: string, folder: string, handler: string, ignore: read
   for (const candidate of candidates) {
     const path = resolve(root, candidate);
     if (!existsSync(path) || !statSync(path).isFile()) continue;
-    if (declaresAtTop(readProjectText(path, "source"), name)) return candidate;
+    if (declaresAtTop(readProjectText(path, "source"), name, candidate)) return candidate;
   }
   return {
     reason:
@@ -737,6 +853,72 @@ function handlerFile(root: string, folder: string, handler: string, ignore: read
         ? `handler ${name} is declared at the top level of no source file under ${folder}`
         : `handler ${name} is not declared at the top level of ${file} (read under ${folder} and under the root)`,
   };
+}
+
+/** A file a spec names, read relative to the component's folder, then to the root, never above the root; undefined when neither exists. */
+function specNamedFile(root: string, folder: string, file: string): string | undefined {
+  const candidates = [folder === "." ? file : `${folder}/${file}`, file].filter((path, index, all) => all.indexOf(path) === index && !path.split("/").includes(".."));
+  return candidates.find((candidate) => {
+    const path = resolve(root, candidate);
+    return existsSync(path) && statSync(path).isFile();
+  });
+}
+
+/**
+ * A mirror as the model holds it: the list's file and the recipe's files
+ * found, and a problem for each name or file that is gone, so a declaration
+ * cannot rot unseen (the edit-time alarm reports it at the edit too).
+ */
+/**
+ * Whether a folded bullet still names a folder of this component: inside its
+ * folder, on disk, and with no spec of its own. Each way it fails is a
+ * problem, so a fold cannot outlive the folder it named or hide a component.
+ */
+function foldedHolds(root: string, folder: string, specPath: string, folded: FoldedFolder, components: ReadonlySet<string>, problems: Problem[]): boolean {
+  const written = `${folded.folder}${folded.subtree ? "/**" : ""}`;
+  const at = posix.normalize(folder === "." ? folded.folder : `${folder}/${folded.folder}`);
+  const inside = folded.folder !== "" && !isAbsolute(folded.folder) && at !== folder && !at.startsWith("../") && at !== ".." && (folder === "." || at.startsWith(folder + "/"));
+  const fail = (message: string): false => {
+    problems.push({ file: specPath, line: folded.line, message: `folded folder ${written}: ${message}` });
+    return false;
+  };
+  if (!inside) return fail(`not a folder inside ${folder}; a folded folder is written relative to its spec`);
+  let isFolder = false;
+  try {
+    isFolder = statSync(resolve(root, at)).isDirectory();
+  } catch {}
+  if (!isFolder) return fail(`${at} is not a folder; remove the bullet, or name the folder as it is now`);
+  if (components.has(at)) return fail(`${at} has a spec of its own, so it is a component, not folded; remove the bullet`);
+  return true;
+}
+
+export function modelMirror(root: string, folder: string, specPath: string, mirror: Mirror, problems: Problem[] = []): ModelMirror {
+  const declared = (name: string, file: string, role: string): string | undefined => {
+    const found = specNamedFile(root, folder, file);
+    if (found === undefined) {
+      problems.push({ file: specPath, line: role === "list" ? mirror.line : mirror.recipeLine, message: `mirror ${mirror.name}: ${file} does not exist (read under ${folder} and under the root)` });
+      return undefined;
+    }
+    if (!declaresAtTop(readProjectText(resolve(root, found), "source"), name, found)) {
+      problems.push({ file: specPath, line: role === "list" ? mirror.line : mirror.recipeLine, message: `mirror ${mirror.name}: ${name} is not declared at the top level of ${found}; derive what was hand-kept, or remove the mirror` });
+      return undefined;
+    }
+    return found;
+  };
+  const listFile = declared(mirror.name, mirror.file, "list");
+  const sources: string[] = [];
+  const recipe = mirror.recipe;
+  if (recipe?.kind === "closure") {
+    for (const file of recipe.files) {
+      const found = specNamedFile(root, folder, file);
+      if (found === undefined) problems.push({ file: specPath, line: mirror.recipeLine, message: `mirror ${mirror.name}: closure of ${file}, which does not exist (read under ${folder} and under the root)` });
+      else sources.push(found);
+    }
+  } else if (recipe !== undefined) {
+    const found = declared(recipe.name, recipe.file, "partner");
+    if (found !== undefined) sources.push(found);
+  }
+  return { ...mirror, component: folder, spec: specPath, listFile, sources };
 }
 
 function countModel(components: Component[], problems: Problem[]): Counts {

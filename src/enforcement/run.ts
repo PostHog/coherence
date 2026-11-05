@@ -16,19 +16,20 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isTestPath, parseName, type LanguageAdapter } from "../adapters/adapter.ts";
-import { isLanguage, type Language } from "../adapters/index.ts";
+import { isTestPath, parseName, type LanguageAdapter, type Occasion } from "../adapters/adapter.ts";
 import { projectFiles } from "../adapters/project-files.ts";
 import { gitState } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
 import type { ChokepointFrom } from "../spec/grammar.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { checkChokepoint, type ChokepointResult } from "./check.ts";
-import { languageOfFile, readEnforcementConfig, setupClaims, type EnforcementConfig } from "./config.ts";
+import { enforcedLanguageOf, readEnforcementConfig, setupClaims, type EnforcementConfig } from "./config.ts";
 import { appendRun, entryKey, loadRuns, machineLoad, type Form, type RunEntry, type RunRecord } from "./record.ts";
 import { enforcesOf } from "../spec/floor.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
-import { escapeRegExp, runTotalityBatch, runTotalityOracle, type TotalityResult } from "./totality.ts";
+import { escapeRegExp, runTotalityBatch, runTotalityOracle, TOTALITY_TIMEOUT_MS, type TotalityResult } from "./totality.ts";
+import { answeringFor } from "../plugins/registry.ts";
+import { proveVia, viaForm } from "../plugins/verify.ts";
 import { readLatency, type LatencyReading } from "./latency.ts";
 import { createObserver, recordObservation, type ObservationOutcome, type TotalityVia } from "../observation/index.ts";
 
@@ -47,6 +48,8 @@ export interface RunOptions {
    * store; the invariant floor counts only graded entries. A full run grades.
    */
   grade?: boolean | undefined;
+  /** Who asks, handed to each refutation: "edit" for the check at an edit, inside the hook's budget; absent is a run. */
+  occasion?: Occasion | undefined;
   /** An adapter to use instead of the warm server (tests, and `--no-server`); in a multi-language project, for its own language. */
   adapter?: LanguageAdapter | undefined;
   /** Adapters by language to use instead of the warm servers (tests, and `--no-server` in a multi-language project). */
@@ -192,6 +195,19 @@ class Instruments {
   }
 }
 
+/**
+ * A run asked for invariants that no bullet names. Nothing runs: a run that
+ * left them out would report the others' verdicts and exit as if every one
+ * asked for had passed, so a misspelled name would look checked.
+ */
+export class UnknownInvariants extends Error {
+  readonly names: readonly string[];
+  constructor(names: readonly string[]) {
+    super(`run: no bullet is named ${names.map((n) => `"${n}"`).join(", ")}; give a bullet's name, or <component folder>/<bullet name> as refute takes it`);
+    this.names = names;
+  }
+}
+
 /** One chokepoint enforcement of a selected invariant, with the languages it may be written in, the likeliest first. */
 interface ChokepointPlan {
   component: string;
@@ -200,7 +216,7 @@ interface ChokepointPlan {
   chokepoint: string;
   /** The bullet's own from: line, when it has one. */
   from: ChokepointFrom | undefined;
-  languages: Language[];
+  languages: string[];
 }
 
 /**
@@ -211,27 +227,28 @@ interface ChokepointPlan {
  * component holds, in the config's order; else every language. A
  * single-language project has the one.
  */
-export function enforcementLanguages(config: EnforcementConfig, component: string, invariant: ModelInvariant, protects: string, chokepoint: string, files: () => readonly string[]): Language[] {
-  if (config.languages.length === 1) return [config.language];
+export function enforcementLanguages(config: EnforcementConfig, component: string, invariant: ModelInvariant, protects: string, chokepoint: string, files: () => readonly string[]): string[] {
+  if (config.enforced.length === 1) return [config.language];
+  const of = (file: string): string | undefined => enforcedLanguageOf(file, config);
   const named = [protects, chokepoint].flatMap((value) => {
     const form = parseName(value);
     const file = form.form === "symbol" ? form.fileHint : form.form === "module" ? form.path : undefined;
-    const language = file === undefined ? undefined : languageOfFile(file, config.languages);
+    const language = file === undefined ? undefined : of(file);
     return language === undefined ? [] : [language];
   });
   if (named.length > 0) return [...new Set(named)];
   const latest = invariant.latest.find((l) => l.form === "chokepoint");
-  const graded = latest?.language !== undefined && isLanguage(latest.language) && config.languages.includes(latest.language) ? [latest.language] : [];
+  const graded = latest?.language !== undefined && config.enforced.includes(latest.language) ? [latest.language] : [];
   const touched = (latest?.files ?? []).flatMap((f) => {
-    const language = languageOfFile(f, config.languages);
+    const language = of(f);
     return language === undefined ? [] : [language];
   });
   const seen = [...new Set([...graded, ...touched])];
   if (seen.length > 0) return seen;
   const prefix = component === "." ? "" : `${component}/`;
-  const held = new Set(files().filter((f) => f.startsWith(prefix)).flatMap((f) => languageOfFile(f, config.languages) ?? []));
-  const ordered = config.languages.filter((l) => held.has(l));
-  return ordered.length > 0 ? ordered : [...config.languages];
+  const held = new Set(files().filter((f) => f.startsWith(prefix)).flatMap((f) => of(f) ?? []));
+  const ordered = config.enforced.filter((l) => held.has(l));
+  return ordered.length > 0 ? ordered : [...config.enforced];
 }
 
 /**
@@ -261,7 +278,7 @@ export function setupChooser(root: string, config: EnforcementConfig): (via: str
   const claims = (): string[][] => {
     if (claimed !== undefined) return claimed;
     const all = projectFiles(root);
-    claimed = config.tests.map((setup) => all.filter((f) => isTestPath(f, setup.testFolders) && setupClaims(setup, f)));
+    claimed = config.tests.map((setup) => all.filter((f) => isTestPath(f, setup.testFolders) && setupClaims(setup, f, config.declared, config.provided)));
     return claimed;
   };
   return (via) => {
@@ -285,10 +302,14 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const wantChokepoints = options.form === undefined || options.form === "chokepoint";
   const wantTotality = options.form === undefined || options.form === "totality oracle";
   const chosen = new Set(options.invariants ?? []);
-  const multi = config.languages.length > 1;
+  const multi = config.enforced.length > 1;
+  // A name is a bullet's own, or its component folder and name as refute takes it; each must name a bullet, or nothing runs.
+  const isChosen = (folder: string, name: string): boolean => chosen.has(name) || chosen.has(`${folder}/${name}`);
+  const unmatched = [...chosen].filter((wanted) => !model.components.some((c) => c.invariants.some((i) => wanted === i.name || wanted === `${c.folder}/${i.name}`)));
+  if (unmatched.length > 0) throw new UnknownInvariants(unmatched);
 
   const selected = model.components.flatMap((c) =>
-    c.invariants.filter((i) => (chosen.size === 0 || chosen.has(i.name)) && i.enforcements.length > 0).map((i) => ({ component: c.folder, invariant: i })),
+    c.invariants.filter((i) => (chosen.size === 0 || isChosen(c.folder, i.name)) && i.enforcements.length > 0).map((i) => ({ component: c.folder, invariant: i })),
   );
 
   const details: EntryDetail[] = [];
@@ -319,7 +340,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const observing = options.observe === true && wantTotality && config.testJson !== undefined ? createObserver(root, config) : undefined;
   // An observed pass reads through the primary language's instrument after it, so that one is reached first and kept awake.
   if (observing !== undefined) await instruments.open(config.language);
-  const allVias = selected.flatMap(({ component, invariant }) => totalityEnforcements(invariant).map(({ via }) => ({ component, name: invariant.name, filter: primary?.testFilter(via) ?? via, setup: chooseSetup(via) })));
+  // A via a plugin proves ([form] name) never joins a test runner's invocation: its plugin answers it below.
+  const allVias = selected.flatMap(({ component, invariant }) => totalityEnforcements(invariant).filter(({ via }) => viaForm(via) === undefined).map(({ via }) => ({ component, name: invariant.name, filter: primary?.testFilter(via) ?? via, setup: chooseSetup(via) })));
   const vias: TotalityVia[] = allVias.filter((v) => v.setup === 0).map(({ component, name, filter }) => ({ component, name, filter }));
   if (wantTotality) {
     // The test suite can outlast a warm server's idle timeout, and its timer only resets on a request line.
@@ -364,7 +386,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
         let firstReason: string | undefined;
         for (const [i, language] of plan.languages.entries()) {
           const last = i === plan.languages.length - 1;
-          const tag = multi ? { language } : {};
+          const answering = answeringFor(config.plugins, language);
+          const tag = { ...(multi ? { language } : {}), ...(answering.length === 0 ? {} : { plugins: answering }) };
           const door = await instruments.ready(language);
           if (door.adapter === undefined || door.reason !== undefined) {
             firstReason ??= door.reason ?? "no adapter";
@@ -387,7 +410,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
           }
           let result: ChokepointResult;
           try {
-            result = await checkChokepoint(door.adapter, { protects, chokepoint, component, testFolders: config.testFolders, root, ...governs });
+            result = await checkChokepoint(door.adapter, { protects, chokepoint, component, testFolders: config.testFolders, root, ...governs, occasion: options.occasion ?? "run" });
           } catch (error) {
             const message = error instanceof Error ? error.message.split("\n")[0]! : String(error);
             instruments.fail(language, message);
@@ -443,6 +466,28 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     if (wantTotality) {
       for (const { via } of totalityEnforcements(invariant)) {
         const t0 = Date.now();
+        if (viaForm(via) !== undefined) {
+          // Proved by the plugin that declares the form, graded as a test is, with the plugin and its evidence on the entry.
+          const proved = await proveVia(root, config.plugins, via, options.timeoutMs ?? TOTALITY_TIMEOUT_MS, component);
+          details.push({
+            entry: {
+              ...entryOf(component, invariant.name, "totality oracle", {
+                verdict: proved.verdict,
+                grade: undefined,
+                refutation: recorded.has(entryKey(component, invariant.name, "totality oracle")) ? "witnessed" : "missing",
+                bypasses: [],
+                testReferences: 0,
+                files: [],
+                latency: Date.now() - t0,
+                reason: proved.reason,
+                ...(proved.plugins.length === 0 ? {} : { plugins: proved.plugins, evidence: proved.evidence }),
+              }),
+              mode: "one-at-a-time",
+            },
+            totality: proved,
+          });
+          continue;
+        }
         const filter = primary?.testFilter(via) ?? via;
         const index = chooseSetup(via);
         const setup = config.tests[index]!;

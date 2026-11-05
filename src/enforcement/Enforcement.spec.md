@@ -38,6 +38,13 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   crossing: instrument -> reading
   refuted: dropped the rule that a plain import specifier in the chokepoint's own module is inside, so classifySite read that site by range like any other -> the totality oracle went red, then green once restored (2026-09-18); stopped querying references to the chokepoint, so the real TypeScript fixture's runtime and import-only chokepoint references disappeared from the classified sites -> the focused enforcement test went red, then green once restored (2026-09-18)
   kinds: none
+- a site the adapter marks as test is a test: A reference site the adapter marks as test code is a test reference wherever it stands, the chokepoint's own file and range included: the marker is read before the chokepoint's range, and only a re-export, a bypass wherever it stands, is read before it; an unmarked site in the same place is classified as before.
+  over: every site in a test folder, a test file by name, or an in-file test module the adapter marks, inside and outside the chokepoint's range and file
+  via: a site the adapter marks as test is a test reference even in the chokepoint's own file
+  because: Rust keeps unit tests in a `#[cfg(test)]` module inside the file they test, so a path rule cannot see them; read by range, a test beside the chokepoint is inside it and a test elsewhere in its file is a bypass, and either would grade the chokepoint on code that never ships. Only the adapter can read the module a site sits in, so it marks the site and the check honours the mark first
+  crossing: instrument -> reading
+  refuted: dropped the site.test clause from classifySite, so a marked site was read by range like any other -> "a site the adapter marks as test is a test reference even in the chokepoint's own file" went red in enforcement.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-13)
+  kinds: none
 - both endpoint sites recorded honestly: A completed chokepoint run persists protected references and chokepoint references, and an import-only chokepoint reference is reliance evidence without being called a runtime call.
   over: every completed protected-thing and chokepoint reference query, every persisted site, and every import-only reference to a public chokepoint
   via: run sites persist protected references and chokepoint references without turning an unused import into a call
@@ -228,6 +235,12 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   because: in a monorepo the callers outside the adopted folder are the bypasses a product-boundary invariant exists for, and the language server is started on the project alone, so a clean grade with no qualifier claims more than the search read (df-0d235229)
   refuted: checkChokepoint returned the verdict over a nested project with no horizon and no qualifier -> "a chokepoint verdict over a nested project says its reference search covered that folder alone" went red in monorepo.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- nothing to check is not a pass: A chokepoint whose protected thing the instrument finds no reference to, not even inside the chokepoint, is recorded not run with its reason saying there was nothing to check and its refutation missing, never a pass, so the bullet is not witnessed; a rung whose enforcer is the language, or a checker that refused the staged outside import, still passes on that refusal.
+  over: an exported protected thing that nothing in the project references, its chokepoint included
+  via: a protected thing the instrument finds no reference to, not even inside the chokepoint, is not run: there was nothing to check
+  because: a check over no reference classifies nothing, so a pass claims the chokepoint holds where the check saw nothing that could break it. In a Convex project the only path to an internalAction is the generated internal.<module>.<name> API, which the language server does not follow back to the export, so a planted bypass graded pass with 0 references of any kind and the refutation proved only a re-export the real callers never use; counting that refutation would still have promoted the bullet to an invariant. The language, or a checker drawing the module boundary, refuses every outside reference whether or not one exists, so those rungs need no reference to hold
+  refuted: let a chokepoint over no reference at all pass whenever its refutation fired -> "a protected thing the instrument finds no reference to, not even inside the chokepoint, is not run: there was nothing to check" went red in enforcement.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-12)
+  kinds: none
 - the reference horizon widens the search: A project's config may widen where a chokepoint check searches for references: "project" (the default) searches the project alone, "repository" the whole repository, and a list of folders, each relative to the repository top, the project and those folders; a reference found in a horizon folder is classified like any in the project, and a verdict over less than the whole repository names every folder it searched.
   over: a bypass planted in another team's folder of a TypeScript and of a Python monorepo, checked under the default, under "repository", under a list naming its folder and under a list naming another
   via: the reference horizon widens a chokepoint check past the project: a bypass in another folder is found under repository and under a list naming it, and named as not searched under project
@@ -241,10 +254,10 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   refuted: made a config naming one language also list TypeScript, so a single-language config read as multi-language -> "a single-language config reads as it always did: one language, one test setup from the single keys, the plain server names" went red in languages.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
 - a multi-language config is read whole or refused by name: A config may list its languages, the first the primary, and its test setups, each with its own runner, test files and folder; a file's language is its extension; a setup with no command, an unknown language, or a folder outside the root is refused with the key that is wrong.
-  over: every language list and test setup a config can hold, and every file extension the two languages use
+  over: every language list and test setup a config can hold, and every file extension the three languages use
   via: a multi-language config lists its languages and test setups; a file's language is its extension; a malformed setup is refused by name
   because: one product in the PostHog monorepo is a Python backend and a TypeScript frontend, so a config with one language could adopt half of it; a malformed setup read as absent would leave a totality oracle silently not run
-  refuted: dropped the refusal of a test setup that names neither test nor testJson -> "a multi-language config lists its languages and test setups; a file's language is its extension; a malformed setup is refused by name" went red in languages.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  refuted: dropped the refusal of a test setup that names neither test nor testJson -> "a multi-language config lists its languages and test setups; a file's language is its extension; a malformed setup is refused by name" went red in languages.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07); made a Rust file's extension name no language -> the same test went red in languages.test.ts on its .rs assertion; restored byte for byte, green (2026-10-13)
   kinds: none
 - each test runs through its own setup: A totality oracle's test runs through the test setup whose test files define it, in one batched invocation per setup, started in that setup's folder, and its entry names the setup's language.
   over: every totality oracle of a project with more than one test setup, batched and each one alone
@@ -278,6 +291,42 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   because: a CLI-level hook test started a detached warm server that outlived the test and raced its cleanup, with every test green, until COHERENCE_NO_WARM_UP=1 was set for the suite; the first guarded runs then found three more test files whose hooks left a warm server running, two of them only on CI's runners, and eight that left fixture folders or a socket in the temp folder, three of them only under a name filter
   refuted: made the leak guard name and remove what a test file leaves behind without failing the file -> "the leak guard fails a test file that leaves a process or a temp folder behind, names each, and passes one that cleans up" went red in leak-guard.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- a test file pays Coherence's load a bounded number of times: A unit test file that launches Coherence's own command line (a node process whose arguments name this repository's src/cli.ts or dist/cli.js) and waits on it more than three times fails, naming the count, the file, each test's launches and the in-process cli() to use instead; a *.e2e.ts file, the home of spawned end-to-end tests, and a detached launch the code under test starts and lets go are not counted.
+  over: every spawn a test file's process makes, through any route to node's child_process, counted at the work meter's watch; a file over the budget, one at it, one whose launches run detached, and a *.e2e.ts file
+  via: the spawn budget fails a test file that launches Coherence's command line more than its budget, naming the count, the file, each test's launches and cli(), and passes one at the budget, one whose launches run detached, and a *.e2e.ts file
+  because: each launch pays Node's start and Coherence's load, about a second, and the tests kept doing it once per call: 23 of 76 test files, the --mod install tests at 8 s each, and the CI unit step from 136 s to 214 s in five days (df-608d319a); sharding bought time without stopping the pattern, so the pattern fails when the test is written
+  refuted: made the leak guard name a test file over its spawn budget without failing it -> "the spawn budget fails a test file that launches Coherence's command line more than its budget, naming the count, the file, each test's launches and cli(), and passes one at the budget, one whose launches run detached, and a *.e2e.ts file" went red in test-budgets.test.ts on its own assertion (the file over the budget passed); restored byte for byte (cmp), green batched and alone (2026-10-13)
+  kinds: budget
+  checklist: execution-budget declared as a test file pays Coherence's load a bounded number of times
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is a count of waited launches per test file
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on launched processes, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+- a unit test runs under a ceiling: A unit test that runs longer than the suite's ceiling fails, naming its time, the ceiling and the ways out; a test may run longer only under a budget it declares with budget(t, seconds, because), which fails it past that budget and fails it when the decision it cites is not in the journal or the budget is not a finite number of seconds; the test keeps its own file and place in what the runner reports.
+  over: a test past the ceiling, one nested in a suite, one that calls back, one within a budget citing a decision, one past its own budget, one citing no decision, and one asking for an unbounded budget, under a lowered ceiling
+  via: the time ceiling fails a test that runs past it, nested or called back, in its own file's name and place, and holds a test that declares a budget citing a decision to that budget; a budget citing no decision, or none at all, fails
+  because: the suite's cost grew by tests that each looked cheap when written; a ceiling names the one that is not when it is written, and a budget that must cite a decision cannot become a silent skip
+  refuted: made the afterEach hook hold a test only to a budget it declared, never to the suite's ceiling -> "the time ceiling fails a test that runs past it, nested or called back, in its own file's name and place, and holds a test that declares a budget citing a decision to that budget; a budget citing no decision, or none at all, fails" went red in test-budgets.test.ts on its own assertion (the test past the ceiling passed); restored byte for byte (cmp), green batched and alone (2026-10-13)
+  kinds: budget
+  checklist: execution-budget declared as a unit test runs under a ceiling
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is one test's time
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: the ceiling bounds one test's time, not a count in a window
+  checklist: memory-budget dismissed: the bound is on time, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+- no unit test reads Coherence's whole tree: A unit test file that lists, searches or compares Coherence's own tree (a git listing, grep, status, diff, log or rev-list, or a recursive tool, run inside this repository) fails, naming each read by the test that made it; a question about named files is no such read, and a reading over the whole tree belongs in the bench job.
+  over: every spawn a test file's process makes, with the folder it runs in; a listing of the repository and a listing of one named file
+  via: a unit test file that reads Coherence's own tree fails, naming each read; a question about one named file does not
+  because: a test over Coherence's own tree costs more with every merge: the prefilter's whole-tree pass grew from 55 s to 89 s of CI time in five days before it moved to the bench job (#103), and the Scope page over Coherence's own data was the slowest file in the suite until it moved too
+  refuted: made the whole-tree rule judge a spawn by the test process's folder, not by the folder the spawn runs in -> "a unit test file that reads Coherence's own tree fails, naming each read; a question about one named file does not" went red in test-budgets.test.ts on its own assertion (the listing of the repository passed); restored byte for byte (cmp), green batched and alone (2026-10-13)
+  kinds: budget
+  checklist: execution-budget declared as no unit test reads Coherence's whole tree
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is zero whole-tree reads per unit test file
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on reads of the tree, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
 - unchanged sites are written once per run file: A run entry whose reference sites are exactly the ones its enforcement's last entry in the same run file wrote is written with a reference in their place, their content's hash and the run in that file that holds them in full; changed sites, and an enforcement's first entry in each run file, are written in full, so a reference never leaves its file and any one run file, alone, resolves; loadRuns resolves every reference back into the sites it names, in the place a full write puts them, so no reader sees a reference; and a reference its file cannot resolve is said on the entry, among the damaged lines, in Scope's reliance, enforcement card and flow map, and in query, never read as no sites.
   over: two runs with the same sites, a run whose sites changed, another session's file with the same sites, each file taken away in turn, and a reference its file does not hold
   via: a run whose sites did not change stores a reference within its own run file that resolves to the same sites; changed sites are stored in full; a reference no record holds is reported, never an empty list
@@ -309,4 +358,25 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   via: run at a registry's top runs each listed project from its own folder, its records in each
   because: run at the top read the whole repository as one project with the top's keys, so it ran specs no registry lists and wrote its records at the top (df-3c6a666d); the CI check runs there for a registry, and spec --check already read each listed project there
   refuted: runCommand never took the registry branch, so run at the top read the whole repository as one project again -> "run at a registry's top runs each listed project from its own folder, its records in each" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
+  kinds: none
+- a run's named invariants all name bullets: A run given --invariant names runs only if each one names a bullet, by its own name or as its component folder and name the way refute takes it; otherwise it runs nothing, records nothing, names each unmatched name and exits 64.
+  over: a real name beside a misspelled one, and a bullet given as its component folder and name
+  via: run refuses an --invariant that names no bullet, running nothing, and takes a bullet by its component folder and name too
+  because: a name that matched no bullet was dropped without a word, so a run of nine names whose fifth was mistyped ran eight, reported them passing and exited 0, and a refutation confirmed through it would read as witnessed for a bullet it never ran (df-5c88f106)
+  refuted: let run go on without the names that match no bullet, as before -> "run refuses an --invariant that names no bullet, running nothing, and takes a bullet by its component folder and name too" went red in each.test.ts; restored (cmp), green batched and alone (2026-10-12)
+  kinds: none
+- a check that lapsed is no pass: A run exits 1 when an enforcement an earlier run checked, pass or fail, reads not run now, whatever the reason, and names each with its earlier verdict and when; an enforcement no run has checked reads not run without failing the run.
+  over: a project whose chokepoint names a protected thing no file declares, run once with no earlier record and once after a record of its pass
+  via: a run that cannot check an enforcement an earlier run checked exits 1 and names it; the same not run with no earlier check exits 0
+  because: a verified chokepoint whose protected name became ambiguous read not run and the run exited 0, so a CI job running it went green over a check it no longer made (the blind Swift plugin session, 2026-10-22)
+  refuted: made runCommand's exit ignore the lapsed entries, so a run that lost a check it made before exits 0 again (cli.ts) -> "a run that cannot check an enforcement an earlier run checked exits 1 and names it; the same not run with no earlier check exits 0" went red in enforcement.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
+  kinds: none
+- a served refutation is the adapter's: The warm server hands the adapter every argument of a refutation, the exempt folder and the occasion included, so a refutation asked through it stages what the adapter asked in process stages.
+  over: the warm server's adapter and an adapter in process over one project, each asked to refute an exported function with an exempt folder, and the server asked again without one
+  via: a served refutation stages what the adapter in process stages, the exempt folder and the occasion carried
+  because: the server forwarded the protected thing and the chokepoint alone, so a served refutation of a check that exempts a folder never staged its use from outside the folder, and the occasion an adapter is told would never have reached it
+  refuted: made the server's client send the protected thing and the chokepoint alone, as before, dropping the exempt folder and the occasion (server.ts) -> "a served refutation stages what the adapter in process stages, the exempt folder and the occasion carried" went red in server.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
+  kinds: none
+- a via that maps to no test is said, never graded as a fail: When a run's batched pass finds no reported test whose title, or a group's title above it, is a bullet's via, while the same via run alone selects a test by pattern and passes, run --each names the via as naming no test exactly, with the titles it selected alone, instead of printing a fail batched beside a pass alone.
+  because: three bullets read 'no test ran' in every full batched run and passed alone, and run --each printed both verdicts without saying they disagreed, so the floor graded them failing while each targeted run passed (df-03839b92)
   kinds: none

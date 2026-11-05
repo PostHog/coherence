@@ -3,8 +3,10 @@
  *
  * The server sends a first load (a windowed state), then updates on an event
  * stream: journal, runs and work appends as the records that are new, a
- * recomputed snapshot when a spec, a lexicon or the config changes, and the
- * component interfaces when the language server has read them again. Every
+ * recomputed snapshot when a spec, a lexicon or the config changes, the
+ * component interfaces when the language server has read them again, and the
+ * vocabulary coverage when the server's worker has read it, each of which
+ * moves the state's version as a snapshot does. Every
  * update is merged into the state the page already holds and the page
  * renders again; nothing is kept beside the state.
  *
@@ -17,7 +19,8 @@
  * Shared by the browser bundle and the Node tests; it imports types only.
  */
 
-import type { Damaged, InterfaceReading, JournalRecord, RunRecord, ShellState, WorkOrder } from "./model.ts";
+import type { CoverageUnread, Damaged, InterfaceReading, JournalRecord, LexiconCoverage, PageEntry, RecordedSite, RunRecord, ShellState, WorkOrder } from "./model.ts";
+import { setLanguageData } from "./language-data.ts";
 
 /** One event off the stream: its name and its data, still JSON text. */
 export interface StreamEvent {
@@ -116,6 +119,20 @@ export function mergeRuns(state: ShellState, records: readonly RunRecord[], olde
   return added.length;
 }
 
+/**
+ * Take every reference site of one chokepoint entry, fetched by its run and
+ * enforcement, in place of the share the first load carried and the count of
+ * the rest. Returns whether the page held that entry.
+ */
+export function mergeSites(state: ShellState, run: string, component: string, name: string, sites: RecordedSite[]): boolean {
+  const record = state.runs.records.find((r) => runKeyOf(r) === run);
+  const at = record?.invariants.findIndex((e) => e.component === component && e.name === name && e.form === "chokepoint") ?? -1;
+  if (record === undefined || at === -1) return false;
+  const { sitesLeft: _left, ...entry } = record.invariants[at] as PageEntry;
+  record.invariants = record.invariants.map((e, i) => (i === at ? { ...entry, sites } : e));
+  return true;
+}
+
 /** Replace the work orders an update names, add the new ones, keep the rest. */
 export function mergeWork(state: ShellState, orders: readonly WorkOrder[], damaged: Damaged[]): void {
   const current = state.journal.work.kind === "present" ? state.journal.work.orders : [];
@@ -126,8 +143,9 @@ export function mergeWork(state: ShellState, orders: readonly WorkOrder[], damag
 }
 
 /**
- * Take a recomputed snapshot: the model (lexicons, specs, interfaces, work)
- * is replaced, the records the page already holds are kept beside the
+ * Take a recomputed snapshot: the model (lexicons, their coverage as the
+ * snapshot carries it, read or still being read, specs, interfaces, work, the
+ * relief) is replaced, the records the page already holds are kept beside the
  * snapshot's, and the count of what is left out is the snapshot's total less
  * what the page now holds. What the reader chose (the view, queries, filters,
  * a selection) is kept.
@@ -139,7 +157,10 @@ export function mergeSnapshot(state: ShellState, incoming: ShellState): void {
   state.views = incoming.views;
   state.lexicon = { ...incoming.lexicon, query: state.lexicon.query };
   state.spec = incoming.spec;
+  if (incoming.spec.languages !== undefined) setLanguageData(incoming.spec.languages);
   state.componentInterfaces = incoming.componentInterfaces;
+  if (incoming.relief === undefined) delete state.relief;
+  else state.relief = incoming.relief;
   state.structure = { ...state.structure, preview: incoming.structure.preview };
   const journal = { ...incoming.journal, records: state.journal.records };
   delete journal.omitted;
@@ -185,9 +206,20 @@ export function applyUpdate(state: ShellState, event: string, data: unknown): bo
       if (state.connection !== undefined) state.connection.version = update.version;
       return true;
     }
-    case "interfaces":
-      state.componentInterfaces = data as InterfaceReading;
+    case "interfaces": {
+      // The reading moves the state's version, so a reconnect from here is sent no snapshot it already holds.
+      const update = data as { interfaces: InterfaceReading; version: string };
+      state.componentInterfaces = update.interfaces;
+      if (state.connection !== undefined) state.connection.version = update.version;
       return true;
+    }
+    case "coverage": {
+      // The reading moves the state's version, so a reconnect from here is sent no snapshot it already holds.
+      const update = data as { coverage: LexiconCoverage | CoverageUnread; version: string };
+      state.lexicon.coverage = update.coverage;
+      if (state.connection !== undefined) state.connection.version = update.version;
+      return true;
+    }
     default:
       return false;
   }

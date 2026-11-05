@@ -16,26 +16,36 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import type { Definition, LanguageAdapter, ReferenceSite, Resolved } from "../../adapters/adapter.ts";
-import { PythonAdapter } from "../../adapters/python.ts";
-import { TypeScriptAdapter } from "../../adapters/typescript.ts";
+import { PythonAdapter } from "../../../plugins/python/python.ts";
+import { TypeScriptAdapter } from "../../../plugins/typescript/typescript.ts";
+import { RpcError } from "../../adapters/jsonrpc.ts";
 import { projectFiles } from "../../adapters/project-files.ts";
+import { oldGit } from "../../adapters/old-git-fixture.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
 import { proposeClosures, renderProposal, type Proposal } from "../../scaffold/control.ts";
-import { readComponentInterfaces } from "./component-interfaces.ts";
-import { keptLine } from "./kept-answers.ts";
-import { lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
+import { callArguments, readComponentInterfaces, switchesOff } from "./component-interfaces.ts";
+import { predictClosure } from "../../economy/closure.ts";
+import { readInterfaceMap } from "../../observation/interfaces.ts";
+import { loadSpecModel } from "../../spec/model.ts";
+import { parseSpec } from "../../spec/grammar.ts";
+import { readEnforcementConfig } from "../../enforcement/config.ts";
+import { adapterCode, keptLine } from "./kept-answers.ts";
+import { sharedStructureDir } from "./shared-structure.ts";
+import { STRUCTURE_DIR, lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
+import { readInterfacesApart } from "./apart.ts";
 import type { InterfaceReading } from "./model.ts";
-import { checked, routedProject } from "./routed-fixture.ts";
+import { bothWays, sameMap } from "./both-ways.ts";
+import { checked, ROUTED, routedProject } from "./routed-fixture.ts";
 import { scopedUnsettled } from "./scoped-route.ts";
-import { renderView } from "./shell.ts";
+import { reliefNotes } from "./relief/data.ts";
 import { flowOf } from "./structure-flow.ts";
 
 const COHERENCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -65,6 +75,12 @@ class TextServer implements LanguageAdapter {
   /** Every question put to it, a resolve or a references, by the file it is about. */
   readonly questions: string[] = [];
   readonly stall = new Set<string>();
+  /** Files it fails every question about, with its words (or the error itself), as gopls fails a file outside the host's build. */
+  readonly fail = new Map<string, string | Error>();
+  /** Files the server itself answers with an error, as tsserver returns its own crash on a question. */
+  readonly refuse = new Map<string, string>();
+  /** The code its refusals carry. */
+  refuseCode = -32603;
   /** How many times a reading started it. */
   started = 0;
   private readonly root: string;
@@ -91,6 +107,10 @@ class TextServer implements LanguageAdapter {
     this.asked.push(definition.name);
     this.questions.push(definition.file);
     if (this.stall.has(definition.name)) return new Promise(() => {});
+    const failed = this.fail.get(definition.file);
+    if (failed !== undefined) throw failed instanceof Error ? failed : new Error(failed);
+    const refused = this.refuse.get(definition.file);
+    if (refused !== undefined) throw new RpcError("textDocument/references", this.refuseCode, refused);
     const sites: ReferenceSite[] = [];
     for (const file of projectFiles(this.root).filter((f) => /\.(ts|py)$/.test(f))) {
       let enclosing: string | undefined;
@@ -150,9 +170,9 @@ test("interfaces read only within the declared components", async () => {
     assert.deepEqual(read.outside, { sites: 2, files: 1, into: [{ component: "src/store", sites: 2 }] }, "an import and a call in loose/use.ts, counted into the store; none from vendor/");
     assert.ok(read.symbols.every((s) => s.from.startsWith("src/")), "no outside caller is drawn as a component");
     const { state } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: read });
-    const evidence = /data-field="evidence">([^<]*)</.exec(renderView(state, "structure").text)?.[1] ?? "";
+    const evidence = reliefNotes(state).join(" ");
     assert.match(evidence, /read only within the 2 declared components/);
-    assert.match(evidence, /2 reference sites from 1 file in no declared component counted, not drawn: 2 into src\/store; a declaration only such code names is not asked, and code past the config&#39;s bounds is not read/);
+    assert.match(evidence, /2 reference sites from 1 file in no declared component counted, not drawn: 2 into src\/store; a declaration only such code names is not asked, and code past the config's bounds is not read/);
     assert.match(answerStructure(state).text, /^evidence: .*read only within the 2 declared components.*2 reference sites from 1 file in no declared component counted, not drawn/m, "query structure says the same");
   } finally {
     remove();
@@ -172,28 +192,6 @@ test("a name no other component spells is never asked for its references", async
     remove();
   }
 });
-
-/** Read a project exhaustively and through the prefilter on one server; both readings, and the server closed. */
-async function bothWays(adapter: LanguageAdapter, root: string): Promise<{ exhaustive: InterfaceReading; filtered: InterfaceReading }> {
-  try {
-    // Neither keeps answers: the filtered reading must ask the server itself for what the prefilter lets through.
-    const exhaustive = await readComponentInterfaces(root, adapter, { exhaustive: true, keep: false });
-    const filtered = await readComponentInterfaces(root, adapter, { keep: false });
-    return { exhaustive, filtered };
-  } finally {
-    await adapter.close();
-  }
-}
-
-function sameMap(exhaustive: InterfaceReading, filtered: InterfaceReading, what: string): void {
-  assert.equal(filtered.kind, "read", what);
-  assert.equal(exhaustive.kind, "read", what);
-  if (filtered.kind !== "read" || exhaustive.kind !== "read") return;
-  assert.deepEqual(filtered.symbols, exhaustive.symbols, `${what}: the same component interfaces, symbols and site counts`);
-  assert.deepEqual(filtered.entrances, exhaustive.entrances, `${what}: the same entrances and reaches`);
-  assert.equal(filtered.declarations, exhaustive.declarations, what);
-  assert.deepEqual(filtered.unowned, exhaustive.unowned, what);
-}
 
 const TS_CONFIG = JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["**/*.ts"] });
 
@@ -246,13 +244,7 @@ test("the prefilter never hides a cross-component reference", { timeout: 600_000
     ts.remove();
     py.remove();
   }
-  // Coherence's own tree, read both ways through one warm server.
-  const own = await bothWays(new TypeScriptAdapter(COHERENCE_ROOT), COHERENCE_ROOT);
-  if (own.filtered.kind === "unread") t.diagnostic(`no TypeScript instrument for Coherence's tree: ${own.filtered.because}`);
-  else {
-    sameMap(own.exhaustive, own.filtered, "Coherence's own tree");
-    assert.ok(own.filtered.kind === "read" && own.filtered.symbols.length > 100, "a real map, not an empty one");
-  }
+  // Coherence's own tree, read both ways, is bench/interfaces/own-tree.ts in the bench job: it reads the whole tree twice, so it would cost the unit suite more with every merge.
 });
 
 test("the interface reading is bounded in time and says when it is partial", { timeout: 30_000 }, async () => {
@@ -271,8 +263,7 @@ test("the interface reading is bounded in time and says when it is partial", { t
     assert.deepEqual(read.partial?.unread, ["src/api", "src/store"], "the store's write was never answered, and the api's entrance reach was never read");
     assert.match(read.entrances[0]?.reason ?? "", /^not read: the interface reading stopped at its time budget \(1 s\)/);
     const { state } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: read });
-    const page = renderView(state, "structure").text;
-    assert.match(page, /data-field="partial" data-partial="time">Partial map: the interface reading stopped at its time budget \(1 s\)[^<]*src\/api, src\/store were not all read/);
+    assert.match(reliefNotes(state)[0] ?? "", /^Partial map: the interface reading stopped at its time budget \(1 s\).*src\/api, src\/store were not all read/, "the Structure view says it first");
     assert.match(answerStructure(state).text, /^partial map: the interface reading stopped at its time budget \(1 s\)/, "query structure leads with it");
     // Memory: a server over its ceiling stops the reading before the next question.
     const heavy = await readComponentInterfaces(root, new TextServer(root), { budget: { memoryMB: 100 }, memory: async () => 250 });
@@ -281,7 +272,7 @@ test("the interface reading is bounded in time and says when it is partial", { t
     const complete = await readComponentInterfaces(root, new TextServer(root), { budget: { seconds: 60 } });
     assert.equal(complete.kind === "read" && complete.partial, undefined, "a reading that finished says nothing of the kind");
     const { state: whole } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: complete });
-    assert.doesNotMatch(renderView(whole, "structure").text, /data-field="partial"/);
+    assert.ok(!reliefNotes(whole).some((note) => /^Partial map/.test(note)), "a finished reading says nothing of the kind");
   } finally {
     remove();
   }
@@ -296,6 +287,128 @@ test("the interface reading is bounded in time and says when it is partial", { t
     assert.equal(byFlag.kind === "read" && byFlag.partial?.budget, "50 MB", "the flag's memory ceiling outranks the config's");
   } finally {
     configured.remove();
+  }
+});
+
+test("a file the language server cannot answer for is named and left unread while the rest of the language is read", async () => {
+  // A second store file only one host's build holds, which the api calls beside the store's write.
+  const { root, remove } = project({
+    ...BOUNDED,
+    "src/store/clock_windows.ts": "export function tick(): number {\n  return 1;\n}\n",
+    "src/api/api.ts": "import { write } from \"../store/rows.ts\";\nimport { tick } from \"../store/clock_windows.ts\";\nexport function go(): string {\n  tick();\n  return write(\"a\");\n}\n",
+  });
+  try {
+    const server = new TextServer(root);
+    server.fail.set("src/store/clock_windows.ts", "no package metadata for file src/store/clock_windows.ts");
+    const read = await readComponentInterfaces(root, server, { keep: false });
+    assert.equal(read.kind, "read", `one file's failure leaves the language read: ${read.kind === "unread" ? read.because : ""}`);
+    if (read.kind !== "read") return;
+    assert.deepEqual(read.unanswered, [{ file: "src/store/clock_windows.ts", component: "src/store", reason: "no package metadata for file src/store/clock_windows.ts" }]);
+    assert.ok(read.symbols.some((s) => s.from === "src/api" && s.to === "src/store" && s.symbol === "write"), "every other file is read: the api's use of the store's write is drawn");
+    assert.equal(read.partial, undefined, "no budget was spent");
+    const { state } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: read });
+    assert.match(reliefNotes(state)[0] ?? "", /^Partial map: the language server could not answer for 1 file, which was left unread while the rest was read.*src\/store\/clock_windows\.ts \(no package metadata/, "the Structure view says it first");
+    assert.match(answerStructure(state).text, /^partial map: the language server could not answer for 1 file[^\n]*src\/store\/clock_windows\.ts/, "query structure leads with it");
+    const whole = await readComponentInterfaces(root, new TextServer(root), { keep: false });
+    assert.equal(whole.kind === "read" && whole.unanswered, undefined, "a server that answers every file leaves nothing unanswered");
+    const overflowing = new TextServer(root);
+    overflowing.fail.set("src/store/clock_windows.ts", new RpcError("textDocument/references", -32603, "<main> TypeScript Server Error (5.9.3)\nMaximum call stack size exceeded\nRangeError: Maximum call stack size exceeded\n    at trackExistingEntityName (/host/node_modules/typescript/lib/typescript.js:94992:14)\n    at isSymbolAccessible (/host/node_modules/typescript/lib/typescript.js:57448:23)"));
+    const overflowed = await readComponentInterfaces(root, overflowing, { keep: false });
+    assert.equal(overflowed.kind, "read", "one question's failure leaves the language read");
+    if (overflowed.kind !== "read") return;
+    assert.deepEqual(overflowed.unanswered, [{ file: "src/store/clock_windows.ts", component: "src/store", reason: "textDocument/references: <main> TypeScript Server Error (5.9.3) Maximum call stack size exceeded RangeError: Maximum call stack size exceeded (-32603)" }], "the server's words, never its stack");
+    assert.equal(overflowed.partial, undefined, "a question the server could not answer spends no budget");
+    assert.equal(recordReading(root, overflowed, structureFingerprint(root)), true, "kept for the hooks, as a complete reading that names the file");
+    // The economy of a change to that file: the closure is said, with the file's line naming what the server could not answer.
+    const economy = await predictClosure(root, ["src/store/clock_windows.ts"], { adapter: server });
+    const why = Object.fromEntries(economy.entries.map((e) => [e.file, e.why]));
+    assert.ok(why["src/store/clock_windows.ts"]?.some((w) => /^the typescript server could not answer for it \(no package metadata for file src\/store\/clock_windows\.ts\), so what references it is not read$/.test(w)), JSON.stringify(why));
+    assert.deepEqual(why["src/store/Store.spec.md"], ["spec of src/store, which holds src/store/clock_windows.ts"], "the rest of the closure is still read");
+    // The observation's interface map: the file is named, the store's write still read.
+    const observed = await readInterfaceMap(root, server, loadSpecModel(root, { runs: false }), readEnforcementConfig(root), "typescript");
+    assert.deepEqual(observed.unanswered, [{ file: "src/store/clock_windows.ts", reason: "no package metadata for file src/store/clock_windows.ts" }]);
+    assert.ok(observed.symbols.some((s) => s.from === "src/api" && s.to === "src/store" && s.symbol === "write"), "the observation reads every other file");
+  } finally {
+    remove();
+  }
+});
+
+test("a question the server refused is kept like an answer while the tree is unchanged, and a crash, a transient refusal or a tsserver assertion is asked again", async () => {
+  const { root, remove } = project({
+    ...BOUNDED,
+    "src/store/clock_windows.ts": "export function tick(): number {\n  return 1;\n}\n",
+    "src/api/api.ts": "import { write } from \"../store/rows.ts\";\nimport { tick } from \"../store/clock_windows.ts\";\nexport function go(): string {\n  tick();\n  return write(\"a\");\n}\n",
+  });
+  const clockFile = "src/store/clock_windows.ts";
+  try {
+    const server = new TextServer(root);
+    server.fail.set(clockFile, "language server exited (SIGKILL)");
+    await readComponentInterfaces(root, server);
+    // The same crash on the unchanged tree: asked again, and counted as asked anew though nothing is kept for it.
+    const crashing = new TextServer(root);
+    crashing.fail.set(clockFile, "language server exited (SIGKILL)");
+    const crashed = await readComponentInterfaces(root, crashing);
+    assert.ok(crashing.asked.includes("tick"), "a crash is asked again");
+    assert.ok(crashed.kind === "read" && crashed.kept?.asked === 1, `a question asked again that failed is asked anew: ${JSON.stringify(crashed.kind === "read" && crashed.kept)}`);
+    // A refusal that may pass on its own is never kept: each reading of the unchanged tree asks it again.
+    const passing: [number, string][] = [
+      [-32800, "request cancelled"],
+      [-32801, "content modified"],
+      [-32802, "server cancelled"],
+      [-32002, "server not initialized"],
+      [1, "<semantic> TypeScript Server Error (5.9.3)\nDebug Failure. False expression: Project is dirty\nError: Debug Failure. False expression: Project is dirty\n    at updateProjectIfDirty (/tsserver.js:1:1)"],
+    ];
+    for (const [code, words] of passing) {
+      const first = new TextServer(root);
+      first.refuseCode = code;
+      first.refuse.set(clockFile, words);
+      await readComponentInterfaces(root, first);
+      const next = new TextServer(root);
+      next.refuseCode = code;
+      next.refuse.set(clockFile, words);
+      const read = await readComponentInterfaces(root, next);
+      assert.ok(next.asked.includes("tick"), `a refusal coded ${code} is asked again`);
+      assert.equal(read.kind === "read" && read.unanswered?.[0]?.reason, new RpcError("textDocument/references", code, words).message, "and the file is named with the server's words, on one line");
+    }
+    // A refusal the server returned is kept like an answer: the unchanged tree never starts the server for it, and still names the file.
+    const refusing = new TextServer(root);
+    refusing.refuse.set(clockFile, "Maximum call stack size exceeded");
+    await readComponentInterfaces(root, refusing);
+    const again = new TextServer(root);
+    const kept = await readComponentInterfaces(root, again);
+    assert.equal(again.started, 0, "the server is never started for a question it already refused");
+    assert.ok(kept.kind === "read" && kept.kept?.asked === 0, "nothing is asked anew");
+    assert.deepEqual(kept.kind === "read" && kept.unanswered, [{ file: clockFile, component: "src/store", reason: "textDocument/references: Maximum call stack size exceeded (-32603)" }]);
+    // A change anywhere drops the kept refusal, even in a file that never spells the refused name: what the server
+    // overflowed on may be any file it read, so the server is asked again.
+    writeFileSync(join(root, "src/store/rows.ts"), readFileSync(join(root, "src/store/rows.ts"), "utf8") + "// edited\n");
+    const changed = new TextServer(root);
+    await readComponentInterfaces(root, changed);
+    assert.ok(changed.asked.includes("tick"), "an edit elsewhere in the tree asks the refused question again");
+  } finally {
+    remove();
+  }
+});
+
+test("the interface reading's worker keeps a refused question as the reading in process does: the unchanged tree never starts the server for it", async () => {
+  const { root, remove } = routedProject();
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    const refusing = new TextServer(root);
+    const words = "<semantic> TypeScript Server Error (5.9.3)\nMaximum call stack size exceeded\nRangeError: Maximum call stack size exceeded\n    at trackExistingEntityName (/tsserver.js:1:1)";
+    refusing.refuse.set("src/store/rows.ts", words);
+    const first = await readInterfacesApart(root, () => refusing);
+    // The server's words cross the thread as the error says them, so the worker names the file exactly as the reading in process does.
+    const reason = new RpcError("textDocument/references", -32603, words).message;
+    assert.deepEqual(first.kind === "read" && first.unanswered, [{ file: "src/store/rows.ts", component: "src/store", reason }], "the worker names the refused file with the server's words");
+    const again = new TextServer(root);
+    const kept = await readInterfacesApart(root, () => again);
+    assert.equal(again.started, 0, "the server is never started for a question it already refused");
+    assert.deepEqual(again.questions, [], "nothing is asked of it");
+    assert.ok(kept.kind === "read" && kept.kept?.asked === 0, "nothing is asked anew");
+    assert.deepEqual(kept.kind === "read" && kept.unanswered, [{ file: "src/store/rows.ts", component: "src/store", reason }], "and the file is still named, with the same words");
+  } finally {
+    remove();
   }
 });
 
@@ -345,6 +458,69 @@ test("a scoped reading proposes for its entrances what the whole reading propose
   }
 });
 
+test("a chokepoint whose every call in a handler passes the option its unless: line names as true credits that handler nothing, and is named switched off; a call with the check on, or the option not a literal true, keeps the credit", async () => {
+  const { root, remove } = routedProject();
+  try {
+    const write = (path: string, text: string): void => writeFileSync(join(root, path), text);
+    write("src/service/check.ts", "export function check(v: string, options?: { skip: boolean }): string {\n  if (!options?.skip) inner();\n  return v;\n}\nfunction inner(): void {}\n");
+    write(
+      "src/api/api.ts",
+      [
+        'import { serve } from "../service/serve.ts";',
+        'import { check } from "../service/check.ts";',
+        "export function look(): string {",
+        '  return check(serve("l"));',
+        "}",
+        "export function peek(): string {",
+        '  return check(serve("p"), { skip: true });',
+        "}",
+        "export function poke(): string {",
+        "  const skip = Math.random() > 2;",
+        '  return check(serve("k"), { skip });',
+        "}",
+        "export function grab(): string {",
+        '  return serve("g");',
+        "}",
+        "",
+      ].join("\n"),
+    );
+    const spec = (unless: boolean): void => {
+      write("src/api/Api.spec.md", ["# Api", "", "Takes requests.", "", "## entrances", ...["look", "peek", "poke", "grab"].flatMap((n) => [`- ${n}: a caller ${n}s`, `  handler: ${n} in src/api/api.ts`, "  trust: public"]), "", "## invariants", ""].join("\n"));
+      write("src/service/Service.spec.md", ["# Service", "", "Does the work.", "", "## invariants", "- one check: Every look is checked before its work runs.", "  protects: inner", "  chokepoint: check", ...(unless ? ["  unless: skip"] : []), "  because: the check is where a look is let in", "  kinds: none", ""].join("\n"));
+    };
+    const read = async (): Promise<Map<string, { guards: string[]; off: string[] }>> => {
+      const reading = await readComponentInterfaces(root, new TextServer(root));
+      assert.equal(reading.kind, "read");
+      if (reading.kind !== "read") return new Map();
+      return new Map(reading.entrances.filter((e) => e.component === "src/api").map((e) => [e.name, { guards: (e.guards ?? []).map((g) => `${g.name} ${g.how}`), off: (e.switchedOff ?? []).map((o) => `${o.name} ${o.unless}`) }]));
+    };
+    spec(false);
+    const without = await read();
+    assert.deepEqual(without.get("peek"), { guards: ["one check wrapper"], off: [] }, "with no unless: line, a call that switches the check off is credited as one that runs it: the reading cannot tell them apart");
+    spec(true);
+    const declared = await read();
+    assert.deepEqual(declared.get("look"), { guards: ["one check wrapper"], off: [] }, "a call with the check on keeps its credit");
+    assert.deepEqual(declared.get("peek"), { guards: [], off: ["one check skip"] }, "every call passing skip: true: no credit, and named switched off");
+    assert.deepEqual(declared.get("poke"), { guards: ["one check wrapper"], off: [] }, "the option passed as a variable proves nothing switched off, so the credit stands");
+    assert.deepEqual(declared.get("grab"), { guards: [], off: [] });
+    const state = checked(structureState(root, await readComponentInterfaces(root, new TextServer(root))));
+    const model = flowOf(state);
+    assert.deepEqual(model.entrances.find((e) => e.name === "peek")?.switchedOff?.map((o) => o.name), ["one check"], "Structure carries it");
+    assert.match(answerStructure(state).text, /switched off: one check \(src\/service\), called with skip: true/, "and the query names it on the route");
+    assert.deepEqual(callArguments('a(check(x, { y: ")" }), z); check(q)', "check"), ['x, { y: ")" }', "q"], "arguments read with brackets and strings balanced");
+    assert.equal(switchesOff("check(a, { skip: true }); check(b)", "check", "skip"), false, "one call with the check on is enough to keep it");
+    assert.equal(switchesOff("check(a, { skip: trueish })", "check", "skip"), false);
+    assert.equal(switchesOff("lib.check(a, { skip: true })", "check", "skip"), true, "a qualified call is a call");
+    const parsed = (lines: string[]): ReturnType<typeof parseSpec> => parseSpec(["# S", "", "Does.", "", "## invariants", ...lines, ""].join("\n"), "S.spec.md");
+    const chokepoint = parsed(["- c: C holds.", "  protects: inner", "  chokepoint: check", "  unless: skip", "  because: b", "  kinds: none"]);
+    assert.deepEqual([chokepoint.problems, chokepoint.invariants[0]!.enforcements[0]], [[], { form: "chokepoint", protects: "inner", chokepoint: "check", line: 7, unless: "skip" }], "the chokepoint form carries the option");
+    assert.match(parsed(["- t: T holds.", "  over: all", "  via: a test", "  unless: skip", "  because: b", "  kinds: none"]).problems.map((x) => x.message).join("\n"), /unless: on t belongs to the chokepoint form/, "a totality oracle has no option to switch off");
+    assert.match(parsed(["- c: C holds.", "  protects: inner", "  chokepoint: check", "  unless: skip: true", "  because: b", "  kinds: none"]).problems.map((x) => x.message).join("\n"), /unless: on c names one option/, "one property name, never an expression");
+  } finally {
+    remove();
+  }
+});
+
 test("a scoped reading is never recorded as the tree's reading", async () => {
   const { root, remove } = routedProject();
   try {
@@ -366,6 +542,35 @@ function mapOf(reading: InterfaceReading): unknown {
   const { kept: _kept, ...map } = reading;
   return map;
 }
+
+test("the interface reading on a worker thread is the reading in process: each question goes to the adapter the caller holds, the reading is kept for the hooks, and a stop ends the worker", async () => {
+  const { root, remove } = routedProject();
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    const held = new TextServer(root);
+    const languages: string[] = [];
+    const apart = await readInterfacesApart(root, (language) => (languages.push(language), held));
+    assert.equal(apart.kind, "read");
+    assert.ok(held.questions.length > 0 && languages.every((l) => l === "typescript"), "the worker asked the caller's adapter, for the project's language");
+    assert.deepEqual(lastReading(root)?.reading, apart, "and the reading is kept for the hooks, as in process");
+    const here = await readComponentInterfaces(root, new TextServer(root), { keep: false });
+    assert.deepEqual(mapOf(apart), mapOf(here), "the map is the one the reading in process draws");
+
+    // A server that never answers, asked again since nothing is kept, and a stop: the reading is refused and its worker ended.
+    rmSync(join(root, STRUCTURE_DIR), { recursive: true, force: true });
+    rmSync(sharedStructureDir(root)!.dir, { recursive: true, force: true });
+    const silent = { ...new TextServer(root), language: "typescript", ready: () => new Promise<never>(() => {}) } as unknown as LanguageAdapter;
+    const stop = new AbortController();
+    let asked = false;
+    const stopped = readInterfacesApart(root, () => ((asked = true), silent), stop.signal);
+    for (let i = 0; i < 400 && !asked; i++) await new Promise((r) => setTimeout(r, 25));
+    assert.ok(asked, "the reading asked the silent server");
+    stop.abort();
+    await assert.rejects(stopped, /was stopped/);
+  } finally {
+    remove();
+  }
+});
 
 test("a spec edit asks the language server only what no reading asked before, and rereads no source", async () => {
   const { root, remove } = routedProject();
@@ -441,4 +646,158 @@ test("kept answers are never used silently: when what the server's answers rest 
   } finally {
     remove();
   }
+});
+
+test("a new git worktree of the repository starts from the answers another worktree kept: nothing is asked and the server never starts", async () => {
+  const { root, remove } = routedProject();
+  const other = mkdtempSync(join(tmpdir(), "coherence-worktree-"));
+  const worktree = join(other, "second");
+  try {
+    const git = (...args: string[]): void => void execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: root });
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-qm", "tree");
+    git("worktree", "add", "-q", worktree);
+    await readComponentInterfaces(root, new TextServer(root));
+    const server = new TextServer(worktree);
+    const seeded = await readComponentInterfaces(worktree, server);
+    assert.equal(server.started, 0, "the server never starts");
+    assert.ok(seeded.kind === "read" && seeded.kept?.asked === 0 && seeded.kept.reused > 0, keptLine(seeded.kind === "read" ? seeded.kept : undefined));
+    const alone = await readComponentInterfaces(root, new TextServer(root), { keep: false });
+    assert.deepEqual(mapOf(seeded), mapOf(alone), "the seeded map is the one a reading asking everything draws");
+    assert.ok(existsSync(join(worktree, ".coherence", "structure", "answers-typescript.json")), "the worktree keeps its own answers from then on");
+  } finally {
+    rmSync(other, { recursive: true, force: true });
+    remove();
+  }
+});
+
+/** A git repository at a fresh temporary top holding `files`, committed, with a way to run git in any of its worktrees. */
+function repository(files: Record<string, string>): { top: string; git: (cwd: string, ...args: string[]) => void; remove: () => void } {
+  const { root: top, remove } = project(files);
+  const git = (cwd: string, ...args: string[]): void => void execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd, stdio: "ignore" });
+  git(top, "init", "-q");
+  git(top, "add", "-A");
+  git(top, "commit", "-qm", "tree");
+  return { top, git, remove };
+}
+
+/** Read `root` through a fresh text server: the reading, and whether the server started. */
+async function readFresh(root: string): Promise<{ reading: InterfaceReading; started: number }> {
+  const server = new TextServer(root);
+  const reading = await readComponentInterfaces(root, server);
+  return { reading, started: server.started };
+}
+
+function allReused(what: string, read: { reading: InterfaceReading; started: number }): void {
+  const kept = read.reading.kind === "read" ? read.reading.kept : undefined;
+  assert.ok(read.started === 0 && kept?.asked === 0 && kept.reused > 0, `${what}: ${keptLine(kept)}; the server started ${read.started} times`);
+}
+
+test("each project and each basis of a repository keeps its own answers: two projects alike in every basis file, and a branch whose configuration differs, each start a new worktree with nothing asked", async () => {
+  // Two projects in one repository whose configuration is the same file for file, so their basis matches; only their code differs.
+  const files: Record<string, string> = {};
+  for (const [path, text] of Object.entries(ROUTED)) {
+    files[`one/${path}`] = text;
+    files[`two/${path}`] = path === "src/store/rows.ts" ? "export function put(v: string): string {\n  return v + v;\n}\nexport function count(): number {\n  return 2;\n}\n" : text;
+  }
+  const { top, git, remove } = repository(files);
+  const outside = mkdtempSync(join(tmpdir(), "coherence-worktrees-"));
+  try {
+    await readFresh(join(top, "one"));
+    await readFresh(join(top, "two"));
+    git(top, "worktree", "add", "-q", join(outside, "fresh"));
+    allReused("the first project in a new worktree", await readFresh(join(outside, "fresh", "one")));
+    allReused("the second project in a new worktree", await readFresh(join(outside, "fresh", "two")));
+    // A branch whose tsconfig differs: what the answers rest on differs, so it asks everything once, and keeps its own beside the main line's.
+    git(top, "worktree", "add", "-q", "-b", "strict", join(outside, "strict"));
+    writeFileSync(join(outside, "strict", "one", "tsconfig.json"), JSON.stringify({ ...JSON.parse(ROUTED["tsconfig.json"]!), exclude: ["dist"] }));
+    git(join(outside, "strict"), "commit", "-qam", "strict");
+    const branch = await readFresh(join(outside, "strict", "one"));
+    assert.ok(branch.reading.kind === "read" && branch.reading.kept?.whole !== undefined, "the branch's basis differs, so nothing kept is used");
+    git(top, "worktree", "add", "-q", join(outside, "main-again"), "HEAD");
+    allReused("a new worktree of the main line after the branch was read", await readFresh(join(outside, "main-again", "one")));
+    git(top, "worktree", "add", "-q", "--detach", join(outside, "strict-again"), "strict");
+    allReused("a new worktree of the branch", await readFresh(join(outside, "strict-again", "one")));
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+    remove();
+  }
+});
+
+test("a project in a folder its surrounding repository does not track writes nothing into that repository's git folder", async () => {
+  const { top, remove } = repository({ "README.md": "an unrelated repository\n" });
+  try {
+    const root = join(top, "scratch", "project");
+    for (const [path, text] of Object.entries(ROUTED)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), text);
+    }
+    await readFresh(root);
+    allReused("the project's own answers", await readFresh(root));
+    assert.deepEqual(readdirSync(join(top, ".git")).filter((name) => name === "coherence"), [], "nothing of the project is kept in the surrounding repository's git folder");
+  } finally {
+    remove();
+  }
+});
+
+test("a refusal the repository keeps names no worktree's folder: a new worktree of the same commit reuses it and never starts the server, and one whose tree differs asks again", async () => {
+  const { top, git, remove } = repository(ROUTED);
+  const outside = mkdtempSync(join(tmpdir(), "coherence-worktrees-"));
+  try {
+    // The server's words name the file it refused by its absolute path, as tsserver's do.
+    const refusing = new TextServer(top);
+    refusing.refuse.set("src/store/rows.ts", `Could not find source file: '${join(realpathSync(top), "src", "store", "rows.ts")}'.`);
+    await readComponentInterfaces(top, refusing);
+    const fresh = join(outside, "fresh");
+    git(top, "worktree", "add", "-q", fresh);
+    const server = new TextServer(fresh);
+    const reused = await readComponentInterfaces(fresh, server);
+    assert.equal(server.started, 0, "the refusal is reused: the server never starts");
+    assert.ok(reused.kind === "read" && reused.kept?.asked === 0, keptLine(reused.kind === "read" ? reused.kept : undefined));
+    const reason = reused.kind === "read" ? reused.unanswered?.find((u) => u.file === "src/store/rows.ts")?.reason : undefined;
+    assert.equal(reason, "textDocument/references: Could not find source file: 'src/store/rows.ts'. (-32603)", "the refused file by its project-relative path, never the asking worktree's folder");
+    // A worktree whose tree differs in any file asks the refused question again.
+    const edited = join(outside, "edited");
+    git(top, "worktree", "add", "-q", "-b", "edited", edited);
+    writeFileSync(join(edited, "src", "report", "report.ts"), `${ROUTED["src/report/report.ts"]!}// edited\n`);
+    git(edited, "commit", "-qam", "edit");
+    const asking = new TextServer(edited);
+    await readComponentInterfaces(edited, asking);
+    assert.ok(asking.started === 1 && asking.asked.includes("put"), `the changed tree asks again: ${asking.asked.join(", ")}`);
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+    remove();
+  }
+});
+
+test("a git older than 2.31, which prints --path-format back as a line, still finds the repository's kept answers", { skip: process.platform === "win32" }, async () => {
+  const { top, git, remove } = repository(ROUTED);
+  const outside = mkdtempSync(join(tmpdir(), "coherence-worktrees-"));
+  const restore = oldGit();
+  try {
+    await readFresh(top);
+    assert.deepEqual(sharedStructureDir(top), { dir: join(top, ".git", "coherence", "structure"), prefix: "" }, "the main checkout's common folder, resolved against the root");
+    git(top, "worktree", "add", "-q", join(outside, "fresh"));
+    allReused("a new worktree through the old git", await readFresh(join(outside, "fresh")));
+    assert.equal(realpathSync(sharedStructureDir(join(outside, "fresh"))!.dir), realpathSync(join(top, ".git", "coherence", "structure")));
+  } finally {
+    restore();
+    rmSync(outside, { recursive: true, force: true });
+    remove();
+  }
+});
+
+test("the kept answers rest on every module the language adapters reach: their entry and each module any of them imports, wherever it lives", () => {
+  const code = adapterCode();
+  const held = new Set(code);
+  const src = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  assert.ok(held.has(join(src, "adapters", "index.ts")), "the adapters' entry");
+  for (const file of code) {
+    for (const [, specifier] of readFileSync(file, "utf8").matchAll(/^(?:import|export)\s[^;]*?\sfrom\s+["'](\.{1,2}\/[^"']+)["']/gm)) {
+      const target = resolve(dirname(file), specifier!);
+      assert.ok(held.has(target), `${file} imports ${specifier}, so a change to it may change an answer`);
+    }
+  }
+  for (const reached of ["adapters/installed.ts", "../plugins/python/tach.ts", "adapters/toml.ts", "adapters/project-config.ts", "lifecycle/work-meter.ts"]) assert.ok(held.has(join(src, reached)), reached);
 });

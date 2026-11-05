@@ -3,8 +3,8 @@
 A component is any folder with a spec file, `<Name>.spec.md`. Folders without
 one are transparent; a super folder becomes a component when a relationship
 invariant about its children needs a home. The spec holds a title, a one-line
-intent, `## trust levels` in the entry spec only, `## entrances`, and
-`## invariants`. No other section: the parser refuses the reference's sections
+intent, `## trust levels` in the entry spec only, `## entrances`, `## mirrors`,
+`## folded`, and `## invariants`. No other section: the parser refuses the reference's sections
 by name and says what replaced each.
 
 The header may also declare who owns the component, on one line beside the
@@ -122,6 +122,80 @@ spec. A malformed `tach.toml` is refused with its line, and so is a module it
 does not declare, and nothing is drafted. Each source is named for the tool
 whose file it reads, so others can follow.
 
+## Mirrors
+
+A hand list is a literal kept by hand that must equal something defined
+elsewhere: the modules a bundle joins, the tool hooks a status line counts. Where
+the list cannot simply be derived from what it mirrors, the component that
+owns it declares it as a mirror, one bullet each, with what it must equal:
+
+```markdown
+## mirrors
+- BROWSER_SOURCES in build.ts: the modules the browser bundle joins
+  mirrors: closure of page.ts
+- STATUS_TOOL_HOOKS in statusline.ts: the tool hooks the status line holds to the budget
+  mirrors: TOOL_HOOKS in hook-events.ts
+- RULE_NAMES in rules.ts: the rules a plural is kept for
+  mirrors: keys of RULE_PLURALS in entrance-coverage.ts
+```
+
+The bullet's head is `<NAME> in <file>`: the top-level `const`, `let` or
+`var` the list is, and the file declaring it. After the colon comes a
+one-line meaning. The `mirrors:` line takes one of three forms:
+
+| form | the list must equal |
+| --- | --- |
+| `closure of <file>, <file>` | the value-import closure of those files: each file, and every project file it imports for a value, transitively. A type-only import (`import type`, or braces whose every name is marked `type`) and a package import are not followed. Each member is a path relative to the list's folder or to the root. |
+| `keys of <NAME> in <file>` | the keys of that object literal |
+| `<NAME> in <file>` | the members of that literal |
+
+A file reads relative to the component's folder, then to the root, as a
+handler does. A literal's members are an array's strings, with a tuple
+counted by its first string (a `Map`'s keys, a table's first column), and an
+object's keys; a wrapping call such as `new Set([...])` or
+`Object.freeze({...})` is looked through.
+
+The model checks that the list, and the partner literal or the closure's
+files, are still declared. A mirror whose list or partner is gone is a
+problem, so a declaration cannot rot unseen: derive the list and remove the
+mirror, or point the mirror at where the list now is.
+
+At an edit, the hook reads a mirror again when the edit wrote a file it spans:
+the list's file, any file in the closure, the partner literal's file, or the
+declaring spec. A file that is none of those costs one lookup in the index
+kept under `.coherence/mirrors`. A disagreement is added to the edit's context
+as advice, never a block, once per session until it changes:
+
+```text
+Mirror: src/readings/scope/structure-flow.ts now imports src/readings/scope/languages-read.ts, which BROWSER_SOURCES (src/readings/scope/build.ts:51) does not name: it mirrors the closure of page.ts (declared at src/readings/scope/Scope.spec.md:40: the modules the browser bundle joins).
+```
+
+A literal the reader cannot read whole (a spread, a computed key, an element
+that is not a string) is said, and nothing is compared.
+
+## Folded folders
+
+`coherence mass` names every folder inside a component that holds three or
+more code files and has no spec of its own: each may be a unit that deserves
+a spec. When one is not a unit (page folders, a UI kit, one folder per report
+query), the component that holds it says so, one bullet each, with why:
+
+```markdown
+## folded
+- input: the form controls every view shares
+- hooks/**: one data hook per query, read through this component's interface
+```
+
+A bullet names a folder relative to the spec. `<folder>/**` folds the
+folder and every folder under it, at any depth; a folder folded alone does
+not fold the folders under it. Mass stops naming a folded folder and counts
+the folded folders and their weight on one line of their own.
+
+The model checks that each bullet still names a folder of its component: a
+folder outside it, one that no longer exists, and one that has since got a
+spec of its own are problems, so a fold cannot outlive its folder or hide a
+component. A bullet with no reason is a problem too.
+
 ## The bullet
 
 Every bullet is an invariant. Its first line is the name and the sentence,
@@ -132,7 +206,9 @@ first and filled second.
 
 `--preview` requires a declared `--crossing "<level> -> <level>"`. It builds a
 self-contained Scope page in a private system temporary directory, opens on
-Structure, and adds the proposed crossing as a dashed, unverified edge. The
+Structure, and carries the proposed crossing in the page's state. No view
+draws the proposal yet: the relief has no place for it, and drawing it as a
+dashed, unverified door in Connections is the next round. The
 command prints the generated page path. The proposal is not run evidence: it
 has no grade, lifecycle state, verdict, or reliance sites, and it does not
 change the component spec. Add `--write` explicitly to append the same
@@ -147,6 +223,7 @@ module) and the chokepoint every reference passes through:
 
 ```markdown
 ## trust levels
+- visitor (outside): what anyone on the network sends
 - storage: the rows beneath everything
 - public-egress: what leaves in the clear
 
@@ -161,6 +238,19 @@ module) and the chokepoint every reference passes through:
   checklist: redaction declared as digest-only egress
   checklist: encrypted-storage dismissed: the digest is the stored form; nothing is decrypted
 ```
+
+A trust level is one bullet, `- <name>: <one-line meaning>`. A level whose
+data or caller comes from outside the system's control wears `(outside)`
+right after its name, before the colon, as `visitor` does above. Written
+anywhere else, in the meaning or before the name, the marker marks nothing
+and the level would read as inside, so the check refuses it.
+
+`protects` and `chokepoint` (and an entrance's `handler`) each name one thing,
+in one of three forms: a bare symbol (`seal`), a symbol in its file
+(`Write in internal/store/store.go`), or a module by its path (`api/render.ts`,
+or a package folder with a trailing slash, `posthog/query_cache/`). A dotted
+name (`store.Write`, `models.User`) is none of these: it reads as prose, which
+no adapter resolves, so write the symbol in its file instead.
 
 The totality oracle form, the compromise where structure is not practical,
 names the whole set the detector is total over and the test:
@@ -209,6 +299,22 @@ exempted rather than absent. Under a `from:` line that exempts a folder, the
 automatic refutation also stages a use of the protected thing from an unsaved
 document outside that folder. The check must call it a bypass. Any other value
 is a problem, and so is a `from:` on a bullet with no chokepoint form.
+
+A chokepoint whose callers can switch its check off names the option with
+an `unless:` line:
+
+```markdown
+  chokepoint: parseRequest in src/lib/request.ts
+  unless: skipAuth
+```
+
+An entrance whose handler calls the chokepoint only with that option passed
+as a literal `true` (`parseRequest(request, schema, { skipAuth: true })`)
+earns no credit from it. Structure names the chokepoint as switched off on
+that entrance, and the entrance is a spec gap unless something else controls
+it. A call that passes the option any other way keeps the credit, because
+nothing in the text proves the check is off. The value is one property name,
+and an `unless:` on a bullet with no chokepoint form is a problem.
 
 `because` says why the invariant exists and what it protects against.
 `crossing` is the security marker: two trust levels the entry spec declares.

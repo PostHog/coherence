@@ -20,6 +20,7 @@ import { configIgnore, projectSites } from "../adapters/project-files.ts";
 import { componentOf, declarationsOf, isTest, sourceFiles } from "../economy/source.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
 import type { Language } from "../adapters/index.ts";
+import { parsedOf } from "../plugins/languages.ts";
 import type { SpecModel } from "../spec/model.ts";
 
 export interface InterfaceSite {
@@ -60,6 +61,8 @@ export interface EntranceHandler {
 export interface InterfaceMap {
   symbols: InterfaceSymbol[];
   entrances: EntranceHandler[];
+  /** Files the server failed a question about, with its words: their interfaces are not read, the rest are. */
+  unanswered?: { file: string; reason: string }[];
 }
 
 /** The id a component interface goes by in a record: the ordered pair. */
@@ -68,20 +71,9 @@ export function interfaceId(from: string, to: string): string {
 }
 
 /** What a declaration line's keyword says can execute. */
-export function declares(line: string, language: string): InterfaceSymbol["declares"] {
-  if (language === "python") return /^\s*(?:async\s+)?(?:def|class)\s/.test(line) ? "body" : "value";
-  const m = /^\s*(?:export\s+)?(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(function\*?|const|let|var|class|interface|type|enum|namespace)\s/.exec(line);
-  const keyword = m?.[1];
-  if (keyword === "interface" || keyword === "type") return "type";
-  if (keyword === "enum" || keyword === "namespace") return "value";
-  if (keyword === "const" || keyword === "let" || keyword === "var") {
-    const value = /=\s*(.*)$/.exec(line)?.[1]?.trim() ?? "";
-    if (/^(async\s+)?(function\b|class\b|\(|[A-Za-z_$][\w$]*\s*=>)/.test(value)) return "body";
-    if (/^([{["'`\d-]|new\s|true\b|false\b|null\b|undefined\b|Symbol\()/.test(value) || value === "") return "value";
-    // Anything else (a call's result, an identifier) may hold a function: counted as able to execute, so never read as bodiless.
-    return "unknown";
-  }
-  return "body";
+export function declares(line: string, language: Language): InterfaceSymbol["declares"] {
+  // Each language's reading is its parser's; a language whose plugin names none says nothing executes.
+  return parsedOf(language, "declares")?.(line) ?? "unknown";
 }
 
 
@@ -98,6 +90,7 @@ export async function readInterfaceMap(root: string, adapter: LanguageAdapter, m
   const testFolders = config.testFolders;
   const files = sourceFiles(root, language, configIgnore(root)).filter((file) => !isTest(file, testFolders));
   const tally = new Map<string, InterfaceSymbol>();
+  const unanswered = new Map<string, string>();
   for (const file of files) {
     const owner = componentOf(model, file)?.folder;
     if (owner === undefined) continue;
@@ -105,10 +98,19 @@ export async function readInterfaceMap(root: string, adapter: LanguageAdapter, m
     const lines = text.split("\n");
     for (const declaration of declarationsOf(text, language)) {
       if (!declaration.exported) continue;
-      const resolved = await adapter.resolve(`${declaration.name} in ${file}`, { component: owner, testFolders });
-      if (!resolved.ok || resolved.definition.file !== file) continue;
-      const kind = declares(lines[declaration.line - 1] ?? "", language);
-      for (const site of projectSites(root, await adapter.references(resolved.definition))) {
+      let resolved: Awaited<ReturnType<LanguageAdapter["resolve"]>>;
+      let references: Awaited<ReturnType<LanguageAdapter["references"]>>;
+      try {
+        resolved = await adapter.resolve(`${declaration.name} in ${file}`, { component: owner, testFolders });
+        if (!resolved.ok || resolved.definition.file !== file) continue;
+        references = await adapter.references(resolved.definition);
+      } catch (error) {
+        // A server that fails a question about one file (gopls has no package for a file outside the host's build) leaves that file's interfaces unread, named; the rest are read.
+        unanswered.set(file, error instanceof Error ? error.message : String(error));
+        break;
+      }
+      const kind = declaration.declares ?? declares(lines[declaration.line - 1] ?? "", language);
+      for (const site of projectSites(root, references)) {
         if (isTest(site.file, testFolders)) continue;
         const from = componentOf(model, site.file)?.folder;
         if (from === undefined || from === owner) continue;
@@ -134,5 +136,5 @@ export async function readInterfaceMap(root: string, adapter: LanguageAdapter, m
     );
   }
   const symbols = [...tally.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to) || a.symbol.localeCompare(b.symbol) || a.file.localeCompare(b.file));
-  return { symbols, entrances };
+  return { symbols, entrances, ...(unanswered.size === 0 ? {} : { unanswered: [...unanswered].map(([file, reason]) => ({ file, reason })).sort((a, b) => a.file.localeCompare(b.file)) }) };
 }

@@ -18,11 +18,20 @@
  *     guard: <a chokepoint's symbol>                     optional; the chokepoint its handler is registered through
  *     control: none — <reason>                           optional; it needs no control, and why (never beside guard:)
  *
+ *   ## mirrors                 (any spec)
+ *   - <NAME> in <file>: <one-line meaning: what the hand list lists>
+ *     mirrors: closure of <file>, <file> | keys of <NAME> in <file> | <NAME> in <file>
+ *
+ *   ## folded                  (any spec)
+ *   - <folder, relative to the spec>: <why it belongs to this component>
+ *   - <folder>/**: <why its whole subtree does>
+ *
  *   ## invariants
  *   - <name>: <sentence>
  *     protects: <symbol or module>            chokepoint form, with
  *     chokepoint: <symbol>
  *     from: anywhere | outside the component | outside <folder>   optional; which references the chokepoint governs
+ *     unless: <option>                        optional; a call passing <option>: true switches the check off and earns no credit
  *     over: <the set the detector is total over>   totality oracle form, with
  *     via: <the test>
  *     because: <why it exists, what it protects against>
@@ -61,13 +70,15 @@ export const RETIRED_SECTIONS: readonly RetiredSection[] = (
 
 export const TRUST_LEVELS_SECTION = "trust levels";
 export const ENTRANCES_SECTION = "entrances";
+export const MIRRORS_SECTION = "mirrors";
+export const FOLDED_SECTION = "folded";
 export const INVARIANTS_SECTION = "invariants";
 
 /** What a spec may hold, for the problems that name it. */
-const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances and ## invariants";
+const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances, ## mirrors, ## folded and ## invariants";
 
 /** The keys an invariant bullet may carry, in the order the scaffold prints them. */
-export const KEYS = ["protects", "chokepoint", "from", "over", "via", "because", "crossing", "entrances", "refuted", "kinds", "checklist"] as const;
+export const KEYS = ["protects", "chokepoint", "from", "unless", "over", "via", "because", "crossing", "entrances", "refuted", "kinds", "checklist"] as const;
 export type Key = (typeof KEYS)[number];
 const MANY: ReadonlySet<Key> = new Set<Key>(["refuted", "checklist"]);
 
@@ -87,6 +98,11 @@ export interface TrustLevel {
 
 /** The marker a trust level wears when it comes from outside the system's control. */
 export const OUTSIDE_MARKER = "(outside)";
+
+/** The marker written where it marks nothing: in a meaning, or on a bullet that is not a trust level. */
+const STRAY_OUTSIDE = /\(outside\)/i;
+/** The marker ending an entrance's or an invariant's name, as on a trust level; a route group such as (outside)/page is a path, not a marker. */
+const STRAY_OUTSIDE_NAME = /\s\(outside\)$/i;
 
 /**
  * Where work enters the system from outside: a command, a host event, a
@@ -119,6 +135,79 @@ export interface Entrance {
   noControl?: string | undefined;
   /** The control line, when there is one. */
   controlLine?: number | undefined;
+}
+
+/**
+ * What a mirror's list must equal: the value-import closure of some files
+ * (the files they import, transitively, never through a type-only import),
+ * the keys of another object literal, or another literal's members. A file
+ * reads relative to the component's folder, then to the root.
+ */
+export type MirrorRecipe =
+  | { kind: "closure"; files: string[] }
+  | { kind: "keys"; name: string; file: string }
+  | { kind: "literal"; name: string; file: string };
+
+/**
+ * A hand list that must mirror something defined elsewhere, declared beside
+ * what it mirrors so an edit that makes the two disagree is named at the edit
+ * (lifecycle/mirrors.ts). The model checks that the list and what it names
+ * are still declared, so a declaration cannot rot unseen.
+ */
+export interface Mirror {
+  /** The list's top-level name. */
+  name: string;
+  /** The file declaring it, as written. */
+  file: string;
+  meaning: string;
+  line: number;
+  /** Undefined when the bullet names none, which is a problem. */
+  recipe: MirrorRecipe | undefined;
+  /** The mirrors: line, or the bullet's own line when there is none. */
+  recipeLine: number;
+}
+
+/**
+ * A folded folder: a folder inside the component, with no spec of its own,
+ * that the spec declares belongs to it, so mass stops naming it as a unit
+ * still to decide. The model checks that it is still a folder of this
+ * component, so a declaration cannot rot unseen.
+ */
+export interface FoldedFolder {
+  /** Relative to the spec's folder, as written, without the trailing /**. */
+  folder: string;
+  /** Whether the bullet folds the folder's whole subtree (written <folder>/**). */
+  subtree: boolean;
+  reason: string;
+  line: number;
+}
+
+/** How a folded bullet is written, for the problems that name it. */
+export const FOLDED_FORM = "- <folder, relative to this spec>: <why it belongs to this component>, or - <folder>/**: <why its whole subtree does>";
+
+/** How a mirror bullet is written, for the problems that name it. */
+export const MIRROR_FORM = "- <NAME> in <file>: <meaning>, with an indented mirrors: closure of <file>, <file> | keys of <NAME> in <file> | <NAME> in <file> line";
+
+const NAME_IN_FILE = /^([A-Za-z_$][\w$]*)\s+in\s+(\S+)$/;
+
+/** A mirrors: value read, or undefined when it is none of the three forms. */
+export function parseMirrorRecipe(value: string): MirrorRecipe | undefined {
+  const text = value.trim().replace(/\s+/g, " ");
+  const closure = /^closure of (.+)$/.exec(text);
+  if (closure !== null) {
+    const files = closure[1]!.split(",").map((file) => file.trim()).filter((file) => file !== "");
+    return files.length === 0 || files.some((file) => /\s/.test(file)) ? undefined : { kind: "closure", files };
+  }
+  const keys = /^keys of (.+)$/.exec(text);
+  const named = NAME_IN_FILE.exec(keys === null ? text : keys[1]!);
+  if (named === null) return undefined;
+  return { kind: keys === null ? "literal" : "keys", name: named[1]!, file: named[2]! };
+}
+
+/** A recipe as a spec writes it. */
+export function mirrorRecipeText(recipe: MirrorRecipe): string {
+  if (recipe.kind === "closure") return `closure of ${recipe.files.join(", ")}`;
+  return `${recipe.kind === "keys" ? "keys of " : ""}${recipe.name} in ${recipe.file}`;
 }
 
 /** The one value a control: line takes, and its reason after a dash: `none — <reason>` (an em dash, or - or --). */
@@ -169,7 +258,7 @@ export function fromText(from: ChokepointFrom): string {
 }
 
 export type Enforcement =
-  | { form: "chokepoint"; protects: string; chokepoint: string; line: number; from?: ChokepointFrom }
+  | { form: "chokepoint"; protects: string; chokepoint: string; line: number; from?: ChokepointFrom; unless?: string }
   | { form: "totality oracle"; over: string; via: string; line: number };
 
 export interface Refutation {
@@ -230,6 +319,10 @@ export interface ParsedSpec {
   trustLevelsLine: number | undefined;
   /** Empty when the spec has no entrances section. */
   entrances: Entrance[];
+  /** Empty when the spec has no mirrors section. */
+  mirrors: Mirror[];
+  /** Empty when the spec has no folded section. */
+  folded: FoldedFolder[];
   invariants: Invariant[];
   problems: Problem[];
 }
@@ -296,9 +389,14 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
   let trustLevelsLine: number | undefined;
   let entrancesSeen = false;
   const entrances: Entrance[] = [];
+  let mirrorsSeen = false;
+  const mirrors: Mirror[] = [];
+  const misread = new Set<Mirror>();
+  let foldedSeen = false;
+  const folded: FoldedFolder[] = [];
   const bullets: RawBullet[] = [];
 
-  type Section = "head" | "trust levels" | "entrances" | "invariants" | "skip";
+  type Section = "head" | "trust levels" | "entrances" | "mirrors" | "folded" | "invariants" | "skip";
   let section: Section = "head";
   let paragraph: string[] = [];
   let paragraphLine = 0;
@@ -357,6 +455,18 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         if (entrancesSeen) problem(line, "## entrances given twice");
         entrancesSeen = true;
         section = "entrances";
+        return;
+      }
+      if (key === MIRRORS_SECTION) {
+        if (mirrorsSeen) problem(line, "## mirrors given twice");
+        mirrorsSeen = true;
+        section = "mirrors";
+        return;
+      }
+      if (key === FOLDED_SECTION) {
+        if (foldedSeen) problem(line, "## folded given twice");
+        foldedSeen = true;
+        section = "folded";
         return;
       }
       if (key === INVARIANTS_SECTION) {
@@ -418,6 +528,13 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
           else problem(line, `trust level ${marked[1]} is marked ${marked[2]}; the one marker is ${OUTSIDE_MARKER}, for a level from outside the system's control`);
           name = marked[1]!;
         }
+        // A marker anywhere but after the name marks nothing, and the level would read as inside: refused, never ignored.
+        const stray = /\([^()]*\)/.exec(name)?.[0] ?? (STRAY_OUTSIDE.test(meaning) ? OUTSIDE_MARKER : undefined);
+        if (stray !== undefined) {
+          const bare = name.replace(/\s*\([^()]*\)\s*/g, " ").trim();
+          problem(line, `trust level ${bare} carries ${stray} where it marks nothing, so it reads as inside; the marker follows the name: - ${bare} ${OUTSIDE_MARKER}: <one-line meaning>`);
+          name = bare;
+        }
         if (meaning === "") problem(line, `trust level ${name} needs a one-line meaning`);
         if (trustLevels!.some((level) => level.name === name)) problem(line, `trust level ${name} declared twice`);
         trustLevels!.push({ name, meaning, outside, line });
@@ -434,6 +551,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
           }
           const name = bullet[1]!.slice(0, colon).trim();
           const meaning = bullet[1]!.slice(colon + 1).trim();
+          if (STRAY_OUTSIDE_NAME.test(name)) problem(line, `entrance ${name} carries ${OUTSIDE_MARKER}, which marks a trust level, never an entrance: name the level it carries in with trust: <a level the entry spec marks ${OUTSIDE_MARKER}>`);
           if (meaning === "") problem(line, `entrance ${name} needs a one-line meaning`);
           if (entrances.some((entrance) => entrance.name === name)) problem(line, `entrance ${name} declared twice`);
           entrances.push({ name, meaning, handler: undefined, line, handlerLine: line, trust: undefined, trustLine: undefined });
@@ -486,6 +604,62 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         current.handlerLine = line;
         return;
       }
+      case "mirrors": {
+        if (raw.trim() === "") return;
+        const bullet = /^[-*]\s+(.*)$/.exec(raw);
+        if (bullet !== null) {
+          const colon = bullet[1]!.indexOf(":");
+          const named = colon <= 0 ? null : NAME_IN_FILE.exec(bullet[1]!.slice(0, colon).trim());
+          if (named === null) {
+            problem(line, `a mirror is one bullet: ${MIRROR_FORM}`);
+            // The lines under it belong to no mirror; a placeholder keeps them from landing on the one above.
+            mirrors.push({ name: "", file: "", meaning: "", line, recipe: undefined, recipeLine: -1 });
+            return;
+          }
+          const meaning = bullet[1]!.slice(colon + 1).trim();
+          if (meaning === "") problem(line, `mirror ${named[1]} needs a one-line meaning`);
+          if (mirrors.some((m) => m.name === named[1] && m.file === named[2])) problem(line, `mirror ${named[1]} in ${named[2]} declared twice`);
+          mirrors.push({ name: named[1]!, file: named[2]!, meaning, line, recipe: undefined, recipeLine: line });
+          return;
+        }
+        const current = mirrors[mirrors.length - 1];
+        const field = /^\s+([a-z]+):\s*(.*)$/.exec(raw);
+        if (current === undefined || field === null) {
+          problem(line, "expected a mirror bullet (- <NAME> in <file>: <meaning>) or an indented mirrors: line under one");
+          return;
+        }
+        if (current.recipeLine === -1) return;
+        if (field[1] !== "mirrors") {
+          problem(line, `unknown key "${field[1]}": a mirror carries mirrors`);
+          return;
+        }
+        if (current.recipe !== undefined || current.recipeLine !== current.line) problem(line, `mirror ${current.name} names what it mirrors twice`);
+        current.recipeLine = line;
+        const value = field[2]!.trim();
+        if (value === "" || isPlaceholder(value)) return;
+        const recipe = parseMirrorRecipe(value);
+        if (recipe === undefined) misread.add(current);
+        if (recipe === undefined) problem(line, `mirrors: on ${current.name} reads closure of <file>, <file>, keys of <NAME> in <file>, or <NAME> in <file>`);
+        else current.recipe = recipe;
+        return;
+      }
+      case "folded": {
+        if (raw.trim() === "") return;
+        const bullet = /^[-*]\s+(.*)$/.exec(raw);
+        const colon = bullet === null ? -1 : bullet[1]!.indexOf(":");
+        const written = colon <= 0 ? "" : bullet![1]!.slice(0, colon).trim();
+        if (written === "" || /\s/.test(written)) {
+          problem(line, `a folded folder is one bullet, with no lines under it: ${FOLDED_FORM}`);
+          return;
+        }
+        const subtree = written.endsWith("/**");
+        const folder = (subtree ? written.slice(0, -3) : written).replace(/^\.\//, "").replace(/\/+$/, "");
+        const reason = bullet![1]!.slice(colon + 1).trim();
+        if (reason === "") problem(line, `folded folder ${written} needs its reason: why it belongs to this component`);
+        if (folded.some((f) => f.folder === folder && f.subtree === subtree)) problem(line, `folded folder ${written} declared twice`);
+        folded.push({ folder, subtree, reason, line });
+        return;
+      }
       case "invariants": {
         if (raw.trim() === "") return;
         const bullet = /^[-*]\s+(.*)$/.exec(raw);
@@ -494,12 +668,13 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
           const head = bullet[1]!;
           const colon = head.indexOf(":");
           if (colon <= 0) {
-            problem(line, "an invariant bullet starts with <name>: <sentence>");
+            problem(line, "an invariant bullet starts with a short name and a colon, as in \"- <name>: <sentence>\"");
             current = { name: head.trim(), sentence: "", line, fields: [] };
             return;
           }
           const name = head.slice(0, colon).trim();
           const sentence = head.slice(colon + 1).trim();
+          if (STRAY_OUTSIDE_NAME.test(name)) problem(line, `invariant ${name} carries ${OUTSIDE_MARKER}, which marks a trust level, never an invariant: name the levels it checks with crossing: <trust level> -> <trust level>`);
           if (sentence === "") problem(line, `invariant ${name} needs its sentence: the abstract behavioral requirement`);
           current = { name, sentence, line, fields: [] };
           return;
@@ -517,6 +692,12 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
             return;
           }
           current.fields.push({ key: key as Key, value: field[2]!.trim(), line });
+          return;
+        }
+        // A key written in another case would fold into the value above it as prose: refused, never absorbed.
+        const miscased = /^([A-Za-z]+):/.exec(body)?.[1];
+        if (miscased !== undefined && (KEYS as readonly string[]).includes(miscased.toLowerCase())) {
+          problem(line, `key "${miscased}" is written ${miscased.toLowerCase()}:; a key in another case would read as the line above continuing`);
           return;
         }
         // A wrapped line continues the value above it, or the sentence.
@@ -543,8 +724,12 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
       problem(entrance.controlLine ?? entrance.line, `entrance ${entrance.name} names a guard: and control: none; a guard is a control, so keep one of them`);
     }
   }
+  const named = mirrors.filter((mirror) => mirror.recipeLine !== -1);
+  for (const mirror of named) {
+    if (mirror.recipe === undefined && !misread.has(mirror)) problem(mirror.line, `mirror ${mirror.name} names nothing it mirrors: add mirrors: closure of <file>, keys of <NAME> in <file>, or <NAME> in <file>`);
+  }
   const invariants = bullets.map((bullet) => buildInvariant(bullet, problem, options.seed));
-  return { file, title, intent, ...(owners === undefined ? {} : { owners }), trustLevels, trustLevelsLine, entrances, invariants, problems };
+  return { file, title, intent, ...(owners === undefined ? {} : { owners }), trustLevels, trustLevelsLine, entrances, mirrors: named, folded, invariants, problems };
 }
 
 function buildInvariant(bullet: RawBullet, problem: (line: number, message: string) => void, seed: Seed | undefined): Invariant {
@@ -613,6 +798,16 @@ function buildInvariant(bullet: RawBullet, problem: (line: number, message: stri
       if (from === undefined) problem(fromField.line, `from: on ${bullet.name} reads ${FROM_FORM}; "${value}" is none of them`);
       else if (chokepoint !== undefined && chokepoint.form === "chokepoint") chokepoint.from = from;
     }
+  }
+
+  // The option a call passes as true to switch the chokepoint's check off (parseRequest's skipAuth): such a call earns no credit.
+  const unlessField = single.get("unless");
+  if (unlessField !== undefined) {
+    const value = filled("unless");
+    const chokepoint = enforcements.find((e) => e.form === "chokepoint");
+    if (!single.has("protects") && !single.has("chokepoint")) problem(unlessField.line, `unless: on ${bullet.name} belongs to the chokepoint form (protects: and chokepoint:); it names the option a call passes as true to switch the check off`);
+    else if (value !== undefined && !/^[A-Za-z_$][\w$]*$/.test(value)) problem(unlessField.line, `unless: on ${bullet.name} names one option, the property a call passes as true to switch the check off; "${value}" is no property name`);
+    else if (value !== undefined && chokepoint !== undefined && chokepoint.form === "chokepoint") chokepoint.unless = value;
   }
 
   const because = filled("because");

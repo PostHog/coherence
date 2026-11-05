@@ -1,0 +1,15 @@
+46cb97d9a2c52c94e22d9a76c2f1116156b8b61f98360e2a9cce05fcb197cd4d  tree-sitter-macos-arm64.gz
+b740262cb0f35be64e39b50ad68b020433924a7bcee5ae5c8e40e68d71215647  tree-sitter-macos-x64.gz
+d01042f94ba3d6827ddc9788e235f75d8366431be42bdf90ade534d960c98b7d  tree-sitter-linux-x64.gz
+404be5d54a4955571c4067c21d4699660eab3a534cefb0659341b207f7139ec5  tree-sitter-linux-arm64.gz
+9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9  wasi-sdk-34.0-arm64-macos.tar.gz
+87d27fa8adc68dee59bfbf2e22a6d34ef717c34d6bf1d8af2a56fc929d9ce0eb  wasi-sdk-34.0-x86_64-macos.tar.gz
+b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4  wasi-sdk-34.0-x86_64-linux.tar.gz
+f7e243dff54d60bcc576e94d6166b69f410f2500ae4a9ceef34315be10e77971  wasi-sdk-34.0-arm64-linux.tar.gz
+98aad827847af7ef990ed7098d885725c8e5b5aae75073403635617ae4e259aa  binaryen-version_132-arm64-macos.tar.gz
+40c3de90bb3766bd0282a895e139a6f50253dba49b4f5bb89e66faca162d832e  binaryen-version_132-x86_64-macos.tar.gz
+195ddc94f9bc89f45abdabb0b9eea86023d727ba90eac8b35b80f2544fc30572  binaryen-version_132-x86_64-linux.tar.gz
+c58562417836c5d0493d89bdefc434933bdc097db641b483df86bcfa557a107f  binaryen-version_132-aarch64-linux.tar.gz
+90e80b25a67517a4daf6ad751557bee21efbda7b7a5a554897933245d1734398  tree-sitter-javascript-0.23.1.tgz
+10e108c9cf7d5f2879053dff18515fb405abf2ccef63eaaf017d9c571687a1d3  typescript-5.9.3.tgz
+7346db659eb870a5284242851ab7aedea41d7397b8c7e95ff8d9ec5b5a80270f  web-tree-sitter-0.27.1.tgz

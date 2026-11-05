@@ -1,6 +1,6 @@
 {
   "name": "@posthog/coherence",
-  "version": "1.7.0",
+  "version": "1.12.1",
   "description": "A prosthetic for proprioception: specs, invariants, and the readings that keep an agent balanced.",
   "type": "module",
   "license": "MIT",
@@ -24,22 +24,34 @@
     "lexicon:check": "node --disable-warning=ExperimentalWarning src/cli.ts lexicon --check",
     "spec:check": "node --disable-warning=ExperimentalWarning src/cli.ts spec --check",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test:unit": "COHERENCE_NO_WARM_UP=1 COHERENCE_TELEMETRY=0 COHERENCE_NO_UPDATE_CHECK=1 node --disable-warning=ExperimentalWarning --import=./src/enforcement/leak-guard.ts --test \"src/**/*.test.ts\"",
+    "test:unit": "COHERENCE_NO_WARM_UP=1 COHERENCE_TELEMETRY=0 COHERENCE_NO_UPDATE_CHECK=1 node --disable-warning=ExperimentalWarning --import=./src/enforcement/leak-guard.ts --test ${COHERENCE_TEST_SHARD:+--test-shard=$COHERENCE_TEST_SHARD} \"src/**/*.test.ts\" \"src/*.e2e.ts\"",
     "test": "npm run typecheck && npm run test:unit && npm run lexicon:check && npm run spec:check",
     "test:setup": "\"${COHERENCE_PYTHON:-python3}\" -m venv .venv && .venv/bin/python -m pip install --requirement requirements-test.txt",
     "test:python": "node --disable-warning=ExperimentalWarning --test src/adapters/python.test.ts",
     "test:upgrade": "node --disable-warning=ExperimentalWarning --test --test-timeout=1800000 src/lifecycle/upgrade.e2e.ts",
     "test:pnpm": "node --disable-warning=ExperimentalWarning --test --test-timeout=1200000 src/adapters/pnpm.e2e.ts",
     "build": "node --disable-warning=ExperimentalWarning src/build.ts",
+    "readme": "node --disable-warning=ExperimentalWarning src/readme.ts",
     "prepare": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
+    "@types/three": "0.160.0",
+    "esbuild": "0.24.0",
+    "three": "0.160.0",
     "typescript": "^5.9.3"
   },
   "bin": {
     "coherence": "dist/cli.js",
     "coherence-statusline": "dist/statusline.js"
+  },
+  "exports": {
+    "./plugin": {
+      "types": "./dist/plugins/api.d.ts",
+      "default": "./dist/plugins/api.js"
+    },
+    "./package.json": "./package.json",
+    "./dist/*": "./dist/*"
   },
   "files": [
     "dist",
@@ -47,7 +59,14 @@
     "docs/checklist-seed.json",
     "src/*/*.practice.md",
     "docs/config.md",
-    "docs/spec.md"
+    "docs/enforcement.md",
+    "docs/spec.md",
+    "docs/plugins.md",
+    "docs/setup.md",
+    "docs/tour.md",
+    "docs/telemetry.md",
+    "plugins",
+    "docs/how-coherence-works.md"
   ],
   "optionalDependencies": {
     "pyright": "^1.1.414",
@@ -68,5 +87,8 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
+  },
+  "dependencies": {
+    "web-tree-sitter": "0.27.1"
   }
 }

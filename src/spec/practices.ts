@@ -15,7 +15,6 @@
  */
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { spawnSync } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRACTICE_SUFFIX, RECORD_ID, globMatches, parsePractices, type Practice } from "./practice.ts";
@@ -24,6 +23,7 @@ import type { Problem } from "./grammar.ts";
 import { loadJournal } from "../journal/store.ts";
 import { loadWork } from "../journal/work.ts";
 import { recordsOnOtherBranches } from "../journal/branches.ts";
+import { missingCommits } from "../journal/commits.ts";
 import type { Decision, Enactment, JournalRecord } from "../journal/record.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -109,18 +109,6 @@ export function kernelPractices(enactments: readonly Enactment[] = []): ModelPra
   return out;
 }
 
-/** The commits among the citations that this repository does not hold; undefined when git cannot be asked. */
-function missingCommits(root: string, commits: readonly string[]): Set<string> | undefined {
-  if (commits.length === 0) return new Set();
-  const result = spawnSync("git", ["cat-file", "--batch-check"], { cwd: root, input: commits.map((c) => `${c}^{commit}`).join("\n") + "\n", encoding: "utf8" });
-  if (result.status !== 0) return undefined;
-  const missing = new Set<string>();
-  result.stdout.split("\n").forEach((line, index) => {
-    if (/ missing$| ambiguous$/.test(line) && commits[index] !== undefined) missing.add(commits[index]!);
-  });
-  return missing;
-}
-
 export interface PracticeChecks {
   root: string;
   practices: readonly ModelPractice[];
@@ -129,11 +117,13 @@ export interface PracticeChecks {
   /** Whether the root is Coherence's own tree, where every practice declares its reach and nowhere else may. */
   coherenceTree: boolean;
   records: readonly JournalRecord[];
+  /** The defect classes and families the project's lexicon stack declares, asked only when a practice has a defect trigger. */
+  classes?: () => ReadonlySet<string>;
 }
 
 /**
  * The model-level problems of a project's practices: a citation found nowhere,
- * an invariant no spec declares, a reach missing in Coherence's tree or written outside it,
+ * an invariant no spec declares, a defect trigger naming a class no lexicon declares, a reach missing in Coherence's tree or written outside it,
  * and a step or pitfall gone from an enacted practice with no decision amending it (floorGaps).
  */
 export function practiceProblems(checks: PracticeChecks): Problem[] {
@@ -153,7 +143,7 @@ export function practiceProblems(checks: PracticeChecks): Problem[] {
     if (isRecord(c)) {
       if (!known.has(c) && !elsewhere.has(c)) problems.push({ file: p.file, line, message: `practice ${p.name} cites ${c}, which no journal or work record has, here or on another branch` });
     } else if (absent !== undefined && absent.has(c)) {
-      problems.push({ file: p.file, line, message: `practice ${p.name} cites ${c}, which is no commit in this repository` });
+      problems.push({ file: p.file, line, message: `practice "${p.name}" cites ${c}, but no branch in this repository has that commit. If its pull request was squash-merged, cite the merge commit instead.` });
     }
   }
 
@@ -171,6 +161,15 @@ export function practiceProblems(checks: PracticeChecks): Problem[] {
       const invariant = slash === -1 ? name : name.slice(slash + 1);
       if (invariantsByFolder.get(folder)?.has(invariant)) continue;
       problems.push({ file: p.file, line: p.lines.invariants ?? p.line, message: `practice ${p.name} names invariant ${name}, which ${slash === -1 ? "its sister spec" : `the spec at ${folder}`} does not declare` });
+    }
+  }
+
+  // A defect trigger naming a class no lexicon declares can never fire: the defect verb refuses that class.
+  const defectTriggers = practices.flatMap((p) => p.triggers.flatMap((t) => (t.kind === "defect" ? [{ p, name: t.class }] : [])));
+  if (defectTriggers.length > 0 && checks.classes !== undefined) {
+    const declared = checks.classes();
+    for (const { p, name } of defectTriggers) {
+      if (!declared.has(name)) problems.push({ file: p.file, line: p.lines.when ?? p.line, message: `practice ${p.name}: its trigger defect ${name} names a class no lexicon declares, so no defect can carry it and the practice never fires on it; name a declared class or family, or declare it (lexicon propose define defect)` });
     }
   }
 

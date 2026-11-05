@@ -6,7 +6,7 @@
  * updated in place on every push (ci-report.ts builds it).
  *
  *   coherence ci install --host github --mode fail|comment [--write]
- *   coherence ci report --session <id>
+ *   coherence ci report --session <id> [--base <commit>]
  *
  * Install prints the workflow it would write, and with --write writes
  * .github/workflows/coherence.yml at the repository top; a file already
@@ -24,8 +24,12 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { registryOf, repositoryTop } from "../adapters/project-config.ts";
+import { ciNotes, ciSteps, forProject } from "../plugins/languages.ts";
+import type { CiStep } from "../plugins/plugin.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
 import type { Io } from "../journal/cli.ts";
 import { isCoherenceItself, PACKAGE_NAME } from "./project.ts";
+import { LOCKFILES, type PackageManager as AnyManager } from "./lockfiles.ts";
 
 export const CI_HOSTS = ["github"] as const;
 export type CiHost = (typeof CI_HOSTS)[number];
@@ -43,7 +47,7 @@ export const MODE_TEXT: Record<CiMode, string> = {
 
 export const CI_USAGE = [
   `  ci install --host <${CI_HOSTS.join("|")}> --mode <${CI_MODES.join("|")}> [--write]   the workflow that runs Coherence on every pull request: --mode fail ${MODE_TEXT.fail}; --mode comment ${MODE_TEXT.comment}; printed, and with --write written to ${WORKFLOW_PATH.split(sep).join("/")}, never over a file already there`,
-  "  ci report --session <id>   the pull request report as Markdown: problems, chokepoint verdicts, spec gaps and guard failures for every project; exit 1 when the session's run is missing or a chokepoint was not run",
+  "  ci report --session <id> [--base <commit>]   the pull request report as Markdown: problems, chokepoint verdicts, spec gaps and guard failures for every project, marking those in files changed since --base (on GitHub Actions, the pull request's fixed base commit by default, or its base branch when that is not known); exit 1 when the session's run is missing or a chokepoint was not run",
 ].join("\n");
 
 /** The actions the workflow uses, pinned by commit; the comment names the release. */
@@ -51,21 +55,50 @@ const ACTIONS = {
   checkout: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
   setupNode: "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0",
   setupPnpm: "pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0",
+  setupBun: "oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0",
 } as const;
 
-/** The pnpm major the workflow installs when package.json names no packageManager; lockfile 9.0 is what pnpm 9 and 10 write. */
+/** The pnpm major the workflow installs when package.json names no pnpm; lockfile 9.0 is what pnpm 9 and 10 write. */
 const PNPM_DEFAULT = "10";
 
-export type PackageManager = "npm" | "pnpm";
+/** The package managers the workflow sets up, in the order a refusal names them. */
+const CI_MANAGERS = ["npm", "pnpm", "bun"] as const;
+export type PackageManager = (typeof CI_MANAGERS)[number];
 
-/** The lockfiles read, in the order a folder holding several is refused by; the unsupported ones are named, never ignored. */
-const LOCKFILES: readonly { file: string; manager: PackageManager | undefined }[] = [
-  { file: "package-lock.json", manager: "npm" },
-  { file: "pnpm-lock.yaml", manager: "pnpm" },
-  { file: "yarn.lock", manager: undefined },
-  { file: "bun.lock", manager: undefined },
-  { file: "bun.lockb", manager: undefined },
-];
+/** How each manager installs from its lockfile, runs the installed Coherence and never one it would fetch, and adds Coherence as a dev dependency; Bun's runs through Node.js, as an older bunx has no --no-install and fetches what is missing. */
+const COMMANDS: Record<PackageManager, { install: string; cli: string; add: string }> = {
+  npm: { install: "npm ci", cli: "npx --no -- coherence", add: "npm install -D" },
+  pnpm: { install: "pnpm install --frozen-lockfile", cli: "pnpm exec coherence", add: "pnpm add -D" },
+  bun: { install: "bun install --frozen-lockfile", cli: "npx --no -- coherence", add: "bun add -d" },
+};
+
+/** The step a manager Node.js does not bring needs: its action, the input that reads packageManager from a package.json below the top, the input that names a version, and the version it installs when package.json names none. */
+const MANAGER_SETUP: Partial<Record<PackageManager, { action: string; packageJsonInput: string; versionInput: string; fallback: string }>> = {
+  pnpm: { action: ACTIONS.setupPnpm, packageJsonInput: "package_json_file", versionInput: "version", fallback: PNPM_DEFAULT },
+  bun: { action: ACTIONS.setupBun, packageJsonInput: "bun-version-file", versionInput: "bun-version", fallback: "latest" },
+};
+
+function setUp(manager: AnyManager): manager is PackageManager {
+  return (CI_MANAGERS as readonly string[]).includes(manager);
+}
+
+/** Every lockfile Coherence recognizes, named in a refusal in file order; one whose manager the workflow does not set up is named, never ignored. */
+const LOCKS: readonly { file: string; manager: PackageManager | undefined }[] = LOCKFILES.map(([file, manager]) => ({ file, manager: setUp(manager) ? manager : undefined })).sort((a, b) => a.file.localeCompare(b.file));
+/** The lockfiles the workflow installs from, each with its manager. */
+const SET_UP = LOCKS.flatMap((l) => (l.manager === undefined ? [] : [{ file: l.file, manager: l.manager }]));
+
+function orList(items: readonly string[]): string {
+  return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} or ${items.at(-1)}`;
+}
+
+function lockfilesOf(manager: PackageManager): string[] {
+  return SET_UP.filter((l) => l.manager === manager).map((l) => l.file);
+}
+
+/** The lockfiles the workflow installs from, as a refusal names them. */
+const SET_UP_FILES = orList(CI_MANAGERS.flatMap(lockfilesOf));
+/** Each manager the workflow sets up with its lockfiles, as a refusal names them. */
+const SET_UP_MANAGERS = orList(CI_MANAGERS.map((manager) => `${manager} (${orList(lockfilesOf(manager))})`));
 
 export class CiError extends Error {}
 
@@ -82,12 +115,16 @@ export interface CiPlan {
   manager: PackageManager;
   /** The folder holding the lockfile, relative to the top ("." for the top). */
   installDir: string;
-  /** The pnpm version to install, or undefined when package.json's packageManager names it. */
-  pnpmVersion: string | undefined;
+  /** Whether the package.json at the install folder names the manager's version where its setup action reads one. */
+  versionDeclared: boolean;
+  /** The pnpm engines.pnpm names in the package.json at the install folder, which the workflow writes because its setup action does not read it. */
+  enginesVersion: string | undefined;
   /** The Node.js version file at the install folder (.nvmrc or .node-version), relative to the top, when there is one. */
   nodeVersionFile: string | undefined;
-  /** Whether any of the projects reads Python, whose project checkers the workflow does not install. */
-  python: boolean;
+  /** What the workflow says for the languages the projects read: each a language plugin's note (a Python checker the workflow does not install). */
+  notes: string[];
+  /** The steps the language plugins the projects run ask the workflow to set up with (Go and gopls), after the install. */
+  steps: CiStep[];
 }
 
 function realOr(path: string): string {
@@ -120,6 +157,29 @@ function declares(manifest: Record<string, unknown> | undefined, name: string): 
   });
 }
 
+/** The value at `key` in the object a package.json holds at `field`. */
+function within(manifest: Record<string, unknown> | undefined, field: string, key: string): unknown {
+  const held = manifest?.[field];
+  return typeof held === "object" && held !== null ? (held as Record<string, unknown>)[key] : undefined;
+}
+
+/** Whether a package.json names the manager's version where its setup action reads one: packageManager, for pnpm devEngines.packageManager too, and for Bun engines.bun. */
+function declaresVersion(manifest: Record<string, unknown> | undefined, manager: PackageManager): boolean {
+  const packageManager = manifest?.["packageManager"];
+  if (typeof packageManager === "string" && packageManager.startsWith(`${manager}@`)) return true;
+  const dev = within(manifest, "devEngines", "packageManager");
+  const devNamed = typeof dev === "object" && dev !== null ? (dev as Record<string, unknown>) : undefined;
+  if (manager === "pnpm" && devNamed?.["name"] === "pnpm" && typeof devNamed["version"] === "string") return true;
+  return manager === "bun" && typeof within(manifest, "engines", "bun") === "string";
+}
+
+/** The pnpm engines.pnpm names when it holds one major line (12.3.4, 10, ^10.2.0, ~10.2.0), which pnpm/action-setup does not read; a range open above, as >=9, names no one pnpm to set up. */
+function enginesVersion(manifest: Record<string, unknown> | undefined, manager: PackageManager): string | undefined {
+  const named = within(manifest, "engines", manager);
+  if (manager !== "pnpm" || typeof named !== "string") return undefined;
+  return /^[\^~]?\d+(\.\d+){0,2}(-[0-9A-Za-z.-]+)?$/.test(named.trim()) ? named.trim() : undefined;
+}
+
 /** The folders from `from` up to `top`, both included, nearest first. */
 function upTo(from: string, top: string): string[] {
   const out: string[] = [];
@@ -129,11 +189,10 @@ function upTo(from: string, top: string): string[] {
   }
 }
 
-/** Whether a config at `dir` (or the registry's keys) names Python among its languages. */
-function readsPython(dir: string): boolean {
-  const config = readJson(join(dir, "coherence.config.json"));
-  const language = config?.["language"];
-  return language === "python" || (Array.isArray(language) && language.includes("python"));
+/** The languages a config at `dir` names, as its language key lists them. */
+function languagesNamed(dir: string): string[] {
+  const language = readJson(join(dir, "coherence.config.json"))?.["language"];
+  return typeof language === "string" ? [language] : Array.isArray(language) ? language.filter((l): l is string => typeof l === "string") : [];
 }
 
 /**
@@ -153,19 +212,19 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
   const workdir = slash(relative(top, at));
   let lock: { dir: string; manager: PackageManager } | undefined;
   for (const dir of upTo(at, top)) {
-    const held = LOCKFILES.filter((l) => existsSync(join(dir, l.file)));
+    const held = LOCKS.filter((l) => existsSync(join(dir, l.file)));
     if (held.length === 0) continue;
     if (held.length > 1) throw new CiError(`ci install: ${slash(relative(top, dir))} holds ${held.map((l) => l.file).join(" and ")}; keep the one lockfile the project installs with`);
     const [one] = held;
-    if (one!.manager === undefined) throw new CiError(`ci install: ${slash(relative(top, join(dir, one!.file)))} is a lockfile the workflow does not set up; it installs with npm (package-lock.json) or pnpm (pnpm-lock.yaml)`);
+    if (one!.manager === undefined) throw new CiError(`ci install: ${slash(relative(top, join(dir, one!.file)))} is a lockfile the workflow does not set up; it installs with ${SET_UP_MANAGERS}`);
     lock = { dir, manager: one!.manager };
     break;
   }
   if (lock === undefined) {
     throw new CiError(
       registry === undefined
-        ? `ci install: no package-lock.json or pnpm-lock.yaml from ${workdir} up to the repository top; install ${PACKAGE_NAME} as a dev dependency first (npm install -D or pnpm add -D)`
-        : `ci install: no package-lock.json or pnpm-lock.yaml at the repository top, where a registry's check runs; install ${PACKAGE_NAME} as a dev dependency there first`,
+        ? `ci install: no ${SET_UP_FILES} from ${workdir} up to the repository top; install ${PACKAGE_NAME} as a dev dependency first (${orList(CI_MANAGERS.map((m) => COMMANDS[m].add))})`
+        : `ci install: no ${SET_UP_FILES} at the repository top, where a registry's check runs; install ${PACKAGE_NAME} as a dev dependency there first`,
     );
   }
   // The workflow runs the installed package from where the check runs, as npx --no -- coherence does there.
@@ -173,11 +232,21 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
   if (!manifests.some((m) => declares(m, PACKAGE_NAME))) {
     throw new CiError(`ci install: no package.json from ${workdir} up to ${slash(relative(top, lock.dir))} lists ${PACKAGE_NAME}; add it as a dev dependency so the workflow runs the installed package`);
   }
-  const packageManager = readJson(join(lock.dir, "package.json"))?.["packageManager"];
-  const pnpmVersion = lock.manager === "pnpm" && !(typeof packageManager === "string" && packageManager.startsWith("pnpm@")) ? PNPM_DEFAULT : undefined;
+  const lockManifest = readJson(join(lock.dir, "package.json"));
+  const versionDeclared = declaresVersion(lockManifest, lock.manager);
   const versionFile = [".nvmrc", ".node-version"].find((name) => existsSync(join(lock.dir, name)));
   const projects = registry === undefined ? undefined : registry.leaves.map((leaf) => slash(relative(top, leaf)));
-  const python = readsPython(top) || readsPython(at) || (registry?.leaves ?? []).some(readsPython);
+  // Each project's plugins are registered by reading its config, so a language a plugin adds says what it needs as a bundled one does.
+  const said = [...new Set([top, at, ...(registry?.leaves ?? [])])].map((dir) => {
+    try {
+      readEnforcementConfig(dir);
+    } catch (error) {
+      throw new CiError(`ci install: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return forProject(dir, () => ({ notes: ciNotes(languagesNamed(dir)), steps: ciSteps(languagesNamed(dir)) }));
+  });
+  const notes = [...new Set(said.flatMap((s) => s.notes))];
+  const steps = [...new Map(said.flatMap((s) => s.steps).map((step) => [JSON.stringify(step), step])).values()];
   return {
     host,
     mode,
@@ -186,21 +255,33 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
     projects,
     manager: lock.manager,
     installDir: slash(relative(top, lock.dir)),
-    pnpmVersion,
+    versionDeclared,
+    enginesVersion: versionDeclared ? undefined : enginesVersion(lockManifest, lock.manager),
     nodeVersionFile: versionFile === undefined ? undefined : slash(relative(top, join(lock.dir, versionFile))),
-    python,
+    notes,
+    steps,
   };
 }
 
-/** The command that runs the installed Coherence where the check runs. */
-function coherenceCommand(manager: PackageManager): string {
-  return manager === "pnpm" ? "pnpm exec coherence" : "npx --no -- coherence";
+/** One plugin step as workflow lines: an action keeps its release in a comment, every other value is quoted. */
+function stepLines(step: CiStep): string[] {
+  const head = step.name === undefined ? [] : [`name: ${JSON.stringify(step.name)}`];
+  const body = step.uses !== undefined ? [`uses: ${step.uses}${step.version === undefined ? "" : ` # ${step.version}`}`, ...(step.with === undefined ? [] : ["with:", ...Object.entries(step.with).map(([k, v]) => `  ${k}: ${JSON.stringify(v)}`)])] : [`run: ${JSON.stringify(step.run)}`];
+  return [...head, ...body].map((line, i) => `${i === 0 ? "      - " : "        "}${line}`);
+}
+
+/** The step that sets up a manager Node.js does not bring: the version packageManager names, read where the lockfile is, else the one engines.pnpm names, quoted so YAML keeps 10.10 a version and not a number, else the fallback. */
+function managerSetup(plan: CiPlan): string[] {
+  const setup = MANAGER_SETUP[plan.manager];
+  if (setup === undefined) return [];
+  const version = plan.enginesVersion === undefined ? setup.fallback : JSON.stringify(plan.enginesVersion);
+  const withs = !plan.versionDeclared ? [`${setup.versionInput}: ${version}`] :plan.installDir === "." ? [] : [`${setup.packageJsonInput}: ${plan.installDir}/package.json`];
+  return [`      - uses: ${setup.action}`, ...(withs.length > 0 ? ["        with:", ...withs.map((w) => `          ${w}`)] : []), ""];
 }
 
 /** The workflow text for a plan. */
 export function workflowText(plan: CiPlan): string {
-  const cli = coherenceCommand(plan.manager);
-  const install = plan.manager === "pnpm" ? "pnpm install --frozen-lockfile" : "npm ci";
+  const { cli, install } = COMMANDS[plan.manager];
   const comment = plan.mode === "comment";
   const lines: string[] = [];
   const add = (...more: string[]) => lines.push(...more);
@@ -244,14 +325,7 @@ export function workflowText(plan: CiPlan): string {
     "          fetch-depth: 0",
     "",
   );
-  if (plan.manager === "pnpm") {
-    add(`      - uses: ${ACTIONS.setupPnpm}`);
-    const withs: string[] = [];
-    if (plan.pnpmVersion !== undefined) withs.push(`          version: ${plan.pnpmVersion}`);
-    else if (plan.installDir !== ".") withs.push(`          package_json_file: ${plan.installDir}/package.json`);
-    if (withs.length > 0) add("        with:", ...withs);
-    add("");
-  }
+  add(...managerSetup(plan));
   add(`      - uses: ${ACTIONS.setupNode}`, "        with:", plan.nodeVersionFile === undefined ? '          node-version: "22"' : `          node-version-file: ${plan.nodeVersionFile}`, "");
   add(
     "      # The lockfile install brings Coherence and, as its optional dependencies, the language servers it asks.",
@@ -260,7 +334,8 @@ export function workflowText(plan: CiPlan): string {
     `        run: ${install}`,
     "",
   );
-  if (plan.python) add("      # A chokepoint graded by a Python checker the project runs (tach, import-linter) needs that checker here: install the project's Python tools before the check.", "");
+  for (const note of plan.notes) add(`      # ${note}`, "");
+  for (const step of plan.steps) add(...stepLines(step), "");
   const where = plan.workdir === "." ? [] : [`        working-directory: ${plan.workdir}`];
   if (!comment) {
     add(

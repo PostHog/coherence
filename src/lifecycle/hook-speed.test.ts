@@ -7,13 +7,13 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { recordWriteTrace, sessionPatch, type Snapshot } from "../economy/trace.ts";
+import { patchFingerprint, recordWriteTrace, sessionPatch, traceFile, type Snapshot } from "../economy/trace.ts";
 import { economyStopText, editContext, runHook } from "./hook.ts";
-import { TypeScriptAdapter } from "../adapters/typescript.ts";
+import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
@@ -54,6 +54,29 @@ test("regulate names the files the prediction found beyond what the session wrot
   assert.match(text, /^Economy: this session wrote 1 file; the prediction names 3 other files that rely on them or that they rely on, and the session read 1 of them\. Not read: src\/c\.ts, src\/A\.spec\.md\.$/);
   assert.equal(economyStopText(snapshot(["src/a.ts"], [])), "", "nothing beyond the session's own files says nothing");
   assert.equal(economyStopText(undefined), "");
+});
+
+test("a stop starts the snapshot detached, with a fingerprint that moves only with the patch, and reports the newest one already recorded", async () => {
+  const root = repo({ "src/a.ts": "export const a = 1;\n", "src/b.ts": "export const b = 1;\n" });
+  try {
+    writeFileSync(join(root, "src/a.ts"), "export const a = 2;\n");
+    recordWriteTrace(root, "s1", ["src/a.ts"]);
+    const recorded: Snapshot = { kind: "snapshot", at: "2026-10-20T00:00:00.000Z", session: "s1", commit: null, changed: ["src/a.ts"], read: [], predicted: ["src/a.ts", "src/b.ts"], tokens: 0, instrument: { language: "typescript", server: "warm" }, fingerprint: patchFingerprint(root, ["src/a.ts"], 0) };
+    appendFileSync(traceFile(root, "s1"), `${JSON.stringify(recorded)}\n`);
+    const started: string[] = [];
+    const options = { snapshot: (r: string, session: string, fingerprint: string) => void started.push(`${session} ${fingerprint}`), door: (() => assert.fail("the stop never waits on the instrument")) as never };
+    const stop = await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    assert.match(stop.stdout, /Economy: this session wrote 1 file; the prediction names 1 other file .* Not read: src\/b\.ts\./);
+    await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    writeFileSync(join(root, "src/a.ts"), "export const a = 3;\n");
+    const edited = await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    assert.match(edited.stdout, /Economy \(as of an earlier patch\): /, "the same file edited again leaves the recorded snapshot stale");
+    assert.equal(started.length, 3);
+    assert.equal(started[0], started[1], "an unchanged patch keeps its fingerprint, so no second closure starts");
+    assert.notEqual(started[1], started[2], "an edit moves it, so the newer patch supersedes");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("a session start and every prompt warm the instrument without waiting for it, and no other event does", async () => {
@@ -117,6 +140,26 @@ test("an edit says which chokepoint invariants it could not check, and stays sil
     const text = await editContext(root, { cwd: root, session_id: "s1", tool_name: "Edit", tool_input: { file_path: join(root, "src/a.ts") } }, { adapter });
     assert.match(text, /Coherence could not check 1 chokepoint invariant at this edit:\n {2}○ \.\/ghost door: .*GHOST/, text);
     assert.doesNotMatch(text, /prose door/, "a prose value is the spec's own lack, reported by spec --check");
+  } finally {
+    await adapter.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a protected name in a file of none of the project's languages starts no check at the edit; the same name in its code does", { timeout: 120_000 }, async () => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const root = repo({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    "coherence.config.json": JSON.stringify({ language: "typescript" }),
+    "Fixture.spec.md": spec,
+    "NOTES.md": "Today I renamed GHOST and kept release.\n",
+    "src/a.ts": "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  const adapter = new TypeScriptAdapter(root);
+  const edit = (file: string): Promise<string> => editContext(root, { cwd: root, session_id: "s1", tool_name: "Edit", tool_input: { file_path: join(root, file) } }, { adapter });
+  try {
+    assert.equal(await edit("NOTES.md"), "", "the notes are prose: no check starts, so none waits on the instrument");
+    assert.match(await edit("src/a.ts"), /Coherence could not check 1 chokepoint invariant at this edit/, "the same name in the project's code starts the check");
   } finally {
     await adapter.close();
     rmSync(root, { recursive: true, force: true });

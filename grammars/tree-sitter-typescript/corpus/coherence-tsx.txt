@@ -1,0 +1,161 @@
+Coherence's own cases for the TSX grammar alone (a file named *-tsx.txt is read by it alone), one form to a case, each
+with the whole tree the patched grammar must read it as. Kept out of coherence.patch, as coherence.txt is.
+
+==========================================
+Coherence: a bare ampersand in JSX text
+==========================================
+
+const a = <p>Read & write</p>;
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (jsx_element
+        (jsx_opening_element
+          (identifier))
+        (jsx_text)
+        (jsx_closing_element
+          (identifier))))))
+
+==========================================
+Coherence: a bare ampersand before a letter in a JSX string
+==========================================
+
+const b = <a to="x?a=1&b=2">x</a>;
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (jsx_element
+        (jsx_opening_element
+          (identifier)
+          (jsx_attribute
+            (property_identifier)
+            (string
+              (string_fragment)
+              (string_fragment)
+              (string_fragment))))
+        (jsx_text)
+        (jsx_closing_element
+          (identifier))))))
+
+==========================================
+Coherence: a bare ampersand before a single-quoted JSX string's closing quote
+==========================================
+
+const c = <a title='Q&' />;
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (jsx_self_closing_element
+        (identifier)
+        (jsx_attribute
+          (property_identifier)
+          (string
+            (string_fragment)
+            (string_fragment)))))))
+
+==========================================
+Coherence: a bare ampersand before a double-quoted JSX string's closing quote
+==========================================
+
+const c = <a data-x="R&" />;
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (jsx_self_closing_element
+        (identifier)
+        (jsx_attribute
+          (property_identifier)
+          (string
+            (string_fragment)
+            (string_fragment)))))))
+
+==========================================
+Coherence: a bare ampersand among character references in JSX text
+==========================================
+
+const d = <p>&amp; &#123; & {v}</p>;
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (jsx_element
+        (jsx_opening_element
+          (identifier))
+        (html_character_reference)
+        (jsx_text)
+        (html_character_reference)
+        (jsx_text)
+        (jsx_expression
+          (identifier))
+        (jsx_closing_element
+          (identifier))))))
+
+==========================================
+Coherence: character references in JSX text and a JSX string
+==========================================
+
+const e = <p title="x&amp;y">&amp; ok &#123;</p>;
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (jsx_element
+        (jsx_opening_element
+          (identifier)
+          (jsx_attribute
+            (property_identifier)
+            (string
+              (string_fragment)
+              (html_character_reference)
+              (string_fragment))))
+        (html_character_reference)
+        (jsx_text)
+        (html_character_reference)
+        (jsx_closing_element
+          (identifier))))))
+
+==========================================
+Coherence: character references at their limits
+==========================================
+
+const e = <p>&#x10FFFF;|&#x1234567;|&#12345;|&#123456;|&aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;|&aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;</p>;
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (jsx_element
+        (jsx_opening_element
+          (identifier))
+        (html_character_reference)
+        (jsx_text)
+        (html_character_reference)
+        (jsx_text)
+        (html_character_reference)
+        (jsx_text)
+        (jsx_closing_element
+          (identifier))))))

@@ -4,9 +4,11 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realp
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
-import { appendRun, loadRuns, type RunRecord } from "../enforcement/record.ts";
-import { appendRecord, loadJournal } from "../journal/store.ts";
-import { appendWork, loadWork } from "../journal/work.ts";
+import { loadRuns, type RunRecord } from "../enforcement/record.ts";
+import { appendWhole } from "../journal/append.ts";
+import { loadJournal } from "../journal/store.ts";
+import { storeDir } from "../journal/stores.ts";
+import { loadWork } from "../journal/work.ts";
 import type { Decision, WorkOrderRecord } from "../journal/record.ts";
 import { RECORD_STORES } from "./project.ts";
 import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, ATTRIBUTE_LINES, EARLIER_IGNORE_TEXTS, IGNORE_FILE, IGNORE_TEXT, keepAttributes, keepIgnore, keepStateFiles } from "./state-files.ts";
@@ -56,11 +58,17 @@ function run(at: string, name: string): RunRecord {
   };
 }
 
-/** One record in every record store, all under the one session, as a branch's work appends them. */
+/** A store's legacy session file, the one file per session releases before sealed shards append to (journal/shards.ts). */
+function legacy(root: string, store: "journal" | "work" | "runs"): string {
+  mkdirSync(join(root, storeDir(store)), { recursive: true });
+  return join(root, storeDir(store), `${SESSION}.jsonl`);
+}
+
+/** One record in every record store, all under the one session, appended to its legacy session file as a release before sealed shards appends it. */
 function appendAll(root: string, n: string, at: string): void {
-  appendRecord(root, decision(n, at));
-  appendWork(root, order(n, at));
-  appendRun(root, run(at, `invariant ${n}`));
+  appendWhole(legacy(root, "journal"), `${JSON.stringify(decision(n, at))}\n`);
+  appendWhole(legacy(root, "work"), `${JSON.stringify(order(n, at))}\n`);
+  appendWhole(legacy(root, "runs"), `${JSON.stringify(run(at, `invariant ${n}`))}\n`);
 }
 
 /**
@@ -190,4 +198,19 @@ test("install and every session start keep .coherence/.gitattributes: written wh
   writeFileSync(join(none, IGNORE_FILE), "*.log\n");
   assert.equal(keepIgnore(none, true), "kept");
   assert.equal(readFileSync(join(none, IGNORE_FILE), "utf8"), "*.log\n");
+});
+
+test("a command that makes .coherence writes its git files with it, so a project without hooks commits only its records; one already there keeps what its adopter left", async () => {
+  const { cli } = await import("./cli-fixture.ts");
+  const root = fixture("first-command");
+  ok(root, "init", "-q");
+  writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ language: "typescript" }));
+  const decide = (n: string) => cli(["decide", `chose ${n}`, "--over", "the other", "--because", "a test", "--session", SESSION, "--agent", "test"], { cwd: root });
+  const first = await decide("one");
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(readFileSync(join(root, IGNORE_FILE), "utf8"), IGNORE_TEXT, "the first record wrote the ignore file beside it");
+  assert.equal(readFileSync(join(root, ATTRIBUTES_FILE), "utf8"), ATTRIBUTES_TEXT);
+  rmSync(join(root, IGNORE_FILE));
+  assert.equal((await decide("two")).status, 0);
+  assert.ok(!existsSync(join(root, IGNORE_FILE)), "a folder that was already there is its adopter's: a removed ignore file stays removed");
 });

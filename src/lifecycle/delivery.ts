@@ -22,6 +22,7 @@ import { busiestFolder, undeclaredNow } from "../readings/scope/undeclared.ts";
 import type { HostStatus } from "./install.ts";
 import { loadProjectLexicons } from "./project.ts";
 import { attention, type Coverage } from "./lexicon-coverage.ts";
+import { deliveredText } from "./lexicon.ts";
 
 export type Reading = "orient" | "peer feed" | "practice" | "regulate";
 
@@ -115,7 +116,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     `escalations awaiting a human: ${escalations} (shown whole, never shortened)`,
     specLine,
     `the session's own work order, when it owns one (${plural(orders, "order")} open or active in the project)`,
-    `${vocabulary}, delivered at detail "${start.detail}"`,
+    `${vocabulary}, delivered ${deliveredText(start.delivered)}`,
     vocabularySignal(start.coverage),
     gapSignal(root, gaps),
     undeclaredSignal(root),
@@ -134,7 +135,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     ? `the lexicon check over the changed files (${changed.files.length} now)`
     : `the lexicon check over the changed files (not known now: ${changed.failure})`;
   const debt = "error" in spec ? specLine : `spec: ${plural(spec.problems, "problem")}, ${plural(spec.defects, "structural defect")}, ${plural(spec.open, "open requirement")}`;
-  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the terms this session made recur without a definition, in one line with the declare-or-alias command", "the spec gaps this session touched, advisory", "the undeclared entrances in the files it changed, advisory", "practices that fired this session with no enactment since, advisory", "the read trace snapshotted for calibrate"];
+  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the terms this session made recur without a definition, in one line with the declare-or-alias command", "the spec gaps this session touched, advisory", "the first-ranked undeclared entrance in the files it changed, advisory, one line", "practices that fired this session with no enactment since, advisory", "the read trace snapshotted for calibrate"];
 
   const carries: Record<HookEvent, string[]> = {
     SessionStart: orient,

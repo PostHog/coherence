@@ -154,7 +154,7 @@ function chokepointSymbols(root: string, owner: string, chokepoint: string): str
   if (path === undefined) return [];
   const text = readFileSync(path, "utf8");
   const tokens = new Set(text.match(/[A-Za-z_$][\w$]*/g) ?? []);
-  return [...tokens].filter((t) => declaresAtTop(text, t)).sort();
+  return [...tokens].filter((t) => declaresAtTop(text, t, path)).sort();
 }
 
 function spells(text: string, symbol: string): boolean {

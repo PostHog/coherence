@@ -1,22 +1,22 @@
-- carry a lexicon change through: A change to the lexicon reaches every place that names the concept, and the injection still fits, before anything uses the new name.
+- carry a lexicon change through: A change to the lexicon reaches every place that names the concept before anything uses the new name.
   when: command lexicon apply | edit docs/lexicon.json
-  step: measure the compact injection before proposing; when the change would take it past 2,000 tokens, first split a long first sentence, moving its enumeration later and dropping nothing
-    leaves: a decision per split, with the measured tokens in its because
+  step: write the first sentence as the definition a session needs at a glance; the lexicon has no token ceiling; the start injection presents at most 2,000 tokens of it and decays the least recently named concepts to fit (d-2b4c96a2, d-f0da2f1f)
+  step: mark a concept "protected": true only when a human asks for it to stay whole however long the journal goes without naming it
   step: before a reject or a rename, count the findings it would create across the corpus; a word in ordinary use or a language keyword gets a qualifying rename instead of a bare rejection
   step: propose, then apply with because and over; a human ruling carries the human's words with --human, and none is ever invented
   step: declare a new noun before any code, spec, or record uses it
   step: update every concept whose definition or related list names the changed one
   step: rename once, everywhere: files, commands, modules, Scope views, npm scripts, and refuse the old name with a one-line migration
-  step: run the vocabulary check and the compact budget test
-    leaves: lexicon check with 0 rejected names and 0 unknown nouns; the budget test green
+  step: run the vocabulary check
+    leaves: lexicon check with 0 rejected names and 0 unknown nouns
   pitfall: rejecting a bare word turned 227 uses of the TypeScript keyword into findings (d-5060eaab, rt-cdcf2a29)
-  pitfall: the budget was crossed and trimmed afterwards three times, and once the budget test was already red for the next session (d-3eb04416, d-7f5b5203, d-beedd69e, u-1c5215fe)
+  pitfall: a fixed token ceiling was crossed and trimmed afterwards three times, and once its test was already red for the next session (d-3eb04416, d-7f5b5203, d-beedd69e, u-1c5215fe); the ceiling is gone (d-2b4c96a2)
   pitfall: a rejected alternative of three words or fewer becomes a name the check enforces; write it as a sentence when the word is in ordinary use (d-7c0ecc04)
   pitfall: a rejected name sat in a concept's related list after its concept was renamed (d-572be38e)
   pitfall: new nouns were left undeclared because the lexicon was outside the work order's write scope; escalate rather than leave them (u-de8416b2)
   learned: d-14651cb4, d-3eb04416, rt-cdcf2a29, d-edf80438
   reach: internal
-  because: the lexicon is injected into every session, so a change that stops halfway teaches every later session the half; the cascade and the budget check are the steps that were skipped, and each skip cost a retraction or a trim after the fact
+  because: the lexicon is injected into every session, so a change that stops halfway teaches every later session the half; the cascade is the step that was skipped, and each skip cost a retraction after the fact
 - harvest practices: A project adopting Coherence finds the methods it already has and keeps each as a candidate practice with its evidence, before the next session has to rediscover them.
   when: explicit
   step: read where method hides: the agent instructions (CLAUDE.md, AGENTS.md), skills, saved memories, contributing and release notes, and the order of the build and release scripts
@@ -38,15 +38,16 @@
   when: explicit
   step: confirm the hooks are wired as install would write them: coherence hooks --check --host <claude or codex>
     leaves: hooks --check exits 0
+  step: before asking the user anything, tell them how Coherence works, in your own words and within one screen, from docs/how-coherence-works.md in the installed package: its diagram, what a requirement, an invariant, its enforcement, its refutation, an entrance and a spec gap are, and what a short set of invariants buys them; say that you will propose the invariants for them to confirm, and invite their questions; put it where the user reads it whole, since some agent hosts fold text written before a question tool into one line
   step: write coherence.config.json where the project lives: at the repository root for a whole repository; in a monorepo, in the folder you adopt, after coherence adopt <folder> from the root when the repository keeps a registry (a root config with projects), writing only the keys the folder overrides; name, language (a list when the folder spans Python and TypeScript, the first the primary), the folders that are not this project's code or prose under ignore (vendored code, generated output, fixtures), and, where the project has tests, test with testMatch and testJson, or tests, one setup per runner with its own cwd; every key is in docs/config.md in the installed package
   step: settle the vocabulary: coherence lexicon coverage, then declare the terms that carry the project's meaning (the practice settle a domain term)
   step: to settle one part of the project first, name its folders or files: coherence lexicon coverage src/billing docs, and coherence lexicon draft src/billing for its unsettled candidates; each path is relative to the root or absolute inside it, and the config's ignore list still holds inside it
   step: where the repository already declares its module boundaries in a file coherence scaffold import reads (tach.toml today), draft the component specs from it first: coherence scaffold import tach --all prints one draft per module with its dependencies and exposed paths as bullets, and --write creates only the specs that do not exist; fill each placeholder (where tach enforces a drafted facade, the chokepoint is graded checker-choked by tach itself, so its own check is the enforcement), and place the via: tests it prints where the project's tests run
     leaves: the drafted specs, listed by --write as wrote or skipped
-  step: declare the components and where work enters them: the entry spec with its trust levels, one spec per component folder, then every entrance (the practice declare entrances); the grammar is in docs/spec.md in the installed package
-  step: give each real unit its own spec at whatever depth it sits, not one per top-level folder: run coherence mass, and for each folder it names as having no spec of its own, write its spec or record with decide why it belongs to the component above; repeat until mass names none you have not decided
-    leaves: mass names no folder without a spec or a decision
-  step: declare the few invariants that matter most (security, tenant isolation, data integrity), each through the practice declare a requirement; for a module boundary whose own code may use its internals, say which references the chokepoint governs (from: outside the component), and in a folder of a larger repository, where the boundary's callers live outside it, choose the references horizon in the config (a list of folders, or repository)
+  step: declare the components and where work enters them: the entry spec with its trust levels, one spec per component folder, then the entrances coherence scaffold entrances ranks first, 10 to 20 of them and every one carrying outside trust in whose handler writes, a family that goes through one helper as one grouped entrance, and the rest left undeclared (the practice declare entrances); the grammar is in docs/spec.md in the installed package
+  step: give each real unit its own spec at whatever depth it sits, not one per top-level folder: run coherence mass, and for each folder it names as having no spec of its own, write its spec or declare it under ## folded in the spec of the component above, with why it belongs there (docs/spec.md, Folded folders); repeat until mass names none
+    leaves: mass names no folder with no spec of its own
+  step: declare the few invariants that matter most (security, tenant isolation, data integrity), each through the practice declare a requirement, proposing each to the user first in plain words: the rule, what goes wrong for the project if it breaks, and how it would be checked; for a module boundary whose own code may use its internals, say which references the chokepoint governs (from: outside the component), and in a folder of a larger repository, where the boundary's callers live outside it, choose the references horizon in the config (a list of folders, or repository)
   step: run, then witness each refutation (the practice witness a refutation); a broken chokepoint is a finding to report with its bypass sites, not a failure to hide; a requirement the code already breaks stays a requirement, with a defect per site and an escalation, and a test that cannot run here is recorded as unable
     leaves: spec --check with 0 problems
   step: baseline what the project already held: coherence lexicon baseline, and coherence scaffold control --baseline for entrances with no traced control
@@ -54,19 +55,23 @@
   step: find the methods the project already has (the practice harvest practices)
   step: ask the user how Coherence should run on pull requests, presenting both modes: fail (the check fails on a spec problem or a structural defect) or comment (one report comment on the pull request, updated on each push, and the check fails only when Coherence itself breaks); then run coherence ci install --host github --mode <their choice> --write, or record with decide that they declined
     leaves: .github/workflows/coherence.yml, or the decision's id
-  step: commit coherence.config.json (and the registry's change, when adopt wrote one), the lexicon, the specs and practice files, the hook settings unless they were installed --local, the CI workflow, .coherence/.gitignore (hooks install wrote it so git sees nothing Coherence regenerates), and .coherence/journal, .coherence/runs and .coherence/work
+  step: commit coherence.config.json (and the registry's change, when adopt wrote one), the lexicon, the specs and practice files, the hook settings unless they were installed --local (when .gitignore keeps them out of git, add an exception for that one file, such as !.claude/settings.json, unless the user strongly prefers otherwise: the hooks are how Coherence reaches every session in the project, and a teammate's agent without them gets no vocabulary, specs, journal or checks), the CI workflow, .coherence/.gitignore (hooks install wrote it so git sees nothing Coherence regenerates), and .coherence/journal, .coherence/runs and .coherence/work
     leaves: the commit
-  step: from the project's own folder (the adopted folder in a monorepo), run coherence scope and report what the reading shows: health, broken chokepoints, entrances with no traced control, and components no enforcement covers
+  step: from the project's own folder (the adopted folder in a monorepo), run coherence scope and report what the reading shows: health, broken chokepoints, entrances with no traced control, how many detected entrances stay undeclared (a count, no finding), and components no enforcement covers
   pitfall: both outside adopters' checks were red on arrival from Coherence's rejected names in their own prose, and npm link broke a pnpm build; install as a dev dependency and baseline what was already there (d-127ab8e4)
   pitfall: Scope failed when run from an adopter's own folder, because every page until then had been built from Coherence's checkout with --root (d-01976691)
   pitfall: a coverage report redirected into the adopter's root was read back as its source and grew on every run (df-79ac2d4e)
   pitfall: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2)
+  pitfall: an adoption declared every detected entrance, 280 with trust assigned by rule, and its first reading led with 263 gaps no one had judged (d-a37af46f)
   pitfall: an adoption declared one spec per top-level folder and stopped, and a human had to ask for the nested units (df-9750aee2)
+  pitfall: three trial adoptions of umami, whose .gitignore excludes .claude, each stopped at the commit to ask whether the hook settings should be committed (d-58daa53f)
+  pitfall: an adoption recorded seven decisions for the 69 folders that belonged to the component above, and mass, which reads no decision, still named all 69 (d-8ebb2e2e)
   pitfall: a fresh adoption found its first requirements already false and its tests unable to run unattended, and had to improvise what to record (df-8ac95c4d)
   pitfall: in a monorepo, a session started at the repository root took the whole repository as the project: another team's specs reached orient, their practices fired, and .coherence was written at the root (df-0b68c987)
   pitfall: a chokepoint in a project nested below the repository top passed without searching the rest of the repository, where a product boundary's bypasses live; choose its references horizon (df-0d235229)
+  pitfall: the user was asked which invariants to declare before anything had said what an invariant is, or what Coherence does with one (df-729d4e68)
   pitfall: a bullet inserted between another bullet and its refuted:, kinds: or checklist: lines took them, so that invariant fell back to a requirement while spec --check reported 0 problems; append a whole bullet after another's last line (df-f3826eaa)
-  learned: d-96eb6814, d-127ab8e4, d-a1095ef2, f658594
+  learned: d-96eb6814, d-127ab8e4, d-a1095ef2, d-a37af46f, f658594, df-729d4e68
   reach: kernel
   because: the setup prompt was a method kept in prose, carried out once and reported in a chat reply that no later session reads; as a practice each step is delivered where its commands run, and the enactment is the durable record of how the project was adopted
 - settle a domain term: A term enters the project's lexicon as the right kind of thing (a concept, an alias, a property, or ordinary code) with the reason recorded, before code or specs use it.

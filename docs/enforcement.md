@@ -156,9 +156,133 @@ The totality oracle pass runs pytest with `--junitxml={out}` and
 `testFilterForm: "pytest"`: names go to `-k` joined with `or`, and the
 JUnit report (or pytest-json-report's JSON) maps back by test name.
 
+## Rust
+
+`"language": "rust"` grades through rust-analyzer. It is no npm package, so
+it is found on the machine: `COHERENCE_RUST_ANALYZER` first, then `rustup
+which rust-analyzer` from the project root (a `rust-toolchain.toml` is
+honoured), then the first `rust-analyzer` on PATH that answers `--version`.
+rustup's proxy at `~/.cargo/bin` exists without the component and fails only
+when run; a missing server is a reason naming each place looked. Install it
+with `rustup component add rust-analyzer rust-src` (`rust-src` lets it index
+`std`).
+
+Rust's ladder has two rungs:
+
+- **visibility-choked** (the compiler, rustc): the protected item's
+  effective visibility stops short of the crate root. That is its own
+  visibility (private, `pub(self)`, `pub(super)`, `pub(in …)`) narrowed by
+  every module that encloses it, read up the module chain through
+  rust-analyzer's `experimental/parentModule`, so a `pub fn` of a private
+  module is no more reachable than the module. rustc refuses a path to it
+  from outside that scope; inside it, every reference is classified as
+  usual.
+- **reference-choked** (Coherence's check at the edit and in CI): the item
+  is reachable crate-wide (`pub(crate)`, `pub`, or private at the crate
+  root). In a single-crate project the compiler's boundary is the whole
+  project, so it is not credited.
+
+The adapter asks nothing indexed until rust-analyzer reports itself
+quiescent (`experimental/serverStatus`): about 5 s on a small crate, 6 to
+14 s on a 14k-line one. Build scripts and proc macros are on, for
+references inside expanded code; `COHERENCE_RUST_LEAN=1` turns both off for
+a faster start. `checkOnSave` is off, so no check runs cargo.
+
+A site inside a `#[cfg(test)]` or `#[test]` item, or in a file whose module
+is declared under `#[cfg(test)]`, is a test reference, so a unit test module
+beside the chokepoint is not a bypass. A `use` site is an import; a `pub
+use` (or `pub(…) use`) is a re-export, a bypass wherever it stands. A
+module is its file: `src/kernel/mod.rs`, `src/kernel.rs`, or a folder
+(`src/kernel/`, which is its `mod.rs` or sibling `.rs`; a crate folder, which
+is its `src/lib.rs` or `src/main.rs`). A site in a file the module's subtree
+owns is inside the module.
+
+The refutation never touches disk. rust-analyzer does not see an unsaved
+file no module declares, so each synthetic module is staged as a pair: the
+file, and an unsaved overlay of the crate root that declares it. For a
+visibility-choked item the synthetic module `use`s it, and rust-analyzer's
+refusal (E0432 "unresolved import"; rustc says E0603 "is private") is the
+refutation, with a control `use` inside the item's own module that must not
+be refused. Otherwise the synthetic module re-exports it and the
+chokepoint's file gains a use past its range, and both must come back as
+bypasses.
+
+Named limits. rust-analyzer is not rustc: code behind a `cfg` it has not
+enabled, and references inside unexpanded macro input, are unseen, and its
+refusal is E0432 on a `use` only. An item of an `impl` or a trait has no
+`use` path, so its refutation is not run. References from crates outside
+the workspace are unseen. Totality oracles run through `cargo test` one at a
+time (`"test": "cargo test -q -- --exact {filter}"`, `"testMatch": "test
+result: ok\\. [1-9]"`); doctests are not run as `via`s.
+
+## Go
+
+`"language": "go"` with `"plugins": { "go": "bundled" }` grades through
+gopls, found from `COHERENCE_GOPLS`, then the `PATH`, then
+`go env GOPATH`/bin; install it with
+`go install golang.org/x/tools/gopls@latest`. Go is the opt-in bundled
+plugin's, not a default: a project that does not name the plugin reads no
+`.go` file as Go.
+
+Go's ladder has two rungs, by Go's one visibility rule:
+
+- **visibility-choked** (the compiler, go build): the protected name is
+  unexported (its first letter is not upper case), so the compiler refuses
+  it from any other package, and every reference inside its package is
+  classified as usual.
+- **reference-choked** (Coherence's check at the edit and in CI): the name
+  is exported, and every reference gopls reports in the module is inside
+  the chokepoint.
+
+A site in a `_test.go` file is a test reference. A module is one `.go`
+file; a package folder resolves only when it holds one non-test file.
+
+The refutation never touches disk: every staged use is an unsaved overlay.
+For an unexported name, a new package beside the protected one uses it, and
+gopls's refusal (`UnexportedName`) is the refutation, with a control use
+inside the package that must not be refused. For an exported one, a new
+file in the protected thing's package and the chokepoint's own file, past
+the chokepoint, each use it, and both must come back as bypasses; with
+`from:`, a use from a new package outside the exempt folder is staged
+instead of the one inside it.
+
+## A declared language
+
+A language Coherence has no adapter for is declared in the config, under
+`languages`, with its file extensions and its language server's command (see
+[config.md](config.md#a-language-coherence-has-no-adapter-for)). The generic
+adapter (`src/adapters/declared.ts`) drives that server over the protocol
+alone, the way the built-in adapters drive theirs: `workspace/symbol` and the
+document symbols resolve a name, `textDocument/references` lists the sites,
+and the project's own files are the only evidence.
+
+Its ladder has one rung:
+
+- **reference-choked** (Coherence's check at the edit and in CI): every
+  reference the server reports is inside the chokepoint. The protocol says
+  nothing about visibility, and nothing declares the language's rules, so no
+  compiler or checker is credited, even where the language would refuse an
+  outside reference.
+
+The refutation stages the config's `refute` template as an unsaved document
+beside the protected thing (outside the exempted folder when the chokepoint
+governs only references from outside one) and requires the server to report
+the reference it holds; the check must then call that site a bypass. A server
+that answers only from open or indexed files would see the staged document and
+miss a bypass in a file it never opened, so the adapter opens every file of
+the language first, and a file whose text names the thing but holds no
+reported site makes the check not run, naming the file. Without
+a template the refutation is not run, and says so, so the chokepoint reads not
+run, never pass. Every verdict names what answered
+(`toy via toy-language-server (declared in the config)`).
+
+No reading scans a declared language's text: Structure, the economy
+prediction, mass, entrance detection and `scaffold control` name it as not
+read.
+
 ## The run and its view
 
-A run appends one line to `.coherence/runs/<session>.jsonl`: time, session,
+A run appends one record to the session's shard, `.coherence/runs/<session>.<token>.jsonl` (docs/records-layout.md): time, session,
 agent, commit, and one entry per enforcement: form, verdict, grade,
 refutation, bypasses, test references, files, latency, reason. The
 refutation field takes one of four values: `automatic` (the check called
@@ -204,8 +328,12 @@ full.
 A run exits non-zero when an enforcement failed and also when the instrument
 was needed and could not answer: the totality pass runs the whole suite
 before the first question, so the run holds the warm server's idle timer open
-with a heartbeat and asks the instrument again afterwards. A run that proved
-nothing must never read like a clean one.
+with a heartbeat and asks the instrument again afterwards. It exits non-zero
+too when an enforcement an earlier run checked (pass or fail) reads not run
+now, whatever the reason (a protected name that became ambiguous, a
+chokepoint that no longer resolves), and names each with its earlier verdict:
+a check that lapsed is no pass. A run that proved nothing must never read
+like a clean one.
 
 `run --status` is a view: the latest entry per enforcement across every run;
 one the latest run skipped keeps its prior dated verdict, and the line says
@@ -235,8 +363,18 @@ down after a few idle minutes.
 
 On PostToolUse for a file-writing tool, the hook re-checks only the
 chokepoint invariants the file may involve (a prior run touched the file, or
-a protected or chokepoint name appears in it) and appends the pass as a run. A bypass is printed as additionalContext in the same turn: the
+a protected or chokepoint name appears in it, in a file written in one of the
+project's languages: a name in notes or prose starts no check) and appends the
+pass as a run, its refutation asked as an edit's (`occasion: "edit"`,
+docs/plugins.md). A bypass is printed as additionalContext in the same turn: the
 invariant, the bypass site, and the two honest options, route the reference
 through the chokepoint or escalate a retirement for a human. At Stop the
 regulation message carries the structural defects the latest run left; at
 SubagentStop one refuses the stop.
+
+When the tool wrote a spec or practice file, the hook parses that file alone
+and prints each of its problems, with its file and line, in the same turn. A
+file is named again only when its problems change, and once it is clean it is
+forgotten. Problems only the whole model can see, such as a crossing that
+names a trust level the entry spec lacks, still come from `spec --check` and
+the stop.

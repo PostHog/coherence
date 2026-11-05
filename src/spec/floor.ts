@@ -50,6 +50,8 @@ export interface InvariantFloorGap {
   lost: string[];
   /** The latest run that graded what was lost an invariant. */
   gradedAt: string;
+  /** Why the bullet's latest run entry could not check it, when that entry was not run: the cause a lost refutation follows from. */
+  notRun?: string;
 }
 
 /** The enforcements a bullet's form names: its via: test titles for a totality oracle, its chokepoints for a chokepoint. */
@@ -134,7 +136,10 @@ export function rawFloorGaps(components: readonly Component[], runs: readonly Ru
       }
       if (floor.at > gradedAt) gradedAt = floor.at;
     }
-    if (lost.length > 0) gaps.push({ id, component: floor.component, name: floor.name, lost, gradedAt });
+    if (lost.length > 0) {
+      const latest = runs.flatMap((r) => r.invariants.filter((e) => e.component === floor.component && e.name === floor.name)).at(-1);
+      gaps.push({ id, component: floor.component, name: floor.name, lost, gradedAt, ...(latest?.verdict === "not run" ? { notRun: latest.reason } : {}) });
+    }
   }
   return gaps;
 }
@@ -156,7 +161,10 @@ export function invariantFloorProblems(components: readonly Component[], gaps: r
     return {
       file: component?.specPath ?? gap.component,
       line: bullet?.line ?? 1,
-      message: `invariant ${gap.id} was graded an invariant by the run of ${gap.gradedAt} and has lost ${gap.lost.join(", ")}; an invariant is not demoted silently: ${demoteCommand(gap.id)}`,
+      // A lost refutation may only follow from a check the latest run could not make: the cause comes first, and making it checkable again is a fix besides demotion.
+      message: gap.notRun === undefined
+        ? `invariant ${gap.id} was graded an invariant by the run of ${gap.gradedAt} and has lost ${gap.lost.join(", ")}; an invariant is not demoted silently: ${demoteCommand(gap.id)}`
+        : `invariant ${gap.id} was graded an invariant by the run of ${gap.gradedAt} and has lost ${gap.lost.join(", ")}, since its latest run could not check it: ${gap.notRun}; make it checkable and run again, or, if it is retired, an invariant is not demoted silently: ${demoteCommand(gap.id)}`,
     };
   });
 }

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,13 +11,14 @@ import { journalVerbs } from "../journal/cli.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
-import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, adopterExample, adopterInstruction, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
+import { BOUNDARY_RULE, CONTEXT_BUDGET, VOCABULARY_TOKENS, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, ADOPTER_INSTRUCTION, runHook, startReading, sessionBlock, type WarmDoor } from "./hook.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { TRACES_DIR, recordReadTrace, recordWriteTrace } from "../economy/trace.ts";
 import { COHERENCE_LEXICON, installedRoot, PACKAGE_NAME } from "./project.ts";
 import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, EARLIER_IGNORE_TEXTS, IGNORE_FILE, IGNORE_TEXT } from "./state-files.ts";
-import { loadLexicon, rejectedNames } from "./lexicon.ts";
+import { loadLexicon, rejectedNames, tokenEstimate } from "./lexicon.ts";
+import { cli } from "./cli-fixture.ts";
 import { gapProject } from "../readings/scope/gaps-fixture.ts";
 import { undeclaredProject } from "../readings/scope/undeclared-fixture.ts";
 import { orientUndeclaredText } from "../readings/scope/undeclared.ts";
@@ -27,10 +28,6 @@ import { currentGaps, readAndRecord, recordGapBaseline, structureFingerprint } f
 async function coherenceRejected(concept: string): Promise<string> {
   return rejectedNames(await loadLexicon(COHERENCE_LEXICON)).find((n) => n.concept === concept && !n.name.includes(" "))!.name;
 }
-async function adopterRule(): Promise<string> {
-  return adopterInstruction(adopterExample(await loadLexicon(COHERENCE_LEXICON)));
-}
-
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
 let root: string;
@@ -87,9 +84,10 @@ test("the block after the lexicon is under 120 words: session, decide template, 
   assert.match(cli, /^node \S*src\/cli\.ts$/, "an adopter is told the checkout the hook ran from, never a path into its node_modules");
   assert.ok(block.includes(`\n  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session abc123 --agent Explore\n`), block);
   assert.ok(block.includes(`Read the project journal from the project root:\n  ${cli} journal\n`), block);
-  const rule = await adopterRule();
+  const rule = ADOPTER_INSTRUCTION;
   assert.ok(block.endsWith(`${rule}\n`), "an adopter is given the rule its check enforces");
-  assert.ok(rule.includes(`say invariant, not ${await coherenceRejected("invariant")}`), "the example swap comes from the lexicon");
+  assert.match(rule, /restrict none of this project's\s+words/, "Coherence's names restrict none of an adopter's words");
+  for (const { name } of rejectedNames(await loadLexicon(COHERENCE_LEXICON))) assert.ok(!new RegExp(`\\b${name}\\b`, "i").test(rule), `the adopter rule names no word Coherence rejected (${name})`);
   assert.match(rule, /project's rejected names are defects/);
   assert.match(rule, /adoption baseline/);
   const own = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -118,8 +116,8 @@ test("SessionStart and SubagentStart inject both lexicons and the instruction as
     assert.match(context, /- widget: A thing with a knob\. \(also: gadget\)/);
     assert.match(context, /- rejected names: doohickey/);
     assert.ok(context.includes(`Read the project journal from the project root:\n  ${await cliName(root)} journal\n`));
-    assert.ok(context.endsWith(`${await adopterRule()}\n`));
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts; use these names when you mean Coherence's concepts\):/m, "an adopter's header does not call Coherence's rejected names defects");
+    assert.ok(context.endsWith(`${ADOPTER_INSTRUCTION}\n`));
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts; the tool's terms, which restrict none of this project's words\):/m, "an adopter's header says Coherence's names restrict none of its words");
     assert.ok(context.length <= CONTEXT_BUDGET);
   }
 });
@@ -206,20 +204,23 @@ test("an unknown noun in a changed file is advisory: Stop reports it and Subagen
   await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
 });
 
-test("in an adopter, Coherence's rejected names in the project's own code and prose never refuse a subagent stop", async () => {
+test("in an adopter, Coherence's rejected names in the project's own code, prose and specs never refuse a subagent stop, and the stop names none of them", async () => {
   // Its own starting tree: only the files that use Coherence's rejected names in the project's sense are changed.
   await writeFile(join(root, "clean.md"), "The widget is fine.\n");
   const place = await coherenceRejected("trust level");
   const surface = await coherenceRejected("scope");
   await writeFile(join(root, "places.ts"), `export const ${place} = 'loading dock';\nexport const ${surface} = ${place};\n`);
   await writeFile(join(root, "floor.md"), `The ${place} by the ${surface} holds the widget.\n`);
+  await writeFile(join(root, "Floor.spec.md"), `# Floor\n\nThe floor holds widgets.\n\n## invariants\n\n- the ${place} holds: the ${surface} keeps the widget.\n  because: the ${place} is the project's word\n`);
   try {
     const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
     assert.equal(subagent.exit, 0, `the project's own words never refuse: ${subagent.stderr}`);
-    assert.doesNotMatch(subagent.stdout + subagent.stderr, /REJECTED NAME/, "and nothing reports them as rejected names");
+    const said = subagent.stdout + subagent.stderr;
+    assert.doesNotMatch(said, /REJECTED NAME|ADVISORY|Coherence names?\b/, "and nothing reports or counts them");
   } finally {
     await rm(join(root, "places.ts"), { force: true });
     await rm(join(root, "floor.md"), { force: true });
+    await rm(join(root, "Floor.spec.md"), { force: true });
     await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
   }
 });
@@ -319,9 +320,12 @@ test("an open escalation that cites a decision and a work order names each by id
   assert.equal(journalVerbs["acknowledge"]!([escalation.id, "--because", "renamed", ...who], io), 0, printed.join("\n"));
 });
 
-test("the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened", async () => {
+test("the start injection stays under the budget with escalations present: the vocabulary decays from its least recently named concept, to names and then to a pointer, and no escalation is shortened", async () => {
   const dir = await freshRoot();
   try {
+    // The project's vocabulary: sixty parts no record names, then the vertebra every escalation names.
+    const part = (i: number) => ({ name: `part${i}`, definition: `The ${i}th part of the widgetry, described at some length so that its line is long. More follows.` });
+    await writeFile(join(dir, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, rejected: [], concepts: [...Array.from({ length: 60 }, (_, i) => part(i)), { name: "vertebra", definition: "One bone of the spine the owner alone may retire." }] }));
     const io = { cwd: dir, out: () => {}, err: () => {} };
     const ids: string[] = [];
     const what = (n: number): string => `retire invariant ${n}: ${"the chokepoint no longer reflects how the store is reached and a human must weigh the reliance listing ".repeat(4)}`;
@@ -333,8 +337,12 @@ test("the start injection stays under the budget with escalations present: the v
     const context = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
     assert.ok(context.length <= CONTEXT_BUDGET, `${context.length} characters against a budget of ${CONTEXT_BUDGET}`);
     for (let n = 0; n < 8; n += 1) assert.ok(context.includes(`▲ ${ids[n]}  scope  ${what(n)} — only the owner can retire a vertebra, and this is the ${n}th`), `escalation ${n} is shown whole`);
-    assert.doesNotMatch(context, /^- invariant: /m, "the vocabulary stepped down: no full concept line");
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts; names only here, use these names when you mean Coherence's concepts; full entries: coherence lexicon\):\n/m, "Coherence's layer at names only");
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts; the tool's terms, which restrict none of this project's words\):\n\d+ more: /m, "in an adopter Coherence's layer is not ranked, and its names go before any of the project's");
+    assert.match(context, /^Widgetry vocabulary \(61 concepts, most recently named first; [^)]*\):\n/m, "the project's layer in the order the journal last named it");
+    assert.match(context, /^(Named only here \(full entries: [^)]*\): |\d+ more, the least recently named: )/m, "the project's vocabulary decayed: not every concept keeps its line");
+    const vocabulary = context.slice(context.indexOf("Widgetry vocabulary"));
+    assert.ok(/^- vertebra: /m.test(vocabulary), "the vertebra, which the escalations name, keeps its whole line");
+    assert.ok(vocabulary.search(/\bvertebra\b/) < vocabulary.search(/\bpart59\b/) || !/\bpart59\b/.test(vocabulary), "the vertebra is kept ahead of part59, which no record names");
     assert.match(context, /\nSession: s-budget\n/, "the session block still rides along");
 
     // More escalations, until even the names do not fit: the vocabulary gives way to one line that points at the lexicon command.
@@ -344,11 +352,13 @@ test("the start injection stays under the budget with escalations present: the v
       assert.equal(journalVerbs["escalate"]!([what(n), "--because", `only the owner can retire a vertebra, and this is the ${n}th`, "--session", `peer-${n}`, "--agent", "scope"], { ...io, out: (l) => printed.push(l) }), 0);
       ids.push(printed[0]!.split(/\s+/)[0]!);
       pointed = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
+      // Each concept decays on its own, so every size on the way down still fits while any vocabulary is shown.
+      if (/^Coherence vocabulary/m.test(pointed)) assert.ok(pointed.length <= CONTEXT_BUDGET, `${n + 1} escalations: ${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
     }
     assert.doesNotMatch(pointed, /^Coherence vocabulary/m, "the names no longer fit");
     assert.ok(pointed.includes(`\n  ${await cliName(dir)} journal\n`), "the journal command survives the reduced vocabulary");
     assert.ok(pointed.includes(`\nVocabulary omitted to stay under the host budget; full entries: ${await cliName(dir)} lexicon\n`), "one line points at the lexicon command instead");
-    assert.ok(pointed.length <= CONTEXT_BUDGET, `${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
+    // Past this point what overruns is what is never shortened: the escalations themselves.
     ids.forEach((id, n) => assert.ok(pointed.includes(`▲ ${id}  scope  ${what(n)} — only the owner`), `escalation ${n} is still shown whole`));
 
     const one = await freshRoot();
@@ -357,9 +367,23 @@ test("the start injection stays under the budget with escalations present: the v
       const light = contextOf(await runHook("SessionStart", { cwd: one, session_id: "s-light" }, one));
       assert.ok(light.length <= CONTEXT_BUDGET);
       assert.match(light, /^Escalations awaiting a human \(1\)/);
-      assert.match(light, /^- invariant: /m, "with room to spare the vocabulary is injected in full");
+      assert.match(light, /^Coherence vocabulary \(\d+ concepts; the tool's terms, which restrict none of this project's words\):\nNamed only here \(full entries: [^)]*\): invariant, requirement, /m, "with room to spare an adopter still sees Coherence's concepts by name alone, in the file's order");
+      assert.doesNotMatch(light, /^- invariant: /m, "and never their whole lines");
     } finally {
       await rm(one, { recursive: true, force: true });
+    }
+
+    // No escalation and a project lexicon long enough that the host's budget would leave the vocabulary more than its own bound: the bound decides.
+    const roomyRoot = await freshRoot();
+    try {
+      await writeFile(join(roomyRoot, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, rejected: [], concepts: Array.from({ length: 70 }, (_, i) => ({ name: `thing${i}`, definition: `The ${i}th thing, described at some length so that the line is long. A second sentence follows.` })) }));
+      const roomy = await startReading(roomyRoot);
+      assert.ok(roomy.text.includes(roomy.vocabulary));
+      assert.ok(tokenEstimate(roomy.vocabulary).tokens <= VOCABULARY_TOKENS, `with room to spare the vocabulary still presents at most ${VOCABULARY_TOKENS} tokens: ${tokenEstimate(roomy.vocabulary).tokens}`);
+      assert.ok(roomy.delivered.name + roomy.delivered.out > 0, "the bound trimmed the least recently named");
+      assert.ok(roomy.text.length < CONTEXT_BUDGET - 200, `the host's budget had room left (${roomy.text.length} of ${CONTEXT_BUDGET}), so the trim was the vocabulary's own bound`);
+    } finally {
+      await rm(roomyRoot, { recursive: true, force: true });
     }
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -444,18 +468,17 @@ test("readStdinJson tolerates empty and malformed input", async () => {
   assert.deepEqual(await readStdinJson(Readable.from(['{"cwd":"/x",', '"stop_hook_active":true}'])), { cwd: "/x", stop_hook_active: true });
 });
 
-test("the CLI reads the event from stdin and uses its cwd", () => {
+test("the CLI reads the event from stdin and uses its cwd", async () => {
   // Started in the temp root's parent and told about the temp root on stdin: only the stdin cwd reaches Widgetry.
-  const run = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "SessionStart"], {
-    input: JSON.stringify({ hook_event_name: "SessionStart", cwd: root, source: "startup" }),
-    encoding: "utf8",
+  const run = await cli(["hook", "SessionStart"], {
+    stdin: JSON.stringify({ hook_event_name: "SessionStart", cwd: root, source: "startup" }),
     cwd: tmpdir(),
   });
   assert.equal(run.status, 0, run.stderr);
   const parsed = JSON.parse(run.stdout) as { hookSpecificOutput: { additionalContext: string } };
   assert.match(parsed.hookSpecificOutput.additionalContext, /Widgetry vocabulary/);
 
-  const bad = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "NoSuchEvent"], { input: "{}", encoding: "utf8", cwd: tmpdir() });
+  const bad = await cli(["hook", "NoSuchEvent"], { stdin: "{}", cwd: tmpdir() });
   assert.equal(bad.status, 64);
   assert.match(bad.stderr, /expected one of/);
 });
@@ -565,7 +588,7 @@ test("the peer feed injects a peer's decisions and escalations and no other kind
     // One record of every other kind a peer can write, between two the feed must carry.
     const decision = idOf(verb(dir, "decide", "a peer chose the store", "--because", "b", "--session", "peer-1", "--agent", "scope"));
     const conjecture = idOf(verb(dir, "conjecture", "a peer noticed something", "--could-be", "one", "--discriminated-by", "a test", "--session", "peer-1", "--agent", "scope"));
-    const defect = idOf(verb(dir, "defect", "a peer saw a deviation", "--evidence", "a report", "--session", "peer-1", "--agent", "scope"));
+    const defect = idOf(verb(dir, "defect", "a peer saw a deviation", "--evidence", "a report", "--file", "src/a.ts", "--session", "peer-1", "--agent", "scope"));
     const wall = idOf(verb(dir, "unable", "a peer hit a wall", "--because", "no password", "--session", "peer-1", "--agent", "scope"));
     const retraction = idOf(verb(dir, "retract", decision, "--because", "the test said otherwise", "--session", "peer-1", "--agent", "scope"));
     const resolution = idOf(verb(dir, "resolved", conjecture, "--because", "the test showed one", "--session", "peer-1", "--agent", "scope"));
@@ -699,19 +722,19 @@ test("the peer feed injects subjects of other sessions' records since the cursor
   }
 });
 
-/** Run the hook CLI on an event; with `closePipe` the host's end of stdout is closed before the hook can write, as a host that died would leave it. */
-function spawnHook(dir: string, event: string, input: object, closePipe: boolean): Promise<{ status: number | null; stdout: string; stderr: string }> {
+/**
+ * Run the hook CLI on an event as a spawned process whose host's end of stdout
+ * is closed before the hook can write, as a host that died would leave it: a
+ * real process boundary, which an in-process call has no pipe to lose.
+ */
+function spawnHookPipeClosed(dir: string, event: string, input: object): Promise<{ status: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", event], { cwd: dir, stdio: ["pipe", "pipe", "pipe"] });
-    let stdout = "";
+    const stdout = "";
     let stderr = "";
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => (stderr += chunk));
-    if (closePipe) child.stdout.destroy();
-    else {
-      child.stdout.setEncoding("utf8");
-      child.stdout.on("data", (chunk: string) => (stdout += chunk));
-    }
+    child.stdout.destroy();
     child.on("error", reject);
     child.on("close", (status) => resolve({ status, stdout, stderr }));
     child.stdin.end(JSON.stringify(input));
@@ -737,11 +760,11 @@ test("the feed cursor advances only after the feed is printed: rendering moves n
     assert.equal(typeof rendered.commit, "function", "the advance rides with the result for the caller that prints");
 
     // The CLI boundary: the host's end of the pipe is gone, so the write fails and the cursor must stay.
-    const lost = await spawnHook(dir, "UserPromptSubmit", { session_id: "child", cwd: dir }, true);
+    const lost = await spawnHookPipeClosed(dir, "UserPromptSubmit", { session_id: "child", cwd: dir });
     assert.notEqual(lost.status, 0, `a hook whose output never reached the host does not exit 0: ${lost.stderr}`);
     assert.deepEqual(readCursor(dir, "child"), before, "the cursor did not move: the feed the host never received is shown again");
 
-    const printed = await spawnHook(dir, "UserPromptSubmit", { session_id: "child", cwd: dir }, false);
+    const printed = await cli(["hook", "UserPromptSubmit"], { cwd: dir, stdin: JSON.stringify({ session_id: "child", cwd: dir }) });
     assert.equal(printed.status, 0, printed.stderr);
     assert.match(printed.stdout, /peer wrote/, "the unprinted feed is shown again");
     assert.notDeepEqual(readCursor(dir, "child"), before, "the commit after the print moves the cursor");
@@ -880,7 +903,7 @@ function coverageLine(text: string): string | undefined {
   return text.split("\n").find((l) => l.startsWith("Entrance coverage"));
 }
 
-test("orient names the undeclared entrances in one bounded line: the count against what is detected now, the folder holding the most, and the scaffold command that proposes their bullets, with no reading and no gap needed", async () => {
+test("orient counts the undeclared entrances in one bounded line, as the normal state of a detected entrance and never a gap: the count against what is detected now, the folder holding the most, and the scaffold command that ranks them, with no reading and no gap needed", async () => {
   // Every declared entrance carries an inside level: nothing could be a gap, and no reading was ever kept.
   const { root: project, remove } = track(undeclaredProject({ trust: "operator" }));
   try {
@@ -890,7 +913,7 @@ test("orient names the undeclared entrances in one bounded line: the count again
     assert.equal(started.length, 0, "and no reading is started for one");
     const line = coverageLine(text);
     assert.ok(line !== undefined, text);
-    assert.match(line, /^Entrance coverage: 1 declared entrance covers 1 of 7 detected; 6 undeclared, which the gap count says nothing of; most in src\/server \(4 server functions\)\. node \S+ scaffold entrances src\/server proposes their ## entrances bullets; declare each in the spec that owns it\.$/);
+    assert.match(line, /^Entrance coverage: 1 declared entrance covers 1 of 7 detected; 6 undeclared, the normal state of a detected entrance, never a gap; most in src\/server \(4 server functions\)\. node \S+ scaffold entrances ranks them and proposes their bullets; declare those that matter\.$/);
     const spec = readFileSync(join(project, "Shelf.spec.md"), "utf8");
     writeFileSync(join(project, "Shelf.spec.md"), spec.replace("\n## invariants", "- write thing: a visitor writes a thing\n  handler: writeThing in src/server/fns.ts\n  trust: operator\n\n## invariants"));
     assert.match(coverageLine(await start()) ?? "", /cover 2 of 7 detected; 5 undeclared/, "detected now: a declaration counts at the next start");
@@ -902,7 +925,7 @@ test("orient names the undeclared entrances in one bounded line: the count again
   try {
     const text = await gapStarter(crowded, "cov-crowded").start();
     const line = coverageLine(text)!;
-    assert.match(line, /covers 1 of 402 detected; 401 undeclared, [^]*most in src\/server \(399 server functions\)/);
+    assert.match(line, /covers 1 of 402 detected; 401 undeclared, [^]*most in src\/server \(399 server functions\)[^]*proposes bullets for the first 15;/);
     const own = line.length - /node \S+/.exec(line)![0].length;
     assert.ok(own < 300, `one bounded line whatever the count (${own} characters besides the command's path)`);
     assert.doesNotMatch(line, /extraThing/, "a folder, never a list");
@@ -912,20 +935,25 @@ test("orient names the undeclared entrances in one bounded line: the count again
   }
 });
 
-test("regulate names the undeclared entrances in the files a session changed, by file, and never refuses a subagent stop for them", async () => {
+test("regulate names the one undeclared entrance that ranks first in the files a session changed, with what ranks it and how many more those files hold, never a list, and never refuses a subagent stop for it", async () => {
   const { root: project, remove } = track(undeclaredProject());
   try {
     const opened = await runHook("SessionStart", { session_id: "cov-stop", cwd: project }, project);
     opened.commit?.();
-    assert.doesNotMatch((await runHook("Stop", { session_id: "cov-stop", cwd: project }, project)).stdout, /Undeclared entrances/, "nothing changed: nothing named");
+    assert.doesNotMatch((await runHook("Stop", { session_id: "cov-stop", cwd: project }, project)).stdout, /Undeclared entrance/, "nothing changed: nothing named");
     const fns = readFileSync(join(project, "src", "server", "fns.ts"), "utf8");
     writeFileSync(join(project, "src", "server", "fns.ts"), `${fns}export const hideThing = createServerFn({ method: 'POST' })\n  .handler(async () => null)\n`);
+    // A package script is run on the machine; the server functions a browser calls rank above it, so the script the session also touched is never the one named.
+    writeFileSync(join(project, "scripts", "seed.ts"), "console.log('seeded twice')\n");
     const message = systemMessageOf(await runHook("Stop", { session_id: "cov-stop", cwd: project }, project));
-    assert.match(message, /Undeclared entrances in files this session changed; advisory, never a reason to refuse the stop:\n  src\/server\/fns\.ts \(5 server functions\): writeThing, deleteThing, listThings and 2 more\n  node \S+ scaffold entrances src\/server\/fns\.ts proposes their ## entrances bullets/);
-    assert.doesNotMatch(message, /users\.\$id|seed\.ts/, "an unchanged file's entrances are orient's, not regulate's");
+    const block = message.split("\n").filter((l, i, all) => l.startsWith("Undeclared entrance") || all[i - 1]?.startsWith("Undeclared entrance"));
+    assert.equal(block.length, 2, `one heading and one line, never a list: ${message}`);
+    assert.match(block[0]!, /^Undeclared entrance this session touched; advisory, never a reason to refuse the stop:$/);
+    assert.match(block[1]!, /^  writeThing \(src\/server\/fns\.ts:\d+\), a server function, ranks first of the 6 undeclared entrances in the files this session changed: from off the machine, imports reach 1 component\. If it matters, declare it: node \S+ scaffold entrances src\/server\/fns\.ts proposes its bullet, and the rest can stay undeclared\.$/);
+    assert.doesNotMatch(message, /users\.\$id/, "an unchanged file's entrances are orient's, not regulate's");
     const sub = await runHook("SubagentStop", { agent_id: "cov-stop", hook_event_name: "SubagentStop", cwd: project }, project);
     assert.equal(sub.exit, 0, "advisory: an undeclared entrance never refuses a subagent stop");
-    assert.match(systemMessageOf(sub), /Undeclared entrances in files this session changed/);
+    assert.match(systemMessageOf(sub), /Undeclared entrance this session touched/);
   } finally {
     remove();
   }

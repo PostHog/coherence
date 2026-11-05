@@ -6,6 +6,8 @@
  * its view.
  */
 
+import { defectStates, type DefectState } from "../../journal/defect-states.ts";
+import type { JournalRecord as StoredRecord } from "../../journal/record.ts";
 import { slug } from "./html.ts";
 import type {
   WorkOrder,
@@ -13,10 +15,12 @@ import type {
   JournalKind,
   JournalRecord,
   LatestEntry,
+  PageEntry,
   RunEntry,
   RunRecord,
   ShellState,
   RecordedSite,
+  SiteTally,
   SpecComponent,
   SpecInvariant,
   StructurePreview,
@@ -94,11 +98,20 @@ export function workId(id: string): string {
   return `work-${slug(id)}`;
 }
 
+/**
+ * The Connections view, named once (the owner's name, 2026-10-30): the label
+ * its tab shows, its view id, and the id its deep links start with, followed by
+ * "--" as the flow model's ids are, so no card id of another view can collide.
+ */
+export const CONNECTIONS_LABEL = "Connections";
+export const CONNECTIONS_ID = "connections";
+export const CONNECTIONS_PREFIX = `${CONNECTIONS_ID}--`;
+
 /** The prefixes each view's card ids carry; a hash resolves to its view by them. */
 const ID_PREFIXES: [string, string][] = [
-  ["structure-", "structure"],
   ["component-", "components"],
   ["invariant-", "invariants"],
+  ["reliance-", "invariants"],
   ["practice-", "practices"],
   ["run-", "runs"],
   ["journal-", "journal"],
@@ -106,6 +119,7 @@ const ID_PREFIXES: [string, string][] = [
   ["coherence-", "lexicon"],
   ["domain-", "lexicon"],
   ["layer-", "lexicon"],
+  [CONNECTIONS_PREFIX, CONNECTIONS_ID],
 ];
 
 export interface HashTarget {
@@ -119,33 +133,14 @@ export function resolveHash(state: ShellState, hash: string): HashTarget | undef
   const text = hash.startsWith("#") ? hash.slice(1) : hash;
   if (text === "") return undefined;
   if (state.views.some((v) => v.id === text)) return { view: text, id: undefined };
-  const redirected = retiredStructureLink(state, text);
-  if (redirected !== undefined) return redirected;
+  // A reliance listing is on its invariant's card (its id leads with reliance-, below), so the retired Reliance view's own link opens Invariants.
+  if (text === "reliance") return { view: "invariants", id: undefined };
+  // The relief has no cards: a link into the retired map or its security spine opens Structure.
+  if (text.startsWith("structure-")) return { view: "structure", id: undefined };
   for (const [prefix, view] of ID_PREFIXES) {
     if (text.startsWith(prefix)) return { view, id: text };
   }
   return undefined;
-}
-
-/**
- * Links into the retired Reliance view and the retired security-spine section
- * land on the one map's selection that replaced them: a reliance card, or a
- * spine crossing of an invariant with a chokepoint, selects that chokepoint;
- * a spine crossing with no chokepoint selects the trust level it leaves.
- */
-function retiredStructureLink(state: ShellState, text: string): HashTarget | undefined {
-  if (text === "reliance") return { view: "structure", id: undefined };
-  const spine = text.startsWith("structure-") && !text.startsWith("structure--");
-  if (!text.startsWith("reliance-") && !spine) return undefined;
-  for (const component of state.spec.components) {
-    for (const invariant of component.invariants) {
-      if (text !== relianceId(invariant.component, invariant.name) && text !== structureId(invariant.component, invariant.name)) continue;
-      if (invariant.enforcements.some((e) => e.form === "chokepoint")) return { view: "structure", id: flowChokepointId(invariant.component, invariant.name) };
-      if (invariant.crossing !== undefined) return { view: "structure", id: flowLevelId(invariant.crossing.from) };
-      return { view: "invariants", id: invariantId(invariant.component, invariant.name) };
-    }
-  }
-  return text.startsWith("reliance-") ? { view: "structure", id: undefined } : undefined;
 }
 
 /** The component a hash names, when it names one. */
@@ -288,9 +283,9 @@ export interface RelianceSite {
   test: boolean;
 }
 
-/** Complete means both endpoint queries completed; unknown never means empty. */
+/** Complete means both endpoint queries completed; unknown never means empty. `left` counts the sites the page's window does not carry (0 when it carries them all). */
 export type RelianceEvidence =
-  | { status: "complete"; sites: RelianceSite[] }
+  | { status: "complete"; sites: RelianceSite[]; left: number }
   | { status: "unknown"; reason: string };
 
 /** The component whose folder is the longest prefix of the file, or undefined when no component holds it. */
@@ -350,7 +345,7 @@ function relianceEvidenceOf(
         a.siteClass.localeCompare(b.siteClass) ||
         a.symbol.localeCompare(b.symbol),
     );
-  return { status: "complete", sites };
+  return { status: "complete", sites, left: sitesLeftCount(entry) };
 }
 
 export interface RelianceEntry {
@@ -510,6 +505,70 @@ export const JOURNAL_WINDOW = 150;
  * command that shows it.
  */
 export const CITED_WINDOW = 60;
+/**
+ * How many of each practice's latest enactments a page embeds beyond the
+ * latest records: what the Practices view's strips read (STRIP_WINDOW). An
+ * enactment past it is counted with the journal's other omitted records,
+ * and the view says how many of a practice's enactments it holds.
+ */
+export const ENACTMENT_WINDOW = 12;
+
+/**
+ * How many reference sites a page carries across every latest chokepoint
+ * entry. Bypass sites are always carried and count against it; the rest is
+ * shared evenly (an entry that needs less gives the rest back), so neither a
+ * growing codebase nor another chokepoint grows the page; every site left
+ * out is counted on its entry (`sitesLeft`).
+ */
+export const SITE_WINDOW = 500;
+
+/** How many of an entry's sites the page counts and does not carry: the sum of its tally. */
+export function sitesLeftCount(entry: PageEntry | LatestEntry): number {
+  return (entry.sitesLeft ?? []).reduce((sum, tally) => sum + tally.count, 0);
+}
+
+/** Even shares of `budget` over `needs`, the smallest needs served first, so no share is larger than its need and none is left unused while a need is unmet. */
+function evenShares(needs: readonly number[], budget: number): number[] {
+  const order = needs.map((_, i) => i).sort((a, b) => needs[a]! - needs[b]! || a - b);
+  const shares = needs.map(() => 0);
+  let left = budget;
+  order.forEach((i, k) => {
+    shares[i] = Math.min(needs[i]!, Math.floor(left / (order.length - k)));
+    left -= shares[i]!;
+  });
+  return shares;
+}
+
+/**
+ * One latest chokepoint entry's sites within its share: every bypass site,
+ * then sites from outside the owner component, then the owner's, tests
+ * last, each by file and line; the carried ones keep the run's order, and
+ * the rest are counted by component, endpoint, class and test mark.
+ */
+function shareSites(entry: RunEntry, share: number, components: readonly SpecComponent[]): PageEntry {
+  const sites = entry.sites!;
+  const folder = (site: RecordedSite): string | null => componentOfFile(site.file, components)?.folder ?? null;
+  const rank = (site: RecordedSite): number => (site.class === "bypass" ? 0 : site.test ? 3 : folder(site) === entry.component ? 2 : 1);
+  const order = sites
+    .map((site, index) => ({ site, index }))
+    .filter(({ site }) => site.class !== "bypass")
+    .sort((a, b) => rank(a.site) - rank(b.site) || a.site.file.localeCompare(b.site.file) || a.site.line - b.site.line || a.index - b.index);
+  if (order.length <= share) return entry;
+  const left = new Set(order.slice(share).map(({ index }) => index));
+  const tally = new Map<string, SiteTally>();
+  sites.forEach((site, index) => {
+    if (!left.has(index)) return;
+    const component = folder(site);
+    const key = `${component ?? ""}\u0000${site.of}\u0000${site.class}\u0000${site.test}`;
+    const known = tally.get(key);
+    if (known === undefined) tally.set(key, { component, of: site.of, class: site.class, test: site.test, count: 1 });
+    else known.count += 1;
+  });
+  const sitesLeft = [...tally.values()].sort(
+    (a, b) => (a.component ?? "~").localeCompare(b.component ?? "~") || a.of.localeCompare(b.of) || a.class.localeCompare(b.class) || Number(a.test) - Number(b.test),
+  );
+  return { ...entry, sites: sites.filter((_, index) => !left.has(index)), sitesLeft };
+}
 
 /**
  * The run records a page embeds: the latest `keep` whole, and every older run
@@ -521,9 +580,16 @@ export const CITED_WINDOW = 60;
  * entries, and the verdicts of the rest as counts (`superseded`, by run id),
  * so a full run of hundreds of entries that still holds two latest verdicts
  * costs the page two entries, not hundreds. Superseded entries in the latest
- * `keep` carry no sites: a full run's sites are most of its bytes.
+ * `keep` carry no sites: a full run's sites are most of its bytes. The
+ * latest entries share `sites` reference sites between them (SITE_WINDOW),
+ * each counting what it leaves out by the components it reads them against.
  */
-export function windowRuns(records: readonly RunRecord[], keep: number = RUN_WINDOW): { records: RunRecord[]; omitted: number; superseded: Record<string, VerdictCounts> } {
+export function windowRuns(
+  records: readonly RunRecord[],
+  keep: number = RUN_WINDOW,
+  components: readonly SpecComponent[] = [],
+  sites: number = SITE_WINDOW,
+): { records: RunRecord[]; omitted: number; superseded: Record<string, VerdictCounts> } {
   const holders = new Map<string, number>();
   records.forEach((record, index) => {
     for (const entry of record.invariants) holders.set(entryKey(entry.component, entry.name, entry.form), index);
@@ -531,16 +597,23 @@ export function windowRuns(records: readonly RunRecord[], keep: number = RUN_WIN
   const kept = new Set(holders.values());
   const recent = Math.max(0, records.length - keep);
   for (let index = recent; index < records.length; index++) kept.add(index);
+  const holds = (entry: RunEntry, index: number): boolean => holders.get(entryKey(entry.component, entry.name, entry.form)) === index;
+  // The latest entries with sites, and the share of the site window each carries: bypass sites first, never cut.
+  const latest = records.flatMap((record, index) => (kept.has(index) ? record.invariants.filter((entry) => entry.sites !== undefined && holds(entry, index)) : []));
+  const bypassSites = latest.reduce((sum, entry) => sum + entry.sites!.filter((site) => site.class === "bypass").length, 0);
+  const share = evenShares(latest.map((entry) => entry.sites!.length - entry.sites!.filter((site) => site.class === "bypass").length), Math.max(0, sites - bypassSites));
+  const shares = new Map(latest.map((entry, i) => [entry, share[i]!]));
+  const carry = (entry: RunEntry): RunEntry => (shares.has(entry) ? shareSites(entry, shares.get(entry)!, components) : entry);
   const superseded: Record<string, VerdictCounts> = {};
   const window = records.flatMap((record, index) => {
     if (!kept.has(index)) return [];
-    const holds = (entry: RunEntry): boolean => holders.get(entryKey(entry.component, entry.name, entry.form)) === index;
     if (index < recent) {
-      const held = record.invariants.filter(holds);
-      if (held.length < record.invariants.length) superseded[runId(record)] = verdictCounts({ ...record, invariants: record.invariants.filter((entry) => !holds(entry)) });
-      return [held.length === record.invariants.length ? record : { ...record, invariants: held }];
+      const held = record.invariants.filter((entry) => holds(entry, index));
+      if (held.length < record.invariants.length) superseded[runId(record)] = verdictCounts({ ...record, invariants: record.invariants.filter((entry) => !holds(entry, index)) });
+      const invariants = held.map(carry);
+      return [held.length === record.invariants.length && invariants.every((entry, i) => entry === held[i]) ? record : { ...record, invariants }];
     }
-    const invariants = record.invariants.map((entry) => (entry.sites === undefined || holds(entry) ? entry : (({ sites: _sites, ...rest }) => rest)(entry)));
+    const invariants = record.invariants.map((entry) => (entry.sites === undefined ? entry : holds(entry, index) ? carry(entry) : (({ sites: _sites, ...rest }) => rest)(entry)));
     return [invariants.every((entry, i) => entry === record.invariants[i]) ? record : { ...record, invariants }];
   });
   return { records: window, omitted: records.length - window.length, superseded };
@@ -548,11 +621,14 @@ export function windowRuns(records: readonly RunRecord[], keep: number = RUN_WIN
 
 /**
  * The journal records a page embeds: the latest `keep`, every open
- * escalation, up to `cap` older records that a kept record or a work order
- * cites (so a citation lands on a card; the latest citers are served first),
- * and every record one of those points at (so a retraction or a close can
- * name what it answers), in their original order. `orders` supplies the
- * work orders' own citations.
+ * escalation and open defect (and the resolution of every defect kept and
+ * the retraction of every record kept, so none reads as open that is closed
+ * or withdrawn), up to `cap` older records that a kept
+ * record or a work order cites (so a citation lands on a card; the latest
+ * citers are served first), and every record one of those points at (so a
+ * retraction or a close can name what it answers), in their original order. `orders` supplies the
+ * work orders' own citations. Of the enactments it keeps each practice's
+ * latest `enactmentWindow`, every amendment and what an amendment cites.
  */
 export function windowJournal(
   records: readonly JournalRecord[],
@@ -560,15 +636,27 @@ export function windowJournal(
   orders: readonly WorkOrder[] = [],
   cap: number = CITED_WINDOW,
   pinned: ReadonlySet<string> = new Set(),
+  enactmentWindow: number = ENACTMENT_WINDOW,
 ): { records: JournalRecord[]; omitted: number } {
   const kept = new Set<string>(records.slice(Math.max(0, records.length - keep)).map((record) => record.id));
   // Records a reading must be able to land on whatever their age: what the practices cite (their pitfalls and what they were learned from).
   for (const record of records) if (pinned.has(record.id)) kept.add(record.id);
   for (const escalation of openEscalations(records)) kept.add(escalation.id);
-  // The Practices view reads every enactment and every decision that cites one (an amendment), so the window keeps them all: they are few.
-  const enactments = new Set(records.filter((record) => record.kind === "enactment").map((record) => record.id));
+  // The Structure view counts open defects per component: every open one is kept whatever its age.
+  const defects = defectsOfJournal(records);
+  for (const defect of defects) if (defect.resolution === undefined) kept.add(defect.id);
+  // The Practices view's strips read each practice's latest ENACTMENT_WINDOW enactments, so the window keeps those; every decision
+  // that cites an enactment (an amendment), and the enactments it cites, are kept whatever their age: they are few.
+  const enactments = records.filter((record): record is Extract<JournalRecord, { kind: "enactment" }> => record.kind === "enactment");
+  const byPractice = new Map<string, JournalRecord[]>();
+  for (const enactment of [...enactments].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))) byPractice.set(enactment.practice, [...(byPractice.get(enactment.practice) ?? []), enactment]);
+  for (const mine of byPractice.values()) for (const enactment of mine.slice(-enactmentWindow)) kept.add(enactment.id);
+  const enacted = new Set(enactments.map((record) => record.id));
   for (const record of records) {
-    if (enactments.has(record.id) || (record.kind === "decision" && citesOf(record).some((id) => enactments.has(id)))) kept.add(record.id);
+    const amends = record.kind === "decision" ? citesOf(record).filter((id) => enacted.has(id)) : [];
+    if (amends.length === 0) continue;
+    kept.add(record.id);
+    for (const id of amends) kept.add(id);
   }
   const present = new Set(records.map((record) => record.id));
   const citing = [...records.filter((record) => kept.has(record.id)).reverse().map(citesOf), ...[...orders].reverse().map(workCites)];
@@ -585,6 +673,10 @@ export function windowJournal(
     const of = kept.has(record.id) ? pointsAt(record) : null;
     if (of !== null) kept.add(of);
   }
+  // A defect kept for a citation would read as open without the resolution that closed it.
+  for (const defect of defects) if (defect.resolution !== undefined && kept.has(defect.id)) kept.add(defect.resolution.id);
+  // Nor may a kept record read as standing without the retraction that withdrew it: a retracted defect kept for a citation is no open defect.
+  for (const record of records) if (record.kind === "retraction" && kept.has(record.of)) kept.add(record.id);
   const window = records.filter((record) => kept.has(record.id));
   return { records: window, omitted: records.length - window.length };
 }
@@ -676,6 +768,15 @@ export function citations(records: readonly JournalRecord[], orders: readonly Wo
 export function openEscalations(records: readonly JournalRecord[]): (JournalRecord & { kind: "escalation" })[] {
   const acknowledged = new Set(records.filter((r) => r.kind === "acknowledgement").map((r) => pointsAt(r)));
   return records.filter((r): r is JournalRecord & { kind: "escalation" } => r.kind === "escalation" && !acknowledged.has(r.id));
+}
+
+/**
+ * The journal's defects, folded as the CLI folds them (defectStates): a
+ * resolution closes one, a retracted one is none. The page holds the
+ * journal's own records, so they are read as the store's.
+ */
+export function defectsOfJournal(records: readonly JournalRecord[]): DefectState[] {
+  return defectStates(records as readonly StoredRecord[]);
 }
 
 /** The status each record has acquired from later records that point at it, as "resolved by rs-…". */

@@ -5,18 +5,21 @@
  */
 
 import assert from "node:assert/strict";
+import { onlyFile } from "../journal/shard-fixture.ts";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { after, test } from "node:test";
+import { after, describe, test } from "node:test";
 import { commandMatches, firedBy, globMatches, parsePractices, type ToolUse } from "./practice.ts";
 import { loadSpecModel, projectPractices } from "./model.ts";
+import { COHERENCE_ROOT, kernelPractices } from "./practices.ts";
 import { journalVerbs, type Io } from "../journal/cli.ts";
 import { appendRecord, loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
 import { runHook } from "../lifecycle/hook.ts";
 import { installedEntry } from "../lifecycle/install.ts";
+import { writersUnmatched } from "../lifecycle/host-tools.ts";
 import { practiceAnswer, practiceOrientText, toolUseOf } from "../lifecycle/practice-delivery.ts";
 import { scaffoldCommand } from "../scaffold/cli.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
@@ -154,6 +157,43 @@ test("a command trigger's words match whole words of one simple command in place
   assert.notEqual(pattern.version, practice("command turn-knob").version, "the pattern is part of the version");
 });
 
+test("a defect trigger fires on a command that records, classifies or closes a defect in its class or family, and on no other class, verb or quoted text", () => {
+  const practice = (when: string) => parsePractices(practiceText("d-0000abcd").replace("command turn-knob | edit src/widget/**/*.ts adding knob", when), "W.practice.md");
+  const p = practice("defect duplicated-fact | explicit").practices[0]!;
+  assert.deepEqual(p.triggers, [{ kind: "defect", class: "duplicated-fact" }, { kind: "explicit" }]);
+  const fires = (practice: typeof p, command: string) => firedBy(practice, toolUseOf({ tool_input: { command } }, []));
+  for (const command of [
+    `node src/cli.ts defect "the count drifted" --evidence "seen" --class duplicated-fact`,
+    `npx coherence defect "the count drifted" --evidence "seen" --class duplicated-fact`,
+    `node node_modules/@posthog/coherence/dist/cli.js defect "x" --class=duplicated-fact --evidence "y"`,
+    `node src/cli.ts classify df-1a2b3c4d --class duplicated-fact --because "two copies"`,
+    `node src/cli.ts resolved df-1a2b3c4d --because "derived" --guard src/journal/a --class duplicated-fact`,
+    `ls && node src/cli.ts defect "x" --evidence "y" --class "duplicated-fact"`,
+  ]) assert.equal(fires(p, command), "defect of class duplicated-fact", command);
+  for (const command of [
+    `node src/cli.ts defect "the count drifted" --evidence "seen" --class cost`,
+    `node src/cli.ts defect "the count drifted" --evidence "seen"`,
+    `node src/cli.ts defect "the --class duplicated-fact flag" --evidence "seen"`,
+    `node src/cli.ts decide "x" --because "y" --class duplicated-fact`,
+    `node src/cli.ts journal --kind defect --class duplicated-fact`,
+    "cat > notes.md <<'EOF'\nnode src/cli.ts defect x --class duplicated-fact\nEOF",
+  ]) assert.equal(fires(p, command), undefined, command);
+  assert.equal(firedBy(p, { command: "npx coherence defect x --class duplicated-fact", writes: [], added: "" }), "defect of class duplicated-fact", "the text fallback reads it too");
+  assert.notEqual(p.version, practice("defect cost | explicit").practices[0]!.version, "the class is part of the version");
+  assert.match(practice("defect Not A Class").problems.map((x) => x.message).join("\n"), /"defect Not A Class" names no class/);
+  // The kernel practice keep state where it is true fires on the duplicated-fact family, and no longer on every defect.
+  const kernel = parsePractices(readFileSync(join(import.meta.dirname, "..", "journal", "Journal.practice.md"), "utf8"), "src/journal/Journal.practice.md").practices.find((x) => x.name === "keep state where it is true")!;
+  assert.equal(fires(kernel, `node src/cli.ts defect "x" --evidence "y" --class duplicated-fact --file a.ts`), "defect of class duplicated-fact");
+  assert.equal(fires(kernel, `node src/cli.ts defect "x" --evidence "y" --class over-claim`), undefined);
+  assert.equal(fires(kernel, `node src/cli.ts defect "x" --evidence "y"`), undefined);
+  // A defect trigger naming a class no lexicon declares can never fire, and is a spec problem.
+  const { root } = widget();
+  writeFileSync(join(root, "src/widget/Widget.practice.md"), practiceText((loadJournal(root).records[0]!).id).replace("command turn-knob | edit src/widget/**/*.ts adding knob", "defect knob-seized | defect duplicated-fact"));
+  const messages = loadSpecModel(root, { runs: false }).problems.map((x) => x.message);
+  assert.ok(messages.some((m) => /its trigger defect knob-seized names a class no lexicon declares/.test(m)), messages.join("\n"));
+  assert.ok(!messages.some((m) => /defect duplicated-fact names a class/.test(m)), "a family Coherence's lexicon declares is no problem");
+});
+
 test("a practice file stands only beside its folder's spec, with the spec's stem", () => {
   const root = project({ "src/widget/Widget.spec.md": SPEC, "src/widget/Gadget.practice.md": practiceText("d-0000abcd"), "src/loose/Loose.practice.md": practiceText("d-0000abcd") });
   const messages = loadSpecModel(root, { runs: false }).problems.map((p) => `${p.file}: ${p.message}`);
@@ -171,6 +211,35 @@ test("every record a practice cites must exist, and every invariant it names mus
   const messages = loadSpecModel(root, { runs: false }).problems.map((p) => p.message);
   assert.ok(messages.some((m) => /cites d-deadbeef, which no journal or work record has/.test(m)), messages.join("\n"));
   assert.ok(messages.some((m) => /names invariant dial clicks, which its sister spec does not declare/.test(m)), messages.join("\n"));
+});
+
+describe("a cited commit is no commit only where git can tell", () => {
+  for (const { clone, cited, cites, problem } of [
+    { clone: "full", cited: "an older commit", cites: (old: string) => old, problem: false },
+    { clone: "full", cited: "a hash nothing has", cites: () => "0123abc", problem: true },
+    { clone: "shallow", cited: "an older commit its depth cut off", cites: (old: string) => old, problem: false },
+    { clone: "shallow", cited: "a file it holds", cites: (_old: string, blob: string) => blob, problem: true },
+  ] as const) {
+    test(`a ${clone} clone citing ${cited}: ${problem ? "a problem" : "no problem"}`, () => {
+      const origin = project({ "src/widget/Widget.spec.md": SPEC, "src/widget/knob.ts": "export const knob = 1;\n" });
+      const git = (cwd: string, ...args: string[]): string => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" }).trim();
+      git(origin, "add", "-A");
+      git(origin, "commit", "-q", "-m", "the knob seized");
+      const old = git(origin, "rev-parse", "--short", "HEAD");
+      const blob = git(origin, "rev-parse", "HEAD:src/widget/knob.ts");
+      writeFileSync(join(origin, "src/widget/Widget.practice.md"), practiceText(cites(old, blob)));
+      git(origin, "add", "-A");
+      git(origin, "commit", "-q", "-m", "oil the knob");
+      let root = origin;
+      if (clone === "shallow") {
+        root = mkdtempSync(join(tmpdir(), "coherence-practice-shallow-"));
+        projects.push(root);
+        git(tmpdir(), "clone", "-q", "--depth", "1", `file://${origin}`, root);
+      }
+      const messages = loadSpecModel(root, { runs: false }).problems.map((p) => p.message);
+      assert.equal(messages.some((m) => /^practice "[^"]+" cites \S+, but no branch in this repository has that commit\. If its pull request was squash-merged, cite the merge commit instead\.$/.test(m)), problem, messages.join("\n"));
+    });
+  }
 });
 
 test("an enactment needs an outcome for every step, a because for a deviation or a skip, and keeps the text it enacted", () => {
@@ -264,7 +333,7 @@ test("PreToolUse delivers a fired practice whole once per version per session, t
   const quiet = await fire("s2", "ls -la");
   assert.equal(quiet.stdout, "");
   assert.equal(quiet.exit, 0);
-  assert.deepEqual(installedEntry({ command: "coherence", host: "claude" }, "PreToolUse").matcher, "Bash|Edit|Write|MultiEdit|NotebookEdit");
+  assert.deepEqual(writersUnmatched(installedEntry({ command: "coherence", host: "claude" }, "PreToolUse").matcher), [], "Claude Code runs the hook for every tool that writes");
 });
 
 test("regulate names a practice that fired with no enactment since, advisory, and never refuses a subagent stop for it", async () => {
@@ -365,7 +434,7 @@ test("in an adopter, a kernel practice a Coherence release changed asks no amend
   const first = run("enact", kernel, ...steps, ...WHO);
   assert.equal(first.code, 0, first.err.join("\n"));
   // As an earlier release left it: the recorded enactment carried a step the kernel practice no longer has.
-  const file = join(root, ".coherence", "journal", "s1.jsonl");
+  const file = onlyFile(join(root, ".coherence", "journal"), "s1");
   const lines = readFileSync(file, "utf8").split("\n").map((line) => {
     if (!line.includes('"kind":"enactment"')) return line;
     const record = JSON.parse(line) as { steps: { text: string }[] };
@@ -377,4 +446,12 @@ test("in an adopter, a kernel practice a Coherence release changed asks no amend
   assert.equal(again.code, 0, `the adopter is not asked to decide for a change it did not make: ${again.err.join("\n")}`);
   const floor = loadSpecModel(root, { runs: false }).problems.filter((p) => /is gone; a practice keeps what it taught/.test(p.message));
   assert.deepEqual(floor.map((p) => p.message), [], "no floor gap is named for a kernel practice");
+});
+
+test("every doc a kernel practice sends an adopter to ships in the package", () => {
+  const shipped: string[] = JSON.parse(readFileSync(join(COHERENCE_ROOT, "package.json"), "utf8")).files;
+  const named = kernelPractices().flatMap((p) => p.steps.flatMap((s) => s.text.match(/\bdocs\/[\w./-]+\.md\b/g) ?? []));
+  assert.ok(named.length > 0, "the kernel practices name the docs an adopter reads");
+  const missing = [...new Set(named)].filter((doc) => !shipped.includes(doc) || !existsSync(join(COHERENCE_ROOT, doc)));
+  assert.deepEqual(missing, []);
 });

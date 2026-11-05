@@ -78,23 +78,60 @@ import { execFile } from "../../lifecycle/work-meter.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite, type ResolveHint, type Resolved } from "../../adapters/adapter.ts";
-import { detectEntranceCandidates, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
+import { detectEntranceCandidates, escape, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
 import { configRecord } from "../../adapters/project-config.ts";
-import { adapterFor, type Language } from "../../adapters/index.ts";
-import { resolveDotted } from "../../adapters/python.ts";
-import { resolveSpecifier } from "../../adapters/typescript.ts";
+import { instrumentFor, type Language } from "../../adapters/index.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
-import { KeptAnswers } from "./kept-answers.ts";
-import { languagesRead } from "./languages-read.ts";
+import { KeptAnswers, lastingRefusal } from "./kept-answers.ts";
+import { DECLARED_NOT_READ, languagesRead, notScannedYet, unscannedOf } from "./languages-read.ts";
+import { parsedOf, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
-import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, KeptReport, ReachReference, ScopedReading } from "./model.ts";
+import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, InterfaceUnanswered, KeptReport, ReachReference, ScopedReading } from "./model.ts";
+
+/**
+ * What the reading reads of one language's text without its server, each
+ * derived from one parse through the parser its plugin names (languages.ts
+ * parsedOf), never a plugin's own reader of the text: a language whose plugin
+ * names no parser is named not read (notScannedYet) before the reading
+ * reaches it, never read as another language.
+ */
+export interface InterfaceReadings {
+  /** Whether a declaration line declares a type only (an interface or a type alias). */
+  isTypeDeclaration(line: string): boolean;
+  /** Whether a declaration line is its module's default export. */
+  isDefaultExport(line: string): boolean;
+  /** The import and export lists a file's text holds, each the text its `original as alias` renames are read from. */
+  importLists(text: string): string[];
+  /** The names a file's text exports as a default by name. */
+  defaultNames(text: string): string[];
+  /** The module files a file star-imports or wildcard re-exports, in every spelling the word index keys them by. */
+  wildcardModules(file: string, text: string): string[];
+}
+
+/**
+ * What a plugin's interfaces table states of its language (the `interfaces`
+ * slot of its manifest's syntax): a fact no parse answers, and no reading of
+ * the language's text, which the table cannot hold (plugin.ts
+ * INTERFACE_FACTS, refused by name in languages.ts).
+ */
+export interface InterfaceFacts {
+  /** Whether the language's server narrows to bounds, so a reader that keeps one warm starts a bounded one of its own. */
+  serverBounds: boolean;
+}
+
+/** A language's readings for the reading, from its parse; ones that read nothing for a language whose plugin names no parser. */
+function interfaceReadings(language: Language): InterfaceReadings {
+  return parsedOf(language, "interfaces") ?? NO_READINGS;
+}
+
+const NO_READINGS: InterfaceReadings = { isTypeDeclaration: () => false, isDefaultExport: () => false, importLists: () => [], defaultNames: () => [], wildcardModules: () => [] };
 
 /** Whether a declaration line declares a type only (an interface or a type alias): a route never follows one. */
-export function isTypeDeclaration(line: string, language: string): boolean {
-  return language === "typescript" && /^(?:export\s+)?(?:declare\s+)?(?:interface|type)\s/.test(line.trim());
+export function isTypeDeclaration(line: string, language: Language): boolean {
+  return interfaceReadings(language).isTypeDeclaration(line);
 }
 
 interface ReachNode {
@@ -164,22 +201,24 @@ function nodeIs(node: ReachNode, named: { symbol?: string; file?: string }, fold
   return named.symbol === undefined ? inFile && node.name !== "" : node.name === named.symbol && inFile;
 }
 
-interface ChokepointTarget {
+export interface ChokepointTarget {
   component: string;
   name: string;
   chokepoint: { symbol?: string; file?: string };
   protects: { symbol?: string; file?: string };
+  /** The option a call passes as true to switch the check off, from the bullet's unless: line. */
+  unless?: string;
 }
 
 /** Every chokepoint an invariant declares, with its protected thing, as reach nodes can be matched against. */
-function chokepointTargets(model: SpecModel): ChokepointTarget[] {
+export function chokepointTargets(model: Pick<SpecModel, "components">): ChokepointTarget[] {
   return model.components.flatMap((component) =>
     component.invariants.flatMap((invariant) =>
       invariant.enforcements.flatMap((e): ChokepointTarget[] => {
         if (e.form !== "chokepoint") return [];
         const chokepoint = namedValue(e.chokepoint);
         const protects = namedValue(e.protects);
-        return chokepoint === undefined || protects === undefined ? [] : [{ component: component.folder, name: invariant.name, chokepoint, protects }];
+        return chokepoint === undefined || protects === undefined ? [] : [{ component: component.folder, name: invariant.name, chokepoint, protects, ...(e.unless === undefined ? {} : { unless: e.unless }) }];
       }),
     ),
   );
@@ -202,13 +241,74 @@ export function guardsOf(start: string, nodes: ReadonlyMap<string, ReachNode>, c
   return guards;
 }
 
+/** The argument text of every call to `symbol` in the text (`symbol(...)` or `x.symbol(...)`), brackets and strings balanced. */
+export function callArguments(text: string, symbol: string): string[] {
+  const out: string[] = [];
+  const call = new RegExp(`(^|[^\\w$])${escape(symbol)}\\s*\\(`, "g");
+  for (let m = call.exec(text); m !== null; m = call.exec(text)) {
+    const open = m.index + m[0].length - 1;
+    let depth = 0;
+    let quote: string | undefined;
+    let end = open;
+    for (let i = open; i < text.length; i++) {
+      const c = text[i]!;
+      if (quote !== undefined) {
+        if (c === "\\") i++;
+        else if (c === quote) quote = undefined;
+        continue;
+      }
+      if (c === "'" || c === '"' || c === "`") quote = c;
+      else if (c === "(" || c === "[" || c === "{") depth++;
+      else if (c === ")" || c === "]" || c === "}") {
+        depth--;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    out.push(text.slice(open + 1, end));
+  }
+  return out;
+}
+
+/**
+ * A declaration's text: its range when the server gave one past its first
+ * line, else from that line until the brackets it opens close again (a server
+ * that names only the declaration's line), at most 2,000 lines.
+ */
+export function declarationText(lines: readonly string[], start: number, end: number): string {
+  if (end > start) return lines.slice(start, end + 1).join("\n");
+  let depth = 0;
+  let opened = false;
+  let at = start;
+  for (; at < lines.length && at < start + 2000; at++) {
+    for (const c of lines[at]!) {
+      if (c === "(" || c === "[" || c === "{") {
+        depth++;
+        opened = true;
+      } else if (c === ")" || c === "]" || c === "}") depth--;
+    }
+    if (opened && depth <= 0) break;
+  }
+  return lines.slice(start, at + 1).join("\n");
+}
+
+/**
+ * Whether a handler's own text switches a chokepoint's check off: it calls the
+ * chokepoint, and every call passes the option the bullet's unless: line names
+ * as a literal true (`{ skipAuth: true }`). A call that passes it any other way,
+ * or a handler that reaches the chokepoint only through another function, keeps
+ * the credit: only what the text proves switches it off.
+ */
+export function switchesOff(text: string, symbol: string, option: string): boolean {
+  const calls = callArguments(text, symbol);
+  const off = new RegExp(`(^|[^\\w$])${escape(option)}\\s*:\\s*true(?![\\w$])`);
+  return calls.length > 0 && calls.every((args) => off.test(args));
+}
+
 /* ------------------------------------------------------------ the bounds */
 
-/** The extensions a language server can report a reference site in; a site in any of them is component code when it lies in a component. */
-const SITE_EXTENSIONS: Record<Language, readonly string[]> = {
-  typescript: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
-  python: [".py", ".pyi"],
-};
 
 /** Whether a project-relative file lies inside the bounds: no rule of the walk (exclusionOf) leaves it out. */
 export function withinBounds(file: string, skip: Bounds): boolean {
@@ -217,8 +317,10 @@ export function withinBounds(file: string, skip: Bounds): boolean {
 
 /** The adapter the reading starts for itself: bounded to the config's ignore list, when it names one and the language's server can be bounded. */
 function boundedAdapter(language: Language, root: string, ignore: readonly string[], memoryMB: number): LanguageAdapter {
+  // Through the registry, so a plugin that provides or extends the language answers here as it does for a check; bounds reach the core's own adapter.
+  const config = readEnforcementConfig(root);
   // The server's heap sits above the reading's memory budget, so the budget stops the reading before the heap limit ends the server.
-  return ignore.length === 0 ? adapterFor(language, root) : adapterFor(language, root, { exclude: ignore, heapMB: memoryMB + HEAP_HEADROOM_MB });
+  return ignore.length === 0 ? instrumentFor(language, root, config) : instrumentFor(language, root, config, { exclude: ignore, heapMB: memoryMB + HEAP_HEADROOM_MB });
 }
 
 /** How far the bounded server's heap ceiling sits above the reading's memory budget. */
@@ -234,7 +336,7 @@ export const HEAP_HEADROOM_MB = 2048;
  */
 export function interfaceAdapter(root: string, language: Language): { adapter: LanguageAdapter; bounds: string } | undefined {
   const ignore = configIgnore(root);
-  if (language !== "python" || ignore.length === 0) return undefined;
+  if (syntaxOf(language, "interfaces")?.serverBounds !== true || ignore.length === 0) return undefined;
   return { adapter: boundedAdapter(language, root, ignore, configuredBudget(root).memoryMB), bounds: ignore.join("\n") };
 }
 
@@ -254,22 +356,14 @@ export function boundsOf(root: string, ignore: readonly string[]): Bounds {
  * bounds; otherwise undefined, and a reference site there is outside.
  */
 function componentCodeOf(model: SpecModel, file: string, language: Language, skip: Bounds, testFolders: readonly string[]): string | undefined {
-  if (!SITE_EXTENSIONS[language].some((ext) => file.endsWith(ext)) || isTest(file, testFolders) || !withinBounds(file, skip)) return undefined;
+  if (!serverExtensions(language).some((ext) => file.endsWith(ext)) || isTest(file, testFolders) || !withinBounds(file, skip)) return undefined;
   return componentOf(model, file)?.folder;
 }
 
 /* ------------------------------------------------------- the word index */
 
 const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
-/** A TypeScript import or export list: `import { a as b } from`, `export { a as b }`, `export type { … }`. */
-const TS_LIST = /\b(?:import|export)\s+(?:type\s+)?(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}/g;
-/** A Python import statement, a parenthesized list or one logical line: `import a as b`, `from m import (a as b, c)`. */
-const PY_IMPORT = /^[ \t]*(?:from\s+\S+\s+)?import\s+(\([^)]*\)|[^\n]*(?:\\\n[^\n]*)*)/gm;
 const ALIAS = /([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)/g;
-/** A TypeScript default export by name: `export default foo;`, `export = foo`, `export { foo as default }` is read as an alias to "default". */
-const TS_DEFAULT_NAME = /^export\s+(?:default\s+|=\s*)([A-Za-z_$][\w$]*)\s*;?\s*$/gm;
-const TS_WILDCARD = /^export\s+(?:type\s+)?\*(?:\s+as\s+[A-Za-z_$][A-Za-z0-9_$]*)?\s+from\s*["']([^"']+)["']/gm;
-const PY_STAR = /^from\s+(\.*)([A-Za-z0-9_.]*)\s+import\s+\*/gm;
 
 /**
  * What the prefilter knows about the component code's text: which
@@ -295,6 +389,7 @@ export interface WordIndex {
 /** The word index over the component code, each file with the component it belongs to. */
 export function wordIndex(root: string, code: ReadonlyMap<string, string>, language: Language, read: (file: string) => string = (file) => readFileSync(join(root, file), "utf8")): WordIndex {
   const files = [...code.keys()].sort();
+  const syntax = interfaceReadings(language);
   const owners = new Map<string, Set<string>>();
   const where = new Map<string, Map<number, number>>();
   const direct = new Map<string, Set<string>>();
@@ -304,6 +399,13 @@ export function wordIndex(root: string, code: ReadonlyMap<string, string>, langu
     const set = map.get(key) ?? new Set<V>();
     set.add(value);
     map.set(key, set);
+  };
+  // An import list's renames: `original as alias`, a default import kept apart.
+  const aliasesIn = (list: string): void => {
+    for (const [, original, alias] of list.matchAll(ALIAS)) {
+      if (alias === "default") defaults.add(original!);
+      else add(direct, original!, alias!);
+    }
   };
   files.forEach((file, index) => {
     const owner = code.get(file)!;
@@ -321,29 +423,9 @@ export function wordIndex(root: string, code: ReadonlyMap<string, string>, langu
       files.set(index, count);
       where.set(token, files);
     }
-    const lists = language === "typescript" ? [...text.matchAll(TS_LIST)].map((m) => m[1]!) : [...text.matchAll(PY_IMPORT)].map((m) => m[1]!);
-    for (const list of lists) {
-      for (const [, original, alias] of list.matchAll(ALIAS)) {
-        if (alias === "default") defaults.add(original!);
-        else add(direct, original!, alias!);
-      }
-    }
-    if (language === "typescript") {
-      for (const [, name] of text.matchAll(TS_DEFAULT_NAME)) defaults.add(name!);
-      for (const [, specifier] of text.matchAll(TS_WILDCARD)) {
-        const target = resolveSpecifier(file, specifier!);
-        if (target === undefined) continue;
-        const stripped = target.replace(/\.(ts|tsx|mts|cts)$/, "");
-        for (const candidate of [target, `${stripped}.ts`, `${stripped}.tsx`, `${stripped}.mts`, `${stripped}.cts`, `${stripped}/index.ts`]) add(wildcards, candidate, owner);
-      }
-    } else {
-      for (const [, dots, dotted] of text.matchAll(PY_STAR)) {
-        const target = resolveDotted(file, dots!, dotted!);
-        if (target === undefined) continue;
-        add(wildcards, `${target}.py`, owner);
-        add(wildcards, `${target}/__init__.py`, owner);
-      }
-    }
+    for (const list of syntax.importLists(text)) aliasesIn(list);
+    for (const name of syntax.defaultNames(text)) defaults.add(name);
+    for (const module of syntax.wildcardModules(file, text)) add(wildcards, module, owner);
   });
   // Every name an alias chain reaches, so a caller that spells only the last alias still counts.
   const aliases = new Map<string, Set<string>>();
@@ -435,13 +517,22 @@ export function configuredBudget(root: string): InterfaceBudget {
   return budget;
 }
 
-/** The flags that override the budget for one reading, as the scope and query commands take them. */
-export const BUDGET_FLAGS = "[--interface-seconds <n>] [--interface-memory <MB>]";
+/** Each flag that overrides the budget for one reading, the budget key it sets, and its value as usage names it. */
+const BUDGET_FLAG_TABLE = [
+  { flag: "interface-seconds", key: "seconds", value: "<n>" },
+  { flag: "interface-memory", key: "memoryMB", value: "<MB>" },
+] as const satisfies readonly { flag: string; key: keyof InterfaceBudget; value: string }[];
 
-/** The budget the flags `--interface-seconds` and `--interface-memory` give, or why a value is refused. */
+/** The budget flags' names, as every command that takes them parses them. */
+export const BUDGET_FLAG_NAMES: readonly string[] = BUDGET_FLAG_TABLE.map((f) => f.flag);
+
+/** The flags that override the budget for one reading, as the scope, query and scaffold commands' usage writes them. */
+export const BUDGET_FLAGS = BUDGET_FLAG_TABLE.map((f) => `[--${f.flag} ${f.value}]`).join(" ");
+
+/** The budget the budget flags give, or why a value is refused. */
 export function budgetFlags(values: ReadonlyMap<string, string>): Partial<InterfaceBudget> | string {
   const budget: Partial<InterfaceBudget> = {};
-  for (const [flag, key] of [["interface-seconds", "seconds"], ["interface-memory", "memoryMB"]] as const) {
+  for (const { flag, key } of BUDGET_FLAG_TABLE) {
     const value = values.get(flag);
     if (value === undefined) continue;
     const n = Number(value);
@@ -452,7 +543,7 @@ export function budgetFlags(values: ReadonlyMap<string, string>): Partial<Interf
 }
 
 /** A process that is a language server by its command line. */
-const LANGUAGE_SERVER = /pyright|langserver|tsserver|typescript-language-server/;
+const LANGUAGE_SERVER = /pyright|langserver|tsserver|typescript-language-server|rust-analyzer/;
 
 /**
  * The resident memory, in megabytes, of the language server the reading
@@ -495,8 +586,8 @@ export interface ReadOptions {
   budget?: Partial<InterfaceBudget>;
   /** Ask every declaration, as before the word index: the reading the prefilter is checked against. */
   exhaustive?: boolean;
-  /** The language server's memory in megabytes (default: languageServerMemory); a test stubs it. */
-  memory?: () => Promise<number | undefined>;
+  /** The memory in megabytes of the language server an adapter asks (default: languageServerMemory of its process); a test stubs it, and a reading on a worker asks the thread that holds the server. */
+  memory?: (adapter: LanguageAdapter) => Promise<number | undefined>;
   /** How often memory is sampled, in milliseconds (default 2000). */
   sampleMs?: number;
   /**
@@ -624,10 +715,12 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
   const languages = config.languages;
   const adapterOf = (language: Language): LanguageAdapter | undefined => (typeof given === "function" ? given(language) : language === languages[0] ? given : undefined);
   const candidates = (): EntranceCandidate[] => detectedEntrances(root, model, languages, config.testFolders, ignore);
+  // A project that names only languages its config declares has no built-in to read with: said, never an empty reading.
+  if (languages.length === 0) return { kind: "unread", because: `the project names no built-in language: ${DECLARED_NOT_READ}` };
   if (languages.length === 1) {
     // One language: the reading it always was, with the one language read.
     const reading = await readLanguage(root, languages[0]!, adapterOf(languages[0]!), options, { model, budget, started, owns: () => true });
-    return reading.kind === "read" ? { ...reading, languages: languagesRead(languages), candidates: candidates() } : reading;
+    return reading.kind === "read" ? { ...reading, languages: languagesRead(languages, new Map(), unscannedOf(config)), candidates: candidates() } : reading;
   }
   // Several languages: each one's component code is read through its own adapter, started only when the language has
   // component code or an entrance handled in its files. Each language's references are its own (no language server reports a
@@ -647,7 +740,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     const reading = await readLanguage(root, language, adapterOf(language), options, { model, budget, started, owns: (_component, entrance) => owner(entrance) === language });
     parts.push({ language, reading });
   }
-  return mergeLanguages(languages, parts, model, candidates());
+  return mergeLanguages(languages, parts, model, candidates(), unscannedOf(config));
 }
 
 /** An adapter for each language a multi-language reading asks, started by the caller (who closes it); undefined lets the reading start its own. */
@@ -674,7 +767,7 @@ const OTHER_LANGUAGE = "\u0000handled in another language";
  * entrance takes the resolution of the language its handler is written in.
  * No edge is drawn across languages: each language's references are its own.
  */
-function mergeLanguages(languages: readonly Language[], parts: readonly { language: Language; reading: InterfaceReading }[], model: SpecModel, candidates: EntranceCandidate[]): InterfaceReading {
+function mergeLanguages(languages: readonly Language[], parts: readonly { language: Language; reading: InterfaceReading }[], model: SpecModel, candidates: EntranceCandidate[], declared: readonly { readonly name: string; readonly because?: string }[]): InterfaceReading {
   const read = parts.flatMap((p) => (p.reading.kind === "read" ? [{ language: p.language, reading: p.reading }] : []));
   const unread = new Map(parts.flatMap((p) => (p.reading.kind === "unread" ? [[p.language, p.reading.because] as const] : [])));
   if (read.length === 0 && unread.size > 0) return { kind: "unread", because: [...unread.values()].join("; ") };
@@ -689,6 +782,7 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
   const outsideInto = new Map<string, number>();
   for (const r of read) for (const i of r.reading.outside?.into ?? []) outsideInto.set(i.component, (outsideInto.get(i.component) ?? 0) + i.sites);
   const partials = read.flatMap((r) => (r.reading.partial === undefined ? [] : [r.reading.partial]));
+  const unanswered = read.flatMap((r) => r.reading.unanswered ?? []).sort((a, b) => a.file.localeCompare(b.file));
   const scopes = read.flatMap((r) => (r.reading.scoped === undefined ? [] : [r.reading.scoped]));
   const maybe = new Map(scopes.flatMap((sc) => sc.maybe.map((m) => [`${m.from}\u0000${m.to}`, m] as const)));
   const sum = (of: (r: Extract<InterfaceReading, { kind: "read" }>) => number): number => read.reduce((n, r) => n + of(r.reading), 0);
@@ -708,7 +802,7 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
   return {
     kind: "read",
     language: languages[0]!,
-    languages: languagesRead(languages, unread),
+    languages: languagesRead(languages, unread, declared),
     declarations: sum((r) => r.declarations),
     symbols,
     entrances,
@@ -721,6 +815,7 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
     },
     candidates,
     ...(kept === undefined ? {} : { kept }),
+    ...(unanswered.length === 0 ? {} : { unanswered }),
     ...(partials.length === 0 ? {} : { partial: { ...partials[0]!, seconds: Math.max(...partials.map((p) => p.seconds)), unread: [...new Set(partials.flatMap((p) => p.unread))].sort() } }),
     ...(scopes.length === 0
       ? {}
@@ -736,6 +831,9 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
 
 /** One language's reading (see readComponentInterfaces): its component code, through its adapter (started here when not given). */
 async function readLanguage(root: string, language: Language, given: LanguageAdapter | undefined, options: ReadOptions, part: LanguagePart): Promise<InterfaceReading> {
+  // A language whose declarations and imports no scan reads yet is named as not read, never parsed as another language.
+  const notScanned = notScannedYet(language) ?? (parsedOf(language, "interfaces") !== undefined ? undefined : `the ${language} plugin names no treeSitter parser, so the reading reads no ${language} declaration or import list`);
+  if (notScanned !== undefined) return { kind: "unread", because: notScanned };
   const config = readEnforcementConfig(root);
   const { model, budget, started } = part;
   const deadline = started + budget.seconds * 1000;
@@ -747,7 +845,7 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
   const inScope = (component: string, name: string): boolean => starting === undefined || starting.some((e) => e.component === component && e.name === name);
   let stop: { limit: "time" | "memory"; observed?: number } | undefined;
   let memory: number | undefined;
-  const measure = options.memory ?? (() => languageServerMemory(adapter.serverPid?.()));
+  const measure = (): Promise<number | undefined> => (options.memory === undefined ? languageServerMemory(adapter.serverPid?.()) : options.memory(adapter));
   let sampling = false;
   const sampler = setInterval(() => {
     if (sampling) return;
@@ -803,7 +901,13 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
     const kept = keep?.resolved(query, hint);
     if (kept !== undefined) return kept;
     if ((await live()) === STOPPED) return STOPPED;
-    const answer = await within(() => adapter.resolve(query, hint));
+    let answer: Resolved | typeof STOPPED;
+    try {
+      answer = await within(() => adapter.resolve(query, hint));
+    } catch (error) {
+      keep?.failedAnew();
+      throw error;
+    }
     if (answer !== STOPPED) keep?.keepResolved(query, hint, answer, name);
     return answer;
   };
@@ -811,8 +915,18 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
   const referencesOf = async (definition: Definition, spelled: readonly string[], broad: boolean): Promise<ReferenceSite[] | typeof STOPPED> => {
     const kept = keep?.referenced(definition);
     if (kept !== undefined) return kept;
+    const failure = keep?.failed(definition);
+    if (failure !== undefined) throw new Error(failure);
     if ((await live()) === STOPPED) return STOPPED;
-    const answer = await within(() => adapter.references(definition));
+    let answer: ReferenceSite[] | typeof STOPPED;
+    try {
+      answer = await within(() => adapter.references(definition));
+    } catch (error) {
+      // Only the server's lasting refusal is kept; an exit, a timeout or a transient refusal is asked again by the next reading.
+      if (lastingRefusal(error)) keep?.keepFailed(definition, error.message);
+      else keep?.failedAnew();
+      throw error;
+    }
     if (answer !== STOPPED) keep?.keepReferenced(definition, answer, spelled, broad);
     return answer;
   };
@@ -845,9 +959,10 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
       const lines = text.split("\n");
       for (const declaration of declarationsOf(text, language)) {
         const line = lines[declaration.line - 1] ?? "";
-        const type = isTypeDeclaration(line, language);
+        // A language read through a parser says what each declaration declares, and whether it is the default export, in the same parse; another answers by its line.
+        const type = declaration.declares !== undefined ? declaration.declares === "type" : isTypeDeclaration(line, language);
         const id = `${file}#${declaration.name}`;
-        const isDefault = language === "typescript" && /^export\s+default\s/.test(line.trim());
+        const isDefault = declaration.isDefault ?? interfaceReadings(language).isDefaultExport(line);
         declared.push({ id, component: owner, name: declaration.name, file, type, exported: declaration.exported, isDefault });
         nodes.set(id, { component: owner, name: declaration.name, file, type });
         if (declaration.exported) declarations += 1;
@@ -892,19 +1007,29 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
     };
     const asked = new Set<string>();
     const answered = new Set<string>();
+    // Files the server could not answer for (gopls has no package for a file outside this host's build): the reading goes on and names each.
+    const unanswered = new Map<string, InterfaceUnanswered>();
     // The tree holds still for one reading: git's listing is taken once and every reported site is kept against it.
     const listing = projectListing(root);
     /** Ask one declaration for its references and account for every site; false once a budget stops the reading. */
     const ask = async (d: Declared): Promise<boolean> => {
       asked.add(d.id);
-      const resolved = await resolveOf(`${d.name} in ${d.file}`, { component: d.component, testFolders }, d.name);
-      if (resolved === STOPPED) return false;
-      if (!resolved.ok || resolved.definition.file !== d.file) {
-        answered.add(d.id);
+      let resolved: Resolved | typeof STOPPED;
+      let reported: ReferenceSite[] | typeof STOPPED;
+      try {
+        resolved = await resolveOf(`${d.name} in ${d.file}`, { component: d.component, testFolders }, d.name);
+        if (resolved === STOPPED) return false;
+        if (!resolved.ok || resolved.definition.file !== d.file) {
+          answered.add(d.id);
+          return true;
+        }
+        reported = await referencesOf(resolved.definition, spellings(index, d.name), d.isDefault || index.defaults.has(d.name));
+      } catch (error) {
+        // A server that is not up ends the language's reading; one that fails a question about one file leaves that file unanswered, named, and reads on.
+        if (error instanceof NotUp) throw error;
+        if (!unanswered.has(d.file)) unanswered.set(d.file, { file: d.file, component: d.component, reason: error instanceof Error ? error.message : String(error) });
         return true;
       }
-      const definition: Definition = resolved.definition;
-      const reported = await referencesOf(definition, spellings(index, d.name), d.isDefault || index.defaults.has(d.name));
       if (reported === STOPPED) return false;
       for (const site of projectSites(root, reported, listing) as ReferenceSite[]) {
         if (isTest(site.file, testFolders)) continue;
@@ -961,7 +1086,7 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
       if (symbol === undefined) return `guard ${guard} names no symbol`;
       // A chokepoint module's symbol may be a binding no declaration line names (a factory's destructured products), so its text is read too.
       const moduleDeclares = (t: ChokepointTarget): boolean =>
-        [...code.keys()].some((file) => nodeIs({ component: t.component, name: "x", file, type: false }, t.chokepoint, t.component) && declaresAtTop(readFileSync(join(root, file), "utf8"), symbol));
+        [...code.keys()].some((file) => nodeIs({ component: t.component, name: "x", file, type: false }, t.chokepoint, t.component) && declaresAtTop(readFileSync(join(root, file), "utf8"), symbol, file));
       const named = targets.filter((t) => (t.chokepoint.symbol !== undefined ? t.chokepoint.symbol === symbol : [...nodes.values()].some((n) => n.name === symbol && nodeIs(n, t.chokepoint, t.component)) || moduleDeclares(t)));
       if (named.length === 0) return `guard ${symbol} is no chokepoint an invariant declares`;
       const wraps = [...(calls.get(start) ?? new Map<string, number>()).keys()].some((id) => nodes.get(id)?.name === symbol);
@@ -1087,7 +1212,20 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
         else if (typeof confirmed === "string") resolution.guardUnconfirmed = confirmed;
         else for (const target of confirmed) if (!guards.some((g) => g.component === target.component && g.name === target.name && g.how === "wrapper")) guards.push({ component: target.component, name: target.name, how: "declared" });
       }
-      if (guards.length > 0) resolution.guards = guards;
+      // A chokepoint whose every call here passes the option its unless: line names as true checks nothing for this handler.
+      const switchable = guards.flatMap((g) => targets.filter((t) => t.component === g.component && t.name === g.name && t.unless !== undefined && t.chokepoint.symbol !== undefined));
+      let kept = guards;
+      if (switchable.length > 0) {
+        const startFile = start.slice(0, start.lastIndexOf("#"));
+        const lines = readFileSync(join(root, startFile), "utf8").split("\n");
+        const own = definition === undefined ? lines.join("\n") : declarationText(lines, definition.range.start.line, definition.range.end.line);
+        const off = switchable.filter((t) => switchesOff(own, t.chokepoint.symbol!, t.unless!));
+        if (off.length > 0) {
+          kept = guards.filter((g) => !off.some((t) => t.component === g.component && t.name === g.name));
+          resolution.switchedOff = off.map((t) => ({ component: t.component, name: t.name, unless: t.unless! }));
+        }
+      }
+      if (kept.length > 0) resolution.guards = kept;
     }
 
     const symbols = [...tally.values()].sort(
@@ -1124,11 +1262,13 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
           seconds: Math.round((Date.now() - started) / 1000),
           unread: [...unread].sort(),
         },
+        ...(unanswered.size === 0 ? {} : { unanswered: [...unanswered.values()].sort((a, b) => a.file.localeCompare(b.file)) }),
         ...scoped,
         ...keptOf(),
       };
     }
-    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside, ...scoped, ...keptOf() };
+    const failed = unanswered.size === 0 ? {} : { unanswered: [...unanswered.values()].sort((a, b) => a.file.localeCompare(b.file)) };
+    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside, ...failed, ...scoped, ...keptOf() };
   } catch (error) {
     if (error instanceof NotUp) return { kind: "unread", because: error.message };
     return { kind: "unread", because: `the ${language} instrument failed: ${error instanceof Error ? error.message : String(error)}` };

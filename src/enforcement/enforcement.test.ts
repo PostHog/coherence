@@ -14,13 +14,15 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
-import { TypeScriptAdapter, locateServer } from "../adapters/typescript.ts";
+import type { Definition, LanguageAdapter, ReferenceSite } from "../adapters/adapter.ts";
+import { TypeScriptAdapter, locateServer } from "../../plugins/typescript/typescript.ts";
 import { runHook, specStopText } from "../lifecycle/hook.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { deriveState } from "../spec/state.ts";
 import { checkChokepoint, classifySite } from "./check.ts";
-import { formatRun, formatStatus, refuteCommand } from "./cli.ts";
+import { formatRun, formatStatus, refuteCommand, runCommand } from "./cli.ts";
 import { readEnforcementConfig } from "./config.ts";
+import { sessionText } from "../journal/shard-fixture.ts";
 import { appendRun, entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type RunRecord } from "./record.ts";
 import { mayTouch, performRun } from "./run.ts";
 import { runTotalityOracle } from "./totality.ts";
@@ -358,9 +360,9 @@ test("a run appends one record, never rewrites; spec --check reads the run; the 
   assert.deepEqual(json.invariants.find((entry) => entry.name === "hidden set")!.sites, hiddenEntry.sites, "the JSON run record exposes the classified sites unchanged");
   const printed = formatRun(first);
   assert.match(printed, /digest-only egress\n  chokepoint seal protects SECRET_COLUMNS: broken — fail/);
-  assert.match(printed, /run recorded in \.coherence\/runs\/s1\.jsonl: 5 enforcements, 2 pass, 2 fail, 1 not run/);
+  assert.match(printed, /run recorded in \.coherence\/runs\/s1\.[0-9a-f]{8}\.jsonl: 5 enforcements, 2 pass, 2 fail, 1 not run/);
 
-  const lines = () => readFileSync(join(root, ".coherence", "runs", "s1.jsonl"), "utf8").trimEnd().split("\n");
+  const lines = () => sessionText(join(root, ".coherence", "runs"), "s1").trimEnd().split("\n");
   assert.equal(lines().length, 1);
   const second = await performRun(root, { session: "s1", agent: "enforcement", adapter, form: "chokepoint", invariants: ["hidden set"], now: () => new Date("2026-09-17T11:00:00Z") });
   assert.equal(second.record.invariants.length, 1);
@@ -407,7 +409,7 @@ test("reference-query failures and legacy records never masquerade as confirmed 
   assert.equal(failedEntry.verdict, "not run");
   assert.match(failedEntry.reason, /instrument failed: chokepoint references unavailable/);
   assert.equal(failedEntry.sites, undefined, "a failed second query does not persist the first query as complete evidence");
-  const persistedFailure = JSON.parse(readFileSync(join(root, ".coherence", "runs", "query-failure.jsonl"), "utf8")) as { invariants: Record<string, unknown>[] };
+  const persistedFailure = JSON.parse(sessionText(join(root, ".coherence", "runs"), "query-failure")) as { invariants: Record<string, unknown>[] };
   assert.equal(Object.hasOwn(persistedFailure.invariants[0]!, "sites"), false);
 
   const legacy: RunRecord = {
@@ -418,6 +420,37 @@ test("reference-query failures and legacy records never masquerade as confirmed 
   appendRun(root, legacy);
   const loadedLegacy = loadRuns(root).records.find((record) => record.session === "legacy")!;
   assert.equal(loadedLegacy.invariants[0]!.sites, undefined, "an old record remains readable and honestly lacks site evidence");
+});
+
+test("a run that cannot check an enforcement an earlier run checked exits 1 and names it; the same not run with no earlier check exits 0", async () => {
+  const other = mkdtempSync(join(tmpdir(), "coherence-lapsed-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(other, path)), { recursive: true });
+    writeFileSync(join(other, path), text, "utf8");
+  };
+  put("tsconfig.json", TSCONFIG);
+  put("coherence.config.json", JSON.stringify({ language: "typescript" }));
+  put("Fixture.spec.md", "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n");
+  put("src/a.ts", "export function release(): number {\n  return 1;\n}\n");
+  const run = async (session: string): Promise<{ code: number; out: string }> => {
+    const out: string[] = [];
+    const code = await runCommand(["--form", "chokepoint", "--no-server", "--session", session, "--agent", "enforcement"], { cwd: other, out: (l) => out.push(l), err: (l) => out.push(l) });
+    return { code, out: out.join("\n") };
+  };
+  try {
+    const first = await run("never-checked");
+    assert.equal(first.code, 0, `never checked, its not run is the spec's lack, not a lapse: ${first.out}`);
+    appendRun(other, {
+      at: "2020-01-01T00:00:00.000Z", session: "checked", agent: "enforcement", commit: null, dirty: false,
+      instrument: { language: "typescript", server: "none" }, latency: 1,
+      invariants: [{ component: ".", name: "ghost door", form: "chokepoint", verdict: "pass", grade: "reference-choked", refutation: "witnessed", bypasses: [], testReferences: 0, files: ["src/a.ts"], latency: 1, reason: "every reference inside release" }],
+    });
+    const lapsed = await run("lapsed");
+    assert.equal(lapsed.code, 1, lapsed.out);
+    assert.match(lapsed.out, /1 enforcement an earlier run checked could not be checked now; a check that lapsed is no pass:\n {2}○ \.\/ghost door \(chokepoint\): pass at 2020-01-01T00:00:00\.000Z, not run now: .*GHOST/);
+  } finally {
+    rmSync(other, { recursive: true, force: true });
+  }
 });
 
 test("appendRun refuses a session that cannot name a file", () => {
@@ -446,7 +479,7 @@ test("PostToolUse on a file-writing tool re-checks the invariants that may invol
   assert.doesNotMatch(context.additionalContext, /hidden set/, "an invariant the file cannot involve is not re-checked");
   assert.match(context.additionalContext, /route the reference through the chokepoint, or escalate a retirement for a human/);
   assert.match(context.additionalContext, /escalate "retire <invariant>" .* --session s2 --agent main/);
-  assert.ok(readFileSync(join(root, ".coherence", "runs", "s2.jsonl"), "utf8").trimEnd().split("\n").length === 1, "the edit-time pass is recorded as a run");
+  assert.ok(sessionText(join(root, ".coherence", "runs"), "s2").trimEnd().split("\n").length === 1, "the edit-time pass is recorded as a run");
 
   const reading = await runHook("PostToolUse", { cwd: root, session_id: "s2", tool_name: "Read", tool_input: { file_path: join(root, "src/api/render.ts") } }, root);
   assert.deepEqual(reading, { stdout: "", stderr: "", exit: 0 }, "a reading tool changes nothing");
@@ -530,7 +563,7 @@ export const sneak = SECRET_COLUMNS;
 export { SECRET_COLUMNS } from "../store/secrets.ts";
 `;
 
-async function ruledTree(seal: string): Promise<{ dir: string; adapter: TypeScriptAdapter }> {
+async function ruledTree(seal: string, extra: Record<string, string> = {}): Promise<{ dir: string; adapter: TypeScriptAdapter }> {
   const dir = mkdtempSync(join(tmpdir(), "coherence-ruling-"));
   const put = (path: string, text: string): void => {
     mkdirSync(dirname(join(dir, path)), { recursive: true });
@@ -541,11 +574,13 @@ async function ruledTree(seal: string): Promise<{ dir: string; adapter: TypeScri
   put("src/door/seal.ts", seal);
   put("src/api/leak.ts", 'import { SECRET_COLUMNS } from "../store/secrets.ts";\nexport const held = SECRET_COLUMNS;\n');
   put("src/api/star.ts", 'export * from "../store/secrets.ts";\n');
+  for (const [path, text] of Object.entries(extra)) put(path, text);
   return { dir, adapter: new TypeScriptAdapter(dir) };
 }
 
 test("a plain import specifier in the chokepoint's own module is inside; the same import elsewhere, a re-export anywhere, a wildcard re-export, and a use outside the chokepoint's range are bypasses", async () => {
-  const { dir, adapter: fresh } = await ruledTree(RULING_SEAL);
+  // A NodeNext project writes the compiled name: `./secrets.js` means secrets.ts. The wildcard must still reach it.
+  const { dir, adapter: fresh } = await ruledTree(RULING_SEAL, { "src/api/star-js.ts": 'export * from "../store/secrets.js";\n' });
   try {
     const protectedThing = (await fresh.resolve("SECRET_COLUMNS in secrets.ts", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
     const chokepoint = (await fresh.resolve("seal", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
@@ -555,6 +590,7 @@ test("a plain import specifier in the chokepoint's own module is inside; the sam
     assert.deepEqual(classes, [
       "src/api/leak.ts:1 bypass",
       "src/api/leak.ts:2 bypass",
+      "src/api/star-js.ts:1 bypass",
       "src/api/star.ts:1 bypass",
       "src/door/seal.ts:1 inside",
       "src/door/seal.ts:4 inside",
@@ -564,10 +600,77 @@ test("a plain import specifier in the chokepoint's own module is inside; the sam
     assert.equal(sites.find((s) => s.file === "src/door/seal.ts" && s.line === 1)!.form, "import");
     assert.equal(sites.find((s) => s.file === "src/door/seal.ts" && s.line === 9)!.form, "re-export");
     assert.equal(sites.find((s) => s.file === "src/api/star.ts" && s.line === 1)!.form, "re-export");
+    assert.equal(sites.find((s) => s.file === "src/api/star-js.ts" && s.line === 1)!.form, "re-export", "a wildcard written with the .js specifier is a re-export site too");
   } finally {
     await fresh.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+/** A definition by hand, for the classifier alone: a symbol over a line range, or a module over its whole file. */
+function definitionAt(file: string, kind: "symbol" | "module", from = 0, to = 0): Definition {
+  return { name: file, kind, file, range: { start: { line: from, character: 0 }, end: { line: to, character: 0 } }, selection: { line: from, character: 0 } };
+}
+
+/** A reference site by hand, one-based as the adapter reports it. */
+function siteAt(file: string, line: number, test?: true): ReferenceSite {
+  return { file, line, character: 4, symbol: undefined, ...(test === undefined ? {} : { test }) };
+}
+
+test("a site the adapter marks as test is a test reference even in the chokepoint's own file", () => {
+  const protectedThing = definitionAt("src/store.rs", "symbol", 2, 4);
+  const chokepoint = definitionAt("src/lib.rs", "symbol", 9, 19);
+  const classes = [
+    siteAt("src/lib.rs", 15),
+    siteAt("src/lib.rs", 15, true),
+    siteAt("src/lib.rs", 40),
+    siteAt("src/lib.rs", 40, true),
+    siteAt("src/api.rs", 3),
+    siteAt("src/api.rs", 3, true),
+  ].map((s) => `${s.file}:${s.line}${s.test === true ? " marked" : ""} ${classifySite(s, protectedThing, chokepoint, [])}`);
+  assert.deepEqual(classes, [
+    "src/lib.rs:15 inside",
+    "src/lib.rs:15 marked test",
+    "src/lib.rs:40 bypass",
+    "src/lib.rs:40 marked test",
+    "src/api.rs:3 bypass",
+    "src/api.rs:3 marked test",
+  ]);
+});
+
+test("a Rust module's subtree is inside the module: X/mod.rs owns X/, X.rs owns its sibling X/, a crate root owns src/", () => {
+  const protectedThing = definitionAt("src/store.rs", "symbol", 2, 4);
+  const classOf = (moduleFile: string, file: string): string => `${moduleFile} <- ${file}: ${classifySite(siteAt(file, 3), protectedThing, definitionAt(moduleFile, "module"), ["tests"])}`;
+  assert.deepEqual(
+    [
+      classOf("src/kernel/mod.rs", "src/kernel/inner.rs"),
+      classOf("src/kernel/mod.rs", "src/kernel/deep/leaf.rs"),
+      classOf("src/kernel/mod.rs", "src/other.rs"),
+      classOf("src/kernel.rs", "src/kernel/x.rs"),
+      classOf("src/kernel.rs", "src/kernelish/x.rs"),
+      classOf("src/kernel.rs", "src/other.rs"),
+      classOf("src/lib.rs", "src/kernel/x.rs"),
+      classOf("src/main.rs", "src/cli.rs"),
+      classOf("crates/core/src/lib.rs", "crates/core/src/a.rs"),
+      classOf("crates/core/src/lib.rs", "crates/app/src/a.rs"),
+      classOf("src/lib.rs", "tests/it.rs"),
+      classOf("src/lib.rs", "benches/b.rs"),
+    ],
+    [
+      "src/kernel/mod.rs <- src/kernel/inner.rs: inside",
+      "src/kernel/mod.rs <- src/kernel/deep/leaf.rs: inside",
+      "src/kernel/mod.rs <- src/other.rs: bypass",
+      "src/kernel.rs <- src/kernel/x.rs: inside",
+      "src/kernel.rs <- src/kernelish/x.rs: bypass",
+      "src/kernel.rs <- src/other.rs: bypass",
+      "src/lib.rs <- src/kernel/x.rs: inside",
+      "src/main.rs <- src/cli.rs: inside",
+      "crates/core/src/lib.rs <- crates/core/src/a.rs: inside",
+      "crates/core/src/lib.rs <- crates/app/src/a.rs: bypass",
+      "src/lib.rs <- tests/it.rs: test",
+      "src/lib.rs <- benches/b.rs: bypass",
+    ],
+  );
 });
 
 test("the automatic refutation stages both synthetic sites — a use in the chokepoint's own module outside its range and a re-export — and is vacuous unless the check calls each one a bypass", async () => {
@@ -591,6 +694,73 @@ export function seal(pattern: string): string[] {
     assert.match(result.refutationAccount, /the check classified each one a bypass/, result.refutationAccount);
   } finally {
     await fresh.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a protected thing the instrument finds no reference to, not even inside the chokepoint, is not run: there was nothing to check", async () => {
+  const unreached = `export function seal(pattern: string): string[] {
+  return [pattern];
+}
+`;
+  const { dir, adapter: fresh } = await ruledTree(unreached);
+  try {
+    rmSync(join(dir, "src/api/leak.ts"));
+    rmSync(join(dir, "src/api/star.ts"));
+    const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS in secrets.ts", chokepoint: "seal", ...hint, root: dir });
+    assert.equal(result.verdict, "not run", result.reason);
+    assert.equal(result.grade, "reference-choked", result.reason);
+    assert.equal(result.siteEvidence, "complete", "both reference queries completed, and reported no site");
+    assert.match(result.reason, /found no reference to SECRET_COLUMNS in secrets\.ts anywhere, not even inside seal: nothing to check/, result.reason);
+    assert.match(result.reason, /a path the instrument cannot follow/, result.reason);
+    assert.doesNotMatch(result.reason, /every reference in the project is inside the chokepoint/, "a check that saw no reference claims nothing about where they are");
+    assert.deepEqual(result.sites.filter((s) => s.of === "protected"), [], "the instrument reported no protected site");
+    assert.equal(result.refutation, "missing", "staged sites alone witness nothing when no real reference was there to check");
+    assert.match(result.refutationAccount, /the check classified each one a bypass, but the instrument found no reference to SECRET_COLUMNS in secrets\.ts to check/, result.refutationAccount);
+  } finally {
+    await fresh.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** An adapter whose instrument finds no reference to the protected thing, and whose rung's enforcer refuses the staged outside reference: the compiler's visibility, or a checker's module boundary. */
+function refusingAdapter(enforcer: "language" | "checker"): LanguageAdapter {
+  const at = (file: string, name: string): Definition => ({ name, kind: "symbol", file, range: { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } }, selection: { line: 0, character: 0 } });
+  const definitions: Record<string, Definition> = { _SECRET: at("src/store/secrets.py", "_SECRET"), seal: at("src/store/seal.py", "seal") };
+  const rung = enforcer === "checker"
+    ? { grade: "checker-choked" as const, enforcer: "tach (tach.toml)", fact: "the src.store interface exposes seal alone" }
+    : { grade: "visibility-choked" as const, enforcer: "the compiler", fact: "_SECRET is not exported, so no other module can reference it" };
+  const visibility = enforcer === "checker"
+    ? { enforced: true, visible: true, evidence: "the src.store interface", rung, boundary: { checker: "tach", module: "src.store", owns: ["src/store/"], except: [], violations: [], scope: "." } }
+    : { enforced: true, visible: false, evidence: "src/store/secrets.py:1 declares _SECRET without export", rung };
+  return {
+    language: "python",
+    ladder: { top: enforcer === "checker" ? "reference-choked" : "visibility-choked", because: "the enforcer refuses an outside reference", rungs: [rung] },
+    ready: async () => ({ ok: true }),
+    resolve: async (name) => ({ ok: true, definition: definitions[name]! }),
+    references: async () => [],
+    visibility: async () => visibility,
+    testFilter: (via) => via,
+    refute: async () => ({ seen: true, staged: [], refused: "_SECRET is not reachable from another module", account: "an import of _SECRET staged in another module was refused" }),
+    forget: async () => {},
+    close: async () => {},
+  };
+}
+
+test("a refusal of a staged outside reference holds a chokepoint over no reference, whether the language or a checker refuses it", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-unreached-refused-"));
+  try {
+    mkdirSync(join(dir, "src/store"), { recursive: true });
+    writeFileSync(join(dir, "src/store/secrets.py"), "_SECRET = 1\n", "utf8");
+    writeFileSync(join(dir, "src/store/seal.py"), "def seal():\n    return 1\n", "utf8");
+    for (const [enforcer, grade, refutation] of [["checker", "checker-choked", "refused by the checker"], ["language", "visibility-choked", "refused by the language"]] as const) {
+      const result = await checkChokepoint(refusingAdapter(enforcer), { protects: "_SECRET", chokepoint: "seal", ...hint, root: dir });
+      assert.equal(result.refutation, refutation, `${enforcer}: ${result.refutationAccount}`);
+      assert.equal(result.verdict, "pass", `${enforcer}: ${result.reason}`);
+      assert.equal(result.grade, grade, `${enforcer}: ${result.reason}`);
+      assert.doesNotMatch(result.reason, /nothing to check/, `${enforcer}: a refusal holds whether or not a reference exists, so the reason claims the rung: ${result.reason}`);
+    }
+  } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });

@@ -1,0 +1,24 @@
+{
+  "concepts": [
+    {
+      "name": "Convex function",
+      "definition": "A query, mutation or action a Convex deployment registers through a builder its functions folder's _generated/server exports; public ones are entrances, internal ones only the deployment's own code can call.",
+      "aliases": ["registered function"]
+    },
+    {
+      "name": "generated API",
+      "definition": "The api and internal objects Convex writes into <functions folder>/_generated/api, through which code reaches a Convex function as a property path (internal.telemetry.send); the Convex plugin reads each such path as a reference to the export it names.",
+      "aliases": ["generated api object"]
+    },
+    {
+      "name": "functions folder",
+      "definition": "The folder Convex deploys, the nearest one above a file holding both _generated/api and _generated/server; a module's path below it is the path the generated API reaches it by.",
+      "aliases": ["convex folder"]
+    },
+    {
+      "name": "Convex cron",
+      "definition": "A function a convex/server cronJobs table runs on the deployment's schedule, with no caller: an entrance at the deployment's own trust.",
+      "aliases": ["cron job"]
+    }
+  ]
+}

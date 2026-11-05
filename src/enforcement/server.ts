@@ -55,8 +55,8 @@ import { tmpdir } from "node:os";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import type { Definition, Ladder, LanguageAdapter, Refutation, ReferenceSite, ResolveHint, Resolved, Visibility } from "../adapters/adapter.ts";
-import { adapterFor, type Language } from "../adapters/index.ts";
+import type { Definition, Ladder, LanguageAdapter, Occasion, Refutation, ReferenceSite, ResolveHint, Resolved, Visibility } from "../adapters/adapter.ts";
+import { instrumentFor } from "../adapters/index.ts";
 import { readEnforcementConfig } from "./config.ts";
 import { codeFingerprint } from "./code-fingerprint.ts";
 
@@ -70,6 +70,8 @@ const LOCK_GRACE_MS = SPAWN_WAIT_MS;
 const CHECK_MS = 5_000;
 /** How long a client waits for a stale server to exit after asking it to stop, before signalling it. */
 const STOP_WAIT_MS = 5_000;
+/** The signals that stop a server. */
+const SIGNALS = ["SIGINT", "SIGTERM"] as const;
 /** Spawns one client attempts before it reports failure: a server that dies at start is not respawned forever. */
 const SPAWN_ATTEMPTS = 3;
 /** How long a client waits for the answer to a question the server answers at once (status, stop, http). */
@@ -85,6 +87,22 @@ const CODE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = join(CODE_DIR, `cli${extname(fileURLToPath(import.meta.url))}`);
 
 /* ------------------------------------------------------ code fingerprint */
+
+/**
+ * The fingerprint a project's warm server answers with and a client asks
+ * for: Coherence's code and the folder of every plugin the project runs
+ * (none when the config names none or refuses them), so an edited plugin
+ * replaces the server as an edited Coherence does.
+ */
+export function serverFingerprint(root: string): string {
+  let dirs: string[] = [];
+  try {
+    dirs = readEnforcementConfig(root).plugins.map((p) => p.dir);
+  } catch {
+    // A config the server refuses starts no server; the fingerprint is Coherence's alone.
+  }
+  return codeFingerprint(dirs);
+}
 
 // The fingerprint lives beside the parses keyed by it; the server reports it and replaces a server running other code.
 export { CODE_SALT_ENV, codeFingerprint } from "./code-fingerprint.ts";
@@ -427,8 +445,8 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   const root = paths.root;
   const idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
   const log = options.log ?? (() => {});
-  // The code this process runs, read before anything else can change it further.
-  const fingerprint = codeFingerprint();
+  // The code this process runs, read before anything else can change it further: Coherence's and every plugin's the project runs.
+  const fingerprint = serverFingerprint(root);
   // The root is taken before a language server starts: a refused server costs nothing.
   await takeRoot(paths);
   heldHere.add(paths.lock);
@@ -438,8 +456,8 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   let adapter: LanguageAdapter;
   try {
     config = readEnforcementConfig(root);
-    if (slot !== undefined && !(config.languages as readonly string[]).includes(slot)) throw new Error(`${slot} is not one of this project's languages (${config.languages.join(", ")})`);
-    adapter = adapterFor(slot === undefined ? config.language : (slot as Language), root);
+    if (slot !== undefined && !config.enforced.includes(slot)) throw new Error(`${slot} is not one of this project's languages (${config.enforced.join(", ")})`);
+    adapter = instrumentFor(slot ?? config.language, root, config);
   } catch (error) {
     if (owns()) rmSync(paths.lock, { force: true });
     heldHere.delete(paths.lock);
@@ -487,11 +505,14 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   // HTTP (the Scope reading) is the primary server's alone: another language's server never takes the root's port.
   const httpFactory = slot === undefined ? options.http : undefined;
 
+  const onSignal = (): void => void stop();
   const stop = async (): Promise<void> => {
     if (stopping) return;
     stopping = true;
     if (idle !== undefined) clearTimeout(idle);
     if (check !== undefined) clearInterval(check);
+    // A stopped server answers no signal: a process that serves one root after another holds no handler per stopped one.
+    for (const signal of SIGNALS) process.off(signal, onSignal);
     log("stopping");
     if (http !== undefined) {
       const closing = http;
@@ -534,7 +555,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
     references: (definition) => enqueue(() => adapter.references(definition)),
     visibility: (definition, chokepoint) => enqueue(() => adapter.visibility(definition, chokepoint)),
     testFilter: (via) => adapter.testFilter(via),
-    refute: (thing, outside) => enqueue(() => adapter.refute(thing, outside)),
+    refute: (thing, outside, exempt, occasion) => enqueue(() => adapter.refute(thing, outside, exempt, occasion)),
     forget: (files) => enqueue(() => adapter.forget(files)),
     // The server owns the instrument; an app never closes it.
     close: async () => {},
@@ -607,7 +628,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
       case "testFilter":
         return adapter.testFilter(params[0] as string);
       case "refute":
-        return adapter.refute(params[0] as Definition, params[1] as Definition | undefined);
+        return adapter.refute(params[0] as Definition, params[1] as Definition | undefined, (params[2] as string | null | undefined) ?? undefined, (params[3] as Occasion | null | undefined) ?? undefined);
       case "forget":
         // Answered only once the instrument has acknowledged the current text, so the client's next question cannot be stale.
         await adapter.forget((params[0] as string[] | undefined) ?? []);
@@ -690,7 +711,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   }, options.checkMs ?? CHECK_MS);
   check.unref();
   options.onListen?.(paths);
-  for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => void stop());
+  for (const signal of SIGNALS) process.once(signal, onSignal);
   return { paths, done, stop };
 }
 
@@ -791,8 +812,9 @@ export class RemoteAdapter implements LanguageAdapter {
   testFilter(via: string): string {
     return via;
   }
-  refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation> {
-    return this.client.request("refute", [protectedThing, outsideOf]);
+  refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string, occasion?: Occasion): Promise<Refutation> {
+    // The exempt folder and the occasion travel too: dropped, a served refutation of an exempting check never staged its outside use.
+    return this.client.request("refute", [protectedThing, outsideOf, exempt ?? null, occasion ?? null]);
   }
   /** Drop what the server cached about file contents and re-read the named files; the edit hook calls it before re-checking. */
   async forget(files: readonly string[] = []): Promise<void> {
@@ -901,7 +923,7 @@ export async function connectAdapter(rootGiven: string, options: ConnectOptions 
   const slot = languageSlot(resolve(rootGiven), options.language);
   const paths = serverPaths(rootGiven, slot);
   const root = paths.root;
-  const want = codeFingerprint();
+  const want = serverFingerprint(root);
   let spawns = 0;
   let deadline = Date.now() + SPAWN_WAIT_MS;
   let lastError: unknown;

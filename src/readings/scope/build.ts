@@ -7,8 +7,10 @@
  * one function every reader of the state goes through (the snapshot here,
  * the warm server's live reading in live.ts, the agent query).
  *
- * The shell: the styles, the embedded font and the browser script joined into
- * one HTML document whose bytes depend on no project content. Live, the warm
+ * The shell: the styles, the embedded font and the browser script (one
+ * esbuild bundle of the page's entry and every module it imports, three.js
+ * included: bundleBrowserScript) joined into one HTML document whose bytes
+ * depend on no project content. Live, the warm
  * server serves it and the page fetches its state and follows the stores as
  * they grow (live.ts). A snapshot is the same shell with one inline state, a
  * self-contained file for sharing and CI (snapshotOf). The browser renders
@@ -25,52 +27,37 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { configuredName, projectName } from "../../adapters/project-config.ts";
-import { stripTypeScriptTypes } from "node:module";
-import { dirname, extname, relative, resolve, sep } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { adapterFor } from "../../adapters/index.ts";
+import { instrumentFor } from "../../adapters/index.ts";
+import { languageDataTable } from "../../plugins/languages.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
+import type { LoadedPlugin } from "../../plugins/plugin.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { WORK_DIR, foldOrders, loadWork as loadWorkRecords, workDir } from "../../journal/work.ts";
-import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON, projectLexiconPath } from "../../lifecycle/project.ts";
 import { loadSpecModel, projectPractices, type SpecModel } from "../../spec/model.ts";
 import { KERNEL_PREFIX } from "../../spec/practices.ts";
-import { projectLexiconCoverage } from "./lexicon-projection.ts";
+import { pageCoverage } from "./coverage-reading.ts";
+import type { ReliefReading } from "../relief/relief.ts";
+import type { ReliefLayout } from "./relief/layout.ts";
 import { windowJournal, windowRuns } from "./derive.ts";
-import { parseLexicon, type Lexicon, type InterfaceReading, type Ladder, type PracticesData, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
+import { parseLexicon, type CoverageUnread, type Lexicon, type LexiconCoverage, type InterfaceReading, type Ladder, type PracticesData, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
 import { DEFAULT_VIEW, VIEWS } from "./shell.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 /**
- * The browser bundle, in dependency order. Each file may import the ones
- * before it; the relative imports are removed when the files are joined into
- * one inline module, and types are stripped by Node's own stripper.
+ * The page's one entry. The browser bundle is not a list kept by hand: esbuild
+ * follows every module the entry imports, packages included, into one script
+ * (bundleBrowserScript). A module the page calls into cannot be left out, and
+ * an import the browser cannot resolve fails the build.
  */
-export const BROWSER_SOURCES = [
-  "html.ts",
-  "model.ts",
-  "derive.ts",
-  "entrance-coverage.ts",
-  // The one source outside this folder: which entrances an invariant covers, shared with the spec model.
-  "../../spec/covers.ts",
-  "structure-flow.ts",
-  "lexicon-view.ts",
-  "components-view.ts",
-  "structure-measure.ts",
-  "structure-flow-view.ts",
-  "structure-view.ts",
-  "invariants-view.ts",
-  "practices.ts",
-  "practices-view.ts",
-  "runs-view.ts",
-  "journal-view.ts",
-  "shell.ts",
-  "updates.ts",
-  "page.ts",
-];
+export const BROWSER_ENTRY = "page.ts";
+
+/** The page's styles, in the order the shell joins them: Scope's own, then the connections view's beside the module that draws it. */
+export const STYLE_SHEETS = ["styles.css", "connections/connections.css"];
 
 export interface BuildOptions {
   /** The project root whose specs, runs, journal and work are read. The working directory when absent. */
@@ -89,6 +76,12 @@ export interface BuildOptions {
   window?: boolean;
   /** The component interfaces as the language adapter read them (readComponentInterfaces); unread when absent. */
   componentInterfaces?: InterfaceReading;
+  /** The vocabulary coverage, when the caller reads it elsewhere (the warm server, off its loop: coverage-reading.ts); read here, through the kept reading, when absent. */
+  coverage?: LexiconCoverage | CoverageUnread;
+  /** What the Structure view draws beyond the spec: files, districts and landings (readRelief); unread when absent. */
+  relief?: ReliefReading;
+  /** The relief's places for the state built (relief/layout-store.ts LayoutKeeper): none when absent, and the page lays it out afresh. */
+  reliefLayout?: (state: ShellState) => ReliefLayout | undefined;
 }
 
 export const DEFAULTS = {
@@ -128,8 +121,9 @@ function domainTitle(options: BuildOptions, lexicon: Lexicon | undefined): strin
  * below are Coherence's own and the same for every language.
  */
 export function ladderFor(root: string): Ladder {
-  const language = readEnforcementConfig(root).language;
-  const adapter = adapterFor(language, root).ladder;
+  const config = readEnforcementConfig(root);
+  const language = config.language;
+  const adapter = instrumentFor(language, root, config).ladder;
   const rungs: LadderRung[] = [];
   if (adapter.top === "visibility-choked") {
     rungs.push({ grade: "visibility-choked", enforcedBy: `the language itself: ${adapter.because}` });
@@ -176,6 +170,7 @@ export function loadSpec(root: string, held?: SpecModel): SpecData {
     problems: model.problems,
     counts: model.counts,
     ladder: ladderFor(root),
+    languages: languageDataTable(),
   };
   return JSON.parse(JSON.stringify(data)) as SpecData;
 }
@@ -237,6 +232,27 @@ async function domainPathFor(options: BuildOptions, root: string): Promise<strin
   return located;
 }
 
+/**
+ * The plugin layers of the lexicon stack (src/plugins/lexicon.ts), between
+ * Coherence's and the project's, each titled with its plugin: what the view
+ * shows is whose each concept is. None when the config runs no plugin with a
+ * lexicon layer, or names plugins it refuses (the spec says why).
+ */
+async function pluginLexiconLayers(root: string): Promise<Layer[]> {
+  let plugins: LoadedPlugin[] = [];
+  try {
+    plugins = readEnforcementConfig(root).plugins;
+  } catch {
+    return [];
+  }
+  const layers: Layer[] = [];
+  for (const plugin of plugins) {
+    if (plugin.manifest.lexicon === undefined) continue;
+    layers.push({ kind: "present", id: `plugin ${plugin.name}`, title: `Plugin ${plugin.name} lexicon (${plugin.version})`, lexicon: await readLexicon(resolve(plugin.dir, plugin.manifest.lexicon)) });
+  }
+  return layers;
+}
+
 /** Load every truth into the shell's state. Absence of the domain layer is a rendered fact. */
 export async function loadState(options: BuildOptions): Promise<ShellState> {
   const root = resolve(options.root ?? process.cwd());
@@ -279,15 +295,16 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
       }
     }
   }
-  return {
+  const state: ShellState = {
     project: options.project,
     views: VIEWS.map((v) => ({ id: v.id, label: v.label })),
     activeView: options.structurePreview === undefined || options.structurePreview.length === 0 ? DEFAULT_VIEW : "structure",
-    lexicon: { layers: [coherence, domain], query: "", coverage: projectLexiconCoverage(await lexiconCoverage(root)) },
+    lexicon: { layers: [coherence, ...(await pluginLexiconLayers(root)), domain], query: "", coverage: options.coverage ?? (await pageCoverage(root)) },
     spec,
     runs: { records: runs.records, damaged: runs.damaged },
     journal: { records: journal.records, damaged: journal.damaged, work: loadWork(root) },
     componentInterfaces: options.componentInterfaces ?? { kind: "unread", because: "no instrument was asked when this page was built" },
+    relief: options.relief ?? { kind: "unread", because: "no relief was read when this page was built" },
     components: { query: "" },
     structure: { preview: options.structurePreview === undefined ? [] : options.structurePreview.map((proposal) => ({ ...proposal, crossing: { ...proposal.crossing }, ...(proposal.chokepoints === undefined ? {} : { chokepoints: proposal.chokepoints.map((entry) => ({ ...entry })) }) })) },
     invariants: { query: "", state: "", component: "" },
@@ -296,6 +313,9 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     runsView: { query: "" },
     journalView: { query: "", kind: "", agent: "", session: "" },
   };
+  const layout = options.reliefLayout?.(state);
+  if (layout !== undefined) state.reliefLayout = layout;
+  return state;
 }
 
 /**
@@ -307,7 +327,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
  * window, so its answers read every record.
  */
 export function windowState(state: ShellState): ShellState {
-  const runs = windowRuns(state.runs.records);
+  const runs = windowRuns(state.runs.records, undefined, state.spec.components);
   const cited = new Set(state.practices.practices.flatMap((p) => [...p.pitfalls.flatMap((pf) => pf.cites), ...p.learned]));
   const journal = windowJournal(state.journal.records, undefined, state.journal.work.kind === "present" ? state.journal.work.orders : [], undefined, cited);
   return {
@@ -317,50 +337,90 @@ export function windowState(state: ShellState): ShellState {
   };
 }
 
-/** One browser source stripped to JavaScript, as the published package carries it beside its compiled modules. */
-export function strippedName(name: string): string {
-  return name.replace(/\.ts$/, ".browser.js");
+/** The page's script as the published package carries it, bundled beside its compiled modules. */
+export const BUNDLE_NAME = "page.bundle.js";
+
+/**
+ * The browser sources bundled into one script, from the entry through every
+ * module it imports, packages included (the Structure view draws with
+ * three.js): bundled here by esbuild in a checkout, and read already bundled in
+ * the published package, whose build ran the same bundler, so an installed
+ * Coherence carries no bundler. An import the browser cannot resolve fails the
+ * bundle, naming it, so a page that would break in the browser is never built.
+ */
+export async function bundleBrowserScript(entry: string = resolve(here, BROWSER_ENTRY)): Promise<string> {
+  const esbuild = await import("esbuild");
+  // esbuild answers from a child process it keeps running; stopped after each bundle so nothing outlives the build.
+  const out = await esbuild.build({
+    entryPoints: [entry],
+    bundle: true,
+    write: false,
+    format: "iife",
+    platform: "browser",
+    target: "es2022",
+    minify: true,
+    legalComments: "none",
+    logLevel: "silent",
+    metafile: true,
+  }).finally(() => esbuild.stop());
+  for (const input of Object.keys(out.metafile.inputs)) pageInputs.add(resolve(process.cwd(), input));
+  for (const sheet of STYLE_SHEETS) pageInputs.add(resolve(here, sheet));
+  return out.outputFiles[0]!.text;
 }
 
 /**
- * One browser source as JavaScript: stripped here in a checkout, and read
- * already stripped in the published package, whose build ran the same
- * stripper, so an installed Coherence never calls the experimental API.
+ * A value made once and kept, unless making it fails: a rejection is handed to
+ * the callers waiting on it and then dropped, so the next caller makes it
+ * again rather than being answered with the old failure forever.
  */
-async function browserSource(name: string): Promise<string> {
-  if (extname(fileURLToPath(import.meta.url)) === ".js") return readFile(resolve(here, strippedName(name)), "utf8");
-  return stripTypeScriptTypes(await readFile(resolve(here, name), "utf8"), { mode: "strip" });
+export function keptUnlessRejected<T>(make: () => Promise<T>): { get(): Promise<T>; forget(): void } {
+  let kept: Promise<T> | undefined;
+  return {
+    get() {
+      if (kept === undefined) {
+        const made = make();
+        kept = made;
+        made.catch(() => {
+          if (kept === made) kept = undefined;
+        });
+      }
+      return kept;
+    },
+    forget() {
+      kept = undefined;
+    },
+  };
 }
 
-/** Drop a stripped source's imports of the other browser sources: this folder's, and the spec's covers.ts. Any other import stays, and the page check refuses it. */
-function toBrowserModule(stripped: string, name: string): string {
-  // A relative import may span several lines; `[^;]` crosses them.
-  return stripped.replace(/^import\s[^;]*from\s+["'](?:\.\/[^"']*|\.\.\/\.\.\/spec\/covers\.ts)["'];[^\S\n]*$/gm, "").concat(`\n// end of ${name}\n`);
-}
-
-/** The names a stripped module declares at its top level. */
-function topLevelNames(module: string): string[] {
-  return [...module.matchAll(/^(?:export )?(?:async )?(?:function|const|let|class) ([A-Za-z_$][A-Za-z0-9_$]*)/gm)].map((m) => m[1]!);
-}
+/** The page's own bundle, made once per process: the shell is fixed, so every build of it bundles the same script. */
+const pageBundle = keptUnlessRejected(() => bundleBrowserScript());
 
 /**
- * The browser sources joined into one module. One module has one name space,
- * so a top-level name declared in two sources is refused here, by name, rather
- * than shipped as a page whose script fails to parse.
+ * Whether this Coherence runs from its sources (a checkout), where the page is
+ * bundled here and its sources can change under a running server: the
+ * published package carries the bundle beside this module, a checkout never does.
  */
+export const FROM_SOURCES = !existsSync(resolve(here, BUNDLE_NAME));
+
+/** Every file the page is built from, by absolute path: the bundle's inputs as esbuild reports them, the styles and the fonts. Known once the page has been bundled. */
+const pageInputs = new Set<string>();
+
+/** Whether a file is one the page is built from: a change to it means the page must be built again. */
+export function isPageSource(path: string): boolean {
+  return pageInputs.has(resolve(path));
+}
+
+/** The folder holding every source the page is bundled from, in a checkout: what a server watches to rebuild the page. */
+export const SOURCE_FOLDER = resolve(here, "../..");
+
+/** Drop the bundled page: the next shell bundles its sources again. */
+export function forgetPageBundle(): void {
+  pageBundle.forget();
+}
+
 async function browserScript(): Promise<string> {
-  const parts: string[] = [];
-  const declared = new Map<string, string>();
-  for (const name of BROWSER_SOURCES) {
-    const module = toBrowserModule(await browserSource(name), name);
-    for (const declaredName of topLevelNames(module)) {
-      const earlier = declared.get(declaredName);
-      if (earlier !== undefined) throw new Error(`Scope: ${name} declares ${declaredName} at top level, which ${earlier} already declares; the inline module has one name space`);
-      declared.set(declaredName, name);
-    }
-    parts.push(module);
-  }
-  return parts.join("\n");
+  if (!FROM_SOURCES) return readFile(resolve(here, BUNDLE_NAME), "utf8");
+  return pageBundle.get();
 }
 
 /** JSON that is safe inside a script element: no `<` can close it. */
@@ -422,7 +482,7 @@ export interface Shell {
  * title names the reading; the page names the project once its state is in.
  */
 export async function buildShell(): Promise<Shell> {
-  const css = (await plexMono()) + (await readFile(resolve(here, "styles.css"), "utf8"));
+  const css = (await plexMono()) + (await Promise.all(STYLE_SHEETS.map((sheet) => readFile(resolve(here, sheet), "utf8")))).join("\n");
   const script = `\n${await browserScript()}\n`;
   const html = `<!doctype html>
 <html lang="en">

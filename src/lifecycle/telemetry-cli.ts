@@ -27,7 +27,7 @@ import { TELEMETRY_TARGET } from "./telemetry-config.ts";
 export const TELEMETRY_USAGE = `  coherence telemetry on | off | status | show | reset-id   opt-in fleet telemetry through PostHog: off until turned on; show prints the queue exactly as it would be sent`;
 
 const WHAT = [
-  `Coherence sends two events, and only these fields (see the README's Telemetry section):`,
+  `Coherence sends two events, and only these fields (see docs/telemetry.md):`,
   `  ${SESSION_EVENT}: per hook event, the count and p50, p95 and max milliseconds; Coherence's version, the host, the OS, Node's major version, the project's languages, its size in files and components as buckets, and whether a registry is in use`,
   `  ${DEFECT_EVENT}: the defect's class, whether a fix introduced it, how it was caught, the version, the host and the project's size bucket; never its text`,
   `Never a name, an email, a host name, a path, a repository or project name, a prompt, a command, code or a defect's text. The id is random and yours to reset.`,

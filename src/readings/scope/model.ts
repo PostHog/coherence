@@ -165,9 +165,25 @@ export function lexiconReviewCommand(term: string): string {
   return `coherence lexicon review '${term.replace(/'/g, "'\\''")}' --json`;
 }
 
+/**
+ * The coverage the warm server has not read yet: its first load carries this
+ * in the coverage's place while the reading runs off its loop, and the
+ * reading arrives as an update ("reading"); or the reading failed, and why
+ * ("failed"). Every reader says which, never a zero.
+ */
+export interface CoverageUnread {
+  kind: "reading" | "failed";
+  because: string;
+}
+
+/** Whether the state holds no coverage reading yet: one under way, or one that failed. */
+export function coverageUnread(coverage: LexiconCoverage | CoverageUnread | undefined): coverage is CoverageUnread {
+  return coverage !== undefined && "kind" in coverage;
+}
+
 /** The state of the Lexicon view: the layers it reads and the reader's query. */
 export interface LexiconViewState {
-  coverage?: LexiconCoverage;
+  coverage?: LexiconCoverage | CoverageUnread;
   layers: Layer[];
   query: string;
 }
@@ -206,20 +222,37 @@ export type SpecChecklistLine =
   | { shape: string; outcome: "declared"; as: string; line: number }
   | { shape: string; outcome: "dismissed"; reason: string; line: number };
 
-/** The lifecycle state of a bullet, as src/spec derives it. */
-export type LifecycleState = "requirement" | "invariant" | "structural defect";
-
-export type Lack = "enforcement" | "refutation" | "kinds" | "checklist" | "because";
+/** The lifecycle state of a bullet and what it lacks, as src/spec derives them: its own types, imported as types, which the bundle strips. */
+export type { State as LifecycleState, Lack } from "../../spec/state.ts";
+import type { State as LifecycleState, Lack } from "../../spec/state.ts";
+import type { PracticeState } from "../../spec/practices.ts";
+import type { Reach } from "../../spec/practice.ts";
 
 export type { Form, Verdict, Grade, Governed, RefutationState, Bypass, RecordedSite, ReferenceForm, ReferenceTarget, RunEntry, RunRecord, SiteClass } from "../../enforcement/record.ts";
 import type { ChokepointFrom } from "../../spec/grammar.ts";
-import type { Bypass, Form, Grade, RefutationState, RunEntry, RunRecord, Verdict } from "../../enforcement/record.ts";
+import type { Bypass, Form, Grade, RecordedSite, RefutationState, RunEntry, RunRecord, Verdict } from "../../enforcement/record.ts";
+
+/**
+ * Reference sites of one entry a page does not carry, counted by what every
+ * derivation over sites reads: the component the site is in (null for none),
+ * the endpoint, the class and the test mark. Set only by a page's window on a
+ * latest chokepoint entry, beside the sites it carries; never written to a run.
+ */
+export interface SiteTally {
+  component: string | null;
+  of: RecordedSite["of"];
+  class: RecordedSite["class"];
+  test: boolean;
+  count: number;
+}
 
 /** A run entry with the run it came from: the latest verdict for one enforcement. */
 export interface LatestEntry extends RunEntry {
   at: string;
   commit: string | null;
   session: string;
+  /** On a page: the entry's sites the window left out, counted (see SiteTally). Absent when the page carries every site. */
+  sitesLeft?: SiteTally[];
 }
 
 export interface SpecInvariant {
@@ -324,6 +357,8 @@ export interface SpecData {
   problems: SpecProblem[];
   counts: SpecCounts;
   ladder: Ladder;
+  /** What the readings say of each language without its code (language-data.ts): the page reads its entrance rules from here. */
+  languages?: Record<string, LanguageData>;
 }
 
 
@@ -353,21 +388,16 @@ export interface RunsData {
   superseded?: Record<string, { pass: number; fail: number; notRun: number }>;
 }
 
+/** A run entry as a page may carry it: the window can leave some of a latest chokepoint entry's sites out, counted. */
+export type PageEntry = RunEntry & { sitesLeft?: SiteTally[] };
+
 /* The journal, as src/journal records it. */
 
-export type JournalKind =
-  | "decision"
-  | "retraction"
-  | "conjecture"
-  | "resolution"
-  | "dismissal"
-  | "defect"
-  | "experiment"
-  | "close"
-  | "unable"
-  | "escalation"
-  | "acknowledgement"
-  | "enactment";
+import type { Kind } from "../../journal/kinds.ts";
+import type { Outcome, StepResult } from "../../journal/record.ts";
+
+/** The journal's kinds, as its minter's table names them: a kind added there is one every Record<JournalKind, …> here must name. */
+export type JournalKind = Kind;
 
 export interface JournalHead {
   id: string;
@@ -397,7 +427,7 @@ export type JournalRecord =
   | (JournalHead & { kind: "dismissal"; of: string; because: string })
   | (JournalHead & { kind: "defect"; what: string; evidence: string; files: string[] })
   | (JournalHead & { kind: "experiment"; expectation: string; context: string[]; actions: JournalStep[]; criteria: JournalStep[] })
-  | (JournalHead & { kind: "close"; of: string; results: Record<string, "pass" | "fail" | "unknown">; outcome: "success" | "failure" | "inconclusive" })
+  | (JournalHead & { kind: "close"; of: string; results: Record<string, StepResult>; outcome: Outcome })
   | (JournalHead & { kind: "unable"; what: string; because: string })
   | (JournalHead & { kind: "escalation"; what: string; because: string })
   | (JournalHead & { kind: "acknowledgement"; of: string; because: string })
@@ -414,6 +444,9 @@ export type JournalStepOutcome = { result: "done"; evidence?: string } | { resul
  */
 import type { WorkOrder } from "../../journal/work.ts";
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
+import type { ReliefReading } from "../relief/relief.ts";
+import type { ReliefLayout } from "./relief/layout.ts";
+import type { LanguageData } from "./language-data.ts";
 import type { LanguagesRead } from "./languages-read.ts";
 export type { WorkOrder };
 
@@ -451,6 +484,8 @@ export interface InvariantsViewState {
   state: LifecycleState | "";
   /** A component folder, or "" for every component. */
   component: string;
+  /** The reliance listing open on its card, by its id: a link landed on it or the reader opened it. Absent while every listing is folded. */
+  reliance?: string;
 }
 
 /**
@@ -503,6 +538,13 @@ export interface EntranceResolution {
   guards?: EntranceGuard[];
   /** Why a declared guard did not count, when it did not: no registration of the handler spells it. */
   guardUnconfirmed?: string;
+  /**
+   * The chokepoints the handler calls only with the option their bullet's
+   * unless: line names passed as true (parseRequest with skipAuth: true),
+   * which switches the check off: by invariant, with the option, and never
+   * among its guards.
+   */
+  switchedOff?: (Omit<EntranceGuard, "how"> & { unless: string })[];
 }
 
 /** One chokepoint an entrance's handler passes, by its invariant, and how the reading traced it. */
@@ -532,6 +574,13 @@ export interface InterfacePartial {
   unread: string[];
 }
 
+/** A file whose declarations the language server could not answer for, with its words: the reading read every other file and names this one. */
+export interface InterfaceUnanswered {
+  file: string;
+  component: string;
+  reason: string;
+}
+
 export type InterfaceReading =
   | {
       kind: "read";
@@ -558,6 +607,8 @@ export type InterfaceReading =
       outside?: { sites: number; files: number; into: { component: string; sites: number }[] };
       /** Present when a budget stopped the reading: which budget, its size, and the components whose declarations were not all read. */
       partial?: InterfacePartial;
+      /** Present when the language server failed a question about some files: those files, unread, while the rest was read. */
+      unanswered?: InterfaceUnanswered[];
       /** The entrances the language's rules detect in the tree, each with its rule and why: what the declared entrances' coverage is measured against. Absent from a reading taken before detection. */
       candidates?: EntranceCandidate[];
       /** Present when the reading was scoped to some entrances' routes rather than read whole: never recorded as the tree's reading. */
@@ -606,13 +657,9 @@ export interface StructurePreview {
   chokepoints?: { chokepoint: string; protects: string }[];
 }
 
-/** Structure has no filters: an optional generated-page preview, and what the reader selected in the flow. */
+/** Structure has no filters: an optional generated-page preview. */
 export interface StructureViewState {
   preview: StructurePreview[];
-  /** A flow id (an entrance, a trust level, a component, a component interface, a chokepoint) whose story is lit. Absent until the reader selects one. */
-  selected?: string;
-  /** Component folders opened in place, one level of the tree at a time. Absent: the top level is open. */
-  expanded?: string[];
 }
 
 export interface RunsViewState {
@@ -629,7 +676,7 @@ export interface JournalViewState {
 /* Practices, as the spec model and Coherence's kernel hold them. */
 
 /** What fires a practice: a command's words, an edited path's glob with the text the edit adds, or nothing but a deliberate choice. */
-export type PracticeTrigger = { kind: "command"; words: string } | { kind: "edit"; glob: string; adding?: string | undefined } | { kind: "explicit" };
+export type PracticeTrigger = { kind: "command"; words: string } | { kind: "edit"; glob: string; adding?: string | undefined } | { kind: "defect"; class: string } | { kind: "explicit" };
 
 /**
  * One practice as the page holds it: the project's own, from a practice file
@@ -645,7 +692,7 @@ export interface ScopePractice {
   component: string;
   file: string;
   kernel: boolean;
-  reach?: "kernel" | "internal" | undefined;
+  reach?: Reach | undefined;
   triggers: PracticeTrigger[];
   steps: { n: number; text: string; leaves?: string | undefined }[];
   pitfalls: { text: string; cites: string[] }[];
@@ -653,7 +700,7 @@ export interface ScopePractice {
   invariants: string[];
   because?: string | undefined;
   version: string;
-  state: "candidate" | "established";
+  state: PracticeState;
   enactments: number;
 }
 
@@ -676,6 +723,10 @@ export interface ShellState {
   journal: JournalData;
   /** Every component interface, as the language adapter resolved the references when the page was built. */
   componentInterfaces: InterfaceReading;
+  /** What the Structure view draws that the rest of the state does not hold: files, districts and landings (relief.ts). Absent from a page built before it. */
+  relief?: ReliefReading;
+  /** Where the relief's components stood when the server last laid them out (relief/layout-store.ts): the page settles from it. Absent where nothing laid it out. */
+  reliefLayout?: ReliefLayout;
   components: ComponentsViewState;
   structure: StructureViewState;
   invariants: InvariantsViewState;

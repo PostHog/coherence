@@ -20,17 +20,26 @@
  */
 
 import { spawnSync } from "../lifecycle/work-meter.ts";
-import { existsSync, lstatSync, readdirSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { configRecord, repositoryTop } from "./project-config.ts";
+import { perProcess } from "../lifecycle/process-caches.ts";
+import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { CONFIG_FILE, configRecord, readConfigFile, repositoryTop } from "./project-config.ts";
+import { HOST_FOLDER } from "../lifecycle/hosts.ts";
+import { environmentFolders, markedFolders } from "../plugins/languages.ts";
 export { repositoryTop };
+
+export function fileIdentity(path: string): string | undefined {
+  const stats = statSync(path, { throwIfNoEntry: false });
+  if (stats === undefined || !stats.isFile()) return undefined;
+  return `${stats.dev}:${stats.ino}:${stats.size}:${stats.mtimeMs}:${stats.ctimeMs}`;
+}
 
 /** The most bytes one git listing may carry; a larger project is a failure worth reporting, not a truncated answer. */
 const GIT_LISTING_LIMIT = 256 * 1024 * 1024;
 /** Pathspecs per git call when asking about named files. */
 const PATHSPEC_BATCH = 400;
 
-const repositoryCache = new Map<string, boolean>();
+const repositoryCache = perProcess(new Map<string, boolean>());
 
 /** Whether git answers for the root: a repository's work tree, at its top or below it. */
 function inRepository(root: string): boolean {
@@ -69,17 +78,42 @@ function insideNested(root: string, rel: string, memo: Map<string, boolean>): bo
   return false;
 }
 
+/**
+ * Whether a listed path is a file a reading may open: a regular file, or a
+ * link to one. Never a folder, a pipe, a socket or a device, which a read
+ * waits on forever or reads without end, and never a link that leads to one
+ * of those or nowhere. The one test every enumeration of the project's files
+ * passes, so no reading is handed what it cannot read.
+ */
 function isFileOnDisk(root: string, rel: string): boolean {
   try {
-    return !lstatSync(join(root, rel)).isDirectory();
+    const entry = lstatSync(join(root, rel));
+    return entry.isFile() || (entry.isSymbolicLink() && statSync(join(root, rel)).isFile());
   } catch {
     return false;
   }
 }
 
-function isFolderOnDisk(root: string, rel: string): boolean {
+/**
+ * Whether what is at a path a change names is no file of the change: a
+ * folder, or a pipe, a socket or a device, which a read waits on forever or
+ * reads without end, or a link to one of those. A link git tracks is a file
+ * of the change whatever it leads to, a folder or nothing: relinked or left
+ * dangling, it changed. A path with nothing at it (a tracked file an edit
+ * deleted) is not.
+ */
+function isOtherOnDisk(root: string, rel: string): boolean {
+  let entry;
   try {
-    return lstatSync(join(root, rel)).isDirectory();
+    entry = lstatSync(join(root, rel));
+  } catch {
+    return false;
+  }
+  if (entry.isDirectory()) return true;
+  if (!entry.isSymbolicLink()) return !entry.isFile();
+  try {
+    const target = statSync(join(root, rel));
+    return !target.isFile() && !target.isDirectory();
   } catch {
     return false;
   }
@@ -129,7 +163,8 @@ export function projectFiles(root: string): string[] {
   const base = resolve(root);
   const memo = new Map<string, boolean>();
   const listed = inRepository(base) ? gitList(base, []) : walkUnversioned(base, memo);
-  return [...new Set(listed)].filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel)).sort();
+  const plugins = pluginFolders(base);
+  return [...new Set(listed)].filter((rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && isFileOnDisk(base, rel)).sort();
 }
 
 /**
@@ -144,7 +179,8 @@ export function projectFilesUnder(root: string, folder: string): string[] {
   const base = resolve(root);
   if (!inRepository(base)) return projectFiles(base).filter((rel) => rel.startsWith(`${key}/`));
   const memo = new Map<string, boolean>();
-  return [...new Set(gitList(base, [key]))].filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel)).sort();
+  const plugins = pluginFolders(base);
+  return [...new Set(gitList(base, [key]))].filter((rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && isFileOnDisk(base, rel)).sort();
 }
 
 /**
@@ -159,9 +195,50 @@ export function projectFilesEnding(root: string, suffix: string): string[] {
   const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", `:(glob)**/*${suffix}`], { cwd: base, encoding: "utf8", maxBuffer: GIT_LISTING_LIMIT });
   if (listed.status !== 0) throw new Error(`the project's files are not known: git ls-files failed in ${base}: ${(listed.stderr ?? "").trim() || `exit ${listed.status}`}`);
   const memo = new Map<string, boolean>();
+  const plugins = pluginFolders(base);
   return [...new Set(listed.stdout.split("\0").filter((entry) => entry !== "" && !entry.endsWith("/") && entry.endsWith(suffix)))]
-    .filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel))
+    .filter((rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && isFileOnDisk(base, rel))
     .sort();
+}
+
+/**
+ * The folders the config names as plugins (`"plugins": { "typescript": "./coherence-plugins/typescript" }`),
+ * project-relative: a plugin's source is Coherence's instrument, not the project's code, so no walk reads it and no
+ * reference found there counts, as with a nested checkout. A project that wants its plugins graded says
+ * `"gradePlugins": true`. A plugin outside the project, bundled, or by an absolute path names no folder.
+ */
+export function pluginFolders(root: string): string[] {
+  // plugins is one of the config's own keys (OWN_KEYS), never a registry's; the answer is kept while the file holds still.
+  const path = join(resolve(root), CONFIG_FILE);
+  const identity = fileIdentity(path) ?? "";
+  const known = pluginFoldersSeen.get(path);
+  if (known !== undefined && known.identity === identity) return known.folders;
+  let record: Record<string, unknown>;
+  try {
+    record = readConfigFile(path) ?? {};
+  } catch {
+    record = {};
+  }
+  const folders = foldersNamed(record);
+  pluginFoldersSeen.set(path, { identity, folders });
+  return folders;
+}
+
+const pluginFoldersSeen = perProcess(new Map<string, { identity: string; folders: string[] }>());
+
+function foldersNamed(record: Record<string, unknown>): string[] {
+  const plugins = record["plugins"];
+  if (record["gradePlugins"] === true || typeof plugins !== "object" || plugins === null || Array.isArray(plugins)) return [];
+  return Object.values(plugins as Record<string, unknown>).flatMap((value) => {
+    if (typeof value !== "string" || value === "bundled" || isAbsolute(value)) return [];
+    const folder = folderKey(posix.normalize(value.split(sep).join("/")).replace(/\/plugin\.json$/, ""));
+    return folder === "" || folder === "." || folder.startsWith("..") ? [] : [folder];
+  });
+}
+
+/** Whether a project-relative path lies in one of the plugin folders. */
+function inPluginFolder(rel: string, folders: readonly string[]): boolean {
+  return folders.some((folder) => rel.startsWith(`${folder}/`));
 }
 
 /** A folder as the ignore list compares it: project-relative, forward slashes, no leading "./" and no trailing "/". */
@@ -170,8 +247,8 @@ function folderKey(folder: string): string {
 }
 
 /**
- * The config's ignore list: the folders, by name or by project-relative
- * path, and the files, by project-relative path, the adoption bounds the
+ * The config's ignore list: the folders and the files, each by its name
+ * anywhere or by its project-relative path, the adoption bounds the
  * project away from. An absent or unreadable
  * config ignores nothing here; the spec walker is the reader that refuses a
  * malformed config.
@@ -187,18 +264,19 @@ export function configIgnore(root: string): string[] {
 }
 
 /**
- * Whether a project-relative path is one the list names: the path itself, a
- * file by its path from the root ("CHANGELOG.md", "src/generated.ts"), or
- * some folder on its way down, by its own name ("node_modules", anywhere) or
- * by its path from the root ("posthog/api"). A file is named by its path
- * alone, never by its name anywhere; pass a folder with a trailing "/" to ask
- * about the folder itself. The one rule every walk applies to the config's
- * ignore list.
+ * Whether a project-relative path is one the list names: the path itself, by
+ * its path from the root ("src/generated.ts"), the file by its own name
+ * ("CHANGELOG.md", anywhere), or some folder on its way down, by its own
+ * name ("node_modules", anywhere) or by its path from the root
+ * ("posthog/api"). A name is one path segment; an entry holding a "/" is a
+ * path from the root. Pass a folder with a trailing "/" to ask about the
+ * folder itself. The one rule every walk applies to the config's ignore
+ * list.
  */
 export function underIgnored(rel: string, ignore: Iterable<string>): boolean {
   const skip = ignore instanceof Set ? (ignore as Set<string>) : new Set([...ignore].map(folderKey));
   if (skip.size === 0) return false;
-  if (skip.has(rel)) return true;
+  if (skip.has(rel) || skip.has(rel.slice(rel.lastIndexOf("/") + 1))) return true;
   const folders = rel.split("/").slice(0, -1);
   return folders.some((name, i) => skip.has(name) || skip.has(folders.slice(0, i + 1).join("/")));
 }
@@ -216,16 +294,9 @@ export function boundedProjectFiles(root: string, ignore: readonly string[] = co
 /* ------------------------------------------------------------ the walks */
 
 /**
- * Folder names no project authors its code in, wherever they sit: a package
- * manager's install and an interpreter's cache. Nothing else is left out by
- * its name alone: a folder named public, dist or build may hold the
- * project's own code (billing's api/public held five routes no walk read),
- * and a generated one is already left out by the project's git ignore rules.
- */
-const ENVIRONMENT_FOLDERS: ReadonlySet<string> = new Set(["node_modules", "__pycache__", "site-packages"]);
 
-/** The agent hosts' and git's own folders: never the project's words, even for a walk that reads hidden folders. */
-const HOST_FOLDERS: ReadonlySet<string> = new Set([".git", ".claude", ".codex"]);
+/** The agent hosts' folders, as hosts.ts declares them, and git's own: never the project's words, even for a walk that reads hidden folders. */
+const HOST_FOLDERS: ReadonlySet<string> = new Set([".git", ...Object.values(HOST_FOLDER)]);
 
 /** A file the walks leave out, and the rule that left it out. */
 export interface Exclusion {
@@ -253,14 +324,26 @@ export function walkBounds(root: string, ignore: readonly string[] = configIgnor
   return { root: resolve(root), ignore: new Set(ignore.map(folderKey).filter((f) => f !== "")), readHidden: options.readHidden ?? false, memo: new Map() };
 }
 
-/** Whether a folder on disk is a Python virtual environment. */
-export function isVirtualEnvironment(dir: string): boolean {
-  return existsSync(join(dir, "pyvenv.cfg"));
+/**
+ * Why a folder on disk is one a language's tools made, by its plugin's
+ * markedFolders (a virtual environment holds pyvenv.cfg; Cargo's build
+ * output is a folder named target beside a Cargo.toml, named by its place,
+ * never by its name alone, since a folder called target elsewhere may hold
+ * the project's own code); undefined when none marks it.
+ */
+export function markedFolderReason(dir: string): string | undefined {
+  for (const mark of markedFolders()) {
+    if (mark.name !== undefined && basename(dir) !== mark.name) continue;
+    if (mark.marker !== undefined && !existsSync(join(dir, mark.marker))) continue;
+    if (mark.beside !== undefined && !existsSync(join(dirname(dir), mark.beside))) continue;
+    return mark.reason;
+  }
+  return undefined;
 }
 
 /** Whether a disk walk looking for folders (virtual environments, nested checkouts) may skip descending into one by its name: hidden, a host's, or an environment folder. */
 export function neverWalkedName(name: string): boolean {
-  return name.startsWith(".") || HOST_FOLDERS.has(name) || ENVIRONMENT_FOLDERS.has(name);
+  return name.startsWith(".") || HOST_FOLDERS.has(name) || environmentFolders().has(name);
 }
 
 /** Why one folder (project-relative) is left out, or "" when the walk enters it. */
@@ -271,9 +354,11 @@ function folderReason(bounds: Bounds, folder: string): string {
   if (bounds.ignore.has(folder) || bounds.ignore.has(name)) reason = `config ignore: ${bounds.ignore.has(folder) ? folder : name}`;
   else if (HOST_FOLDERS.has(name)) reason = `host folder: ${folder}`;
   else if (name.startsWith(".") && !bounds.readHidden) reason = `hidden folder: ${folder}`;
-  else if (ENVIRONMENT_FOLDERS.has(name)) reason = `environment folder: ${folder}`;
-  else if (isVirtualEnvironment(join(bounds.root, folder))) reason = `virtual environment: ${folder}`;
-  else reason = "";
+  else if (environmentFolders().has(name)) reason = `environment folder: ${folder}`;
+  else {
+    const marked = markedFolderReason(join(bounds.root, folder));
+    reason = marked === undefined ? "" : `${marked}: ${folder}`;
+  }
   bounds.memo.set(folder, reason);
   return reason;
 }
@@ -282,7 +367,7 @@ function folderReason(bounds: Bounds, folder: string): string {
  * Why a project-relative path lies outside the walk, or undefined when the
  * walk reads it: the first folder on its way down that a rule leaves out,
  * named with the rule, else the file itself when the config's ignore list
- * names its path. The one place any walk of the project leaves a file out; a
+ * names its path or its name. The one place any walk of the project leaves a file out; a
  * walker may narrow what it reads by kind (an extension, a test), but a
  * folder or a named file is left out here or not at all.
  */
@@ -292,7 +377,9 @@ export function exclusionOf(rel: string, bounds: Bounds): string | undefined {
     const reason = folderReason(bounds, folders.slice(0, i + 1).join("/"));
     if (reason !== "") return reason;
   }
-  return bounds.ignore.has(rel) ? `config ignore: ${rel}` : undefined;
+  if (bounds.ignore.has(rel)) return `config ignore: ${rel}`;
+  const name = rel.slice(rel.lastIndexOf("/") + 1);
+  return bounds.ignore.has(name) ? `config ignore: ${name}` : undefined;
 }
 
 /** Every project file a walk reads, and every one it leaves out with its reason. */
@@ -324,8 +411,9 @@ export function exclusionSummary(excluded: readonly Exclusion[]): { reason: stri
 export function keepProjectFiles(root: string, paths: readonly string[], listing?: ProjectListing): Set<string> {
   const base = resolve(root);
   const memo = new Map<string, boolean>();
+  const plugins = pluginFolders(base);
   const candidates = [...new Set(paths.map((p) => projectRelative(base, p)).filter((rel): rel is string => rel !== undefined))].filter(
-    (rel) => !insideNested(base, rel, memo) && !isFolderOnDisk(base, rel) && !rel.split("/").includes(".git"),
+    (rel) => !insideNested(base, rel, memo) && !inPluginFolder(rel, plugins) && !isOtherOnDisk(base, rel) && !rel.split("/").includes(".git"),
   );
   if (candidates.length === 0 || !inRepository(base)) {
     return new Set(inRepository(base) ? [] : candidates.filter((rel) => !rel.split("/").includes("node_modules")));

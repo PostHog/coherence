@@ -96,8 +96,8 @@ To opt in several folders and state their shared settings once, put a
 
   | Key | Rule |
   |---|---|
-  | `name`, `entryDir`, `lexicon`, `projects` | Never inherited. Each belongs to the leaf. |
-  | `ignore` | Combined. A folder name from the registry applies anywhere. A path from the registry is kept only if it lies inside the leaf, and is rewritten relative to it. |
+  | `name`, `entryDir`, `lexicon`, `projects`, `plugins` | Never inherited. Each belongs to the leaf; a plugin's path is the writer's. |
+  | `ignore` | Combined. A name from the registry, a folder's or a file's, applies anywhere in the leaf. A path from the registry is kept only if it lies inside the leaf, and is rewritten relative to it. |
   | `wellKnown` | Combined. |
   | `tests`, `test`, `testJson`, `testMatch`, `testFilterForm`, `testDir`, `testDirs` | One group. A leaf that sets any of them replaces the registry's whole group. An inherited setup's `cwd` is rewritten from the registry's folder to the leaf, so the registry's `"cwd": "."` runs the tests from the repository root. A setup without `cwd` runs in the leaf. |
   | everything else (`language`, `references`, `latencyBudget`, `interfaceBudget`, ...) | Replaced whole. |
@@ -129,15 +129,18 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 |---|---|---|
 | `projects` | none | At the repository root only: the folders opted in, which makes this file a registry. See [Several folders](#several-folders-a-registry). |
 | `name` | the folder's name | The project's name, as Scope and the lexicon's project layer show it. |
-| `language` | `typescript` | `typescript` or `python`: which language server the chokepoint check asks. A list (`["python", "typescript"]`) for a project that spans both; see [More than one language](#more-than-one-language). |
+| `language` | `typescript` | `typescript`, `python` or `rust`, each read by a plugin bundled with Coherence (`plugins/`): which language server the chokepoint check asks (rust-analyzer for Rust; see [Rust](enforcement.md#rust)), a language declared under `languages`, or one a plugin named under `plugins` provides (`go`, with `"plugins": { "go": "bundled" }`; see [plugins.md](plugins.md#go)). A list (`["python", "typescript"]`) for a project that spans more than one; see [More than one language](#more-than-one-language). Any other name is refused. |
+| `languages` | none | Languages Coherence has no adapter for, each read through its own language server; see [A language Coherence has no adapter for](#a-language-coherence-has-no-adapter-for). Each must also be named in `language`. |
+| `plugins` | none | The plugins the project runs, each name mapped to `"bundled"` or a path to its folder: a language adapter (new, or wrapping a built-in), syntax tables, a verifier for `via: [form] name`, a lexicon layer. The project's own key, never inherited from a registry. See [plugins.md](plugins.md). |
 | `entryDir` | `.` | The folder holding the entry spec, the one that declares the trust levels. |
-| `ignore` | none | Folders that are not this project's code or prose: vendored code, generated output, fixtures, promo material. A name matches that folder anywhere; a path matches from the root. Every walk (the spec, the lexicon check, the reading) leaves them out. |
+| `ignore` | none | Folders and files that are not this project's code or prose: vendored code, generated output, fixtures, promo material, notes kept beside the project. A name with no `/` (`dist`, `CHANGELOG.md`, `schema.generated.ts`) matches every folder or file of that name anywhere in the project; an entry with a `/` (`src/generated`, `packages/web/CHANGELOG.md`) is a path from the root. Every walk (the spec, the lexicon check, the readings, mass) leaves them out, and an entry that names nothing is a spec problem. |
 | `lexicon` | `lexicon.json` | The project's lexicon file, relative to the root. |
 | `wellKnown` | none | Names the project vouches for as well known (its vendors, its own product names), so the lexicon check does not nominate them as nouns to declare. |
 | `references` | `"project"` | Where a chokepoint check searches for references: `"project"` (the project alone), `"repository"` (the whole repository), or a list of folders relative to the repository top (`["posthog/api", "ee"]`), searched beside the project. A verdict over less than the whole repository names every folder it searched. Each folder adds to the language server's work: on PostHog, `products/notebooks` with `["posthog", "ee"]` took 15.5 s and 1.1 GB for one check, against 4.8 s and 380 MB for the project alone. |
 | `chokepointFrom` | `anywhere` | Which references a chokepoint governs when its bullet has no `from:` line: `anywhere`, `outside the component`, or `outside <folder>`. A bullet's own `from:` overrides it, and every run entry records which governed and who said it. Any other value is refused. See [spec.md](spec.md#which-references-a-chokepoint-governs). |
 | `interfaceBudget` | `{ "seconds": 600, "memoryMB": 12288 }` | The most time and memory the Structure reading's interface pass may take; when it runs out, the reading says it is partial. |
-| `telemetry` | none | `false` refuses fleet telemetry for this project, whatever each user chose with `coherence telemetry on`; a registry's `false` refuses for every leaf. Telemetry is off unless a user opts in; see the README's [Telemetry](../README.md#telemetry) section for what is sent. |
+| `telemetry` | none | `false` refuses fleet telemetry for this project, whatever each user chose with `coherence telemetry on`; a registry's `false` refuses for every leaf. Telemetry is off unless a user opts in; see [telemetry.md](telemetry.md) for what is sent. |
+| `latencyBudget` | `3` | The latency budget: the most seconds a tool hook (PreToolUse, PostToolUse) or a stop may take, counted from its process's start. A tool hook over it says so in its own answer; regulate names the session's calls and stops over it, and orient the last week's calls. These hooks run around every tool call, and a call cycle that feels sluggish is how a hook gets switched off. |
 
 ## Tests: how a totality oracle is run
 
@@ -150,7 +153,6 @@ A totality oracle names a test (its `via:` line); these keys say how to run one.
 | `testJson` | none | One invocation for every test the bullets name at once: an argv array or a string with `{filter}` (a combined name pattern) and `{out}` (where the runner writes its report). The report may be jest-shaped JSON (`testResults[].assertionResults[]` with `ancestorTitles`, `title`, `status`), pytest's JUnit XML, or pytest-json-report's JSON. Without it, tests run one per invocation through `test`. |
 | `testFilterForm` | `regex` | How a name filter is written: `regex` (titles escaped and joined with `\|`, as jest, vitest and node:test read a name pattern) or `pytest` (a `-k` expression). |
 | `testDir` / `testDirs` | `__tests__`, `test`, `tests` | A folder name, or a list, whose files are tests, beside the built-in ones. |
-| `latencyBudget` | `3` | The latency budget: the most seconds a tool hook (PreToolUse, PostToolUse) may take, counted from its process's start. A tool hook over it says so in its own answer; regulate names the session's calls over it, and orient the last week's. These hooks run around every tool call, and a call cycle that feels sluggish is how a hook gets switched off. |
 
 A runner whose report is in none of those shapes (Playwright's JSON report,
 for one) works through `test` and `testMatch` alone, one test per invocation.
@@ -183,8 +185,8 @@ project. List both languages, and give each runner its own test setup under
 
 **Which language a file is.** Its extension decides: `.py` and `.pyi` are
 Python; `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` are
-TypeScript (a `.d.ts` file is neither). The two never share an extension, so
-there is no per-folder override. The first language listed is the primary
+TypeScript (a `.d.ts` file is neither); `.rs` is Rust. No two languages share
+an extension, so there is no per-folder override. The first language listed is the primary
 one.
 
 **Which server a chokepoint asks.** One warm server per root and language.
@@ -200,8 +202,10 @@ its name (`server-typescript.json`). Only the primary server answers the live
 Scope reading over HTTP.
 
 **What the hooks keep between calls.** `.coherence/cache/` is transient.
-The `.coherence/.gitignore` that install writes leaves it out, along with
-everything else except the journal, runs, work orders and hook voice.
+The `.coherence/.gitignore` leaves it out, along with everything else except
+the journal, runs, work orders and hook voice. `hooks install` writes it, and
+so does any command that makes `.coherence/` itself (a first `run` in a project
+without hooks); a `.coherence/` already there keeps whatever its adopter left.
 Deleting it costs time, never a result. It holds two things that let a tool
 hook pay for what changed rather than for the whole project:
 
@@ -235,7 +239,7 @@ above (`test`, `testJson`, `testMatch`, `testFilterForm`, `testDir` /
 
 | Key | Default | Meaning |
 |---|---|---|
-| `language` | none | The language whose test files this setup claims, by extension. |
+| `language` | none | The language whose test files this setup claims, by extension: a built-in, or one declared under `languages`. |
 | `files` | none | Globs of the test files this setup claims, relative to the root (`*` within a folder, `**` across folders), in place of `language`. |
 | `cwd` | the root | The folder the runner starts in, relative to the root: `../..` runs a product's tests from the repository root, against its own configuration. |
 
@@ -262,8 +266,79 @@ entrance, and merges the languages side by side over the components
 they share: no language server reports a reference from Python into
 TypeScript, so none is drawn. A language whose server does not answer is
 named as not read, with why. Mass, the entrance detection (`scaffold
-entrances`) and `scaffold control` read every language. Observation maps the
+entrances`) and `scaffold control` read TypeScript, Python and Rust (Rust's
+module paths by its crates' folder layout and their Cargo.toml files); a bundled
+language with no text scan yet (Go) is named as not read. A language declared
+under `languages` is read by none of the readings, and each names it as not
+read. Observation maps the
 first test setup's pass through the primary language alone and says so on its
 record and in the line the run prints.
+
+## A language Coherence has no adapter for
+
+A language with a language server can be checked without any code: declare it
+under `languages`, name it in `language`, and the chokepoint check asks that
+server, over stdio, through the language server protocol. The server must
+report references from a document it has open but not saved, since that is
+where the refutation stages its use; one that answers only from an index on
+disk (sourcekit-lsp) cannot pass it, and its language needs a plugin
+(docs/plugins.md, "A declared language or a plugin").
+
+```json
+{
+  "language": ["typescript", "toy"],
+  "languages": {
+    "toy": {
+      "extensions": [".toy"],
+      "server": ["toy-language-server", "--stdio"],
+      "testFilter": "{name}",
+      "refute": "import {module}\nlet coherenceProbe = {name}\n"
+    }
+  }
+}
+```
+
+| Key | Required | Meaning |
+|---|---|---|
+| `extensions` | yes | The file extensions the language owns, each with its dot. An extension a built-in adapter reads (`.ts`, `.py`, `.rs`, ...) or another declared language owns is refused. |
+| `server` | yes | The language server's command as a list of arguments, speaking the protocol over stdio. A bare program name is found on the PATH; a relative path is the project's. |
+| `testFilter` | no | How a `via` becomes the test runner's filter: `{name}` is the via. Without it, the via is passed as written. |
+| `refute` | no | The unsaved document the refutation stages beside the protected thing. It must reference the thing: `{name}` is its name, `{module}` its file name without the extension, `{file}` its file relative to the staged document (`./secrets.toy`), `{path}` its file from the root. |
+
+The name is lowercase letters, digits and hyphens, and no built-in's
+(`typescript`, `python`, `rust`). A declared language not named in `language`
+is refused, so a declaration is never read by nothing. Each document the
+adapter opens is sent with the language's name as its language id.
+
+**What a declared language gets.** Names resolve through the server's
+`workspace/symbol` and document symbols; references come from
+`textDocument/references`, from the project's own files; a test reference is
+classified by the test folders, as for every language. A chokepoint grades
+broken with its bypasses, or reference-choked, enforced by Coherence's check at
+the edit and in CI. The refutation opens the `refute` template as an unsaved
+document (outside the exempted folder when the chokepoint governs only
+references from outside one) and passes only when the server reports the
+reference it holds, and when every file of the language whose text names the
+thing holds a reported site: the adapter opens each file of the language
+first, since some servers answer only from open documents, and a file the
+server still reported nothing in makes the chokepoint read not run, naming the
+file, never pass. Each verdict names what answered, as
+`toy via toy-language-server (declared in the config)`, and a run records the
+language as its instrument. The server runs in the warm server, as the
+built-in ones do, so an edit's check stays within the latency budget.
+
+**What it does not get.**
+
+- No rung above reference-choked: the protocol says nothing about visibility,
+  so no compiler or checker is credited, and a thing the language would refuse
+  to name from outside its module still grades reference-choked.
+- No refutation without `refute`: the chokepoint then reads not run, with
+  "no refute template declared", never pass.
+- No reading: Structure, the economy prediction, mass, entrance detection
+  and `scaffold control` do not scan its text, and each names it as not read;
+  the mirror reading counts its files among those it left unread; the
+  lexicon's member scan opens none of its type bodies.
+- No module boundary from a checker, no observation of its tests, and no
+  entrance detection.
 
 The spec grammar is in [spec.md](spec.md).

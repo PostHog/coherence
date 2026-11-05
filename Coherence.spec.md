@@ -59,6 +59,9 @@ A prosthetic for proprioception: specs, invariants, and the readings that keep a
 - build: a maintainer, or npm as prepare, compiles the published package from src into dist
   handler: src/build.ts
   trust: project-source
+- readme: a maintainer writes the README's and plugins/README.md's generated lists of agent hosts and bundled plugins
+  handler: src/readme.ts
+  trust: project-source
 
 ## invariants
 - commands act on the project root: A command run from any folder inside a project acts on that project: the nearest folder up to the top of its git checkout that holds coherence.config.json, else the nearest that holds .coherence, else the folder it ran in; a write from a subfolder never makes a second store there.
@@ -80,4 +83,10 @@ A prosthetic for proprioception: specs, invariants, and the readings that keep a
   because: the lexicon defines a structural defect as an invariant whose satisfaction has been removed, and a bullet that never reached invariant has no satisfaction to remove; calling it one both overstates what the tree had and hides the ordinary case, a requirement whose detector is red because the work is not done. A bullet still shown as an invariant after its chokepoint broke is the other half of the same failure, and an automatic refutation counts because the check itself proved it would report the break
   crossing: record -> reading
   refuted: let a failing verdict force the structural defect state whatever else the bullet lacked -> the totality oracle went red, then green once restored (2026-09-18)
+  kinds: none
+- the README's lists are generated: The README's and plugins/README.md's lists of agent hosts and bundled plugins are each what src/readme.ts writes from the hosts and each bundled plugin's manifest title and description, and each file carries every block it is owed.
+  over: every generated block in README.md and plugins/README.md, against every agent host and every bundled plugin, defaults and opt-in alike
+  via: the README's lists of agent hosts and bundled plugins are the ones generated from the hosts and the bundled manifests, each file carrying every block it is owed
+  because: the README listed the supported languages by hand beside plugins/README.md's own hand-written tables, and a list typed beside the plugins it names drifts the day a plugin ships or a host is supported, with nothing failing
+  refuted: generatedBlocks dropped the opt-in plugins from the short languages list -> "the README's lists of agent hosts and bundled plugins are the ones generated from the hosts and the bundled manifests, each file carrying every block it is owed" went red in readme.test.ts on its own assertion (README.md drifted from the hosts and the bundled plugins' manifests); restored byte for byte, green batched and alone (2026-10-30)
   kinds: none

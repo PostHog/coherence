@@ -359,6 +359,25 @@ test("the model: an entrance's trust names a declared trust level, and a trust l
   const marked = parseSpec("# A\n\nAn a.\n\n## trust levels\n- public (untrusted): anyone\n- owner (outside): the owner\n", "A.spec.md");
   assert.deepEqual(marked.trustLevels?.map((level) => [level.name, level.outside]), [["public", false], ["owner", true]]);
   assert.deepEqual(marked.problems.map((p) => p.message), ["trust level public is marked (untrusted); the one marker is (outside), for a level from outside the system's control"]);
+  // The marker anywhere but after the name marks nothing, and the level would read as inside: refused, as the umami adoption wrote it.
+  const misplaced = parseSpec("# A\n\nAn a.\n\n## trust levels\n- visitor: (outside) a browser with no credential\n- caller: an API caller (outside)\n- (outside) viewer: a share link holder\n", "A.spec.md");
+  assert.deepEqual(misplaced.trustLevels?.map((level) => [level.name, level.outside]), [["visitor", false], ["caller", false], ["viewer", false]]);
+  assert.deepEqual(misplaced.problems.map((p) => `${p.line} ${p.message}`), [
+    "6 trust level visitor carries (outside) where it marks nothing, so it reads as inside; the marker follows the name: - visitor (outside): <one-line meaning>",
+    "7 trust level caller carries (outside) where it marks nothing, so it reads as inside; the marker follows the name: - caller (outside): <one-line meaning>",
+    "8 trust level viewer carries (outside) where it marks nothing, so it reads as inside; the marker follows the name: - viewer (outside): <one-line meaning>",
+  ]);
+  // On an entrance or an invariant the marker marks nothing either; a key in another case would fold into the line above.
+  const elsewhere = parseSpec("# A\n\nAn a.\n\n## entrances\n- send (outside): a post\n  handler: send in a.ts\n\n## invariants\n- sealed (outside): A row leaves sealed.\n  over: every row\n  Via: sealed rows\n", "A.spec.md");
+  assert.deepEqual(elsewhere.problems.map((p) => `${p.line} ${p.message}`).filter((m) => !m.includes("names both over: and via:")), [
+    "6 entrance send (outside) carries (outside), which marks a trust level, never an entrance: name the level it carries in with trust: <a level the entry spec marks (outside)>",
+    "10 invariant sealed (outside) carries (outside), which marks a trust level, never an invariant: name the levels it checks with crossing: <trust level> -> <trust level>",
+    "12 key \"Via\" is written via:; a key in another case would read as the line above continuing",
+  ]);
+  // Valid inputs the check must not flag: the word outside and other parentheses in a meaning, a Next.js route group in an entrance's name, and prose wrapping under a key.
+  const valid = parseSpec("# A\n\nAn a.\n\n## trust levels\n- public (outside): what comes from outside the system's control (a browser, a cron)\n- storage: the rows beneath everything\n\n## entrances\n- page (outside)/dashboard: a page in a route group\n  handler: Page in src/app/(outside)/dashboard/page.tsx\n  trust: public\n\n## invariants\n- sealed: A row leaves sealed.\n  over: every row\n  via: sealed rows\n  because: a leak would disclose\n  Note: what it discloses is a bearer\n", "A.spec.md");
+  assert.deepEqual(valid.problems, []);
+  assert.deepEqual(valid.trustLevels?.map((level) => [level.name, level.outside]), [["public", true], ["storage", false]]);
 });
 
 test("the model: an entrance's declared trust contradicting a crossing on its handler is a problem", () => {
@@ -508,11 +527,14 @@ test("the model: a handler an export list re-exports, or a destructuring across 
     assert.deepEqual(model.problems.map((p) => p.message), ["entrance NextAuth handlers object: handler handlers is not declared at the top level of auth.ts (read under app/(auth) and under the root)"], "a key the destructuring reads through binds nothing");
   });
   const listed = "const handle = () => null;\nexport { handle as GET, type Shape, other };\n";
-  assert.deepEqual(["GET", "Shape", "other", "handle"].map((n) => declaresAtTop(listed, n)), [true, true, true, true], "an export list exports a name, under its alias when it has one; handle is declared by its const");
-  assert.equal(declaresAtTop('export { handle as GET } from "./h";\n', "handle"), false, "a name a re-export renames is not exported under its own name");
-  assert.equal(declaresAtTop('import { GET } from "./auth";\n', "GET"), false, "an import declares nothing");
-  assert.equal(declaresAtTop("export const {\n  a,\n  b: { c },\n}: Things = make();\n", "c"), true, "a typed destructuring across lines");
-  assert.equal(declaresAtTop("const {\n  a,\n  b,\n};\n", "a"), false, "braces that assign nothing are no destructuring");
+  assert.deepEqual(["GET", "Shape", "other", "handle"].map((n) => declaresAtTop(listed, n, "route.ts")), [true, true, true, true], "an export list exports a name, under its alias when it has one; handle is declared by its const");
+  assert.equal(declaresAtTop('export { handle as GET } from "./h";\n', "handle", "route.ts"), false, "a name a re-export renames is not exported under its own name");
+  assert.equal(declaresAtTop('import { GET } from "./auth";\n', "GET", "route.ts"), false, "an import declares nothing");
+  assert.equal(declaresAtTop("export const {\n  a,\n  b: { c },\n}: Things = make();\n", "c", "route.ts"), true, "a typed destructuring across lines");
+  assert.equal(declaresAtTop("const {\n  a,\n  b,\n};\n", "a", "route.ts"), false, "braces that assign nothing are no destructuring");
+  assert.equal(declaresAtTop("export const aXb = 1;\n", "a.b", "route.ts"), false, "a handler name is matched as written, not as a pattern");
+  assert.equal(declaresAtTop("aXb = 1\n", "a.b", "handlers.py"), false, "a Python handler name is matched as written, not as a pattern");
+  assert.equal(declaresAtTop("export const $x = 1;\n", "$x", "route.ts"), true, "a $ in a name is matched as written");
 });
 
 test("the model: an entrance's guard: line names a chokepoint an invariant declares, or a symbol of a chokepoint module", () => {
@@ -554,4 +576,102 @@ test("the grammar: an entrance's control: none carries a non-empty reason and ne
   const both = entrance("  guard: door\n  control: none — public\n");
   assert.deepEqual(both.problems.map((p) => `${p.line} ${p.message}`), ["9 entrance in names a guard: and control: none; a guard is a control, so keep one of them"]);
   assert.ok(entrance("  control: none — a\n  control: none — b\n").problems.some((p) => p.line === 9 && p.message === "entrance in names its control twice"));
+});
+
+/** A component declaring hand lists as mirrors: a closure, another literal, and an object's keys, each file named from the component or from the root. */
+function mirrored(mirrors: string, files: Record<string, string> = {}): Record<string, string> {
+  return {
+    "Widgetry.spec.md": "# Widgetry\n\nA store of widgets.\n\n## invariants\n",
+    "src/page/Page.spec.md": `# Page\n\nThe page.\n\n## mirrors\n${mirrors}\n## invariants\n`,
+    "src/page/build.ts": 'export const SOURCES = ["page.ts", "view.ts"];\nexport const EVENTS = ["start", "stop"] as const;\nconst PLURALS = new Set(["route"]);\n',
+    "src/page/page.ts": 'import { view } from "./view.ts";\nexport const page = view;\n',
+    "src/page/view.ts": "export const view = 1;\n",
+    "src/hooks/events.ts": 'export const HOOK_EVENTS = ["start", "stop"];\nexport const RULES = { route: "routes" };\n',
+    ...files,
+  };
+}
+
+test("the model: a mirror names a list and what it mirrors that are both declared, and one whose name or file is gone is a problem", () => {
+  const valid = [
+    "- SOURCES in build.ts: the modules the bundle joins\n  mirrors: closure of page.ts, src/page/view.ts\n",
+    "- EVENTS in src/page/build.ts: the events a summary names\n  mirrors: HOOK_EVENTS in src/hooks/events.ts\n",
+    "- PLURALS in build.ts: the rules a plural is kept for\n  mirrors: keys of RULES in src/hooks/events.ts\n",
+  ];
+  // What adopters write correctly: a file from the component or from the root, a closure of one file or several, a list not exported, keys of an object.
+  withModel(mirrored(valid.join("")), (model) => {
+    assert.deepEqual(model.problems, []);
+    const mirrors = model.components.find((c) => c.folder === "src/page")!.mirrors;
+    assert.deepEqual(mirrors.map((m) => [m.name, m.listFile, m.recipe?.kind, m.sources]), [
+      ["SOURCES", "src/page/build.ts", "closure", ["src/page/page.ts", "src/page/view.ts"]],
+      ["EVENTS", "src/page/build.ts", "literal", ["src/hooks/events.ts"]],
+      ["PLURALS", "src/page/build.ts", "keys", ["src/hooks/events.ts"]],
+    ]);
+  });
+  withModel(mirrored(""), (model) => assert.deepEqual(model.problems, [], "an empty mirrors section is no problem"));
+  const problems = (mirrors: string): string[] => {
+    let found: string[] = [];
+    withModel(mirrored(mirrors), (model) => (found = model.problems.map((p) => `${p.line} ${p.message}`)));
+    return found;
+  };
+  assert.deepEqual(problems("- GONE in build.ts: a list since derived\n  mirrors: closure of page.ts\n"), ["6 mirror GONE: GONE is not declared at the top level of src/page/build.ts; derive what was hand-kept, or remove the mirror"]);
+  assert.deepEqual(problems("- SOURCES in moved.ts: the modules\n  mirrors: closure of page.ts\n"), ["6 mirror SOURCES: moved.ts does not exist (read under src/page and under the root)"]);
+  assert.deepEqual(problems("- EVENTS in build.ts: the events\n  mirrors: HOOK_EVENTS in src/hooks/gone.ts\n"), ["7 mirror EVENTS: src/hooks/gone.ts does not exist (read under src/page and under the root)"]);
+  assert.deepEqual(problems("- EVENTS in build.ts: the events\n  mirrors: closure of page.ts, old.ts\n"), ["7 mirror EVENTS: closure of old.ts, which does not exist (read under src/page and under the root)"]);
+  assert.deepEqual(problems("- EVENTS in build.ts: the events\n"), ["6 mirror EVENTS names nothing it mirrors: add mirrors: closure of <file>, keys of <NAME> in <file>, or <NAME> in <file>"]);
+  assert.deepEqual(problems("- EVENTS in build.ts: the events\n  mirrors: whatever events.ts says\n"), ["7 mirrors: on EVENTS reads closure of <file>, <file>, keys of <NAME> in <file>, or <NAME> in <file>"]);
+  assert.deepEqual(problems("- EVENTS in build.ts: the events\n  mirrors: HOOK_EVENTS in src/hooks/events.ts\n  because: why\n"), ['8 unknown key "because": a mirror carries mirrors']);
+  assert.deepEqual(problems("- EVENTS: the events\n  mirrors: HOOK_EVENTS in src/hooks/events.ts\n"), ["6 a mirror is one bullet: - <NAME> in <file>: <meaning>, with an indented mirrors: closure of <file>, <file> | keys of <NAME> in <file> | <NAME> in <file> line"]);
+});
+
+test("the model: a folded folder names a folder of its component with no spec of its own, and one gone, outside it, or with its own spec is a problem", () => {
+  const folding = (folded: string): Record<string, string> => ({
+    "Widgetry.spec.md": "# Widgetry\n\nA store of widgets.\n\n## invariants\n",
+    "src/app/App.spec.md": `# App\n\nThe app.\n\n## folded\n${folded}\n## invariants\n`,
+    "src/app/pages/home/page.ts": "export const home = 1;\n",
+    "src/app/ui/button.ts": "export const button = 1;\n",
+    "src/app/billed/Billed.spec.md": "# Billed\n\nA unit of its own.\n",
+    "src/app/billed/bill.ts": "export const bill = 1;\n",
+    "src/other/x.ts": "export const x = 1;\n",
+  });
+  // What adopters write correctly: a folder, a subtree, a ./ lead and a trailing slash.
+  withModel(folding("- ui: the app's own controls\n- pages/**: one folder per route\n- ./pages/home/: the landing route\n"), (model) => {
+    assert.deepEqual(model.problems, []);
+    assert.deepEqual(
+      model.components.find((c) => c.folder === "src/app")!.folded.map((f) => [f.folder, f.subtree]),
+      [["ui", false], ["pages", true], ["pages/home", false]],
+    );
+  });
+  const problems = (folded: string): string[] => {
+    let found: string[] = [];
+    withModel(folding(folded), (model) => (found = model.problems.map((p) => `${p.line} ${p.message}`)));
+    return found;
+  };
+  assert.deepEqual(problems("- gone: a folder since removed\n"), ["6 folded folder gone: src/app/gone is not a folder; remove the bullet, or name the folder as it is now"]);
+  assert.deepEqual(problems("- ui/button.ts: a file\n"), ["6 folded folder ui/button.ts: src/app/ui/button.ts is not a folder; remove the bullet, or name the folder as it is now"]);
+  assert.deepEqual(problems("- ../other: another component's folder\n"), ["6 folded folder ../other: not a folder inside src/app; a folded folder is written relative to its spec"]);
+  assert.deepEqual(problems("- billed/**: a unit with its own spec\n"), ["6 folded folder billed/**: src/app/billed has a spec of its own, so it is a component, not folded; remove the bullet"]);
+  assert.deepEqual(problems("- ui:\n"), ["6 folded folder ui needs its reason: why it belongs to this component"]);
+  assert.deepEqual(problems("- ui: controls\n- ui: again\n"), ["7 folded folder ui declared twice"]);
+  assert.deepEqual(problems("- the ui folder: controls\n"), ["6 a folded folder is one bullet, with no lines under it: - <folder, relative to this spec>: <why it belongs to this component>, or - <folder>/**: <why its whole subtree does>"]);
+  assert.deepEqual(problems("- ui: controls\n  because: why\n"), ["7 a folded folder is one bullet, with no lines under it: - <folder, relative to this spec>: <why it belongs to this component>, or - <folder>/**: <why its whole subtree does>"]);
+});
+
+test("the model: a handler is declared as its file's language declares one: a Rust item, a Python def, a TypeScript export, each read by its language's plugin", () => {
+  const spec = (handlers: string): Record<string, string> => ({
+    "Core.spec.md": `# Core\n\nA document core.\n\n## trust levels\n- public (outside): anyone on the network\n\n## entrances\n${handlers}\n## invariants\n`,
+    "src/lib.rs": "pub mod document;\n\n#[wasm_bindgen]\npub fn apply_change(doc: &mut Document) {}\n\npub(crate) struct Session;\n\nmacro_rules! tick {\n    () => {};\n}\n",
+    "src/door.py": "async def take(request):\n    return None\n",
+    "src/door.ts": "export const peek = (): void => {};\n",
+  });
+  const entrance = (name: string, handler: string): string => `- ${name}: work enters\n  handler: ${handler}\n  trust: public\n`;
+  withModel(spec([entrance("change", "apply_change in src/lib.rs"), entrance("session", "Session in src/lib.rs"), entrance("tick", "tick in src/lib.rs"), entrance("take", "take in src/door.py"), entrance("peek", "peek in src/door.ts")].join("")), (model) => {
+    assert.deepEqual(model.problems, [], "each handler is declared as its own language declares one");
+  });
+  withModel(spec([entrance("missing", "apply_change in src/door.ts"), entrance("rust's own", "document in src/lib.rs")].join("")), (model) => {
+    assert.deepEqual(
+      model.problems.map((p) => p.message),
+      ["entrance missing: handler apply_change is not declared at the top level of src/door.ts (read under . and under the root)"],
+      "a TypeScript file is not read as Rust, and a Rust mod is an item",
+    );
+  });
 });

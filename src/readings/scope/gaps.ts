@@ -48,20 +48,22 @@
 
 import { spawn } from "../../lifecycle/work-meter.ts";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "../../lifecycle/work-meter.ts";
-import { dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import { configIgnore, projectFiles } from "../../adapters/project-files.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { isSourceFile } from "../../economy/source.ts";
+import { isBasisFile } from "../../plugins/languages.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { decide } from "../../journal/verbs.ts";
 import { parseSpec } from "../../spec/grammar.ts";
-import { loadSpecModel } from "../../spec/model.ts";
+import { loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import { loadSpec } from "./build.ts";
 import { boundsOf, withinBounds } from "./component-interfaces.ts";
 import type { InterfaceReading, ShellState } from "./model.ts";
+import { writeAtomically } from "./shared-structure.ts";
 import { flowOf, flowUntrusted, type FlowModel } from "./structure-flow.ts";
 
 /** Where the recorded reading, the refresh marker and the per-session snapshots live: transient, never committed. */
@@ -69,8 +71,27 @@ export const STRUCTURE_DIR = join(".coherence", "structure");
 
 const RECORD_VERSION = 1;
 
+/** The three ways a gap closes, each in the words orient, regulate and the scaffold share and as a plain step for a reader who does not know the spec's terms: guard, entrances, control none. One list, so the two forms cannot drift apart. */
+const CLOSE_PARTS: readonly { spec: string; plain: string }[] = [
+  {
+    spec: "declare guard: <chokepoint> where a verified chokepoint wraps it",
+    plain: "If all of the input goes through one function that a rule in the spec protects, add `guard: <function>`.",
+  },
+  {
+    spec: "name it on the entrances: line of an invariant whose crossing enters from its trust",
+    plain: "If a rule in the spec already checks input from the same source, add the place's name to the `entrances:` line of that rule.",
+  },
+  {
+    spec: "record control: none — <reason>",
+    plain: "If the input needs no check, add `control: none - <reason>`.",
+  },
+];
+
 /** The three ways a gap closes, in the words orient, regulate and the scaffold share. */
-export const CLOSE_WAYS = "declare guard: <chokepoint> where a verified chokepoint wraps it, name it on the entrances: line of an invariant whose crossing enters from its trust, or record control: none — <reason>";
+export const CLOSE_WAYS = `${CLOSE_PARTS[0]!.spec}, ${CLOSE_PARTS[1]!.spec}, or ${CLOSE_PARTS[2]!.spec}`;
+
+/** The same three ways, as plain steps for a reader who does not know the spec's terms; built from the same list as CLOSE_WAYS, so the two stay in step. */
+export const CLOSE_STEPS: readonly string[] = CLOSE_PARTS.map((p) => p.plain);
 
 /** An entrance with outside or unknown trust whose route has no traced control, and which declares no control: none. */
 export interface Gap {
@@ -137,24 +158,28 @@ export function gapsOf(state: Pick<ShellState, "spec">, model: FlowModel): GapSt
 /**
  * What of the specs a reading depends on: which folders are components, each
  * entrance's handler and guard (the reading resolves and confirms them), and
- * each chokepoint with what it protects (the reading traces a handler past
- * them). Nothing else a spec says reaches the reading, so a control: none,
+ * each chokepoint with what it protects and the option its unless: line
+ * names (the reading traces a handler past them, and a call that switches
+ * the check off earns none). Nothing else a spec says reaches the reading, so a control: none,
  * a trust: line, a crossing or a totality oracle leaves it standing, and the
  * gaps derived from it show the change at once.
  */
-function specShape(root: string): string {
-  const model = loadSpecModel(root, { runs: false });
+function specShape(root: string, model = loadSpecModel(root, { runs: false })): string {
   return JSON.stringify(
     model.components.map((c) => [
       c.folder,
       c.entrances.map((e) => [e.name, e.handler ?? "", e.guard ?? "", e.file ?? ""]),
-      c.invariants.flatMap((i) => i.enforcements.flatMap((e) => (e.form === "chokepoint" ? [[i.name, e.chokepoint, e.protects]] : []))),
+      // The option that switches a chokepoint's check off decides which handlers it credits; appended only where declared, so a reading of a spec without one keeps its fingerprint.
+      c.invariants.flatMap((i) => i.enforcements.flatMap((e) => (e.form === "chokepoint" ? [e.unless === undefined ? [i.name, e.chokepoint, e.protects] : [i.name, e.chokepoint, e.protects, e.unless]] : []))),
     ]),
   );
 }
 
-/** The root files a reading reads besides source: the config, and the manifests whose runners and bins are detected entrances. */
-const MANIFESTS: ReadonlySet<string> = new Set(["coherence.config.json", "package.json", "pyproject.toml"]);
+/** Whether a reading reads the file besides source: the config, and each language's configuration, manifests and lockfiles (isBasisFile), whose runners and bins are detected entrances. */
+function readBesidesSource(file: string, skip: ReturnType<typeof boundsOf>): boolean {
+  if (file === "coherence.config.json") return true;
+  return isBasisFile(basename(file)) && (!file.includes("/") || withinBounds(file, skip));
+}
 
 /**
  * The fingerprint of what a reading reads: every source file of each of
@@ -162,14 +187,14 @@ const MANIFESTS: ReadonlySet<string> = new Set(["coherence.config.json", "packag
  * manifests, by path and content, and the specs' shape as the reading
  * depends on it. Equal fingerprints mean the reading still describes the tree.
  */
-export function structureFingerprint(root: string): string {
+export function structureFingerprint(root: string, model?: SpecModel): string {
   const languages = readEnforcementConfig(root).languages;
   const skip = boundsOf(root, configIgnore(root));
   const hash = createHash("sha256");
-  hash.update(specShape(root)).update("\u0000");
+  hash.update(specShape(root, model)).update("\u0000");
   for (const file of projectFiles(root)) {
-    // The manifests too: the entrances the reading detects include what package.json and pyproject.toml run.
-    const counted = MANIFESTS.has(file) || (withinBounds(file, skip) && languages.some((language) => isSourceFile(file, language)));
+    // The manifests too: the entrances the reading detects include what the languages' manifests run.
+    const counted = readBesidesSource(file, skip) || (withinBounds(file, skip) && languages.some((language) => isSourceFile(file, language)));
     if (!counted) continue;
     let text: Buffer;
     try {
@@ -193,13 +218,6 @@ interface Recorded {
 
 function readingPath(root: string): string {
   return join(root, STRUCTURE_DIR, "reading.json");
-}
-
-function writeAtomically(path: string, text: string): void {
-  mkdirSync(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  writeFileSync(temporary, text, "utf8");
-  renameSync(temporary, path);
 }
 
 /**
@@ -243,10 +261,10 @@ export function freshReading(root: string, fingerprint: string = structureFinger
  * as they stand now. flowOf reads the spec, the runs, the reading, the zoom
  * and the journal's escalations; the views' own fields are left at rest.
  */
-export function structureState(root: string, reading: InterfaceReading): ShellState {
+export function structureState(root: string, reading: InterfaceReading, model?: SpecModel): ShellState {
   const runs = loadRuns(root);
   const state = {
-    spec: loadSpec(root),
+    spec: loadSpec(root, model),
     runs: { records: runs.records, damaged: runs.damaged },
     // Escalations only color the health strip; the gaps never read them.
     journal: { records: [], damaged: [], work: { kind: "absent", because: "not read for the gaps" } },
@@ -257,10 +275,10 @@ export function structureState(root: string, reading: InterfaceReading): ShellSt
 }
 
 /** The gaps now, from the recorded reading when it still describes the tree; undefined when the state is stale or unknown. */
-export function currentGaps(root: string, fingerprint?: string): (GapState & { at: string }) | undefined {
+export function currentGaps(root: string, fingerprint?: string, model?: SpecModel): (GapState & { at: string }) | undefined {
   const fresh = freshReading(root, fingerprint);
   if (fresh === undefined) return undefined;
-  const state = structureState(root, fresh.reading);
+  const state = structureState(root, fresh.reading, model);
   return { ...gapsOf(state, flowOf(state)), at: fresh.at };
 }
 
@@ -315,33 +333,44 @@ function refreshPath(root: string): string {
   return join(root, STRUCTURE_DIR, "refresh.json");
 }
 
-function readMark(root: string): RefreshMark | undefined {
+/** Where a background run keeps its mark, and the end of the command line that runs it: one slot per kind of run. */
+export interface RefreshSlot {
+  path: string;
+  command: RegExp;
+}
+
+// The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
+const STRUCTURE_QUERY = /(?:^|\s)query\s+structure\s*$/;
+
+function readMark(path: string): RefreshMark | undefined {
   try {
-    return JSON.parse(readFileSync(refreshPath(root), "utf8")) as RefreshMark;
+    return JSON.parse(readFileSync(path, "utf8")) as RefreshMark;
   } catch {
     return undefined;
   }
 }
 
-/** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */
-export function refreshUnderWay(root: string, now: () => number = Date.now): RefreshMark | undefined {
-  const mark = readMark(root);
+function markUnderWay(mark: RefreshMark | undefined, now: () => number): RefreshMark | undefined {
   if (mark === undefined) return undefined;
   return alive(mark.pid) && now() - Date.parse(mark.at) < REFRESH_STALE_MS ? mark : undefined;
+}
+
+/** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */
+export function refreshUnderWay(root: string, now: () => number = Date.now): RefreshMark | undefined {
+  return markUnderWay(readMark(refreshPath(root)), now);
 }
 
 /**
  * Stop a refresh reading a tree that is no longer the tree: its reading could
  * never be kept (recordReading refuses a tree that moved), so it only holds
- * the one slot. Only a process whose command line is a structure query is
- * signalled, so a reused pid is never touched; its whole group goes, the
- * language server with it.
+ * the one slot. Only a process whose command line ends as the slot's own
+ * run does is signalled, so a reused pid is never touched; its whole group
+ * goes, the language server with it.
  */
-function supersede(pid: number): boolean {
+function supersede(pid: number, ownCommand: RegExp): boolean {
   try {
     const command = execFileSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 2000 });
-    // The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
-    if (!/(?:^|\s)query\s+structure\s*$/.test(command)) return false;
+    if (!ownCommand.test(command)) return false;
   } catch {
     return false;
   }
@@ -364,16 +393,16 @@ function supersede(pid: number): boolean {
  * older tree is superseded (df-84db9e4f: the tree a session leaves at its stop
  * is the one the next session starts on). Never twice for the same tree (a
  * reading that could not finish is not retried until the tree changes).
- * `command` is the argv that records a reading (the CLI's query structure).
- * Returns whether one started.
+ * `command` is the argv that records a reading (the CLI's query structure);
+ * `slot` is the structure refresh's own unless another kind of run passes its
+ * mark and command line. Returns whether one started.
  */
-export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now): boolean {
-  const path = refreshPath(root);
+export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now, slot: RefreshSlot = { path: refreshPath(root), command: STRUCTURE_QUERY }): boolean {
   try {
-    const mark = readMark(root);
+    const mark = readMark(slot.path);
     if (mark !== undefined) {
       if (mark.fingerprint === fingerprint) return false;
-      if (refreshUnderWay(root, now) !== undefined && !supersede(mark.pid)) return false;
+      if (markUnderWay(mark, now) !== undefined && !supersede(mark.pid, slot.command)) return false;
     }
     const [program, ...args] = command;
     if (program === undefined) return false;
@@ -381,7 +410,7 @@ export function refreshInBackground(root: string, command: readonly string[], fi
     child.on("error", () => {});
     child.unref();
     if (child.pid === undefined) return false;
-    writeAtomically(path, JSON.stringify({ pid: child.pid, at: new Date(now()).toISOString(), fingerprint } satisfies RefreshMark));
+    writeAtomically(slot.path, JSON.stringify({ pid: child.pid, at: new Date(now()).toISOString(), fingerprint } satisfies RefreshMark));
     return true;
   } catch {
     return false;

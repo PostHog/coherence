@@ -1,0 +1,19 @@
+{
+  "name": "quint",
+  "version": "0.1.0",
+  "pluginApi": 4,
+  "title": "Quint",
+  "description": "a verifier: `via: [quint]` and `[quint run]` prove a property of a Quint model",
+  "module": "index.ts",
+  "verifiers": [
+    {
+      "form": "quint",
+      "evidence": "bounded-model-checked"
+    },
+    {
+      "form": "quint run",
+      "evidence": "simulated"
+    }
+  ],
+  "lexicon": "lexicon.json"
+}

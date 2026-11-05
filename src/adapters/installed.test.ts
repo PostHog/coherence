@@ -13,8 +13,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { installedPackage, locateServer, locateTsserver, tsserverNotice } from "./installed.ts";
-import { startContext, tsserverBlock } from "../lifecycle/hook.ts";
+import { installedPackage, locateServer } from "./installed.ts";
+import { locateTsserver, tsserverNotice } from "../../plugins/typescript/tsserver.ts";
+import { startContext, languageNoticeBlock as tsserverBlock } from "../lifecycle/hook.ts";
 
 // The real path: the resolver answers with real paths, and on macOS the temporary folder is a link.
 const scratch = realpathSync(mkdtempSync(join(tmpdir(), "coherence-installed-")));
@@ -141,7 +142,8 @@ const SHELL_ONLY = new Map([
 
 test("no source file builds a path into node_modules by hand: every package Coherence starts, drives or detects is found by the resolver", () => {
   const src = dirname(dirname(fileURLToPath(import.meta.url)));
-  const found = sources(src)
+  // The bundled plugins' sources too: the language adapters that start and drive the servers live there.
+  const found = [...sources(src), ...sources(join(src, "..", "plugins"))]
     .filter((file) => !SHELL_ONLY.has(file.slice(src.length + 1)))
     .flatMap((file) =>
       readFileSync(file, "utf8")

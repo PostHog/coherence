@@ -1,5 +1,7 @@
 # Coherence checks itself on every pull request and every push to main: the
-# typecheck, the unit tests, the lexicon and spec checks (npm test), and a
+# typecheck, the unit tests (in two shards, with the spawned end-to-end set
+# in src/*.e2e.ts among them), the lexicon and spec checks (what
+# npm test runs), and a
 # chokepoint run over Coherence's own invariants. A test proves code behaves;
 # only the chokepoint run proves no code reaches around a declared door, and
 # without it a bypass reached main with every test green (df-5961bdb2).
@@ -24,7 +26,96 @@ env:
   DO_NOT_TRACK: "1"
 
 jobs:
-  verify:
+  # The unit tests, split by file across two runners: the suite is bound by
+  # the runner's cores, so two shards take about half the wall time of one.
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    name: unit (${{ matrix.shard }}/2)
+    steps:
+      # Full history: a practice's pitfalls may cite commits, and the spec check confirms each exists.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.18"
+
+      - name: Install
+        run: npm ci
+
+      # The language servers the adapters ask: neither is a dependency of the package, so an adopter brings its own.
+      - name: Language servers
+        run: npm install --global typescript-language-server@5.1.3 typescript@5.9.2 pyright@1.1.413
+
+      # The Python test runner and tach, into .venv, where the tests look for them.
+      - name: Python test tools
+        run: npm run test:setup
+
+      # The Rust adapter's server: no npm package, and no default component of the runner's toolchain. A missing one fails rust.test.ts.
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          components: rust-analyzer, rust-src
+
+      # The Go plugin's server: go.test.ts holds it to every duty over a real gopls, and a missing one fails it.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          cache: false
+
+      - name: gopls
+        run: go install golang.org/x/tools/gopls@v0.23.0
+
+      # Some fixtures commit to throwaway repositories.
+      - name: Git identity
+        run: |
+          git config --global user.email "ci@coherence.invalid"
+          git config --global user.name "Coherence CI"
+
+      - name: Unit tests
+        env:
+          COHERENCE_TEST_SHARD: ${{ matrix.shard }}/2
+        run: npm run test:unit
+
+  # The TypeScript plugin's two parsers, rebuilt from tree-sitter-typescript
+  # 0.23.2 and Coherence's patch (grammars/tree-sitter-typescript). The fetch
+  # phase downloads every input and checks it by digest; the build phase runs
+  # in a container with no network (docker --network none, which is what
+  # denies it; the phase's own connection attempt is a tripwire), checks every
+  # input again, builds from the pinned upstream tree, refuses a patch that
+  # changes anything but the grammar and its scanner, runs upstream's corpus
+  # from that clean tree and Coherence's from corpus/ (outside the patch),
+  # builds the stock and patched parsers, fails on any difference between
+  # what they read that intended-differences.json does not allow and on any
+  # expected tree the patched parsers do not read (compare.mjs), and fails
+  # unless each patched parser comes out byte for byte as parsers.sha256
+  # records. The image is inputs.sh's build_image, pinned by digest.
+  typescript-parsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fetch the pinned inputs
+        run: grammars/tree-sitter-typescript/fetch.sh "$RUNNER_TEMP/grammar-inputs"
+
+      - name: Build both parsers with no network and compare them with the stock ones
+        run: |
+          . grammars/tree-sitter-typescript/inputs.sh
+          docker run --rm --network none \
+            --volume "$GITHUB_WORKSPACE:/repo:ro" --volume "$RUNNER_TEMP/grammar-inputs:/inputs:ro" \
+            "$build_image" /repo/grammars/tree-sitter-typescript/build-phase.sh /inputs /tmp/parsers
+
+  # Everything in npm test but the unit tests, beside them, and the chokepoint run.
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -63,12 +154,25 @@ jobs:
           git config --global user.email "ci@coherence.invalid"
           git config --global user.name "Coherence CI"
 
-      - name: Typecheck, unit tests, lexicon and spec checks
-        run: npm test
+      - name: Typecheck, lexicon and spec checks
+        run: npm run -s typecheck && npm run -s lexicon:check && npm run -s spec:check
 
       # Every chokepoint graded in-process (no warm server); a broken one fails the run.
       - name: Chokepoints
         run: node --disable-warning=ExperimentalWarning src/cli.ts run --form chokepoint --no-server --session "ci-${{ github.run_id }}" --agent ci
+
+  # One check that stands for the rest: green only when every shard, the checks and the parsers' build are.
+  verify:
+    if: always()
+    needs: [unit, checks, typescript-parsers]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every shard and check passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
 
   # One session's hooks over a synthetic monorepo of about 5,000 files under a
   # registry of three products, warm-up on: each event's wall time against
@@ -94,3 +198,11 @@ jobs:
 
       - name: Scale benchmark
         run: node --disable-warning=ExperimentalWarning bench/scale/run.ts
+
+      # The prefilter over Coherence's own tree, read both ways: the unit suite proves it on fixtures; this reads the whole tree twice, so it lives here, out of the unit suite's time.
+      - name: Prefilter over Coherence's own tree
+        run: node --disable-warning=ExperimentalWarning bench/interfaces/own-tree.ts
+
+      # The Scope page over Coherence's own tree and every record it keeps: its size, and the site window over its own runs. The unit suite proves both on fixtures; no unit test reads Coherence's whole tree (src/enforcement/test-budgets.ts).
+      - name: Scope page over Coherence's own tree
+        run: node --disable-warning=ExperimentalWarning bench/scope/own-tree.ts

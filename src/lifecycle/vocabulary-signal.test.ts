@@ -13,11 +13,12 @@ import { runHook } from "./hook.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { lexiconWorkCommand } from "./lexicon-cli.ts";
 import { FUNCTION_WORDS, STOPLIST } from "./stoplist.ts";
-import { reviewLexicon } from "./lexicon-maintain.ts";
+import { loadLexicon, rejectedNames } from "./lexicon.ts";
+import { COHERENCE_LEXICON } from "./project.ts";
 
 const COMPONENTS = ["books", "sales", "stock", "staff"];
 
-/** A project whose lexicon knows "exposure" (with a rejected name) and "unit basis" as a property of two concepts. */
+/** A project whose lexicon knows "exposure" (with a rejected name), "unit basis" as a property of two concepts, and "adapter", a spelling Coherence's lexicon also records. */
 function project(config: Record<string, unknown> = {}): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-vocabulary-"));
   writeFileSync(
@@ -36,6 +37,7 @@ function project(config: Record<string, unknown> = {}): string {
         },
         { name: "allocation", definition: "A distributed share.", aliases: [], properties: { unit_basis: "percent" } },
         { name: "agent host", definition: "The application running a session.", aliases: [], instances: ["Claude Code"] },
+        { name: "adapter", definition: "The module that imports one bank's statements.", aliases: [] },
       ],
     }),
   );
@@ -74,6 +76,8 @@ test("a code identifier is never a candidate unless it is declared and prose rec
         "",
       ].join("\n"),
     );
+    // A type body in code no adapter language claims is not read as TypeScript's: its field is no declared name.
+    writeFileSync(join(root, "books/legacy.go"), ["export interface Legacy {", "  auditor: string;", "}", ""].join("\n"));
     // Prose writes "roster", "owner" and "tally marks" as words on many lines in every component; only declared names may surface.
     for (const c of COMPONENTS)
       writeFileSync(
@@ -85,6 +89,9 @@ test("a code identifier is never a candidate unless it is declared and prose rec
           "The owner reconciles it weekly, and tally marks are erased.",
           "Work order w-947cd2be and decision d-4a122d41 touched `.venv/bin/python` and `[a-z]` in src/books/roster.ts.",
           "Session 0e4a21bf-165b-4cef-8131-e66f7d90d073 read `a-z` and `readFileSync` again.",
+          "The auditor reads the roster.",
+          "An auditor signs each closed roster.",
+          "No auditor edits the roster.",
           "",
         ].join("\n"),
       );
@@ -92,6 +99,7 @@ test("a code identifier is never a candidate unless it is declared and prose rec
     const found = candidates(report);
     assert.ok(found.includes("roster"), `a declared name recurring in prose is a candidate: ${found.join(", ")}`);
     assert.ok(found.includes("owner"), `a declared field recurring in prose is a candidate: ${found.join(", ")}`);
+    assert.ok(!found.includes("auditor"), `a field in a file no adapter language claims is never read as declared: ${found.join(", ")}`);
     for (const never of ["tally marks", "tally", "marks", "read file sync", "deep equal", "roster balance sync", "balance", "sync", "a z", "venv", "bin python", "readfilesync"])
       assert.ok(!terms(report).includes(never), `"${never}" is a local, a split identifier, or a fragment, never a term`);
     for (const t of terms(report)) {
@@ -137,32 +145,43 @@ function record(root: string, id: string, chose: string): void {
   );
 }
 
-test("sense review is asked only where meaning is at risk: more than one recorded sense, a rejected name beside the use, or a Coherence concept an adopter's code declares written where Coherence's grammar speaks", async () => {
+test("sense review is asked only where meaning is at risk: more than one of the project's recorded senses, or a name it rejected beside the use; a word Coherence also uses asks nothing, in code, prose, specs or records", async () => {
   const root = project();
   try {
+    writeFileSync(join(root, "staff/adapter.ts"), "export function adapter(): string {\n  return 'bank';\n}\n");
+    writeFileSync(join(root, "staff/banks.md"), "Each adapter imports one bank.\n");
+    appendFileSync(join(root, "stock/Stock.spec.md"), "\n## adapter\n");
     writeFileSync(join(root, "books/notes.md"), "The exposure is counted in USD.\nNothing else here.\n\n\nThe exposure is settled nightly.\n");
     writeFileSync(join(root, "sales/notes.md"), "The exposure is counted in USD.\nIt is not the hazard.\n");
     writeFileSync(join(root, "stock/notes.md"), "Each row states its unit basis.\n");
     writeFileSync(join(root, "staff/model.ts"), "export function scope(): string {\n  return 'staff';\n}\n");
-    writeFileSync(join(root, "staff/notes.md"), "The scope of a shift is one day.\n");
+    // A word Coherence rejected for its own scope concept, beside the adopter's scope: an ordinary word of the project's.
+    const tool = rejectedNames(await loadLexicon(COHERENCE_LEXICON)).find((n) => n.concept === "scope" && !n.name.includes(" "))!.name;
+    writeFileSync(join(root, "staff/notes.md"), `The scope of a shift is one day.\nThe scope of a shift is its ${tool}.\n`);
+    const Tool = tool[0]!.toUpperCase() + tool.slice(1);
+    writeFileSync(join(root, "books/floor.md"), `We open the ${Tool} at dawn.\nEach night the ${Tool} is shut.\nNobody climbs the ${Tool} twice.\n`);
     record(root, "d-1", "narrow the scope to one shift");
+    record(root, "d-2", "retry the chase adapter after it broke");
     const report = await lexiconCoverage(root);
     const risk = (term: string, component: string): string | undefined =>
       report.terms.find((t) => t.term === term)?.contexts.find((c) => c.component === component)?.risk;
     assert.equal(risk("exposure", "books"), undefined, "an ordinary use of a defined word asks no review");
-    assert.match(risk("exposure", "sales") ?? "", /hazard/, "a name rejected for the concept beside its use puts the sense at risk");
-    assert.match(risk("unit basis", "stock") ?? "", /more than one recorded sense/, "a name with two recorded senses is at risk");
-    assert.equal(risk("scope", "staff"), undefined, "a Coherence concept the adopter's code declares is the project's sense in its code and its domain prose");
-    assert.match(risk("scope", ".") ?? "", /declared in this project's code \(staff\/model\.ts:1\).*text Coherence reads as its own \(\.coherence\/journal\/payroll\.jsonl:1\)/, "the same name in a record, text written to Coherence, is where the two senses meet");
+    assert.match(risk("exposure", "sales") ?? "", /hazard/, "a name the project rejected for the concept beside its use puts the sense at risk");
+    assert.match(risk("unit basis", "stock") ?? "", /more than one recorded sense/, "a name with two of the project's senses is at risk");
+    for (const [term, component] of [["adapter", "staff"], ["adapter", "stock"], ["adapter", "."], ["scope", "staff"], ["scope", "."]] as const)
+      assert.equal(risk(term, component), undefined, `${term} in ${component}: a word Coherence also uses is the project's word, in its code, prose, spec grammar and records alike`);
+    assert.equal(report.terms.find((t) => t.term === "scope")?.layer, "coherence", "Coherence's own name still resolves, as a reference");
+    assert.notEqual(report.terms.find((t) => t.term === tool.toLowerCase())?.state, "rejected", `${tool}, which Coherence rejected for its own concept, is never labelled rejected in an adopter`);
+    assert.ok(!candidates(report).includes(tool.toLowerCase()), `nor offered as a term that lacks a definition, recurring as the project's name: ${candidates(report).join(", ")}`);
     const at = attention(report).senses.map((s) => `${s.term}@${s.component}`).sort();
-    assert.deepEqual(at, ["exposure@sales", "scope@.", "unit basis@stock"]);
-    assert.equal(report.totals.unreviewedContexts, 3, "only at-risk contexts await review");
+    assert.deepEqual(at, ["exposure@sales", "unit basis@stock"]);
+    assert.equal(report.totals.unreviewedContexts, 2, "only at-risk contexts await review");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("a Coherence name an adopter's code declares is the project's own sense: its code, its domain prose and its specs' sentences ask nothing, its specs' grammar does", async () => {
+test("a Coherence name an adopter's code declares is the project's own sense everywhere: its code, its domain prose, its specs' sentences and grammar, and its records ask nothing", async () => {
   const root = project();
   try {
     writeFileSync(
@@ -175,42 +194,21 @@ test("a Coherence name an adopter's code declares is the project's own sense: it
       join(root, "books/Books.spec.md"),
       "# books\n\n## invariants\n- books balance: Each run of the books balances within one scope, under one config and spec.\n  because: the structure of a book is its run\n\n## structure\n",
     );
+    record(root, "d-1", "keep one run per scope, one spec per config and one structure per book");
     const report = await lexiconCoverage(root);
-    const risk = (term: string): string | undefined =>
-      report.terms.find((t) => t.term === term)?.contexts.find((c) => c.component === "books")?.risk;
-    for (const name of ["config", "run", "spec", "scope"]) {
-      assert.ok(report.terms.find((t) => t.term === name)?.contexts.some((c) => c.component === "books"), `${name} is observed in books`);
-      assert.equal(risk(name), undefined, `${name}, declared in the adopter's code, written in its code, prose and spec sentences, is the project's sense`);
+    for (const name of ["config", "run", "spec", "scope", "structure"]) {
+      const contexts = report.terms.find((t) => t.term === name)?.contexts ?? [];
+      assert.ok(contexts.some((c) => c.component === "books"), `${name} is observed in books`);
+      assert.deepEqual(contexts.filter((c) => c.risk !== undefined).map((c) => `${c.component}: ${c.risk}`), [], `${name}, declared in the adopter's code, is the project's sense wherever it is written`);
     }
-    assert.match(risk("structure") ?? "", /Books\.spec\.md:7/, "a declared name in a spec's grammar (its ## structure heading) is where Coherence's sense speaks too");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("a ruling on a Coherence name an adopter's code declares holds for its component: a new use of the same name does not reopen it, and settling it still needs a person", async () => {
-  const root = project();
-  try {
-    writeFileSync(join(root, "staff/model.ts"), "export function scope(): string {\n  return 'staff';\n}\n");
-    record(root, "d-1", "narrow the scope to one shift");
-    const context = async () => (await lexiconCoverage(root)).terms.find((t) => t.term === "scope")!.contexts.find((c) => c.component === ".")!;
-    const first = await context();
-    assert.ok(first.risk !== undefined, "the record puts the declared name's sense at risk");
-    const who = { session: "ruling-test", agent: "test" };
-    await assert.rejects(reviewLexicon(root, "scope", ".", first.fingerprint, "not-domain", who, "the payroll scope", ["Coherence's scope"]), /human/);
-    await reviewLexicon(root, "scope", ".", first.fingerprint, "not-domain", who, "the payroll scope is a shift's span", ["Coherence's scope"], "owner: a shift's span");
-    record(root, "d-2", "widen the scope to a fortnight");
-    const later = await context();
-    assert.equal(later.fingerprint, first.fingerprint, "the evidence is the term and component, not the uses");
-    assert.equal(later.disposition, "not-domain", "a new use of the same name keeps the ruling");
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-/** Whether a text carries a count of the population rather than names. */
+/** Whether a text carries a count of the population rather than names: the vocabulary's, or the dead-end reading's line of what it read. */
 function carriesTotal(text: string): boolean {
-  return /\b\d+ (?:unresolved|unsettled|new\/changed|observed|contexts?|candidate)/i.test(text) || /Lexicon coverage:/.test(text);
+  return /\b\d+ (?:unresolved|unsettled|new\/changed|observed|contexts?|candidate|worktree)/i.test(text) || /Lexicon coverage:|Dead ends: none|defects placed by/.test(text);
 }
 
 function injected(stdout: string): string {
@@ -222,6 +220,9 @@ function injected(stdout: string): string {
 test("no hook injection carries a total: orient names the ranked terms or says nothing", async () => {
   const root = project();
   try {
+    // A journal holding a defect and no dead end: the dead-end reading has read something, and orient says nothing of it.
+    mkdirSync(join(root, ".coherence", "journal"), { recursive: true });
+    writeFileSync(join(root, ".coherence", "journal", "earlier.jsonl"), JSON.stringify({ id: "df-0rient00", kind: "defect", at: new Date(Date.now() - 60_000).toISOString(), session: "earlier", agent: "a", commit: null, dirty: false, what: "the sum rounded", evidence: "a report", files: ["books/sums.ts"], component: "books" }) + "\n");
     const input = { session_id: "orient-test", cwd: root };
     const quiet = await runHook("SessionStart", input, root);
     assert.ok(!carriesTotal(injected(quiet.stdout)), injected(quiet.stdout));

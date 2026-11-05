@@ -35,10 +35,12 @@ import {
 } from "../scope/derive.ts";
 import { CORE_RULE, DEFAULT_RULE, NO_CONTROL_NEEDED, NO_TRACED_CONTROL, ROUTE_RULE, CONTROL_WORDS, controlInWords, flowBoundsText, unreadLanguagesText, flowDefaultSelection, flowLabelLines, flowOf, flowPartialText, routeName, trustInWords } from "../scope/structure-flow.ts";
 import type { FlowModel } from "../scope/structure-flow.ts";
-import { CANDIDATE_RULES, NOT_DETECTED, coverageLine, groupLine } from "../scope/entrance-coverage.ts";
+import { candidateRulesOf, coverageLine, groupLine, notDetectedOf } from "../scope/entrance-coverage.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
-import { lexiconReviewCommand } from "../scope/model.ts";
-import type { LexiconCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
+import { BUDGET_FLAGS } from "../scope/component-interfaces.ts";
+import { coverageUnread, lexiconReviewCommand } from "../scope/model.ts";
+import { MIRRORS_USAGE } from "../mirrors/policy.ts";
+import type { CoverageUnread, LexiconCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
 
 export const QUESTIONS = ["invariants", "relies-on", "spine", "structure", "status", "component", "order", "economy", "lexicon", "observed"] as const;
 export type Question = (typeof QUESTIONS)[number];
@@ -52,13 +54,14 @@ export const QUERY_USAGE = [
   "  query invariants <path...>     which invariants touch these files, by component and by reference site",
   "  query relies-on <chokepoint>   who references this chokepoint, from the latest run",
   "  query spine                    trust levels and every crossing-bearing invariant, in Structure order",
-  "  query structure [--interface-seconds <n>] [--interface-memory <MB>]   the structural routes, core dependencies, interface identifiers and component interfaces Structure draws, and the placement; the interface reading is bounded to the declared components and says when a budget left it partial",
+  `  query structure ${BUDGET_FLAGS}   the structural routes, core dependencies, interface identifiers and component interfaces Structure draws, and the placement; the interface reading is bounded to the declared components and says when a budget left it partial`,
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what it cites, what binds to it, and what cites it",
   "  query economy <path...> | --changed [--since <commit>]   what must be loaded to change these files safely: the economy prediction, through the instrument; --changed reads the working change from git (staged, unstaged, untracked), --since widens it from the merge base of <commit> and HEAD (--since main: this branch's whole change set)",
   "  query practice [<practice>]     every practice with its trigger, state and enactments; with one named, the whole practice as the hook delivers it",
-  "  query convergence [--days <n>] [--json]   whether discoveries repay: defects arriving by origin and catch, escapes per release, closes with a guard, repeats per class, bullets over time, churn, hook latency per version",
+  MIRRORS_USAGE,
+  "  query convergence [--days <n>] [--json]   whether discoveries repay: defects arriving by origin and catch, escapes per release, closes with a guard, repeats per class, dead ends, bullets over time, churn, hook latency per version",
   "  query observed [<component>] [--failures [--since <commit>]]   each component interface exercised by N tests or never observed, from the latest observation, fresh or stale; failing tests with what broke, the likely site, and the region",
 ].join("\n");
 
@@ -234,7 +237,7 @@ export function answerStructure(state: ShellState): Answer {
     `crossings (${model.crossings.length}), every one drawn: ${model.crossings.filter((c) => c.on === "interface").length} on component interfaces, ${model.crossings.filter((c) => c.on === "entrance").length} on entrance lines only, ${model.crossings.filter((c) => c.on === "component").length} on component boundary marks`,
     `structural routes (${model.routes.length}), ${model.routesFrom === "root interfaces" ? "derived from the root component's component interfaces by reference weight, not flow: no entrance is declared" : model.routesFrom === "entrances" ? `one per distinct path and trust from the declared entrances; ${ROUTE_RULE}` : "none: no entrance is declared and there is no root"}:`,
   ];
-  for (const route of model.routes) lines.push(`  ${routeName(route)}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}${route.derived ? "" : `  trust ${trustInWords(route)}`}${route.entry.length === 0 ? "" : `  enters through ${route.entry.join(" ")}`}${route.noTracedControl ? `  ${NO_TRACED_CONTROL}` : ""}${route.noControl ? `  ${NO_CONTROL_NEEDED}` : ""}${route.traced.some((c) => c.kind !== "interface") ? `  traced: ${route.traced.filter((c) => c.kind !== "interface").map(controlInWords).join("; ")}` : ""}${route.partial.length === 0 ? "" : `  passed by some: ${route.partial.map((c) => `${c.name} (${CONTROL_WORDS[c.kind]}) on ${c.entrances} of ${route.entrances.length}`).join("; ")}`}  ${route.sites} sites`);
+  for (const route of model.routes) lines.push(`  ${routeName(route)}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}${route.derived ? "" : `  trust ${trustInWords(route)}`}${route.entry.length === 0 ? "" : `  enters through ${route.entry.join(" ")}`}${route.noTracedControl ? `  ${NO_TRACED_CONTROL}` : ""}${route.noControl ? `  ${NO_CONTROL_NEEDED}` : ""}${route.traced.some((c) => c.kind !== "interface") ? `  traced: ${route.traced.filter((c) => c.kind !== "interface").map(controlInWords).join("; ")}` : ""}${route.partial.length === 0 ? "" : `  passed by some: ${route.partial.map((c) => `${c.name} (${CONTROL_WORDS[c.kind]}) on ${c.entrances} of ${route.entrances.length}`).join("; ")}`}${switchedOffText(model, route)}  ${route.sites} sites`);
   const opens = model.nodes.find((node) => node.id === flowDefaultSelection(model));
   lines.push(`the map opens on: ${opens === undefined ? "nothing selected, the whole system" : `${opens.folder}, broken`} (${DEFAULT_RULE})`);
   lines.push(`not covered (${h.uncovered.length})${h.uncovered.length === 0 ? "" : `: ${h.uncovered.join(", ")}`}`);
@@ -268,6 +271,13 @@ export function answerStructure(state: ShellState): Answer {
  * declared entrances cover nothing detected, every undeclared detected
  * entrance with its rule and why, and the rules with what they cannot see.
  */
+/** The chokepoints a route's entrances call with their check switched off, as the query says them: "  switched off: <invariant> (<option>: true)". */
+function switchedOffText(model: FlowModel, route: FlowModel["routes"][number]): string {
+  const off = new Map<string, string>();
+  for (const id of route.entrances) for (const s of model.entrances.find((e) => e.id === id)?.switchedOff ?? []) off.set(`${s.name} (${s.component})`, s.unless);
+  return off.size === 0 ? "" : `  switched off: ${[...off].map(([name, unless]) => `${name}, called with ${unless}: true`).join("; ")}`;
+}
+
 function coverageLines(model: FlowModel): string[] {
   const coverage = model.coverage;
   if (coverage === undefined) return model.evidence === "language adapter" ? ["entrance coverage: not measured; the reading kept no detected entrances (taken before detection)"] : [];
@@ -278,8 +288,8 @@ function coverageLines(model: FlowModel): string[] {
   for (const c of coverage.uncovered) lines.push(`    ${c.file}:${c.line}  ${c.symbol === "" ? "(the file)" : c.symbol}  ${c.rule}: ${c.why}`);
   // Each language read, by its own rules.
   for (const language of model.languages?.read ?? [model.language ?? ""]) {
-    const rules = CANDIDATE_RULES[language] ?? [];
-    if (rules.length > 0) lines.push(`  detected by (${language}): ${rules.map((r) => `${r.rule}, ${r.detects}`).join("; ")}; ${NOT_DETECTED[language]}`);
+    const rules = candidateRulesOf(language);
+    if (rules.length > 0) lines.push(`  detected by (${language}): ${rules.map((r) => `${r.rule}, ${r.detects}`).join("; ")}; ${notDetectedOf(language)}`);
   }
   return lines;
 }
@@ -365,9 +375,10 @@ export interface QueryOptions {
 }
 
 /** Render either the full authoritative reading or an explicitly labelled page selection. */
-export function answerLexicon(report: LexiconCoverage | undefined, args: string[]): Answer {
+export function answerLexicon(report: LexiconCoverage | CoverageUnread | undefined, args: string[]): Answer {
   if (args.length !== 1 || args[0]!.trim() === "") return { text: "query lexicon needs one term", code: 64 };
   if (!report) return { text: "No vocabulary usage reading is available in this page state.", code: 64 };
+  if (coverageUnread(report)) return { text: `The vocabulary coverage is ${report.kind === "reading" ? "still being read" : "not read"}: ${report.because}.`, code: 64 };
   const term = args[0]!.trim().toLowerCase();
   const terms = report.terms.filter((t) =>
     t.term === term || t.concept?.toLowerCase() === term || t.meaningAlternatives?.some((meaning) => meaning.concept.toLowerCase() === term));

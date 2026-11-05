@@ -33,12 +33,19 @@ The context closure of a change, the read traces that record what sessions actua
   crossing: project-source -> reading
   refuted: printed the total line before the unreached line -> "mass: a file in no component and a file in a component that no invariant reaches count as unreached; unreached prints first; deterministic" went red in economy.test.ts on the first printed line; restored, green (2026-09-17)
   kinds: none
-- mass names folders with no spec of their own: Mass names every folder, at any depth inside a component, that directly holds three or more of its code files and has no spec of its own, with its numbers and the component that holds it; a folder with its own spec is a component and is never named.
+- mass names folders with no spec of their own: Mass names every folder, at any depth inside a component, that directly holds three or more of its code files and has no spec of its own, with its numbers and the component that holds it, unless the component's spec declares it folded; a folder with its own spec is a component and is never named.
   over: every folder inside a component's folder, at any depth, that holds code files directly
   via: mass names each folder of three or more code files that a component above it holds only because the folder has no spec of its own
   because: an adoption declared a spec per top-level folder and stopped, and every reading counted the nested units (credit balances, an inbox, each Temporal feature) as covered by the component above them; nothing said the reading had folded them, so a human had to ask the agent to go deeper (df-9750aee2). Naming each folded folder with its weight makes the next spec to write a printed line
   crossing: project-source -> reading
   refuted: named only the folders directly under the component, as a top-level walk would -> "mass names each folder of three or more code files that a component above it holds only because the folder has no spec of its own" went red in economy.test.ts, src/app/queue/inbox unnamed; restored, green (2026-10-06)
+  kinds: none
+- mass never names a folded folder: A folder its component's spec declares under ## folded, by its own path or under a subtree bullet (<folder>/**), at any depth, is never named as a folder with no spec of its own; mass counts the folded folders and their weight on one line of their own, and a folder folded alone does not fold the folders under it.
+  over: every folder of three or more code files inside a component, folded by its own bullet, under a subtree bullet, or not folded
+  via: mass never names a folder its component's spec declares folded, and counts what it set aside
+  because: the adopt practice said to record a decision for each folder that belongs to the component above, and mass read no decision: umami's seven decisions covered 69 folders and mass still named all 69, so the step could never be finished and the line a human reads first stayed a list of things already settled. The fact lives in the holding component's spec, where the model keeps it true
+  crossing: project-source -> reading
+  refuted: made mass name every folder of three or more code files as unspecced, folded or not -> "mass never names a folder its component's spec declares folded, and counts what it set aside" went red in economy.test.ts on its own assertion; restored byte for byte, green (2026-10-28)
   kinds: none
 - working change is the project's change: The economy of the working change starts from exactly the project files git reports as changed, each with how git reported it: staged, unstaged, and untracked files not ignored against HEAD, and with --since everything from the merge base of the ref and HEAD; a deletion is reported and never given, a rename is its new path noting the old, and no ignored file or nested checkout ever counts.
   over: every path git reports for the working change of one tree, with and without --since
@@ -72,4 +79,16 @@ The context closure of a change, the read traces that record what sessions actua
   because: mass read the primary language alone, so a frontend's code was neither reached nor unreached and the report looked complete (df-f47a5c05)
   crossing: project-source -> reading
   refuted: made computeMass take the primary language's source files alone -> "mass of a two-language project counts every language's files and says which languages it read" went red in multi-language.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- mass that read nothing says so: When mass reads no source file, its headline says the mass was not measured and names each language no scan read, never a share of unreached lines.
+  over: a project whose only language is Rust, which no text scan reads yet, holding a spec and a source file
+  via: mass over a project whose only language no scan reads says it measured nothing, never 0% unreached
+  because: mass over a language it could not read printed "0% of lines" unreached at its head, which reads as every line reached, with the language named as not read only at the bottom (the blind Swift plugin session, 2026-10-22)
+  refuted: made mass head with the unreached share even when it read no file, as before (mass.ts) -> "mass over a project whose only language no scan reads says it measured nothing, never 0% unreached" went red in economy.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
+  kinds: none
+- an import of a module joins the files that declare what it imports: An import whose specifier a plugin resolves to a module (its folder and every file of it: a Go package, a SwiftPM target) joins, of the module's files, those that declare the name it imports; it joins every file of the module when it imports the module whole or no file of it declares the name. No plugin picks a file of a module.
+  over: a plugin by path whose resolve names a module of three files, imported by name, by a name no file declares, and whole; and the Go plugin's packages, by name, whole, dot-imported and with a file the change deleted
+  via: an import that resolves to a module joins, of its files, those that declare the name it imports, and every one when it imports the module whole or no file declares the name
+  because: four plugins picked one file of a module four ways, and every one missed a file the importer used: the blind Swift plugins reached Row.swift or Secrets.swift for an import of Store whose names live in both (d-cb7829df, c-38a1baae)
+  refuted: made an import of a module join the module's first file alone, as Go's and two blind Swift plugins' rules did (src/economy/source.ts importsOf) -> "an import that resolves to a module joins, of its files, those that declare the name it imports, and every one when it imports the module whole or no file declares the name" went red in syntax-trees.test.ts on its own assertion (a name joins the file that declares it, and no other); restored from a copy, byte for byte, green batched and alone (2026-10-26)
   kinds: none

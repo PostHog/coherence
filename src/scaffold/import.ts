@@ -2,40 +2,24 @@
  * scaffold import <source> [<module>...] | --all [--write]
  *
  * Drafts a spec per module from a boundary declaration file the repository
- * already keeps (boundaries.ts). Printed by default; --write creates a spec
+ * already keeps (boundaries.ts), through the boundary source of the language
+ * plugin that knows the tool (tach: the Python plugin's). Printed by default; --write creates a spec
  * only where the module's folder holds none and reports every one skipped.
  * The via: tests the drafts name print on stderr, for a human to place.
  */
 
 import { parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
-import { findUpward, readTach, renderDraft, renderTachTests, writeDrafts, type BoundaryModule } from "./boundaries.ts";
+import { boundarySources } from "../plugins/languages.ts";
+import { findUpward, renderDraft, writeDrafts } from "./boundaries.ts";
 import { ScaffoldError } from "./scaffold.ts";
 
 export const IMPORT_USAGE =
   "  scaffold import tach [<module>...] | --all [--write]   a draft spec per module from tach.toml (nearest at or above the root): folder, intent, owners: from product.yaml, a bullet per declared boundary, each facade chokepoint from: outside the component; printed, and --write creates only specs that do not exist";
 
-interface Source {
-  file: string;
-  read: (root: string, file: string) => BoundaryModule[];
-  tests: (modules: readonly BoundaryModule[]) => string;
-}
-
-/** Each source a boundary draft reads, named for the tool whose file it is. */
-const SOURCES: Record<string, Source> = {
-  tach: {
-    file: "tach.toml",
-    read: readTach,
-    tests: (modules) =>
-      renderTachTests(
-        modules.map((m) => m.id),
-        new Set(modules.filter((m) => m.exposes !== undefined).map((m) => m.id)),
-        new Set(modules.filter((m) => m.dependsOn !== undefined).map((m) => m.id)),
-      ),
-  },
-};
-
 export function importVerb(argv: string[], io: Io): void {
+  // Each source a boundary draft reads is a language plugin's, named for the tool whose file it is (tach: the Python plugin's).
+  const SOURCES = Object.fromEntries(boundarySources().map((s) => [s.name, s]));
   const parsed = parseFlags(argv, { all: "switch", write: "switch" });
   const [sourceName, ...named] = parsed.positionals;
   if (sourceName === undefined) throw new ScaffoldError(`scaffold import takes a source: ${Object.keys(SOURCES).join(", ")}\n${IMPORT_USAGE}`);
@@ -51,7 +35,7 @@ export function importVerb(argv: string[], io: Io): void {
   if (unknown.length > 0) throw new ScaffoldError(`${file} declares no module ${unknown.map((u) => JSON.stringify(u)).join(", ")}; it declares ${modules.length} (${modules.slice(0, 5).map((m) => m.id).join(", ")}${modules.length > 5 ? ", ..." : ""})`);
   // The root module is tach's name for code in no module: no folder of its own to draft.
   const chosen = all ? modules.filter((m) => m.id !== "<root>") : named.map((n) => byId.get(n)!);
-  const drafts = chosen.map((m) => renderDraft(io.cwd, m, sourceName));
+  const drafts = chosen.map((m) => renderDraft(io.cwd, m, source));
   for (const d of drafts) {
     io.out(`--- ${d.specPath ?? `${d.module.id} (outside the project)`}`);
     io.out(d.text.trimEnd());

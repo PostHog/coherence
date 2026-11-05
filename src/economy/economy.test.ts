@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
-import { TypeScriptAdapter, locateServer } from "../adapters/typescript.ts";
+import { TypeScriptAdapter, locateServer } from "../../plugins/typescript/typescript.ts";
 import { appendRun, type RunRecord } from "../enforcement/record.ts";
 import type { Defect } from "../journal/record.ts";
 import { appendRecord } from "../journal/store.ts";
@@ -348,6 +348,27 @@ test("mass: a file in no component and a file in a component that no invariant r
   assert.deepEqual(fromSpec.outside.files, ["src/api/render.ts", "src/util/format.ts"]);
 });
 
+test("mass over a project whose only language no scan reads says it measured nothing, never 0% unreached", () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-mass-unread-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text, "utf8");
+  };
+  try {
+    // A plugin that provides a language and names no parser to read it through: no bundled language is left unread (d-6569dec0), so the fixture brings its own.
+    put("coherence.config.json", JSON.stringify({ language: ["zz"], plugins: { zz: "./plugins/zz" } }));
+    put("plugins/zz/plugin.json", JSON.stringify({ name: "zz", version: "0.1.0", pluginApi: 2, provides: { language: "zz" }, module: "./index.ts", extensions: [".zz"] }));
+    put("plugins/zz/index.ts", 'export default { adapter: ({ language }) => ({ language, ladder: { top: "reference-choked", because: "a stand-in", rungs: [] }, ready: async () => ({ ok: true }), resolve: async () => ({ ok: false, reason: "a stand-in" }), references: async () => [], visibility: async () => ({ enforced: false, visible: true, evidence: "a stand-in" }), testFilter: (via) => via, refute: async () => ({ seen: false, staged: [], account: "a stand-in" }), forget: async () => {}, close: async () => {} }) };\n');
+    put("src/Accounts.spec.md", "# Accounts\n\nThe accounts.\n");
+    put("src/post.zz", "verb post\n");
+    const printed = formatMass(computeMass(dir));
+    assert.match(printed.split("\n")[0]!, /^unreached mass: not measured, since no source file was read \(zz NOT READ; see the languages line below\)$/, printed);
+    assert.doesNotMatch(printed, /0% of lines/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("mass names each folder of three or more code files that a component above it holds only because the folder has no spec of its own", () => {
   const dir = mkdtempSync(join(tmpdir(), "coherence-mass-unspecced-"));
   const put = (path: string, text: string): void => {
@@ -373,6 +394,35 @@ test("mass names each folder of three or more code files that a component above 
     const printed = formatMass(report);
     assert.match(printed, /folders with no spec of their own, folded into a component above them .*: 2/);
     assert.match(printed, /\n  src\/app\/accounts: 9 lines, 3 files, 3 symbols, inside src\/app/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("mass never names a folder its component's spec declares folded, and counts what it set aside", () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-mass-folded-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text, "utf8");
+  };
+  const code = (name: string): string => `export function ${name}(): number {\n  return 1;\n}\n`;
+  try {
+    put("coherence.config.json", CONFIG);
+    put("src/app/App.spec.md", "# App\n\nThe whole app, declared at the top.\n\n## folded\n- accounts: the app's account screens\n- pages/**: one folder per route\n");
+    put("src/app/main.ts", code("main"));
+    for (const name of ["post", "replay", "balance"]) put(`src/app/accounts/${name}.ts`, code(name));
+    for (const name of ["a", "b", "c"]) put(`src/app/pages/home/${name}.ts`, code(name));
+    for (const name of ["d", "e", "f"]) put(`src/app/pages/settings/team/${name}.ts`, code(name));
+    for (const name of ["g", "h", "i"]) put(`src/app/accounts/export/${name}.ts`, code(name));
+
+    const report = computeMass(dir);
+    const app = report.components.find((c) => c.folder === "src/app");
+    assert.ok(app !== undefined);
+    assert.deepEqual(app.unspecced.map((u) => u.folder), ["src/app/accounts/export"], "a folder folded alone does not fold the folders under it");
+    assert.deepEqual(app.folded.map((u) => u.folder).sort(), ["src/app/accounts", "src/app/pages/home", "src/app/pages/settings/team"], "a subtree folds every folder under it, at any depth");
+    const printed = formatMass(report);
+    assert.match(printed, /folders with no spec of their own, folded into a component above them .*: 1\n/);
+    assert.match(printed, /\nfolders their component's spec declares folded into it \(## folded\): 3, 27 lines, 9 files, 9 symbols\n/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -1,0 +1,690 @@
+Coherence's own cases, one form to a case, each with the whole tree the patched grammar must read it as. Kept here,
+out of coherence.patch, so the patch has no way to rewrite what it is held to: build-phase.sh runs them with
+tree-sitter test beside upstream's corpus, and compare.mjs holds the bundled parsers to each tree and each intended
+difference to the cases it names. The forms the patch fixes, and forms beside them it must leave as the stock grammar
+reads them.
+
+==========================================
+Coherence: an import type with type arguments in a union
+==========================================
+
+interface A { b: null | import('../api').Page<X>; c: number }
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (union_type
+            (literal_type
+              (null))
+            (member_expression
+              (call_expression
+                (import)
+                (arguments
+                  (string
+                    (string_fragment))))
+              (property_identifier)
+              (type_arguments
+                (type_identifier))))))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: an import type with type arguments as an alias's type
+==========================================
+
+type L = import('kea').Logic<{ a: 1 }>
+
+---
+
+(program
+  (type_alias_declaration
+    (type_identifier)
+    (member_expression
+      (call_expression
+        (import)
+        (arguments
+          (string
+            (string_fragment))))
+      (property_identifier)
+      (type_arguments
+        (object_type
+          (property_signature
+            (property_identifier)
+            (type_annotation
+              (literal_type
+                (number)))))))))
+
+==========================================
+Coherence: an import type as an array's element
+==========================================
+
+type C = import('../x').Column[];
+
+---
+
+(program
+  (type_alias_declaration
+    (type_identifier)
+    (array_type
+      (member_expression
+        (call_expression
+          (import)
+          (arguments
+            (string
+              (string_fragment))))
+        (property_identifier)))))
+
+==========================================
+Coherence: an import type as keyof's operand
+==========================================
+
+type K = keyof import('~/types').Criteria;
+
+---
+
+(program
+  (type_alias_declaration
+    (type_identifier)
+    (index_type_query
+      (member_expression
+        (call_expression
+          (import)
+          (arguments
+            (string
+              (string_fragment))))
+        (property_identifier)))))
+
+==========================================
+Coherence: an import type with type arguments as an indexed type's object
+==========================================
+
+type I = import('x').T<U>['k'];
+
+---
+
+(program
+  (type_alias_declaration
+    (type_identifier)
+    (lookup_type
+      (member_expression
+        (call_expression
+          (import)
+          (arguments
+            (string
+              (string_fragment))))
+        (property_identifier)
+        (type_arguments
+          (type_identifier)))
+      (literal_type
+        (string
+          (string_fragment))))))
+
+==========================================
+Coherence: an import type as an array's element in a type argument
+==========================================
+
+type R = Record<string, import('~/types').P[]>;
+
+---
+
+(program
+  (type_alias_declaration
+    (type_identifier)
+    (generic_type
+      (type_identifier)
+      (type_arguments
+        (predefined_type)
+        (array_type
+          (member_expression
+            (call_expression
+              (import)
+              (arguments
+                (string
+                  (string_fragment))))
+            (property_identifier)))))))
+
+==========================================
+Coherence: a property named in after another member
+==========================================
+
+interface M {
+  a: number
+  in?: number
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a property named instanceof after another member
+==========================================
+
+interface M {
+  b: number
+  instanceof: string
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a property named in_progress after another member
+==========================================
+
+interface M {
+  c: number
+  in_progress: number
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a property named instanceof_x after another member
+==========================================
+
+interface M {
+  d: number
+  instanceof_x: number
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a property named in$ after another member
+==========================================
+
+interface N {
+  a: number
+  in$: number
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a property named in2 after another member
+==========================================
+
+interface N {
+  b: number
+  in2: number
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a property named in\u0061 after another member
+==========================================
+
+interface N {
+  d: number
+  in\u0061: number
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a property named instanceof$ after another member
+==========================================
+
+interface N {
+  e: number
+  instanceof$: number
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a property named in_x in a type literal after another member
+==========================================
+
+type O = {
+  a: number
+  in_x: string
+}
+
+---
+
+(program
+  (type_alias_declaration
+    (type_identifier)
+    (object_type
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a class field named in after another field
+==========================================
+
+class K {
+  a = 1
+  in = 2
+}
+
+---
+
+(program
+  (class_declaration
+    (type_identifier)
+    (class_body
+      (public_field_definition
+        (property_identifier)
+        (number))
+      (public_field_definition
+        (property_identifier)
+        (number)))))
+
+==========================================
+Coherence: a method signature named in_x after another member
+==========================================
+
+interface I {
+  a(): void
+  in_x(): void
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (method_signature
+        (property_identifier)
+        (formal_parameters)
+        (type_annotation
+          (predefined_type)))
+      (method_signature
+        (property_identifier)
+        (formal_parameters)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a generic method signature named in2 after another member
+==========================================
+
+interface G {
+  a: number
+  in2<T>(): T
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (method_signature
+        (property_identifier)
+        (type_parameters
+          (type_parameter
+            (type_identifier)))
+        (formal_parameters)
+        (type_annotation
+          (type_identifier))))))
+
+==========================================
+Coherence: an optional method signature named in after another member
+==========================================
+
+interface P {
+  a: number
+  in?(): void
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (method_signature
+        (property_identifier)
+        (formal_parameters)
+        (type_annotation
+          (predefined_type))))))
+
+==========================================
+Coherence: a method named in_progress after a field
+==========================================
+
+class C {
+  a = 1
+  in_progress() {}
+}
+
+---
+
+(program
+  (class_declaration
+    (type_identifier)
+    (class_body
+      (public_field_definition
+        (property_identifier)
+        (number))
+      (method_definition
+        (property_identifier)
+        (formal_parameters)
+        (statement_block)))))
+
+==========================================
+Coherence: a method signature named in_x in a declared class after a field
+==========================================
+
+declare class Q {
+  a: number
+  in_x(): void
+}
+
+---
+
+(program
+  (ambient_declaration
+    (class_declaration
+      (type_identifier)
+      (class_body
+        (public_field_definition
+          (property_identifier)
+          (type_annotation
+            (predefined_type)))
+        (method_signature
+          (property_identifier)
+          (formal_parameters)
+          (type_annotation
+            (predefined_type)))))))
+
+==========================================
+Coherence: a statement beginning with in_x after another
+==========================================
+
+const a = 1
+in_x()
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (number)))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments))))
+
+==========================================
+Coherence: a statement beginning with in$ after another
+==========================================
+
+foo()
+in$.bar()
+
+---
+
+(program
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments)))
+  (expression_statement
+    (call_expression
+      (member_expression
+        (identifier)
+        (property_identifier))
+      (arguments))))
+
+==========================================
+Coherence: members whose names begin with in and a letter after another member
+==========================================
+
+interface U {
+  a: number
+  index: number
+  input: string
+  init(): void
+  inü: number
+}
+class V {
+  a = 1
+  index = 2
+  init() {}
+}
+
+---
+
+(program
+  (interface_declaration
+    (type_identifier)
+    (interface_body
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))
+      (method_signature
+        (property_identifier)
+        (formal_parameters)
+        (type_annotation
+          (predefined_type)))
+      (property_signature
+        (property_identifier)
+        (type_annotation
+          (predefined_type)))))
+  (class_declaration
+    (type_identifier)
+    (class_body
+      (public_field_definition
+        (property_identifier)
+        (number))
+      (public_field_definition
+        (property_identifier)
+        (number))
+      (method_definition
+        (property_identifier)
+        (formal_parameters)
+        (statement_block)))))
+
+==========================================
+Coherence: in and instanceof continue an expression across lines
+==========================================
+
+const r1 = a
+ in b
+const r2 = a
+ instanceof B
+const r3 = a
+ in b
+const r4 = a
+ instanceof　B
+for (const k
+in o) {}
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (binary_expression
+        (identifier)
+        (identifier))))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (binary_expression
+        (identifier)
+        (identifier))))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (binary_expression
+        (identifier)
+        (identifier))))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (binary_expression
+        (identifier)
+        (identifier))))
+  (for_in_statement
+    (identifier)
+    (identifier)
+    (statement_block)))
+
+==========================================
+Coherence: in and instanceof continue an expression across lines before a parenthesis
+==========================================
+
+const r5 = key
+  in (record)
+const r6 = value
+  instanceof (Date)
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (binary_expression
+        (identifier)
+        (parenthesized_expression
+          (identifier)))))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (binary_expression
+        (identifier)
+        (parenthesized_expression
+          (identifier))))))
