@@ -195,16 +195,21 @@ export function placeComponents(C: readonly Placed[], landings: readonly Landed[
   const own = C.map((): [number, number] => [0, 0]), sub = C.map((): [number, number] => [0, 0]);
   const ext = C.map((_, ci): [number, number] => [maxSide[ci]! / 2, maxSide[ci]! / 2]);
   const on = (ci: number) => (parent[ci]! < 0 ? "" : C[parent[ci]!]!.folder);
+  // A platform centred again round what changed on it carries the shift up, so what stands on it stays where it stood.
+  const drift = C.map((): [number, number] => [0, 0]);
   // A subtree's kept centre counts only on the platform it was kept on.
-  const keptSub = (ci: number) => { const kept = seed[C[ci]!.folder]; return kept?.on === on(ci) ? kept.sub : undefined; };
+  const keptSub = (ci: number) => { const kept = seed[C[ci]!.folder]; return kept?.on === on(ci) && kept.sub !== undefined ? [kept.sub[0]! + drift[ci]![0], kept.sub[1]! + drift[ci]![1]] : undefined; };
   for (const ci of C.map((_, i) => i).sort((a, b) => level[b]! - level[a]!)) {
     if (!kids[ci]!.length) continue;
     const items: Item[] = [{ hx: maxSide[ci]! / 2, hz: maxSide[ci]! / 2, set: sets[ci]!, seed: seed[C[ci]!.folder]?.own }, ...kids[ci]!.map((k) => ({ hx: ext[k]![0], hz: ext[k]![1], set: subSet[k]!, seed: keptSub(k) }))];
     const { P: Q, moved } = settle(items, nudge);
     const box = [Infinity, Infinity, -Infinity, -Infinity];
     items.forEach((it, i) => { box[0] = Math.min(box[0]!, Q[i]![0] - it.hx); box[1] = Math.min(box[1]!, Q[i]![1] - it.hz); box[2] = Math.max(box[2]!, Q[i]![0] + it.hx); box[3] = Math.max(box[3]!, Q[i]![1] + it.hz); });
-    // Centred on its platform; a platform where nothing moved was centred when it was kept, and centring it again would only round it away.
-    const [mx, mz] = moved ? [(box[0]! + box[2]!) / 2, (box[1]! + box[3]!) / 2] : [0, 0];
+    // Centred on its platform, the subtree's own centre moving by as much the other way (drift), so nothing on it moves; a platform
+    // centred when it was kept is off by no more than rounding, and centring it again would only round it away.
+    const cx = (box[0]! + box[2]!) / 2, cz = (box[1]! + box[3]!) / 2;
+    const [mx, mz] = moved || Math.hypot(cx, cz) > TOUCH ? [cx, cz] : [0, 0];
+    drift[ci] = [mx, mz];
     own[ci] = [Q[0]![0] - mx, Q[0]![1] - mz];
     kids[ci]!.forEach((k, i) => { sub[k] = [Q[i + 1]![0] - mx, Q[i + 1]![1] - mz]; });
     ext[ci] = [(box[2]! - box[0]!) / 2 + MARGIN, (box[3]! - box[1]!) / 2 + MARGIN];
@@ -214,7 +219,7 @@ export function placeComponents(C: readonly Placed[], landings: readonly Landed[
   if (tops.length > 1) {
     const { P: Q } = settle(tops.map((t) => ({ hx: ext[t]![0], hz: ext[t]![1], set: subSet[t]!, seed: keptSub(t) })), nudge);
     tops.forEach((t, i) => { at[t] = Q[i]!; });
-  }
+  } else for (const t of tops) at[t] = (keptSub(t) as [number, number] | undefined) ?? [0, 0];
   for (const ci of C.map((_, i) => i).sort((a, b) => level[a]! - level[b]!)) if (parent[ci]! >= 0) at[ci] = [at[parent[ci]!]![0] + sub[ci]![0], at[parent[ci]!]![1] + sub[ci]![1]];
   const P = C.map((_, ci): [number, number] => [at[ci]![0] + own[ci]![0], at[ci]![1] + own[ci]![1]]);
   // A top-level subtree keeps its centre as its sub, so a layout of several roots lays out its own next layout; only a platform has an own block to keep.

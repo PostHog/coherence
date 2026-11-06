@@ -209,24 +209,24 @@ function stringsIn(value: unknown): string[] {
   return [];
 }
 
-test("the render has one view strip with the eight views in order", async () => {
+test("the render has one view strip with the nine views in order", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
   const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ["structure", "connections", "lexicon", "components", "invariants", "practices", "runs", "journal"]);
-  for (const label of ["Structure", "Connections", "Lexicon", "Components", "Invariants", "Practices", "Runs", "Journal"]) {
+  assert.deepEqual(tabs, ["home", "structure", "connections", "lexicon", "components", "invariants", "practices", "runs", "journal"]);
+  for (const label of ["Home", "Structure", "Connections", "Lexicon", "Components", "Invariants", "Practices", "Runs", "Journal"]) {
     assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
   }
 });
 
-test("Structure is the first view: the strip leads with Structure, then Connections, then Lexicon, and a page whose address names no view opens on it", () => {
+test("Home is the first view: the strip leads with Home, then Structure, Connections and Lexicon, and a page whose address names no view opens on it", () => {
   const state = fresh();
-  assert.deepEqual(state.views.map((v) => v.id), ["structure", "connections", "lexicon", "components", "invariants", "practices", "runs", "journal"], "Structure, then Connections, then Lexicon, then the rest in their order");
+  assert.deepEqual(state.views.map((v) => v.id), ["home", "structure", "connections", "lexicon", "components", "invariants", "practices", "runs", "journal"], "Home, then Structure, Connections and Lexicon, then the rest in their order");
   assert.equal(state.activeView, state.views[0]!.id, "the state opens on the first view");
-  assert.equal(state.activeView, "structure");
+  assert.equal(state.activeView, "home");
   const rendered = renderShell(state).text;
   const first = /<button[^>]*role="tab"[^>]*data-view="([^"]+)"[^>]*aria-selected="([a-z]+)"[^>]*tabindex="(-?\d)"/.exec(rendered);
-  assert.deepEqual(first?.slice(1), ["structure", "true", "0"], "the first tab is the selected one and the one keyboard focus reaches");
+  assert.deepEqual(first?.slice(1), ["home", "true", "0"], "the first tab is the selected one and the one keyboard focus reaches");
   assert.equal(resolveHash(state, ""), undefined, "an address with no hash names no view, so the state's own view stands");
   for (const view of state.views) assert.deepEqual(resolveHash(state, `#${view.id}`), { view: view.id, id: undefined }, `#${view.id} still opens ${view.id}`);
 });
@@ -347,10 +347,28 @@ test("the project's vocabulary comes first and Coherence's terms follow in a sec
   assert.equal(state.lexicon.layers.find((l) => l.id === "coherence")?.title, "Coherence lexicon", "Coherence's layer is never titled with the project's name");
   const domain = state.lexicon.layers.find((l) => l.id === "domain");
   assert.ok(domain?.kind === "present");
-  assert.match(renderShell(state).text, /1 concept, lexicon version 7/, "the masthead counts the project's lexicon, not Coherence's");
+  assert.match(renderView(state, "lexicon").text, /1 concept, lexicon version 7/, "the Lexicon view counts the project's lexicon, not Coherence's");
 
   const absent = renderView((await buildScopePage({ ...options, project: "Widgetry" })).state, "lexicon").text;
   assert.ok(absent.indexOf("No domain lexicon is present.") < absent.indexOf('<section class="coherence-terms"'), "with no project lexicon, the note that says so comes before Coherence's terms");
+});
+
+test("Home says what is known and never a verdict: the project and its components, how many invariants guard how many of them, how old their checks are, and by name an invariant whose last check failed", () => {
+  const state = fresh();
+  assert.ok(state.spec.counts.invariants > 0, "the fixture holds an invariant, so Home sums up rather than sets up");
+  const components = state.spec.components.filter((c) => c.folder !== ".").length;
+  // With no check behind them, Home leads with what the project is made of and says the checks have not run.
+  const whole = fresh();
+  for (const c of whole.spec.components) c.invariants = c.invariants.map((i) => (i.state === "structural defect" ? { ...i, state: "invariant" as const } : i));
+  const unchecked = renderView({ ...whole, runs: { ...whole.runs, records: [] } } as ShellState, "home").text;
+  assert.match(unchecked, new RegExp(`<h2 class="home-say">[^<]+, in ${components} components?\\.</h2>`), "it leads with what the project is made of");
+  assert.match(unchecked, new RegExp(`\\d+ invariants? guards? \\d+ of the ${components} components?; \\d+ (has|have) never been checked`), "how many invariants guard how many components, and that none was checked");
+  // The fixture's latest run fails one invariant: Home leads with that, by name.
+  const told = renderView(state, "home").text;
+  assert.match(told, /<h2 class="home-say" data-broken>One invariant failed its last check\.<\/h2>/, "a failed check is said as that, not as health");
+  const failed = state.spec.components.flatMap((c) => c.invariants).filter((i) => told.includes(`>${i.sentence}</a>`));
+  assert.equal(failed.length, 1, "and the invariant is named, linked to its card");
+  for (const page of [unchecked, told]) assert.doesNotMatch(page, /\b(holding|healthy|health|all good|everything)\b/i, "no verdict over the whole project");
 });
 
 test("related names that resolve become links; the rest are marked unresolved", async () => {
@@ -702,6 +720,12 @@ test("deep links resolve: every card id on every view resolves to that view", ()
     // Structure is the relief, a scene with no cards: its hash names the view alone.
     if (view.id === "structure") {
       assert.deepEqual(resolveHash(state, "#structure"), { view: "structure", id: undefined }, "#structure names the view alone");
+      continue;
+    }
+    // Home says where things stand and links into the views that hold the cards: its hash names it alone, and every link it carries resolves.
+    if (view.id === "home") {
+      assert.deepEqual(resolveHash(state, "#home"), { view: "home", id: undefined }, "#home names the view alone");
+      for (const link of [...renderView(state, "home").text.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!)) assert.ok(resolveHash(state, `#${link}`) !== undefined, `Home's link #${link} resolves`);
       continue;
     }
     // Connections draws its cards in the browser: its hash names the view alone, and every origin it can be rooted at, a route or a component, has an id.

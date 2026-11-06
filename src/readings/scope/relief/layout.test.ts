@@ -117,13 +117,15 @@ test("components held stand exactly where they were kept however often they are 
   assert.deepEqual(quiet.layout, first.layout);
   // Laid out afresh, with nothing kept, the same inputs land where they did the first time.
   assert.deepEqual(placeComponents(C, landed).P, first.P);
-  // A new component is placed beside what it lands with; what was kept stays put, its platform only centred again round the newcomer.
+  // A new component is placed beside what it lands with; what was kept stays put where it stands, its platform centred again round the newcomer and the shift carried up.
   const grown = [...C, { folder: "src/c", v: { lines: 80 } }];
   const withNew = placeComponents(grown, [...landed, { n: 2, c: [[5, 1], [2, 1]] }], first.layout);
   const offset = (l: typeof first.layout, x: string, y: string) => [l[x]!.sub![0]! - l[y]!.sub![0]!, l[x]!.sub![1]! - l[y]!.sub![1]!];
   const [dx, dz] = offset(withNew.layout, "src/a", "src/b"), [kx, kz] = offset(first.layout, "src/a", "src/b");
   assert.ok(Math.abs(dx! - kx!) < 0.01 && Math.abs(dz! - kz!) < 0.01, "src/a and src/b keep where they stand to each other");
-  assert.deepEqual(withNew.layout["docs"]!.sub, first.layout["docs"]!.sub, "a platform the newcomer is not on is untouched");
+  const stood = (r: typeof first, at: number) => Math.hypot(r.P[at]![0] - first.P[at]![0], r.P[at]![1] - first.P[at]![1]);
+  assert.ok(stood(withNew, 4) < 0.01, `a platform the newcomer is not on stands where it stood, moved ${stood(withNew, 4)}`);
+  assert.ok(stood(withNew, 2) < 0.01 && stood(withNew, 3) < 0.01, "src/a and src/b stand where they stood, not only where they stand to each other");
   // A place kept on another platform is no place for it: src/a kept on the ground is placed again on src.
   const moved2 = placeComponents(C, landed, { ...first.layout, "src/a": { sub: [500, 500], on: "" } });
   assert.ok(Math.abs(moved2.layout["src/a"]!.sub![0]!) < 100, "placed on its platform, not 500 away");

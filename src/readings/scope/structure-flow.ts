@@ -1167,25 +1167,6 @@ export function flowHealthMembers(model: FlowModel, kind: FlowHealthKind): FlowI
   return kind === "verified" ? model.health.verified : kind === "requirements" ? model.health.requirements : kind === "defects" ? model.health.defects : kind === "bypassed" ? model.health.bypassed : [];
 }
 
-/**
- * The one line the page leads with: the project's health as a verdict, and
- * the count it links to. Broken first; then nothing enforced; then all
- * verified, or verified beside what is not yet enforced.
- */
-export function flowVerdict(model: FlowModel): { kind: "broken" | "nothing" | "verified" | "partial" | "empty"; text: string; select: string } {
-  const broken = flowHealthMembers(model, "broken").length;
-  const verified = model.health.verified.length;
-  const requirements = model.health.requirements.length;
-  if (broken > 0) {
-    const holders = model.nodes.filter((node) => node.defects.length > 0);
-    return { kind: "broken", text: `${broken} broken`, select: holders.length === 1 ? flowBrokenId(holders[0]!.folder) : flowHealthId("broken") };
-  }
-  if (verified === 0 && requirements > 0) return { kind: "nothing", text: "Nothing is enforced yet", select: flowHealthId("requirements") };
-  if (verified > 0 && requirements === 0) return { kind: "verified", text: `All ${verified} ${verified === 1 ? "invariant" : "invariants"} verified`, select: flowHealthId("verified") };
-  if (verified > 0) return { kind: "partial", text: `${verified} ${verified === 1 ? "invariant" : "invariants"} verified, ${requirements} not enforced yet`, select: flowHealthId("requirements") };
-  return { kind: "empty", text: "No invariant is declared", select: flowHealthId("verified") };
-}
-
 /** What the map opens on when the reader has selected nothing (DEFAULT_RULE): nothing, the whole system, unless something is broken. */
 export function flowDefaultSelection(model: FlowModel): string | undefined {
   const broken = model.nodes.filter((node) => node.defects.length > 0);

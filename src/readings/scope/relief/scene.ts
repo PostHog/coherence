@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { ReliefData, ReliefFileLanded } from "./data.ts";
-import { MARGIN, placeComponents, type ReliefLayout } from "./layout.ts";
+import { MARGIN, nesting, placeComponents, type ReliefLayout } from "./layout.ts";
 import type { Touch } from "../../relief/relief.ts";
 
 export type { Touch };
@@ -42,6 +42,22 @@ export interface ReliefView {
   camera: { view: string; position: number[]; target: number[] };
   /** The diff's two ends as the selects held them; null before the commits arrived, or in a snapshot. */
   diff: { a: string; b: string } | null;
+  /** Where each file that had arrived stood, by path, as [x, y, z, w, d, h]: the next build moves each from here, so a project splitting into components is seen to split. */
+  files?: Record<string, number[]>;
+  /** Where each platform stood, by folder, as [x, y, z, w, d, h]. */
+  platforms?: Record<string, number[]>;
+  /** The folder each carried file stood in: a file whose folder changed was split off into another component, and glows as it moves. */
+  owners?: Record<string, string>;
+  /** How the world stood under the camera, its scale and offset: the next build moves it from there rather than jumping. */
+  world?: { S: number; off: number[] };
+  /** The rail each named component's label stood on, by folder, so a rebuild keeps every label where the reader last saw it. */
+  sides?: Record<string, string>;
+  /** Each footprint's outline as [x, y, z, side], by folder: the next build moves it from there. */
+  outlines?: Record<string, number[]>;
+  /** Each file's colour as it stood, by path: the next build shades it from there. */
+  tints?: Record<string, number>;
+  /** Each file still glowing, by path, as [kind, age in ms]: the next build lets it fade on rather than go out. */
+  glows?: Record<string, [string, number]>;
 }
 
 export interface Relief {
@@ -50,6 +66,8 @@ export interface Relief {
   /** Light the files an agent just read or wrote, and the components holding them. */
   touch(touches: readonly Touch[]): void;
   view(): ReliefView;
+  /** Show one block per file while `on` (Home's preview), and give back the reader's own choice when it ends. */
+  files?(on: boolean): void;
   /** Stop for good: the frame loop, timers and listeners end, the GL context and every buffer are released, the root leaves the page. */
   dispose(): void;
 }
@@ -158,7 +176,36 @@ function churn() {
 // ---------- placement: nesting, footprints and co-change positions (layout.ts, which the warm server runs too) ----------
 // Each component stands on the platform of the nearest component whose folder holds it, placed by co-change and held
 // where the server last laid it out, else where this page's last build left it: what was kept stands exactly there.
-const SEED = D.layout ?? carried?.layout ?? {};
+const SEED = carriedSeed(D.layout ?? carried?.layout ?? {});
+// A component new to this build that no kept layout places starts where its files stood in the scene before, a platform's own
+// block where its own files stood: a component named inside another divides off from it, rather than being placed afresh across
+// the map. What a kept layout places stands there.
+function carriedSeed(kept) {
+  if (!carried?.files) return kept;
+  const { parent, kids, under } = nesting(C);
+  const owner = (path) => { let best = -1, len = -1; C.forEach((c, ci) => { const l = c.folder === "." ? 0 : c.folder.length; if ((c.folder === "." || path.startsWith(c.folder + "/")) && l > len) { best = ci; len = l; } }); return best; };
+  // Each component's own files' footprint-weighted sums, so a centre is its block's centre, however its files were tiled.
+  const sum = C.map(() => [0, 0, 0]);
+  for (const [path, at] of Object.entries(carried.files)) { const ci = owner(path); if (ci < 0) continue; const w = Math.max(1e-3, at[3] * at[4]); sum[ci][0] += w * at[0]; sum[ci][1] += w * at[2]; sum[ci][2] += w; }
+  const centre = (cis) => { let x = 0, z = 0, w = 0; for (const ci of cis) { x += sum[ci][0]; z += sum[ci][1]; w += sum[ci][2]; } return w > 0 ? [x / w, z / w] : null; };
+  // Where a subtree's centre stood: its platform's centre, or, for one that was no platform, where its files stood.
+  const centreWas = (ci) => { const p = carried.platforms?.[C[ci].folder]; return p ? [p[0], p[2]] : centre(under(ci)); };
+  const on = (ci) => (parent[ci] < 0 ? "" : C[parent[ci]].folder);
+  const seed = { ...kept };
+  C.forEach((c, ci) => {
+    const was = kept[c.folder], place = { ...(was?.on === on(ci) ? was : {}), on: on(ci) };
+    if (place.sub === undefined) {
+      const at = centre(under(ci)), from = parent[ci] < 0 ? [0, 0] : centreWas(parent[ci]);
+      if (at && from) place.sub = [at[0] - from[0], at[1] - from[1]];
+    }
+    if (kids[ci].length && place.own === undefined) {
+      const at = centre([ci]), from = centreWas(ci);
+      if (at && from) place.own = [at[0] - from[0], at[1] - from[1]];
+    }
+    if (place.sub !== undefined || place.own !== undefined) seed[c.folder] = place;
+  });
+  return seed;
+}
 const { parent, kids, level, under, totals, side, ext, tops, P, layout: LAYOUT } = placeComponents(C, D.landings, SEED);
 const PLH = 2.4;
 // A slice is a component with everything inside it, or (own) just the files no component inside it claims.
@@ -319,7 +366,9 @@ function ghosts(m) { const g = instances(0.85); g.material.transparent = true; g
 const ghostFile = ghosts(), ghostAdd = ghosts(), ghostDel = ghosts();
 const SETS = [[fileMesh, ghostFile], [addMesh, ghostAdd], [delMesh, ghostDel]];
 // Per file: cur, to and now as [x, y, z, w, d, h], caps as [added, deleted], and the colour ramp position.
-const FS = { faded: new Uint8Array(NF), cur: new Float32Array(NF * 6), to: new Float32Array(NF * 6), now: new Float32Array(NF * 6), capCur: new Float32Array(NF * 2), capTo: new Float32Array(NF * 2), capNow: new Float32Array(NF * 2), t: new Float32Array(NF), hide: false, settled: false };
+// Each file's colour as paint() last chose it, and, for a file carried from the scene before, the colour it stood in there.
+const hueTo = new Array(NF), tintFrom = new Map(), _tint = new THREE.Color();
+const FS = { k: 1, arc: new Float32Array(NF), faded: new Uint8Array(NF), cur: new Float32Array(NF * 6), to: new Float32Array(NF * 6), now: new Float32Array(NF * 6), capCur: new Float32Array(NF * 2), capTo: new Float32Array(NF * 2), capNow: new Float32Array(NF * 2), t: new Float32Array(NF), hide: false, settled: false };
 const selBox = new THREE.LineSegments(unitEdges, new THREE.LineBasicMaterial({ color: 0xff8a4c })); selBox.visible = false; world.add(selBox);
 const fileRects = C.map((c) => null); // treemaps of each component's files in its lines footprint, relative to its centre
 function rectsOf(ci) {
@@ -336,6 +385,18 @@ const survey = C.map((c) => {
   const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 5 }, () => new THREE.Vector3())), new THREE.LineDashedMaterial({ transparent: true, dashSize: 0.9, gapSize: 0.6 }));
   world.add(l); return l;
 });
+// Where a footprint's outline and survey line stand, as [x, y, z, side]: drawn each frame they move, from where they stood.
+function placeOutline(ci, [x, y, z, s]) {
+  outlines[ci].position.set(x, y, z); outlines[ci].scale.set(Math.max(0.01, s), 1, Math.max(0.01, s));
+  outlines[ci].userData.now = [x, y, z, s];
+  if (survey[ci]) {
+    const m = s / 2 + 0.6, pos = survey[ci].geometry.attributes.position;
+    [[-m, -m], [m, -m], [m, m], [-m, m], [-m, -m]].forEach(([dx, dz], i) => pos.setXYZ(i, x + dx, y + 0.04, z + dz));
+    pos.needsUpdate = true; survey[ci].geometry.computeBoundingSphere(); survey[ci].computeLineDistances();
+  }
+}
+// A footprint the scene before drew moves from where it stood; one new to a carried build grows from its centre.
+for (const [ci, o] of outlines.entries()) { const was = carried?.outlines?.[C[ci].folder]; if (was) o.userData.cur = was; else if (carried?.files) o.userData.grow = true; }
 // Labels are callouts: a point in the scene it names, and a label at the edge of the viewport with a hairline back to it.
 const calloutBox = $("callouts");
 function callout(d, ci, kind) {
@@ -346,18 +407,41 @@ function callout(d, ci, kind) {
   d.ondblclick = () => rescope(ci, kind === "comp" && kids[ci].length > 0);
   return o;
 }
-const tags = C.map((c, ci) => { const d = el("div", c.virtual ? "label virt" : "label"); d.append(c.name, el("small")); return callout(d, ci, "comp"); });
+// What the scene before held, by path and by folder: each carried file moves from where it stood when its files arrive.
+const CARRIED_FILES = carried?.files ? new Map(Object.entries(carried.files)) : null;
+const CARRIED_PLATFORMS = carried?.platforms ?? {};
+const CARRIED_OWNERS = carried?.owners ?? {};
+// Where a file stands: its folder, and whether a spec claims it, so a folder that gains a spec is a new owner though its path is the same.
+const ownerKey = (ci) => (C[ci].virtual ? "unclaimed:" : "component:") + C[ci].folder;
+// A component no file stood in before this build is new: it is named on the rail, marked, for a while, wherever the scene stands.
+const carriedOwners = new Set(Object.values(CARRIED_OWNERS));
+const FRESH = new Set(carried?.owners ? C.map((_, ci) => ci).filter((ci) => !C[ci].virtual && C[ci].folder !== "." && !carriedOwners.has(ownerKey(ci))) : []);
+const FRESH_MS = 9000;
+const tags = C.map((c, ci) => { const d = el("div", c.virtual ? "label virt" : FRESH.has(ci) ? "label fresh" : "label"); d.append(c.name, el("small")); return callout(d, ci, "comp"); });
 const plinths = C.map((c, ci) => {
   if (!kids[ci].length) return null;
   const m = new THREE.Mesh(unit, new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0 }));
   const edges = new THREE.LineSegments(unitEdges, new THREE.LineBasicMaterial({ transparent: true })); m.add(edges);
-  m.userData = { kind: "plinth", ci, cur: { x: 0, y: 0, z: 0, w: 0.01, d: 0.01, h: 0.01 }, to: null, edges, caps: null };
+  const was = CARRIED_PLATFORMS[c.folder];
+  m.userData = { kind: "plinth", ci, cur: was ? { x: was[0], y: was[1], z: was[2], w: was[3], d: was[4], h: was[5] } : { x: 0, y: 0, z: 0, w: 0.01, d: 0.01, h: 0.01 }, to: null, edges, caps: null };
+  if (was) { m.position.set(was[0], was[1], was[2]); m.scale.set(was[3], was[5], was[4]); }
+  world.add(m); return m;
+});
+// A platform the scene before stood on that this build has none of sinks away where it stood, rather than vanishing.
+const sinking = Object.entries(CARRIED_PLATFORMS).filter(([folder]) => !plinths.some((p, ci) => p && C[ci].folder === folder)).map(([, was]) => {
+  const m = new THREE.Mesh(unit, new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0 }));
+  const edges = new THREE.LineSegments(unitEdges, new THREE.LineBasicMaterial({ transparent: true })); m.add(edges);
+  const cur = { x: was[0], y: was[1], z: was[2], w: was[3], d: was[4], h: was[5] };
+  m.userData = { kind: "sinking", ci: -1, cur, to: { ...cur, h: 0.01, hide: true }, edges, caps: null };
+  m.position.set(was[0], was[1], was[2]); m.scale.set(was[3], was[5], was[4]);
   world.add(m); return m;
 });
 const platTags = C.map((c, ci) => {
   if (!kids[ci].length) return null;
-  const d = el("div", "label plat"); d.append(c.name, el("small")); return callout(d, ci, "plat");
+  const d = el("div", FRESH.has(ci) ? "label plat fresh" : "label plat"); d.append(c.name, el("small")); return callout(d, ci, "plat");
 });
+// Each label keeps the rail it stood on in the scene before.
+for (const o of [...tags, ...platTags]) if (o && carried?.sides?.[C[o.ci].folder]) o.side = carried.sides[C[o.ci].folder];
 // A slice of one component's files alone names its highest-ranking files, as the side column ranks them, in place of
 // one callout repeating the slice's own name; the selected file is named among them wherever it ranks.
 const FILE_NAMED = 8;
@@ -380,6 +464,10 @@ function topFiles(ci, hk) {
 const within = (ci, file) => (C[ci].folder !== "." && file.startsWith(C[ci].folder + "/") ? file.slice(C[ci].folder.length + 1) : file);
 
 let CH = churn(), DIFF = null;
+// On Home the picture is the project and its components, never a diff: a diff loaded or loading while the scene stands
+// there is held aside, and stands again when the scene moves to a view that shows it (files()).
+let onHome = false, homeDiff = null;
+const setDiff = (d) => { if (onHome) homeDiff = d; else DIFF = d; };
 function ramp(t) { const i = Math.min(6, Math.max(0, Math.floor(t * 7))); return css("--r" + (i + 1)); }
 
 const RECT = C.map(() => null); // each component's platform, or its block when it has none, at the current footprint
@@ -410,13 +498,9 @@ function layout() {
     const cd = DIFF && !state.split ? DIFF.comp[ci] : null;
     const showD = cd && IN[ci] && !none && (cd[0] || cd[1]);
     compBlocks[ci].userData.capTo = { a: showD ? meter(cd[0]) : 0, d: showD ? meter(cd[1]) : 0 };
-    outlines[ci].position.set(x, y, z); outlines[ci].scale.set(s, 1, s);
-    if (survey[ci]) {
-      const m = s / 2 + 0.6, pos = survey[ci].geometry.attributes.position;
-      [[-m, -m], [m, -m], [m, m], [-m, m], [-m, -m]].forEach(([dx, dz], i) => pos.setXYZ(i, x + dx, y + 0.04, z + dz));
-      pos.needsUpdate = true; survey[ci].geometry.computeBoundingSphere(); survey[ci].computeLineDistances();
-      survey[ci].visible = IN[ci] && s > 0;
-    }
+    // A footprint's outline, and the survey line round land no spec names, move with what they bound (step()).
+    outlines[ci].userData.to = [x, y, z, s];
+    if (survey[ci]) survey[ci].visible = IN[ci] && s > 0;
     let top = h;
     if (state.split) top = 0;
     const rects = FL[ci] ? rectsOf(ci) : null, sl = side(c, "lines");
@@ -474,9 +558,11 @@ function layout() {
     plinths[ci].userData.to = { x: (r[0] + r[2]) / 2, y, z: (r[1] + r[3]) / 2, w: r[2] - r[0], d: r[3] - r[1], h: show ? PLH : 0.01, hide: !show };
     const all = under(ci);
     platTags[ci].position.set((r[0] + r[2]) / 2, y + (show ? PLH : 0), r[3]); // the platform's front edge
-    platTags[ci].element.firstChild.textContent = `${C[ci].name}, the whole`;
-    const nv = all.filter((k) => C[k].virtual).length;
-    platTags[ci].element.querySelector("small").textContent = `${all.length - nv} components${nv ? ` · ${nv} folders with no spec` : ""} · ${fmt(all.reduce((a, k) => a + C[k].v[fk], 0))} ${FOOT.find((m) => m.key === fk).unit}`;
+    // A platform is named by its component's name alone: it is the component, with everything inside it; the block of the files
+    // directly in its folder is the one named otherwise ("<name>'s own files").
+    platTags[ci].element.firstChild.textContent = C[ci].name;
+    const nv = all.filter((k) => C[k].virtual).length, inside = all.length - 1 - nv;
+    platTags[ci].element.querySelector("small").textContent = `${inside} ${inside === 1 ? "component" : "components"} inside${nv ? ` · ${nv} ${nv === 1 ? "folder" : "folders"} with no spec` : ""} · ${fmt(all.reduce((a, k) => a + C[k].v[fk], 0))} ${FOOT.find((m) => m.key === fk).unit}`;
     platTags[ci].visible = show;
   }
   FS.hide = !state.split; FS.settled = false;
@@ -500,10 +586,20 @@ function paint() {
   ground.material.color.set(css("--ground"));
   const R = [1, 2, 3, 4, 5, 6, 7].map((i) => new THREE.Color(css("--r" + i))), bg = new THREE.Color(css("--surface"));
   const add = new THREE.Color(css("--add")), del = new THREE.Color(css("--del")), tmp = new THREE.Color();
+  // On Home the picture tells named from unnamed: land no component holds is grey, and takes the ramp's colour once a component is
+  // named over it. A folder with no spec inside a named component is that component's, not yet divided, so it keeps the component's
+  // colour; the root's spec names the project, not a component, so what stands loose on it stays grey. Height still says how
+  // often each file changes, named or not: the territory is learned with its weather.
+  const home = root.closest(".home-relief") !== null, sea = new THREE.Color(dark ? "#5b6170" : "#c4c8d0");
+  const unheld = C.map((c, ci) => c.unnamed || (c.virtual && (parent[ci] < 0 || C[parent[ci]].folder === ".")));
   // A file outside the selection fades toward the surface, as a dimmed block fades to 22% opacity.
   for (let i = 0; i < NF; i++) {
     const on = focus == null || focus === FILES[i][0];
-    for (const [m, c] of [[fileMesh, R[Math.min(6, Math.max(0, Math.floor(FS.t[i] * 7)))]], [addMesh, add], [delMesh, del]]) { m.setColorAt(i, c); SETS.find((x) => x[0] === m)[1].setColorAt(i, c); }
+    const hue = home && unheld[FILES[i][0]] ? sea : R[Math.min(6, Math.max(0, Math.floor(FS.t[i] * 7)))];
+    hueTo[i] = hue;
+    // A file carried from the scene before shades from its colour there to its colour here as it moves (stepFiles).
+    const shown = tintFrom.has(i) ? tmp.copy(tintFrom.get(i)).lerp(hue, FS.k) : hue;
+    for (const [m, c] of [[fileMesh, shown], [addMesh, add], [delMesh, del]]) { m.setColorAt(i, c); SETS.find((x) => x[0] === m)[1].setColorAt(i, c); }
     if (FS.faded[i] !== (on ? 0 : 1)) { FS.faded[i] = on ? 0 : 1; FS.settled = false; } // re-route this file's box on the next frame
   }
   for (const m of SETS.flat()) { m.instanceColor.needsUpdate = true; m.material.userData.u.uEdge.value.copy(edge); m.material.userData.u.uEdgeA.value = dark ? 0.35 : 0.3; }
@@ -521,7 +617,7 @@ function paint() {
       m.children[0].material.color.copy(picked ? sel : edge); m.children[0].material.opacity = picked ? 1 : on ? 0.3 : 0.08;
     }
   }
-  for (const p of plinths) if (p) {
+  for (const p of [...plinths, ...sinking]) if (p) {
     p.material.color.set(css("--plinth"));
     p.userData.edges.material.color.copy(focus === p.userData.ci ? sel : edge);
     p.userData.edges.material.opacity = focus === p.userData.ci ? 1 : dark ? 0.3 : 0.25;
@@ -543,7 +639,9 @@ function drawScale(max) {
   lastMax = max;
   const s = $("scale"), hm = HEIGHT.find((m) => m.key === state.height);
   s.innerHTML = "";
-  s.append(el("div", null, `Height and color: ${hm.unit} per ${state.split ? "file" : "component"}`));
+  // On Home colour says named or not (paint()): grey is land no component holds, and the ramp shades the components.
+  const home = root.closest(".home-relief") !== null;
+  s.append(el("div", null, home ? `Height: ${hm.unit} per ${state.split ? "file" : "component"}. Grey: no component yet. A component's blocks are shaded by the same count` : `Height and color: ${hm.unit} per ${state.split ? "file" : "component"}`));
   const r = el("div", "ramp"); for (let i = 1; i <= 7; i++) { const x = el("i"); x.style.background = css("--r" + i); r.append(x); }
   const e = el("div", "ends"); e.append(el("span", null, "0"), el("span", null, fmt(max)));
   s.append(r, e, el("div", null, `Tallest block = ${fmt(max)}. A flat slab changed not at all.`));
@@ -561,11 +659,22 @@ const RELY = D.relies ?? [];
 
 // ---------- animation ----------
 let t0 = performance.now();
+// A move is 700 ms; files carried from the scene before move slower, so a split is watched, not missed.
+let dur = 700;
 const ease = (t) => 1 - Math.pow(1 - t, 3);
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 function step() {
-  const k = ease(Math.min(1, (performance.now() - t0) / 700));
+  const raw = Math.min(1, (performance.now() - t0) / dur);
+  const k = dur > 700 ? easeInOut(raw) : ease(raw);
+  if (raw >= 1 && dur > 700) dur = 700;
   stepFiles(k);
-  for (const b of [...compBlocks, ...plinths.filter(Boolean)]) {
+  for (const [ci, o] of outlines.entries()) {
+    const u = o.userData; if (!u.to || u.done === u.to) continue;
+    if (!u.cur) u.cur = u.grow ? [u.to[0], u.to[1], u.to[2], 0.01] : u.to.slice();
+    placeOutline(ci, u.cur.map((v, j) => v + (u.to[j] - v) * k));
+    if (k >= 1) { u.cur = u.to.slice(); u.done = u.to; }
+  }
+  for (const b of [...compBlocks, ...plinths.filter(Boolean), ...sinking]) {
     const u = b.userData; if (!u.to) continue;
     const c = u.cur, to = u.to;
     const lerp = (a, b) => a + (b - a) * k;
@@ -591,7 +700,10 @@ function stepFiles(k) {
     for (let i = 0; i < NF; i++) {
       const o = i * 6, c = FS.cur, t = FS.to, n = FS.now;
       for (let j = 0; j < 6; j++) n[o + j] = c[o + j] + (t[o + j] - c[o + j]) * k;
-      const [x, y, z, w, d, h] = [n[o], n[o + 1], n[o + 2], n[o + 3], n[o + 4], n[o + 5]];
+      // A file carried to another place lifts off, travels and sets down: the lift is drawn, never kept.
+      const lift = FS.arc[i] ? FS.arc[i] * Math.sin(Math.PI * k) : 0;
+      if (k >= 1) FS.arc[i] = 0;
+      const [x, y, z, w, d, h] = [n[o], n[o + 1] + lift, n[o + 2], n[o + 3], n[o + 4], n[o + 5]];
       const ca = FS.capCur[i * 2] + (FS.capTo[i * 2] - FS.capCur[i * 2]) * k, cd = FS.capCur[i * 2 + 1] + (FS.capTo[i * 2 + 1] - FS.capCur[i * 2 + 1]) * k;
       FS.capNow[i * 2] = ca; FS.capNow[i * 2 + 1] = cd;
       // Each box is drawn solid or see-through, never both: the other set holds a zero-size box in its place.
@@ -602,6 +714,13 @@ function stepFiles(k) {
       put(on(Dl, gD), i, x + mw * 0.55, y + h, z, cd > 0.02 ? mw : 0, cd, cd > 0.02 ? mw : 0); put(off(Dl, gD), i, x, y, z, 0, 0, 0);
     }
     for (const m of SETS.flat()) { m.instanceMatrix.needsUpdate = true; m.visible = !(FS.hide && k >= 1); }
+    FS.k = k;
+    if (tintFrom.size) {
+      const [M, G] = SETS[0];
+      for (const [i, from] of tintFrom) if (hueTo[i]) { _tint.copy(from).lerp(hueTo[i], k); M.setColorAt(i, _tint); G.setColorAt(i, _tint); }
+      M.instanceColor.needsUpdate = true; G.instanceColor.needsUpdate = true;
+      if (k >= 1) tintFrom.clear();
+    }
     if (k >= 1) { FS.cur.set(FS.to); FS.capCur.set(FS.capTo); FS.settled = true; for (const m of SETS.flat()) { m.boundingSphere = null; m.boundingBox = null; } }
   }
   // The selected file wears an outline the colour of a selection, over its block and its caps.
@@ -620,7 +739,7 @@ function frame() {
   if (disposed) return;
   // Freeze the start of each tween at the current values before targets change.
   if (camTween) {
-    const k = ease(Math.min(1, (performance.now() - camTween.t0) / 700));
+    const k = (camTween.ease ?? ease)(Math.min(1, (performance.now() - camTween.t0) / (camTween.dur ?? 700)));
     camera.position.lerpVectors(camTween.from.pos, camTween.to.pos, k); controls.target.lerpVectors(camTween.from.target, camTween.to.target, k);
     const S = camTween.from.S + (camTween.to.S - camTween.from.S) * k; world.scale.set(S, 1, S); world.position.lerpVectors(camTween.from.off, camTween.to.off, k);
     if (k >= 1) camTween = null;
@@ -646,9 +765,32 @@ function placeCallouts() {
   const crumbs = $("crumbs").getBoundingClientRect(), scale = $("scale").getBoundingClientRect(), sb = stage.getBoundingClientRect();
   const lane = { l: [crumbs.bottom - sb.top + 8, scale.top - sb.top - 8], r: [EDGE, H - EDGE] };
   const cand = [];
+  // Where the page draws the scene with only its components named (Home's summary), every component with a spec carries its name, once
+  // and for good, so the reader watches each one come into being: a platform by its whole, a component with nothing inside it by
+  // its block; folders with no spec, the root and files go unnamed.
+  const quiet = root.closest(".home-relief:not([data-named])") !== null;
+  const namedPart = (o) => o.kind !== "file" && !C[o.ci].virtual && C[o.ci].folder !== "." && (o.kind === "plat" || !kids[o.ci].length);
+  // The land no component holds is named too, as what it is: before any component, every file; after, the files no component holds yet.
+  const sea = (o) => o.kind === "comp" && C[o.ci].unnamed;
   for (const [n, o] of [...tags, ...platTags.filter(Boolean), ...fileTags].entries()) {
     o.element.style.display = "none";
-    if (!o.visible) continue;
+    // A component alone in its slice gives its name up to its files; where files go unnamed, the land keeps its own.
+    if (!o.visible && !(quiet && sea(o))) continue;
+    // A component with components inside it is named once, on its platform; the block of files directly in its folder is that
+    // component's too and goes unnamed beside it, unless the reader has stepped into those files alone.
+    if (o.kind === "comp" && kids[o.ci].length && !(state.own && state.scope === o.ci)) continue;
+    if (quiet && !namedPart(o) && !sea(o)) continue;
+    if (quiet && sea(o)) {
+      const name = kids[o.ci].length ? "Not in any component yet" : "All files", said = `${fmt(C[o.ci].files)} files · ${fmt(C[o.ci].v.lines)} lines`, sub = o.element.querySelector("small");
+      if (o.element.firstChild.textContent !== name) o.element.firstChild.textContent = name;
+      if (sub.textContent !== said) sub.textContent = said;
+    }
+    // Where only components are named, a platform's line leaves out the folders with no spec inside it.
+    if (o.kind === "plat" && quiet) {
+      const all = under(o.ci), inside = all.filter((k) => k !== o.ci && !C[k].virtual).length, sub = o.element.querySelector("small");
+      const said = `${inside} ${inside === 1 ? "component" : "components"} inside · ${fmt(all.reduce((a, k) => a + C[k].v.lines, 0))} lines`;
+      if (sub.textContent !== said) sub.textContent = said;
+    }
     o.getWorldPosition(_v).project(camera);
     if (_v.z > 1 || Math.abs(_v.x) > 1 || Math.abs(_v.y) > 1) continue;
     const ax = (_v.x + 1) / 2 * W, ay = (1 - _v.y) / 2 * H;
@@ -664,7 +806,7 @@ function placeCallouts() {
     const [top, bottom] = lane[side], room = Math.max(0, Math.floor((bottom - top + LGAP) / (LH + LGAP)));
     const mine = cand.filter((c) => c.side === side).sort((a, b) => b.rank - a.rank);
     // What an agent is touching right now always carries its name, so the reader sees where the work is.
-    const must = (c) => (c.o.kind === "file" ? pickedFile(c.o) : c.o.kind === "plat" || c.o.ci === state.selected || (c.o.kind === "comp" && (c.o.ci === hovered || litNow.has(c.o.ci))));
+    const must = (c) => quiet || (c.o.kind === "file" ? pickedFile(c.o) : c.o.kind === "plat" || FRESH.has(c.o.ci) || c.o.ci === state.selected || (c.o.kind === "comp" && (c.o.ci === hovered || litNow.has(c.o.ci))));
     const rest = mine.filter((c) => !must(c)).slice(0, NAMED);
     const kept = mine.filter((c) => must(c) || rest.includes(c)).slice(0, room).sort((a, b) => a.ay - b.ay);
     // Each label sits as near its point's height as the column allows: pushed down past its neighbour, then up off the floor.
@@ -690,7 +832,8 @@ function placeCallouts() {
   }
 }
 function retarget() {
-  for (const p of plinths) if (p) p.userData.cur = { x: p.position.x, y: p.position.y, z: p.position.z, w: p.scale.x, d: p.scale.z, h: p.scale.y };
+  for (const o of outlines) if (o.userData.now) o.userData.cur = o.userData.now.slice();
+  for (const p of [...plinths, ...sinking]) if (p) p.userData.cur = { x: p.position.x, y: p.position.y, z: p.position.z, w: p.scale.x, d: p.scale.z, h: p.scale.y };
   FS.cur.set(FS.now); FS.capCur.set(FS.capNow);
   for (const b of compBlocks) {
     const u = b.userData;
@@ -730,13 +873,37 @@ function need(cis) {
 function arrived(cis) {
   diffFiles();
   layout();
-  for (const ci of cis) if (FL[ci]) for (let fi = 0; fi < FL[ci].length; fi++) { const o = fileAt[ci][fi] * 6; for (let j = 0; j < 5; j++) FS.now[o + j] = FS.to[o + j]; FS.now[o + 5] = 0.01; }
+  let carriedAny = false;
+  for (const ci of cis) if (FL[ci]) for (let fi = 0; fi < FL[ci].length; fi++) {
+    const i = fileAt[ci][fi], o = i * 6, was = CARRIED_FILES?.get(FL[ci][fi].file);
+    if (was) {
+      // Where it stood in the scene before: it moves from there, lifting by how far it goes, in the colour it stood in,
+      // still glowing as it was.
+      for (let j = 0; j < 6; j++) FS.now[o + j] = was[j];
+      const tint = carried.tints?.[FL[ci][fi].file];
+      if (tint !== undefined) tintFrom.set(i, new THREE.Color(tint));
+      const glow = carried.glows?.[FL[ci][fi].file];
+      if (glow) glows.set(`${ci}:${fi}`, { ci, fi, kind: glow[0], t0: performance.now() - glow[1] });
+      const dist = Math.hypot(FS.to[o] - was[0], FS.to[o + 2] - was[2]);
+      // A file that now stands in a component with a spec it did not stand in before was split off. It says so by what it becomes,
+      // its component's colour and its component's name on the rail, not by a glow: a split of the whole project would light all of it.
+      const split = !C[ci].virtual && CARRIED_OWNERS[FL[ci][fi].file] !== undefined && CARRIED_OWNERS[FL[ci][fi].file] !== ownerKey(ci);
+      // Only a split file lifts as it travels, by how far it goes; every other file that moves glides along the ground.
+      FS.arc[i] = split && dist > 1 ? Math.min(10, dist * 0.2) : 0;
+      CARRIED_FILES.delete(FL[ci][fi].file);
+      carriedAny = true;
+    } else { for (let j = 0; j < 5; j++) FS.now[o + j] = FS.to[o + j]; FS.now[o + 5] = 0.01; }
+  }
+  if (carriedAny) dur = 2400;
   if (pendingFile) {
     const ci = C.findIndex((c) => c.folder === pendingFile[0]);
     if (FL[ci]) { const fi = FL[ci].findIndex((f) => f.file === pendingFile[1]); if (fi >= 0) state.file = [ci, fi]; pendingFile = null; }
     else if (unloaded.has(ci)) pendingFile = null;
   }
   retarget(); drawSide(); drawNote();
+  // Carried files are drawn where they stood, in their colours there, before the browser paints again, so a rebuild never
+  // shows a frame without them.
+  if (carriedAny && root.isConnected) { FS.k = 0; paint(); step(); renderer.render(scene, camera); placeCallouts(); }
 }
 
 // The component a path belongs to: the one holding it as a counted file, else the deepest folder holding it.
@@ -845,7 +1012,7 @@ renderer.domElement.addEventListener("pointermove", (e) => {
   tip.innerHTML = ""; const c = C[u.ci], hm = HEIGHT.find((m) => m.key === state.height), w = WIN.find((x) => x.key === state.win);
   if (u.kind === "plinth") {
     const fk = state.split ? "lines" : state.foot, fm = FOOT.find((m) => m.key === fk), all = under(u.ci);
-    tip.append(el("b", null, `${c.name}, the whole`), el("div", "k", `the platform under the ${all.length - 1} components inside ${c.folder === "." ? "the repository" : c.folder}, and ${poss(c.name)} own files`));
+    tip.append(el("b", null, c.name), el("div", "k", `the platform under the ${all.length - 1} components inside ${c.folder === "." ? "the repository" : c.folder}, and ${poss(c.name)} own files`));
     const r1 = el("div", "row"); r1.append(el("span", null, fm.label), el("span", null, fmt(all.reduce((a, k) => a + C[k].v[fk], 0))));
     const r2 = el("div", "row"); r2.append(el("span", null, `Lines changed, ${w.label.toLowerCase()}`), el("span", null, fmt(all.reduce((a, k) => a + CH.comp[k].volume, 0))));
     tip.append(r1, r2);
@@ -946,7 +1113,8 @@ function drawSide() {
     s.append(el("h2", null, state.own ? `${poss(C[state.scope].name)} own files` : parent[state.scope] >= 0 ? `Inside ${C[state.scope].name}` : "All components"), el("p", "intent", `Ranked by height: ${hm.label.toLowerCase()}, ${w.label.toLowerCase()}. Click a block or a name.`));
     const g = el("div", "rank"); g.append(el("span", "h", "Component"), el("span", "h", fm.label), el("span", "h", hm.label));
     C.map((c, ci) => [c, ci]).filter(([, ci]) => inScope(ci)).sort((a, b) => CH.comp[b[1]][hm.key] - CH.comp[a[1]][hm.key]).forEach(([c, ci]) => {
-      const n = el("span", "nm", kids[ci].length ? `${poss(c.name)} own files` : c.name); n.onclick = () => { state.selected = ci; paint(); drawSide(); };
+      // The side list ranks blocks, and a component's own block stands for it there: the platform has no row of its own.
+      const n = el("span", "nm", c.name); n.onclick = () => { state.selected = ci; paint(); drawSide(); };
       g.append(n, el("span", null, fmt(c.v[fk])), el("span", null, fmt(CH.comp[ci][hm.key])));
     });
     s.append(g); return;
@@ -1056,12 +1224,12 @@ function diffFiles() {
 const diffTurn = turns();
 async function loadDiff(a, b) {
   const current = diffTurn();
-  if (!a || !b || a === "none") { DIFF = null; retarget(); drawSide(); drawNote(); return; }
+  if (!a || !b || a === "none") { setDiff(null); retarget(); drawSide(); drawNote(); return; }
   let d;
-  try { d = await io.get(`/api/relief/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`); } catch { if (disposed || !current()) return; DIFF = null; retarget(); drawSide(); drawNote(); return; }
+  try { d = await io.get(`/api/relief/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`); } catch { if (disposed || !current()) return; setDiff(null); retarget(); drawSide(); drawNote(); return; }
   // An answer that arrives after the scene was disposed, or after a later ask, lands nowhere.
   if (disposed || !current()) return;
-  if (d.error) { DIFF = null; return; }
+  if (d.error) { setDiff(null); return; }
   // Per component and per file: [added, deleted]. The diff lists only the paths that changed; any other stays [0, 0].
   const comp = C.map(() => [0, 0]), byPath = new Map(), gone = [];
   for (const f of d.files) {
@@ -1071,7 +1239,7 @@ async function loadDiff(a, b) {
     byPath.set(f.path, [was[0] + f.add, was[1] + f.del]);
     if (f.gone) gone.push(f.path);
   }
-  DIFF = { a: d.a, b: d.b, comp, byPath, goneAll: gone };
+  setDiff({ a: d.a, b: d.b, comp, byPath, goneAll: gone });
   diffFiles();
   for (const [id, end] of [["selA", d.a], ["selB", d.b]]) for (const o of $(id).options) if (o.dataset.linked && o.value === end.rev) o.textContent = `${end.date} ${end.sha} ${end.subject.slice(0, 52)}`;
   retarget(); drawSide(); drawNote();
@@ -1109,23 +1277,58 @@ async function startDiff() {
   await loadDiff(selA.value, selB.value);
 }
 let running = true;
+let heldSplit;
 if (pendingFile) need([C.findIndex((c) => c.folder === pendingFile[0])]);
 sync(); layout(); aim(carried?.camera.view ?? "tilt", false);
 if (carried) { camera.position.fromArray(carried.camera.position); controls.target.fromArray(carried.camera.target); controls.update(); }
+if (carried?.files) {
+  // A platform new to this build spreads out and rises where it stands, under the files carried onto it.
+  for (const [ci, p] of plinths.entries()) if (p && !CARRIED_PLATFORMS[C[ci].folder] && p.userData.to) {
+    const { hide: _hide, ...to } = p.userData.to;
+    p.userData.cur = { ...to, w: 0.01, d: 0.01, h: 0.01 }; p.position.set(to.x, to.y, to.z); p.scale.set(0.01, 0.01, 0.01);
+  }
+}
+if (carried?.world) {
+  // The world moves under the camera from where it stood to where this build centres it, at the pace of the files carried with it.
+  const to = { S: world.scale.x, off: world.position.clone(), pos: camera.position.clone(), target: controls.target.clone() };
+  world.scale.set(carried.world.S, 1, carried.world.S); world.position.fromArray(carried.world.off);
+  camTween = { t0: performance.now(), dur: 2400, ease: easeInOut, from: { S: carried.world.S, off: world.position.clone(), pos: to.pos.clone(), target: to.target.clone() }, to };
+}
 drawCrumbs(); drawSide(); drawTable(); drawNote(); resize(); frame(); startDiff();
+if (FRESH.size > 0) later(() => { FRESH.clear(); for (const o of [...tags, ...platTags.filter(Boolean)]) o.element.classList.remove("fresh"); leaders.dataset.key = ""; }, FRESH_MS);
 return {
   root,
   /** Start drawing again after the view was off the page. */
   // Colours come from the relief's own element, which only resolves its tokens once it is on the page.
   resume() { if (disposed || !root.isConnected) return; paint(); drawScale(lastMax); if (!running) { running = true; resize(); frame(); } },
   touch,
+  files(on) {
+    if (on !== onHome) {
+      onHome = on;
+      if (on) { homeDiff = DIFF; DIFF = null; } else { DIFF = homeDiff; homeDiff = null; diffFiles(); }
+      retarget(); drawSide(); drawNote(); drawScale(lastMax);
+    }
+    const want = on ? true : heldSplit;
+    if (on && heldSplit === undefined) heldSplit = state.split;
+    if (!on) heldSplit = undefined;
+    if (want === undefined || state.split === want) return;
+    state.split = want; sync(); retarget(); drawSide(); drawNote();
+  },
   view() {
     const file = state.file ? [C[state.file[0]].folder, FL[state.file[0]][state.file[1]].file] : pendingFile;
     return {
-      layout: LAYOUT, foot: state.foot, height: state.height, win: state.win, split: state.split, big: state.big,
+      layout: LAYOUT, foot: state.foot, height: state.height, win: state.win, split: heldSplit ?? state.split, big: state.big,
       scope: C[state.scope].folder, own: state.own, selected: state.selected == null ? null : C[state.selected].folder, file,
       camera: { view: lastView, position: camera.position.toArray(), target: controls.target.toArray() },
+      world: { S: world.scale.x, off: world.position.toArray() },
+      outlines: Object.fromEntries(outlines.flatMap((o, ci) => (o.userData.now ? [[C[ci].folder, o.userData.now]] : []))),
+      tints: Object.fromEntries(C.flatMap((c, ci) => (FL[ci] ?? []).map((f, fi) => [f.file, (fileMesh.getColorAt(fileAt[ci][fi], _tint), _tint.getHex())]))),
+      glows: Object.fromEntries([...glows.values()].filter((g) => g.fi >= 0 && FL[g.ci]).map((g) => [FL[g.ci][g.fi].file, [g.kind, performance.now() - g.t0]])),
+      sides: Object.fromEntries([...tags, ...platTags].filter((o) => o?.side).map((o) => [C[o.ci].folder, o.side])),
       diff: diffOffered ? { a: $("selA").value, b: $("selB").value } : null,
+      files: Object.fromEntries(C.flatMap((c, ci) => (FL[ci] ?? []).map((f, fi) => { const o = fileAt[ci][fi] * 6; return [f.file, Array.from(FS.now.slice(o, o + 6))]; }).filter(([, at]) => at[3] > 0))),
+      owners: Object.fromEntries(C.flatMap((c, ci) => (FL[ci] ?? []).map((f) => [f.file, ownerKey(ci)]))),
+      platforms: Object.fromEntries(plinths.flatMap((p, ci) => (p && p.visible ? [[C[ci].folder, [p.position.x, p.position.y, p.position.z, p.scale.x, p.scale.z, p.scale.y]]] : []))),
     };
   },
   dispose() {

@@ -3,9 +3,12 @@
 ## See the system: Structure and Connections
 
 `coherence scope` opens Scope, a live page that projects the whole model of
-your project for a human. It leads with one verdict (all verified, nothing
-enforced yet, or how many invariants are broken). Its first two views show
-what the system is made of.
+your project for a human. It opens on Home, which says what is known in
+words: how many components the project has, how many invariants guard how
+many of them and how old the checks behind them are, and by name any
+invariant whose last check failed, over the project drawn as its files. It
+gives no verdict over the whole project. The next two views show what the
+system is made of.
 
 **Structure** shows the project as a relief, one block per component (a
 folder that carries a spec), each standing on its parent's platform.

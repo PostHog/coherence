@@ -30,7 +30,7 @@ import { gapsOf, orientGapText, structureState } from "./gaps.ts";
 import { ADOPTER_ENTRANCES, APPLE, adopterFiles } from "../../spec/covers-fixture.ts";
 import { allInvariants, flowChokepointId, invariantVerdict, relianceId, resolveHash, structureId } from "./derive.ts";
 import type { EntranceGuard, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
-import { CORE_RULE, compareFlows, flowBrokenId, flowHealthId, flowDefaultSelection, flowEdgeId, flowEntranceId, flowLabelLines, flowNodeId, flowOf, flowVerdict, routeName, type FlowEntrance, type FlowModel, type FlowRoute } from "./structure-flow.ts";
+import { CORE_RULE, compareFlows, flowBrokenId, flowHealthId, flowDefaultSelection, flowEdgeId, flowEntranceId, flowLabelLines, flowNodeId, flowOf, routeName, type FlowEntrance, type FlowModel, type FlowRoute } from "./structure-flow.ts";
 import { renderView } from "./shell.ts";
 
 let fixture: Fixture;
@@ -328,7 +328,7 @@ test("the comparison seam measures what a change did: entrance, interface added,
 test("links into the retired map and the security spine open the Structure view, and its Reliance view's links open the listing on the Invariants view", () => {
   const state = projectState();
   // The relief has no cards to land on: each opens the view alone, the masthead verdict's link among them.
-  for (const link of [structureId("src/store", "single writer"), flowEntranceId(".", "run"), flowChokepointId("src/store", "single writer"), flowVerdict(flowOf(state)).select])
+  for (const link of [structureId("src/store", "single writer"), flowEntranceId(".", "run"), flowChokepointId("src/store", "single writer"), flowHealthId("verified")])
     assert.deepEqual(resolveHash(state, `#${link}`), { view: "structure", id: undefined }, link);
   // Reliance is listed on its invariant's card: a reliance id lands there, and the retired view's own link opens Invariants.
   const reliance = relianceId("src/store", "single writer");
@@ -687,29 +687,18 @@ test("with the handler's reach read, a route follows the handler and stops where
   assert.equal(flowOf(projectState()).routes[0]!.followed, "weight");
 });
 
-test("the masthead leads with health: one verdict in large type that links to Structure, with the counts demoted beneath it", () => {
-  const verdictOf = (state: ShellState): { kind: string; href: string; text: string; page: string } => {
-    const page = renderView(state, "lexicon").text;
-    const m = /<a class="verdict" data-field="verdict" data-verdict="([a-z]+)" href="#([^"]+)">([^<]+)<\/a>/.exec(page);
-    assert.ok(m !== null, "the masthead carries a verdict");
-    return { kind: m[1]!, href: m[2]!, text: m[3]!, page };
-  };
-  const healthy = verdictOf(projectState());
-  assert.deepEqual([healthy.kind, healthy.text, healthy.href], ["verified", "All 3 invariants verified", flowHealthId("verified")]);
-  assert.ok(healthy.page.indexOf('data-field="verdict"') < healthy.page.indexOf('data-field="model-counts"'), "the verdict comes before the counts");
-  assert.doesNotMatch(/<div class="masthead">[^]*?<\/div>/.exec(healthy.page)![0], /bullets?\b/, "no implementation noun in the masthead");
+test("the masthead says no verdict: on every view it is the reading's name, the connection and the project, the same for a project that holds, one with nothing enforced and one that is broken", () => {
   const none = projectState({ states: { "one door": "requirement", "append-only store": "requirement", "single writer": "requirement" } });
   none.runs.records = [];
-  const nothing = verdictOf(none);
-  assert.deepEqual([nothing.kind, nothing.text, nothing.href], ["nothing", "Nothing is enforced yet", flowHealthId("requirements")]);
-  const broken = verdictOf(healthState());
-  assert.deepEqual([broken.kind, broken.text, broken.href], ["broken", "1 broken", flowBrokenId("src/store")], "one broken component: the verdict names its broken set");
-  assert.match(broken.page, /data-field="verdict-detail">1 requirement not enforced yet/);
-  for (const verdict of [healthy, nothing, broken]) assert.equal(resolveHash(healthState(), `#${verdict.href}`)?.view, "structure", `the ${verdict.kind} verdict's link lands on the Structure view`);
-  const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
-  const size = (selector: string): string => new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{[^}]*font-size: ([^;]+);`).exec(css)![1]!;
-  assert.match(size(".masthead .verdict"), /clamp\(1\.375rem/, "large type");
-  assert.equal(size(".masthead .meta-counts"), "0.8125rem", "the counts are small");
+  const states = [projectState(), none, healthState()];
+  const mastheads = states.flatMap((state) => state.views.map((view) => /<div class="masthead[^"]*">[^]*?<\/div>/.exec(renderView(state, view.id).text)?.[0] ?? ""));
+  for (const masthead of mastheads) {
+    assert.match(masthead, /<p class="reading-name">Scope<\/p>/, "the reading's name");
+    assert.match(masthead, /<h1>[^<]+<\/h1>/, "the project");
+    assert.doesNotMatch(masthead, /data-field="(verdict|verdict-detail|model-counts)"|class="verdict/, "no verdict, no detail beneath one, no counts");
+    assert.doesNotMatch(masthead, /\b(verified|broken|enforced|invariants?|journal records|runs)\b/i, "nothing that grades or counts the project");
+  }
+  assert.equal(new Set(mastheads).size, 1, "a project that holds, one with nothing enforced and a broken one wear the same masthead on every view");
 });
 
 test("no traced control marks only an untrusted route with nothing traced on it: unknown trust or a level from outside the system's control, never a trusted one", () => {

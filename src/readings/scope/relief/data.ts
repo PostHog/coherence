@@ -34,6 +34,8 @@ export interface ReliefDataComponent {
   intent: string;
   /** A folder with no spec inside a component that holds others. */
   virtual?: true;
+  /** The root when no spec names it: drawn as land nobody has named yet. */
+  unnamed?: true;
   /** How many files it holds; the files themselves load by folder. */
   files: number;
   v: ReliefMeasures;
@@ -154,6 +156,7 @@ export function reliefData(state: ShellState): ReliefData | { absent: string } {
       spec: spec?.specPath ?? "",
       intent: spec?.intent ?? "",
       ...(c.district ? { virtual: true as const } : {}),
+      ...(c.unnamed ? { unnamed: true as const } : {}),
       files: c.files,
       v: {
         lines: c.lines,
