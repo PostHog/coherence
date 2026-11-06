@@ -351,7 +351,7 @@ test("the first load stays flat as the journal, the runs and the code grow, ever
       for (const invariant of whole.spec.components.flatMap((c) => c.invariants)) {
         assert.deepEqual(latestOf(invariant, state.runs.records), latestOf(invariant, whole.runs.records), `${invariant.name}: the first load derives the same latest verdicts`);
       }
-      assert.match(renderShell(state).text, new RegExp(`${allJournal.length} journal records`), "the masthead counts every record");
+      assert.equal(state.journal.records.length + (state.journal.omitted ?? 0), allJournal.length, "the first load knows every record, those it carries and how many it leaves out");
       assert.match(renderView(state, "journal").text, /data-history="journal"/, "the journal view offers the rest");
 
       // Page back as the page does: from the server's hint, then below the oldest record each page returned.

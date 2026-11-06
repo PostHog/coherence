@@ -15,7 +15,7 @@ import { answerStructure } from "../query/query.ts";
 import { flowOf } from "./structure-flow.ts";
 import { makeFixture } from "./check-fixture.ts";
 import { buildScopePage } from "./build.ts";
-import { renderMasthead } from "./shell.ts";
+import { renderMasthead, renderView } from "./shell.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 
 function entrance(name: string, handler: string, file: string | undefined): SpecEntrance {
@@ -96,7 +96,7 @@ describe("entrance coverage", () => {
     assert.ok(orient.includes("scaffold entrances"), "and names the command that proposes them");
   });
 
-  test("undeclared entrances are a neutral count: the masthead gives how many of the detected are undeclared, in quiet ink, never in the attention color nor as a gap", async (t) => {
+  test("undeclared entrances are a neutral count: Home gives how many of the detected are undeclared, in quiet ink, never in the attention color nor as a gap", async (t) => {
     const fixture = makeFixture();
     t.after(() => fixture.remove());
     const { state } = await buildScopePage({ root: fixture.root, lexiconPath: COHERENCE_LEXICON, project: "Coverage" });
@@ -110,10 +110,12 @@ describe("entrance coverage", () => {
     const coverage = flowOf(withCoverage).coverage!;
     const n = coverage.uncovered.length;
     assert.ok(n >= 2, "the fixture holds undeclared entrances");
-    const masthead = String(renderMasthead(withCoverage));
-    assert.match(masthead, new RegExp(`<p class="verdict-detail" data-field="verdict-detail">[^<]*${n} of ${coverage.detected} entrances undeclared`), "the masthead counts them beneath the verdict, in its quiet detail line");
-    assert.doesNotMatch(masthead, /data-verdict="[^"]*"[^>]*>[^<]*undeclared/, "never as the verdict itself");
+    const home = renderView(withCoverage, "home").text;
+    assert.match(home, new RegExp(`<p class="home-sub" data-field="undeclared">${n} of the ${coverage.detected} entrances Coherence detected are undeclared\\.</p>`), "Home counts them in its quiet ink, where the reader starts");
+    assert.doesNotMatch(home, /<h2[^>]*>[^<]*undeclared/, "never as what Home leads with");
+    assert.doesNotMatch(home, /data-broken[^>]*>[^<]*undeclared|class="[^"]*(fail|attention|gap)[^"]*"[^>]*>[^<]*undeclared/, "never in the attention color nor as a gap");
+    assert.doesNotMatch(String(renderMasthead(withCoverage)), /undeclared/, "the masthead says no count");
     const none = { ...state, componentInterfaces: { ...base, candidates: [] } } as ShellState;
-    assert.doesNotMatch(String(renderMasthead(none)), /entrances undeclared/, "nothing to count, nothing said");
+    assert.doesNotMatch(renderView(none, "home").text, /entrances Coherence detected/, "nothing to count, nothing said");
   });
 });

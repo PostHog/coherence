@@ -1,9 +1,27 @@
 # The Scope shell
 
 Scope is the reading: one surface that projects the model for a human, in
-views. Eight views ship, in the order the strip shows them: Structure,
+views. Nine views ship, in the order the strip shows them: Home, Structure,
 Connections, Lexicon, Components, Invariants, Practices, Runs, and Journal.
-A page whose address names no view opens on Structure.
+A page whose address names no view opens on Home. The masthead above them is
+the same on every view, the reading's name, the connection and the project,
+and says no verdict over the whole project.
+
+## Home
+
+Home says where the project stands in words, over the project drawn as its
+files. A project with no invariant yet is being set up, and Home walks its
+onboarding: the files, then the components the agent names, then the
+invariants it suggests. Once an invariant holds, Home leads with the project
+and how many components it has, how many invariants guard how many of them
+and how old their checks are, any invariant whose last check failed by name,
+and how many detected entrances are undeclared, as a neutral count. Unnamed
+land is grey, and a component takes colour once named. A replay shows how the
+project took shape, from one mass of files to its components, in the order
+their specs were first committed. Beneath it, How Coherence works tells the
+five moments of a session from `docs/how-coherence-works.md`, each with what
+Coherence last said at that moment, kept by the hooks under
+`.coherence/hook-said`.
 
 ## Structure
 
@@ -215,10 +233,7 @@ The flow model both read:
   the declaring component, and a dispatcher's entrance is unreachable unless
   the component interface from the declaring component carries the handler.
 
-The masthead's verdict reads the same model: one verdict in large type
-linking to Structure, with what it leaves out (requirements, uncovered
-components, undeclared entrances as a neutral count) beneath it. An
-invariant's enforcements, crossing, refutation and bypass sites are on its
+An invariant's enforcements, crossing, refutation and bypass sites are on its
 card in **Invariants**, with its reliance listing, which `query relies-on`
 also prints.
 

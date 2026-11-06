@@ -80,6 +80,7 @@ import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
+import { keepSaid, saidIn, toolOf } from "./hook-said.ts";
 import { carryBlock, decisionsNear, keepPlaced } from "./carry-over.ts";
 import { syntaxOf } from "../plugins/languages.ts";
 import { parserNotice, staleParsesNotice } from "../plugins/syntax-trees.ts";
@@ -1324,7 +1325,13 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     if (event === "SessionStart" || event === "Stop") options.telemetry?.(root, event, input);
     if (event === "SessionStart") options.updateCheck?.(root, event);
     if (event === "SessionStart" || event === "Stop") options.mirrors?.(root);
-    return overBudget(result, ms, root);
+    const answered = overBudget(result, ms, root);
+    // What reached the host is kept for a person to read (hook-said.ts), once the answer is whole; silence keeps nothing.
+    if (session !== undefined && answered.exit === 0) {
+      const said = saidIn(answered.stdout);
+      if (said !== undefined) keepSaid(root, event, { at: new Date().toISOString(), session, ...said, ...(TOOL_HOOKS.has(event) ? toolOf(root, input as Record<string, unknown>) : {}) });
+    }
+    return answered;
   }
 
   /** A tool hook over the latency budget says so in its own answer. */

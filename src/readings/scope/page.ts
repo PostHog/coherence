@@ -24,7 +24,8 @@
 import { CONNECTIONS_ID, CONNECTIONS_PREFIX, componentOfHash, journalId, resolveHash } from "./derive.ts";
 import type { JournalKind, JournalRecord, LifecycleState, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { renderMasthead, renderShell, renderViewResults } from "./shell.ts";
-import { mountRelief, touchRelief, type Touch } from "./relief/mount.ts";
+import { isReplaying, mountRelief, replayRelief, stopReplay, touchRelief, type Touch } from "./relief/mount.ts";
+import { replayFrames } from "./home-replay.ts";
 import { landConnections, mountConnections } from "./connections/mount.ts";
 import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream } from "./updates.ts";
 import { setLanguageData } from "./language-data.ts";
@@ -100,7 +101,7 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
   // The Connections view is kept the same way, in the host a render leaves on its own tab.
   const mount = (): void => {
     if (state.activeView === CONNECTIONS_ID) mountConnections(root, state);
-    else if (state.activeView === "structure") mountRelief(root, state, io);
+    else if (state.activeView === "structure" || state.activeView === "home") mountRelief(root, state, io, undefined, state.activeView === "home");
   };
   const renderAll = (): void => {
     document.title = `${state.project} Scope`;
@@ -255,6 +256,34 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
         update();
         location.hash = `#${journalId(record)}`;
       });
+      return;
+    }
+
+    // Home's replay: how the project took shape, played in the scene; pressed again while it plays, it stops.
+    const replay = target.closest<HTMLElement>("[data-replay]");
+    if (replay !== null) {
+      if (isReplaying()) {
+        stopReplay();
+        return;
+      }
+      // Each step says what it named and what each named component is for, in its spec's words, as a list under the caption.
+      const say = (caption: string | null, step: number, of: number, named: readonly { name: string; intent: string }[] = []): void => {
+        const line = root.querySelector<HTMLElement>("[data-replay-caption]");
+        const button = root.querySelector<HTMLElement>("[data-replay]");
+        const list = root.querySelector<HTMLElement>("[data-replay-named]");
+        if (line !== null) line.textContent = caption === null ? "" : `${step} of ${of} · ${caption}`;
+        if (list !== null) {
+          list.replaceChildren(...named.filter((n) => n.intent !== "").map((n) => {
+            const item = document.createElement("li");
+            const name = document.createElement("b");
+            name.textContent = n.name;
+            item.append(name, ` ${n.intent}`);
+            return item;
+          }));
+        }
+        if (button !== null) button.textContent = caption === null ? `▶ Replay how ${state.project} took shape` : "■ Stop the replay";
+      };
+      void replayRelief(root, state, io, (all) => replayFrames(state, all), say);
       return;
     }
 

@@ -1465,6 +1465,22 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: record -> harness
   refuted: let decisionsNear tell again a decision the session was already told in carry-over.ts -> "before an edit, the decisions about the component it lands in, kept at the start, are told once a session, capped a component, never the session's own or the root's" went red in carry-over.test.ts on its own assertion; restored byte for byte, green (2026-11-05)
   kinds: none
+- what a hook said is kept, never a command: When a hook answers with words, what reached the host is kept for a person to read, the last three per event, each with when, the session, whom it reached and, for a tool moment, the tool and the file inside the project; a command's text is never kept, a file outside the project is not named, and a hook that says nothing keeps nothing.
+  over: a Bash command carrying a secret, an edit inside the project and a read outside it
+  via: a tool moment keeps the tool and the file inside the project, never a command's text
+  because: the owner asked to preview what each hook says, from one that fired (2026-11-05); a command can carry a secret, so its text is never written down, and a silent call, most of them, writes nothing, so the latency budget pays nothing for it
+  crossing: harness -> record
+  refuted: kept the command's text as the file in toolOf in hook-said.ts -> "a tool moment keeps the tool and the file inside the project, never a command's text" went red in hook-said.test.ts on its own assertion; restored byte for byte, green (2026-11-05)
+  kinds: storage
+  checklist: scoped-reads dismissed: one reader, Scope's Home, reads the store whole for the project it belongs to, and no scope narrows it
+  checklist: encrypted-storage dismissed: what is kept is what Coherence itself told the host, never a command's text; it stays in .coherence, which git ignores
+  checklist: key-rotation-compatibility dismissed: nothing is encrypted
+  checklist: input-validation dismissed: the store holds Coherence's own answers, parsed from the hook's own output; an unreadable file reads as nothing kept
+  checklist: revision-preservation dismissed: the store keeps the latest three by design and makes no claim to history
+  checklist: commit-ordered-effects dismissed: no external effect follows the write
+  checklist: durable-dispatch-intent dismissed: nothing is dispatched
+  checklist: declared-target-coverage dismissed: one file per event, written by the hook that answered
+  checklist: completion-evidence dismissed: no work item completes here
 - orient names the practices no tool use fires: Orient's practices line names, by name, only the practices nothing fires on its own, a trigger of explicit and no other, the project's and Coherence's alike, and Coherence's adoption practice only while the project has no spec; a practice a command, an edit or a defect fires is not named, nor counted, nor how to record one; a project with no spec is pointed at adopting Coherence.
   over: a project with specs and no practice of its own, one with no spec, and one whose practice its command and an edit fire
   via: orient names only the practices nothing fires on their own, and points a project with no spec at adopting Coherence

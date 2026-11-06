@@ -22,7 +22,10 @@ import { promisify } from "node:util";
 import { Worker } from "node:worker_threads";
 import { computeMass } from "../../economy/mass.ts";
 import { LOCKFILES } from "../../lifecycle/lockfiles.ts";
+import { districtsOf, groupFiles, type ReliefFolded } from "./groups.ts";
 import { loadSpecModel } from "../../spec/model.ts";
+
+export { districtsOf };
 
 export interface ReliefFile {
   file: string;
@@ -42,6 +45,8 @@ export interface ReliefComponent {
   name: string;
   /** A folder with no spec inside a component that holds other components: unclaimed land, drawn as a district. */
   district?: true;
+  /** The root when no spec names it: the project's files that no part claims, as yet nobody's. */
+  unnamed?: true;
   /** How many files it holds; the files themselves load by folder, never with the first load. */
   files: number;
   lines: number;
@@ -58,9 +63,22 @@ export interface ReliefLanding {
   c: [number, number][];
 }
 
+/** A spec the reading holds, with the commit that first added it: empty when it is not committed yet. */
+export interface ReliefSpec {
+  folder: string;
+  name: string;
+  sha: string;
+  date: string;
+  subject: string;
+}
+
 export type ReliefReading =
   | {
       kind: "read";
+      /** When each spec was first committed, oldest first, those not yet committed last: how the project took shape, for the page to replay. */
+      specs?: ReliefSpec[];
+      /** The folders the specs fold into their components, for a replay to group as the reading did. */
+      folded?: ReliefFolded[];
       components: ReliefComponent[];
       landings: ReliefLanding[];
       head: string;
@@ -85,51 +103,10 @@ export interface ReliefRead {
 /** The most landings a reading carries, newest first: the first load is bounded, and a busy repository lands hundreds a day. */
 export const LANDINGS_MAX = 1500;
 
-/** A folder must hold this many code files before it stands as a district: the threshold mass names a folder by. */
-const DISTRICT_FILES = 3;
-
 // Lockfiles churn with every dependency bump and say nothing about the code: the ones Coherence recognizes are left out.
 const LOCKFILE_NAMES = new Set(LOCKFILES.map(([file]) => file));
 const leftOut = (path: string): boolean => path.startsWith(".coherence/") || path.includes("/.coherence/") || LOCKFILE_NAMES.has(path.slice(path.lastIndexOf("/") + 1));
 
-/** The folder a path belongs to: the deepest of the given folders holding it, "." holding everything. */
-function ownerIn(folders: readonly string[], path: string): string {
-  let best = ".";
-  for (const folder of folders) if (folder !== "." && (path === folder || path.startsWith(folder + "/")) && folder.length > best.length) best = folder;
-  return best;
-}
-
-/**
- * A container's own files split by the folder below it that holds them. A
- * folder holding most of the container's own lines is opened into its
- * subfolders, so frontend/src is never one district holding nearly everything;
- * files loose in an opened folder stay with the container.
- */
-export function districtsOf(folder: string, files: readonly ReliefFile[]): Map<string, ReliefFile[]> {
-  const base = folder === "." ? "" : folder + "/";
-  const total = files.reduce((n, f) => n + f.lines, 0) || 1;
-  const split = (prefix: string, among: readonly ReliefFile[]): Map<string, ReliefFile[]> => {
-    const groups = new Map<string, ReliefFile[]>();
-    for (const f of among) {
-      const rest = f.file.slice(prefix.length);
-      const slash = rest.indexOf("/");
-      if (slash < 0) continue;
-      const key = prefix + rest.slice(0, slash);
-      groups.set(key, [...(groups.get(key) ?? []), f]);
-    }
-    return groups;
-  };
-  const out = new Map<string, ReliefFile[]>();
-  const todo = [...split(base, files)];
-  while (todo.length > 0) {
-    const [sub, held] = todo.pop()!;
-    const lines = held.reduce((n, f) => n + f.lines, 0);
-    const inner = split(sub + "/", held);
-    if (lines > 0.75 * total && inner.size >= 2) todo.push(...inner);
-    else if (held.length >= DISTRICT_FILES) out.set(sub, held);
-  }
-  return new Map([...out].sort(([a], [b]) => a.localeCompare(b)));
-}
 
 /** One path a commit or a diff changed, with the lines it added and deleted; git counts none for a binary file, which is null. */
 export interface NumstatEntry {
@@ -247,48 +224,9 @@ export async function readRelief(rootGiven: string, signal?: AbortSignal, run?: 
   } catch (error) {
     return unread(`mass could not be read: ${(error as Error).message}`);
   }
-  const specced = [...new Set([".", ...model.components.map((c) => c.folder)])].sort();
-  const files = new Map<string, ReliefFile[]>(specced.map((f) => [f, []]));
-  for (const f of mass.files) files.get(ownerIn(specced, f.file))!.push({ file: f.file, lines: f.lines, reached: f.reachedBy.length });
-
-  // A component holding others gives up its own files' folders as districts; a leaf's subfolders are its spec's to claim.
-  const holdsOthers = (folder: string) => specced.some((o) => o !== folder && (folder === "." || o.startsWith(folder + "/")));
-  const districts = new Map<string, { of: string; files: ReliefFile[] }>();
-  for (const folder of specced.filter(holdsOthers)) {
-    const groups = districtsOf(folder, files.get(folder)!);
-    if (groups.size < 2) continue; // one district would only be the component again
-    const moved = new Set<string>();
-    for (const [sub, held] of groups) {
-      districts.set(sub, { of: folder, files: held });
-      for (const f of held) moved.add(f.file);
-    }
-    files.set(folder, files.get(folder)!.filter((f) => !moved.has(f.file)));
-  }
-
-  const name = new Map(model.components.map((c) => [c.folder, c.name]));
-  const folders = [...specced, ...districts.keys()].sort();
-  const held = folders.map((folder) => (districts.get(folder)?.files ?? files.get(folder)!).slice().sort((a, b) => b.lines - a.lines || a.file.localeCompare(b.file)));
-  const components: ReliefComponent[] = folders.map((folder, ci) => {
-    const district = districts.get(folder);
-    const mine = held[ci]!;
-    return {
-      folder,
-      name: district ? folder.slice(district.of === "." ? 0 : district.of.length + 1) + "/" : (name.get(folder) ?? (folder === "." ? "root" : folder)),
-      ...(district ? { district: true as const } : {}),
-      files: mine.length,
-      lines: mine.reduce((n, f) => n + f.lines, 0),
-      unreached: mine.reduce((n, f) => n + (f.reached ? 0 : f.lines), 0),
-    };
-  });
-  const index = new Map(folders.map((f, i) => [f, i]));
-  const districtFolders = [...districts.keys()];
-  // A path belongs to its deepest component, then within it to the district whose folder holds it, tests and all.
-  const owner = (path: string): number => {
-    const own = ownerIn(specced, path);
-    const district = districtFolders.find((d) => path.startsWith(d + "/") && districts.get(d)!.of === own);
-    return index.get(district ?? own)!;
-  };
-
+  // The folders each spec folds into its component, project-relative, so the picture draws them as the component's own.
+  const folded = model.components.flatMap((c) => c.folded.map((f) => ({ folder: c.folder === "." ? f.folder : `${c.folder}/${f.folder}`, subtree: f.subtree })));
+  const { folders, held, components, owner } = groupFiles(model.components.map((c) => c.folder), new Map(model.components.map((c) => [c.folder, c.name])), mass.files.map((f) => ({ file: f.file, lines: f.lines, reached: f.reachedBy.length })), false, folded);
   const at = new Map<string, [number, number]>();
   held.forEach((mine, ci) => mine.forEach((f, fi) => at.set(f.file, [ci, fi])));
   // Per file, the landings that changed it, as [landing index, lines changed].
@@ -326,8 +264,33 @@ export async function readRelief(rootGiven: string, signal?: AbortSignal, run?: 
     for (const mine of landed) for (const l of mine) l.length = 0;
     landingsUnread = landingsUnreadBecause(error);
   }
+  // When each spec was first added: the order the project's parts were named in, read from the history like the landings.
+  let specs: ReliefSpec[] = [];
+  try {
+    // A spec moved into its folder counts from the move (R), and paths are read from the project's own folder, as the
+    // components are, so a project adopted inside a larger repository dates its specs too.
+    const out = await git(root, "log", "-M", "--diff-filter=AR", "--relative", "--format=%x00%h%x09%ad%x09%s", "--date=short", "--name-only", "--", ":(glob)**/*.spec.md");
+    const added = new Map<string, { sha: string; date: string; subject: string }>();
+    const order = new Map<string, number>();
+    // Newest first: the last a path is seen is when it was first added.
+    const chunks = out.split("\0").filter((c) => c.trim() !== "");
+    for (const [n, chunk] of chunks.entries()) {
+      const [header = "", ...paths] = chunk.split("\n").filter((l) => l.trim() !== "");
+      const [sha = "", date = "", ...subject] = header.split("\t");
+      for (const path of paths) {
+        const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ".";
+        added.set(folder, { sha, date, subject: subject.join("\t") });
+        order.set(folder, chunks.length - n);
+      }
+    }
+    specs = model.components.map((c) => ({ folder: c.folder, name: c.name, ...(added.get(c.folder) ?? { sha: "", date: "", subject: "" }) }));
+    // Oldest commit first, in the order git lists them; those not committed yet last.
+    specs.sort((a, b) => (order.get(a.folder) ?? Infinity) - (order.get(b.folder) ?? Infinity));
+  } catch {
+    specs = model.components.map((c) => ({ folder: c.folder, name: c.name, sha: "", date: "", subject: "" }));
+  }
   const texts = new Map(folders.map((folder, ci) => [folder, JSON.stringify(held[ci]!.map((f, fi): ReliefFileLanded => (landed[ci]![fi]!.length > 0 ? { ...f, l: landed[ci]![fi]! } : f)))]));
-  const reading = { components, landings, head, leftOut: [".coherence/", ...[...LOCKFILE_NAMES].sort()], ...(landingsUnread === undefined ? {} : { landingsUnread }) };
+  const reading = { ...(specs.length > 0 ? { specs } : {}), ...(folded.length > 0 ? { folded } : {}), components, landings, head, leftOut: [".coherence/", ...[...LOCKFILE_NAMES].sort()], ...(landingsUnread === undefined ? {} : { landingsUnread }) };
   const digest = createHash("sha256").update(JSON.stringify(reading));
   for (const [folder, text] of texts) digest.update(folder).update("\0").update(text);
   return { reading: { kind: "read", ...reading, stamp: digest.digest("base64url").slice(0, 16) }, files: texts };

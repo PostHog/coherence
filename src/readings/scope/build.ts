@@ -23,6 +23,8 @@
  * cli.ts.
  */
 
+import { readHowItWorks } from "./how-it-works.ts";
+import { readAllSaid } from "../../lifecycle/hook-said.ts";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -70,6 +72,11 @@ export interface BuildOptions {
   domainTitle?: string;
   /** Project name shown in the masthead. */
   project: string;
+  /**
+   * Read the name from the root's config at every build rather than once: a live page started before the config
+   * named the project (adoption opens Scope first) takes the config's name as soon as it is written.
+   */
+  projectFromRoot?: boolean;
   /** Ephemeral proposed crossings embedded only in this generated page. */
   structurePreview?: readonly StructurePreview[];
   /** False keeps every run and journal record in the state; the agent query reads them all. A page embeds a bounded window (default). */
@@ -296,7 +303,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     }
   }
   const state: ShellState = {
-    project: options.project,
+    project: options.projectFromRoot === true && options.root !== undefined ? projectNameOf(options.root) : options.project,
     views: VIEWS.map((v) => ({ id: v.id, label: v.label })),
     activeView: options.structurePreview === undefined || options.structurePreview.length === 0 ? DEFAULT_VIEW : "structure",
     lexicon: { layers: [coherence, ...(await pluginLexiconLayers(root)), domain], query: "", coverage: options.coverage ?? (await pageCoverage(root)) },
@@ -309,6 +316,8 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     structure: { preview: options.structurePreview === undefined ? [] : options.structurePreview.map((proposal) => ({ ...proposal, crossing: { ...proposal.crossing }, ...(proposal.chokepoints === undefined ? {} : { chokepoints: proposal.chokepoints.map((entry) => ({ ...entry })) }) })) },
     invariants: { query: "", state: "", component: "" },
     practices: loadPractices(root),
+    howItWorks: readHowItWorks(),
+    hookSaid: readAllSaid(root),
     practicesView: { query: "" },
     runsView: { query: "" },
     journalView: { query: "", kind: "", agent: "", session: "" },
@@ -552,7 +561,7 @@ export function projectNameOf(root: string): string {
 
 /** The options a reading of `root` builds with when nothing more is given: Coherence's lexicon, the project's own name. */
 export function rootOptions(root: string): BuildOptions {
-  return { root: resolve(root), lexiconPath: COHERENCE_LEXICON, project: projectNameOf(root) };
+  return { root: resolve(root), lexiconPath: COHERENCE_LEXICON, project: projectNameOf(root), projectFromRoot: true };
 }
 
 // Run directly, this file is the scope command (cli.ts), kept so an older invocation still writes its snapshot.

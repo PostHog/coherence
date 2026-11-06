@@ -125,9 +125,16 @@ function sayUnbuilt(host: HTMLElement, why: string, webgl: boolean): void {
 }
 
 /** Put the relief into the host the render left, building it first when what it draws changed. `create` is the scene's maker, given by tests. */
-export function mountRelief(root: HTMLElement, state: ShellState, io: ReliefIO, create: (data: ReliefData, io: ReliefIO, carried?: ReliefView) => Relief = createRelief): void {
+export function mountRelief(root: HTMLElement, state: ShellState, io: ReliefIO, create: (data: ReliefData, io: ReliefIO, carried?: ReliefView) => Relief = createRelief, files = false): void {
   const host = root.querySelector<HTMLElement>("[data-relief-host]");
   if (host === null) return;
+  // A replay holds the scene: a render puts it back into its host and builds nothing; the replay's end builds what the state holds.
+  if (replaying !== undefined && current !== undefined) {
+    if (current.relief.root.parentElement !== host) host.replaceChildren(current.relief.root);
+    current.relief.files?.(files);
+    current.relief.resume();
+    return;
+  }
   const step = reliefStep(current?.built ?? failed?.built, state);
   if (step.kind === "absent") {
     current?.relief.dispose();
@@ -153,10 +160,93 @@ export function mountRelief(root: HTMLElement, state: ShellState, io: ReliefIO, 
     return;
   }
   if (current.relief.root.parentElement !== host) host.replaceChildren(current.relief.root);
+  current.relief.files?.(files);
   current.relief.resume();
 }
 
 /** Light what an agent just read or wrote, when the relief has been built; activity before it was is not replayed. */
 export function touchRelief(touches: readonly Touch[]): void {
   current?.relief.touch(touches);
+}
+
+let replaying: { stop: boolean } | undefined;
+/** How long the picture takes to fade out of today and into the replay's first step. */
+const FADE_MS = 450;
+
+/** How the reader looks at a scene, without where anything in it stood: a build from it lays everything out afresh. */
+function lookOf(view: ReliefView): ReliefView {
+  const { files: _files, platforms: _platforms, owners: _owners, world: _world, outlines: _outlines, tints: _tints, glows: _glows, ...look } = view;
+  return look;
+}
+
+/** Whether a replay holds the scene now. */
+export function isReplaying(): boolean {
+  return replaying !== undefined;
+}
+
+/** Stop a replay at its next step; the state's own relief is built then. */
+export function stopReplay(): void {
+  if (replaying !== undefined) replaying.stop = true;
+}
+
+/**
+ * Replay how the project took shape in the scene on the page (home-replay.ts):
+ * every folder's files are loaded, then the scene is built from each step in
+ * turn, each build carrying where the files stood from the one before, so
+ * the project is seen to divide. `say` is told each step's caption, and null
+ * at the end, when the scene is built from the state as it now stands.
+ */
+export async function replayRelief(
+  root: HTMLElement,
+  state: ShellState,
+  io: ReliefIO,
+  frames: (all: ReliefFileLanded[]) => { caption: string; named: { name: string; intent: string }[]; data: ReliefData; files: Record<string, ReliefFileLanded[]> }[],
+  say: (caption: string | null, step: number, of: number, named?: readonly { name: string; intent: string }[]) => void,
+  create: (data: ReliefData, io: ReliefIO, carried?: ReliefView) => Relief = createRelief,
+): Promise<void> {
+  if (replaying !== undefined) return;
+  const data = reliefData(state);
+  if ("absent" in data) return;
+  const mine = { stop: false };
+  replaying = mine;
+  try {
+    const folders = state.relief?.kind === "read" ? state.relief.components.map((c) => c.folder) : [];
+    const loaded = await filesFor(state, data, io)(folders);
+    const steps = frames(Object.values(loaded).flat());
+    const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+    for (const [i, frame] of steps.entries()) {
+      if (mine.stop) break;
+      const host = root.querySelector<HTMLElement>("[data-relief-host]");
+      if (host === null) break;
+      const held = current?.relief.view();
+      // The first step is no move from today: the picture fades out and comes back as the project stood before any component
+      // was named, laid out afresh, carrying only how the reader looks at it.
+      let carried = held;
+      if (i === 0 && held !== undefined) {
+        carried = { ...lookOf(held), layout: {} };
+        host.style.transition = `opacity ${FADE_MS}ms ease`;
+        host.style.opacity = "0";
+        await wait(FADE_MS);
+        if (mine.stop) { host.style.opacity = ""; break; }
+      }
+      current?.relief.dispose();
+      current = { relief: create(frame.data, { ...io, files: async (want) => Object.fromEntries(want.flatMap((f) => (frame.files[f] === undefined ? [] : [[f, frame.files[f]!]]))) }, carried), built: { inputs: [], key: "" } };
+      host.replaceChildren(current.relief.root);
+      current.relief.files?.(true);
+      current.relief.resume();
+      if (i === 0) host.style.opacity = "1";
+      say(frame.caption, i + 1, steps.length, frame.named);
+      await wait(i === 0 ? 3000 : 4200);
+    }
+  } finally {
+    replaying = undefined;
+    say(null, 0, 0);
+    // The scene stands for no state now: the next mount builds the state's own, carrying the last step's places into it.
+    // Every step stood on today's kept places, so a replay played through ends on today and nothing moves; one stopped
+    // part way moves on to today as any rebuild does.
+    if (current !== undefined) current.built = { inputs: [], key: "" };
+    mountRelief(root, state, io, create, root.querySelector("[data-relief-host]")?.closest(".home") !== null);
+    const after = root.querySelector<HTMLElement>("[data-relief-host]");
+    if (after !== null) after.style.opacity = "";
+  }
 }

@@ -1582,6 +1582,20 @@
       "provenance": {
         "defined_by": "owner, 2026-10-30, named the view (work order w-faf84c51); the entry written by session a98282e8b37e5461b from the prototype the owner reviewed (d-a314db4e, d-d4f9fea6, d-9cf51e23)"
       }
+    },
+    {
+      "name": "home",
+      "definition": "Scope's first view: where the project stands, said in words over the project drawn as its files; while a project is set up, its onboarding.",
+      "related": [
+        "scope",
+        "structure",
+        "component",
+        "invariant"
+      ],
+      "provenance": {
+        "defined_by": "owner, 2026-11-05, confirmed Home as Scope's first view after a blind review named the conflict with Structure first (d-a323cda4); the view built in session b9e1ddd9 from the owner's design and trials (d-88e1ed21, d-4b7f64e6)",
+        "owner_words": "1. confirm. 2. confirm. proceed, split is fine"
+      }
     }
   ],
   "metaphors": {

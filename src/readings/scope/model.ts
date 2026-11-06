@@ -225,6 +225,7 @@ export type SpecChecklistLine =
 /** The lifecycle state of a bullet and what it lacks, as src/spec derives them: its own types, imported as types, which the bundle strips. */
 export type { State as LifecycleState, Lack } from "../../spec/state.ts";
 import type { State as LifecycleState, Lack } from "../../spec/state.ts";
+import type { HookSaid } from "../../lifecycle/hook-said.ts";
 import type { PracticeState } from "../../spec/practices.ts";
 import type { Reach } from "../../spec/practice.ts";
 
@@ -727,6 +728,10 @@ export interface ShellState {
   relief?: ReliefReading;
   /** Where the relief's components stood when the server last laid them out (relief/layout-store.ts): the page settles from it. Absent where nothing laid it out. */
   reliefLayout?: ReliefLayout;
+  /** How Coherence works, read from the installed package's docs/how-coherence-works.md (how-it-works.ts): absent from a page built before it was read. */
+  howItWorks?: HowItWorks;
+  /** What the hooks last said, by event, newest first (lifecycle/hook-said.ts): Home shows each moment's under its tab. */
+  hookSaid?: Record<string, HookSaid[]>;
   components: ComponentsViewState;
   structure: StructureViewState;
   invariants: InvariantsViewState;
@@ -993,3 +998,8 @@ export function parseLexicon(input: unknown, where: string): Lexicon {
   if (uncertain !== undefined) lexicon.uncertain = uncertain;
   return lexicon;
 }
+
+/** How Coherence works as Home shows it: the five moments of a session, read from the package's docs/how-coherence-works.md, or why it could not be. */
+export type HowItWorks =
+  | { kind: "read"; title: string; lead: string; moments: { tab: string; events: string[]; plain: string; details: string[] }[] }
+  | { kind: "unread"; because: string };

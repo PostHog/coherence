@@ -6,16 +6,16 @@
  * filter changes, and the whole shell when the view changes.
  */
 
+import { renderHomeResults } from "./home-view.ts";
 import { renderComponentsResults, renderComponentsTools } from "./components-view.ts";
 import { openEscalations, plural } from "./derive.ts";
-import { lexiconCounts, renderLexiconView } from "./lexicon-view.ts";
+import { renderLexiconView } from "./lexicon-view.ts";
 import { html, type Markup } from "./html.ts";
 import { renderInvariantsResults, renderInvariantsTools } from "./invariants-view.ts";
 import { renderJournalResults, renderJournalTools } from "./journal-view.ts";
 import { renderPracticesResults, renderPracticesTools } from "./practices-view.ts";
 import type { ShellState } from "./model.ts";
 import { renderRunsResults, renderRunsTools } from "./runs-view.ts";
-import { flowOf, flowVerdict } from "./structure-flow.ts";
 import { renderConnectionsResults, renderStructureResults } from "./structure-view.ts";
 import { CONNECTIONS_ID, CONNECTIONS_LABEL } from "./derive.ts";
 
@@ -25,6 +25,7 @@ import { CONNECTIONS_ID, CONNECTIONS_LABEL } from "./derive.ts";
  * embeds this list; the page reads it from state.
  */
 export const VIEWS = [
+  { id: "home", label: "Home" },
   { id: "structure", label: "Structure" },
   { id: CONNECTIONS_ID, label: CONNECTIONS_LABEL },
   { id: "lexicon", label: "Lexicon" },
@@ -38,19 +39,6 @@ export const VIEWS = [
 /** The view a page opens on when its address names none: the first in strip order. */
 export const DEFAULT_VIEW: string = VIEWS[0].id;
 
-/** The demoted line under the verdict: what the model holds, derived on every render. */
-export function modelCounts(state: ShellState): string {
-  const c = state.spec.counts;
-  const parts = [
-    plural(c.components, "component", "components"),
-    `${c.invariants} ${c.invariants === 1 ? "invariant" : "invariants"}, ${c.requirements} ${c.requirements === 1 ? "requirement" : "requirements"}${c.structuralDefects > 0 ? `, ${plural(c.structuralDefects, "structural defect", "structural defects")}` : ""}`,
-    plural(state.runs.records.length + (state.runs.omitted ?? 0), "run", "runs"),
-    plural(state.journal.records.length + (state.journal.omitted ?? 0), "journal record", "journal records"),
-  ];
-  const open = openEscalations(state.journal.records).length;
-  if (open > 0) parts.push(`${plural(open, "escalation", "escalations")} awaiting a human`);
-  return `${parts.join(", ")}.`;
-}
 
 /**
  * Where the state comes from, in one line: a snapshot that never updates, or
@@ -73,36 +61,15 @@ export function renderConnection(state: ShellState): Markup | null {
 }
 
 /**
- * The masthead leads with health: one verdict in large type, linking to
- * Structure (its href still names the verdict's set, which resolveHash sends
- * to the Structure view), and what else the verdict leaves out beneath it,
- * the undeclared entrances among it as a neutral count.
- * The lexicon and the record counts are demoted to one small line.
+ * The masthead, the same on every view so the view strip under it never moves: the reading's name, the connection,
+ * the project. It says no verdict over the whole project: Coherence speaks for the rules it checked, as of when it
+ * checked them, so where things stand is each view's to say in its own terms (Home in words, Invariants per rule).
  */
 export function renderMasthead(state: ShellState): Markup {
-  // The project's own lexicon when it has one: the masthead counts the project, not the tool.
-  const first = state.lexicon.layers.find((layer) => layer.id === "domain" && layer.kind === "present") ?? state.lexicon.layers[0];
-  const counts =
-    first !== undefined && first.kind === "present"
-      ? lexiconCounts(first.lexicon)
-      : "No lexicon is loaded.";
-  const model = flowOf(state);
-  const verdict = flowVerdict(model);
-  const requirements = model.health.requirements.length;
-  const detail = [
-    verdict.kind === "broken" && requirements > 0 ? `${requirements} ${requirements === 1 ? "requirement" : "requirements"} not enforced yet` : "",
-    verdict.kind === "nothing" ? `${requirements} ${requirements === 1 ? "requirement" : "requirements"} declared, none enforced` : "",
-    model.health.uncovered.length > 0 ? plural(model.health.uncovered.length, "component not covered", "components not covered") : "",
-    // Undeclared is the normal state of a detected entrance, never a gap: a neutral count, kept in view so it is never a quiet place to leave routes (d-a1095ef2).
-    model.coverage !== undefined && model.coverage.uncovered.length > 0 ? `${model.coverage.uncovered.length} of ${plural(model.coverage.detected, "entrance", "entrances")} undeclared` : "",
-  ].filter(Boolean).join(" · ");
-  return html`<div class="masthead">
+  return html`<div class="masthead masthead-quiet">
     <p class="reading-name">Scope</p>
     ${renderConnection(state)}
     <h1>${state.project}</h1>
-    <a class="verdict" data-field="verdict" data-verdict="${verdict.kind}" href="#${verdict.select}">${verdict.text}</a>
-    ${detail === "" ? null : html`<p class="verdict-detail" data-field="verdict-detail">${detail}</p>`}
-    <p class="meta-counts model-counts" data-field="model-counts">${modelCounts(state)} ${counts}</p>
   </div>`;
 }
 
@@ -133,6 +100,8 @@ export function renderViewResults(state: ShellState): Markup {
       return renderLexiconResults(state);
     case "components":
       return renderComponentsResults(state);
+    case "home":
+      return renderHomeResults(state);
     case "structure":
       return renderStructureResults(state);
     case CONNECTIONS_ID:
