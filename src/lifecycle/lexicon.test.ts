@@ -197,7 +197,7 @@ test("renderCompactWithin keeps the vocabulary most recently named first: the ho
   assert.match(tight.text, /^\d+ more, the least recently named: coherence lexicon$/m);
   assert.doesNotMatch(tight.text, /thing38/);
 
-  assert.match(renderCompactWithin(coherence, big, 1_000_000, "coherence", false).text, /^Coherence vocabulary \(2 concepts; the tool's terms, which restrict none of this project's words\):\n/, "in an adopter the header says Coherence's names restrict none of the project's words; with no journal, the file's order and no claim of one");
+  assert.match(renderCompactWithin(coherence, big, 1_000_000, "coherence", false).text, /^Biggish vocabulary \(40 concepts; /, "in an adopter the vocabulary is the project's alone, from its first line");
 
   const tooSmall = renderCompactWithin(coherence, big, 10);
   assert.deepEqual(tooSmall.delivered, { whole: 0, name: 0, out: all }, "when not even one name fits, one line points at the lexicon command");
@@ -206,7 +206,7 @@ test("renderCompactWithin keeps the vocabulary most recently named first: the ho
   assert.equal(deliveredText(renderCompactWithin(coherence, undefined, 1_000_000).delivered), "whole", "without a project and with room, every concept whole");
 });
 
-test("renderCompactWithin in an adopter gives the window to the project: Coherence's own concepts are one line of names in the file's order, never ranked by the journal, and the first to go", () => {
+test("renderCompactWithin in an adopter gives the window to the project: Coherence's own concepts are not delivered, not even by name, however much room there is", () => {
   const widgets = parseLexicon(
     { project: "widgetry", version: 0, concepts: Array.from({ length: 12 }, (_, i) => ({ name: `widget${i}`, definition: `The ${i}th widget, described at some length so that the line is long. More follows.` })) },
     "widgetry.json",
@@ -217,14 +217,9 @@ test("renderCompactWithin in an adopter gives the window to the project: Coheren
   const mine = coherence.concepts.length;
 
   const roomy = renderCompactWithin(coherence, widgets, 1_000_000, "coherence", false, () => true, named);
-  assert.deepEqual(roomy.delivered, { whole: all, name: mine, out: 0 }, "every project concept whole, every Coherence concept by name alone");
-  assert.match(roomy.text, /^Coherence vocabulary \(2 concepts; the tool's terms, which restrict none of this project's words\):\nNamed only here \(full entries: coherence lexicon\): invariant, journal\n/, "Coherence's own in the file's order, not the journal's, and no whole line");
-  assert.match(roomy.text, /^Widgetry vocabulary \(12 concepts, most recently named first; [^\n]*\n- widget7: /m, "the project's layer ranked by the journal");
-
-  // One character short: Coherence's names go, counted, before any project concept loses its line.
-  const short = renderCompactWithin(coherence, widgets, roomy.text.length - 1, "coherence", false, () => true, named);
-  assert.deepEqual(short.delivered, { whole: all, name: 0, out: mine }, JSON.stringify(short.delivered));
-  assert.match(short.text, /^Coherence vocabulary \(2 concepts; [^\n]*\n2 more: coherence lexicon\n/);
+  assert.deepEqual(roomy.delivered, { whole: all, name: 0, out: 0 }, "every project concept whole, and the counts are the project's alone");
+  assert.doesNotMatch(roomy.text, /Coherence vocabulary|Named only here|- journal: |- invariant: /, "no Coherence concept, by line or by name");
+  assert.match(roomy.text, /^Widgetry vocabulary \(12 concepts, most recently named first; [^\n]*\n- widget7: /, "the project's layer first, ranked by the journal");
 
   // In Coherence's own repository the same journal ranks Coherence's concepts with the rest, whole.
   const itself = renderCompactWithin(coherence, widgets, 1_000_000, "coherence", true, () => true, named);

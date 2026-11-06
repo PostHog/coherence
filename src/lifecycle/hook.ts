@@ -80,6 +80,7 @@ import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
+import { carryBlock, decisionsNear, keepPlaced } from "./carry-over.ts";
 import { syntaxOf } from "../plugins/languages.ts";
 import { parserNotice, staleParsesNotice } from "../plugins/syntax-trees.ts";
 import { enforcedLanguageOf, readEnforcementConfig } from "../enforcement/config.ts";
@@ -96,7 +97,7 @@ import { deadEndBlock, readDeadEnds } from "../journal/dead-ends.ts";
 import { filesRead, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotSession, snapshotTrace, traceFile, type Snapshot } from "../economy/trace.ts";
 import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
-import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
+import { citesOf, type AnyRecord, type JournalRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { renderCompactWithin, type Delivered, type Lexicon } from "./lexicon.ts";
 import { lastNamed } from "./lexicon-recency.ts";
@@ -809,11 +810,14 @@ export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.e
 }
 
 /** The start injection with how the vocabulary was delivered, so a reading of the hook can say what orient carries. */
-export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; vocabulary: string; delivered: Delivered; coverage: Coverage }> {
+export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; vocabulary: string; delivered: Delivered; coverage: Coverage; journal: JournalRecord[] }> {
   const { coherence, project } = await loadProjectLexicons(root);
   const commands=await cliName(root);
   // The hand lists come from the last mirror reading kept, never one taken here (recorded.ts).
-  const head = escalationBlock(root) + pluginRefusalBlock(root) + specBlock(root) + languageNoticeBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input);
+  const journal = loadJournal(root).records;
+  // What other sessions settled and left open, which this one did not see happen, rides after the work it owns.
+  const carried = carryBlock(journal, loadOrders(root), sessionOf(input), commands);
+  const head = escalationBlock(root) + pluginRefusalBlock(root) + specBlock(root) + languageNoticeBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input) + carried;
   const reading=report ?? await lexiconCoverage(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);
@@ -823,10 +827,11 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await copyBlock(root)}\n${await sessionBlock(root, input)}`;
   // The vocabulary in the order the journal last named it, so the host's budget trims what the work has not named for longest.
   const own = await isCoherenceItself(root);
-  // In an adopter Coherence's own concepts are not ranked, so the journal is read only for the concepts that are.
-  const named = lastNamed(loadJournal(root).records, [...coherence.concepts.filter((c) => own || c.layer !== undefined), ...(project?.concepts ?? [])]);
+  // In an adopter Coherence's own concepts are not delivered, so the journal is read only for the concepts that are.
+  const named = lastNamed(journal, [...coherence.concepts.filter((c) => own || c.layer !== undefined), ...(project?.concepts ?? [])]);
   const { text, delivered } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), own, pluginsInUse(root, coherence), named, VOCABULARY_TOKENS);
-  return { text: head + text + tail, vocabulary: text, delivered, coverage: reading };
+  // A project with nothing to say before its vocabulary, and no vocabulary yet, opens on what follows, not a blank line.
+  return { text: (head + text + tail).replace(/^\n+/, ""), vocabulary: text, delivered, coverage: reading, journal };
 }
 
 /**
@@ -1319,6 +1324,11 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     if (event === "SessionStart" || event === "Stop") options.telemetry?.(root, event, input);
     if (event === "SessionStart") options.updateCheck?.(root, event);
     if (event === "SessionStart" || event === "Stop") options.mirrors?.(root);
+    return overBudget(result, ms, root);
+  }
+
+  /** A tool hook over the latency budget says so in its own answer. */
+  function overBudget(result: HookResult, ms: number, root: string): HookResult {
     if (!TOOL_HOOKS.has(event) || result.exit !== 0) return result;
     const line = overBudgetLine(event, ms, latencyBudget(root));
     if (line === "") return result;
@@ -1348,7 +1358,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     options.warm?.(root);
     const reading = await keptReading(root, await loadProjectLexicons(root));
     const gaps = await gapReading(root);
-    const text = (await startReading(root, input, reading, gaps)).text;
+    const start = await startReading(root, input, reading, gaps);
+    const text = start.text;
     const answered = (result.stdout.trim() === "" ? {} : JSON.parse(result.stdout)) as { hookSpecificOutput?: { additionalContext?: string } };
     const before = answered.hookSpecificOutput?.additionalContext;
     const context = before === undefined || before === "" ? text : `${text}\n${before}`;
@@ -1358,6 +1369,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       keepStateFiles(root);
       openFeed(root, session);
       saveBaseline(root, session, reading);
+      keepPlaced(root, session, start.journal);
       const found = gaps.now ?? gaps.last;
       if (found !== undefined) saveSessionGaps(root, session, found);
       markOriented(root, session);
@@ -1387,7 +1399,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
           options.refresh?.(root, gaps.fingerprint);
           gaps = { ...gaps, refreshing: refreshUnderWay(root) !== undefined };
         }
-        const context = await voiced(root, input, (await startReading(root, input, reading, gaps)).text, voice);
+        const start = await startReading(root, input, reading, gaps);
+        const context = await voiced(root, input, start.text, voice);
         keepMirrorsFromModel(root);
         const session = sessionOf(input);
         if (session !== undefined) openFeed(root, session);
@@ -1399,6 +1412,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
           // A project that adopted an earlier release gets the attributes file its records merge by at its first session after the upgrade.
           if (event === "SessionStart") keepStateFiles(root);
           saveBaseline(root, session!, reading);
+          // The decisions that name a part, kept for this session's edits to be told before they land (carry-over.ts).
+          keepPlaced(root, session!, start.journal);
           // A project nested below the settings is oriented once per session; this start was it.
           if (!within(root, host)) markOriented(root, session!);
           // The gaps as this session found them, for regulate once its own edits make the reading stale.
@@ -1410,11 +1425,17 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       case "PreToolUse": {
         // Before the act: a practice whose trigger this tool use fires is delivered now, when its first steps can still be taken.
         const session = sessionOf(input);
-        const practice = practiceContext(root, session, toolUseOf(input, writtenFiles(root, input, host)), await cliName(root), agentOf(input), undefined, given);
-        const context = await voiced(root, input, practice.text, voice);
+        const writes = writtenFiles(root, input, host);
+        const cli = await cliName(root);
+        const practice = practiceContext(root, session, toolUseOf(input, writes), cli, agentOf(input), undefined, given);
+        // Before an edit lands in a part, what other sessions decided about that part, once a session (carry-over.ts): read
+        // from what this session's start kept, never the journal, so an edit pays nothing for the project's history.
+        const near = decisionsNear(root, session, writes, cli);
+        const context = await voiced(root, input, [practice.text, near.text].filter((t) => t !== "").join("\n"), voice);
         if (context === "") return { stdout: "", stderr: "", exit: 0 };
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
-        return { stdout, stderr: "", exit: 0, ...(practice.text !== "" && voice.override === undefined ? { commit: practice.commit } : {}) };
+        const told = voice.override === undefined && (practice.text !== "" || near.text !== "");
+        return { stdout, stderr: "", exit: 0, ...(told ? { commit: () => { if (practice.text !== "") practice.commit(); near.commit(); } } : {}) };
       }
       case "UserPromptSubmit":
       case "PostToolUse": {

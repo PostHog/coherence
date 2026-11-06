@@ -85,14 +85,12 @@ so they are the first to keep their whole lines and the last to lose them or
 their names.
 
 In an adopter the window is the project's. Coherence's own concepts are not
-ranked there (an adopter's records name them in nearly every record, so
-recency would put the tool's vocabulary ahead of the project's): they are one
-line of names in their file's order, after everything ranked, kept only while
-every project and plugin concept keeps its whole line, and otherwise counted
-out. That line costs about 220 tokens; the full entries are one
-`coherence lexicon` away, and the practices and hook messages that need
-Coherence's terms carry them. In Coherence's own repository its concepts are
-the project's and are ranked with the rest.
+delivered there at all: a list of the tool's names without their meaning
+taught the agent nothing it acted on, and they restrict none of the
+adopter's words. The practices and hook messages that use one of them carry
+what it means, and the full entries are one `coherence lexicon` away. In
+Coherence's own repository its concepts are the project's and are ranked with
+the rest.
 
 ## Coverage-first work orders
 

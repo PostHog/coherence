@@ -55,7 +55,7 @@ function monorepo(extra: Record<string, string> = {}): { top: string; billing: s
     "apps/billing/coherence.config.json": JSON.stringify({ name: "billing" }) + "\n",
     "apps/billing/tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }) + "\n",
     "apps/billing/Billing.spec.md": BILLING_SPEC,
-    "apps/billing/Billing.practice.md": practice("list before charging"),
+    "apps/billing/Billing.practice.md": practice("list before charging") + "- count the till: Count before closing.\n  when: explicit\n  step: count it\n  learned: d-0000abcd\n  because: a fixture\n",
     "apps/billing/src/store.ts": "export const CARD_NUMBERS: string[] = [\"4111111111111111\"];\n",
     "apps/billing/src/mask.ts": "import { CARD_NUMBERS } from \"./store.ts\";\nexport function mask(): string[] {\n  return CARD_NUMBERS.map((n) => \"*\".repeat(n.length - 4) + n.slice(-4));\n}\n",
     ...extra,
@@ -105,7 +105,7 @@ test("a session at the repository top gets orient once, at its first tool use in
       result.commit?.();
       return context(result.stdout) || result.stdout;
     };
-    const ORIENT = /Coherence vocabulary \(/;
+    const ORIENT = /\nEvery journal write needs --session /;
     assert.doesNotMatch(await hook("SessionStart", {}), ORIENT, "the start carries one line, not orient");
     const git = countingGit();
     const elsewhere: string[] = [];
@@ -130,8 +130,9 @@ test("a session at the repository top gets orient once, at its first tool use in
     assert.ok(!existsSync(join(billing, ".coherence")) && !existsSync(join(top, ".coherence")), "and nothing is written anywhere");
     const first = await hook("PostToolUse", { tool_name: "Edit", tool_input: { file_path: join(billing, "src/mask.ts") } });
     assert.match(first, ORIENT, "the first tool use inside the project carries orient");
-    // The nested project's own: its practice. Its invariant is no longer listed open here, since the edit's own check ran before orient read the spec.
-    assert.match(first, /list before charging/);
+    // The nested project's own: the practice nothing fires, which orient names. Its invariant is no longer listed open here, since the edit's own check ran before orient read the spec.
+    assert.match(first, /count the till/);
+    assert.doesNotMatch(first, /outside practice/);
     const second = await hook("PreToolUse", { tool_name: "Edit", tool_input: { file_path: join(billing, "src/store.ts"), new_string: "x" } });
     assert.doesNotMatch(second, ORIENT, "and only the first");
     assert.doesNotMatch(await hook("PreToolUse", { tool_name: "Bash", tool_input: { command: "ls" } }), ORIENT, "nor a command at the top once the session has entered");

@@ -531,7 +531,7 @@ test("a located Coherence answers, and refuses, as a direct command does", async
       const start = await runInstalled(project, host, "SessionStart", { session_id: `s-${host}` }, env);
       assert.equal(start.status, 0, start.stderr);
       const context = (JSON.parse(start.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
-      assert.match(context, /Coherence vocabulary/, `${host}: the start injection arrives through the located command`);
+      assert.match(context, /\nEvery journal write needs --session s-/, `${host}: the start injection arrives through the located command`);
       assert.match(context, /\n  node \.\.\/coherence\/src\/cli\.ts journal\n/, `${host}: the session is told the checkout it runs, not a node_modules path`);
       assert.match(context, /runs this session: the checkout COHERENCE_HOME names/, `${host}: and that COHERENCE_HOME chose it`);
     }

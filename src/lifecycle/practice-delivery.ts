@@ -143,12 +143,15 @@ export function practiceContext(root: string, session: string | undefined, use: 
   return { text: lines.join("\n") + "\n", commit: () => (session === undefined ? undefined : keepFirings(root, session, kept)) };
 }
 
+/** Coherence's kernel practice that adopts it, by its path below the kernel prefix. */
+const ADOPTION = "src/lifecycle/adopt Coherence";
+
 /**
- * Orient's one line: the project's own practices with what fires each, and a
- * count of Coherence's, which arrive whole when their triggers fire anyway.
- * The line rides inside the start budget the vocabulary also needs, so
- * the kernel practices are counted, not listed. A project with none of its own is
- * pointed at the practice that harvests them.
+ * Orient's one line, when it has something only it can say: the practices nothing fires on their own (a trigger of
+ * explicit and no other), by name, the project's and Coherence's alike, since no tool use will ever deliver them and a
+ * session that is not told of them cannot ask for one. A practice a command, an edit or a defect fires arrives whole
+ * when it fires, and the stop says how to record it, so naming those here, or counting Coherence's, told the agent
+ * nothing it acted on (2026-11-05). A project with no spec yet is pointed at adopting Coherence instead.
  */
 export function practiceOrientText(root: string, cli: string): string {
   let practices: ModelPractice[];
@@ -157,19 +160,12 @@ export function practiceOrientText(root: string, cli: string): string {
   } catch {
     return "";
   }
-  if (practices.length === 0) return "";
-  const own = practices.filter((p) => !p.id.startsWith(KERNEL_PREFIX));
-  const kernel = practices.length - own.length;
-  const record = `record one carried out with ${cli} enact "<practice>"`;
-  if (own.length === 0) {
-    // A project with no spec has not been adopted yet; one with specs but no practice of its own has methods nobody has kept.
-    const adopted = hasSpec(root);
-    const next = adopted ? `none of this project's own yet. To find the ones it already has: ${cli} query practice "harvest practices"` : `this project has no spec yet. To adopt Coherence here, step by step: ${cli} query practice "adopt Coherence"`;
-    return `Practices: ${kernel} of Coherence's kernel, delivered when they fire; ${next}\n\n`;
-  }
-  const listed = own.map((p) => `${p.id} [${p.triggers.map(triggerText).join(", ")}]${p.state === "candidate" ? " (candidate)" : ""}`);
-  const also = kernel === 0 ? "" : `; and ${kernel} of Coherence's kernel`;
-  return `Practices, each delivered whole when what fires it is about to run (${record}): ${listed.join("; ")}${also}\n\n`;
+  if (!hasSpec(root)) return practices.length === 0 ? "" : `Practices: this project has no spec yet. To adopt Coherence here, step by step: ${cli} query practice "adopt Coherence"\n\n`;
+  // Coherence's adoption practice has done its work once a spec stands; the project's own practices are all named.
+  const asked = practices.filter((p) => p.triggers.length > 0 && p.triggers.every((t) => t.kind === "explicit") && p.id !== `${KERNEL_PREFIX}${ADOPTION}`);
+  if (asked.length === 0) return "";
+  const names = [...new Set(asked.map((p) => p.id.slice(p.id.lastIndexOf("/") + 1)))];
+  return `Practices nothing fires on its own, to ask for by name when the work calls for one (${cli} query practice "<name>"): ${names.join(", ")}\n\n`;
 }
 
 /**
