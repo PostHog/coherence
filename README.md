@@ -41,23 +41,6 @@ For the full setup, adopting one folder of a monorepo, and platform requirements
 
 When an agent starts diverging from your project's architecture goals, Coherence can detect and warn that agent in the same turn, spending less inference at review time. Instead of accreting entropy and slop, your agents build a compass toward order and complexity reduction.
 
-## If you know Domain-Driven Design
-
-Many of Coherence's ideas come from the same place as Domain-Driven Design
-(DDD). This table maps the words, and says where they differ.
-
-| DDD | Coherence | Where it differs |
-|---|---|---|
-| Ubiquitous language | Lexicon | One lexicon per project, and each rejected name keeps the reason it was rejected. |
-| Bounded context | Component | A component is a folder with a spec. The words in it are the project's words, not its own. |
-| Aggregate root | Chokepoint | The one site every reference must pass is proven from the code by the language server. |
-| Invariant | Invariant | It counts only once its detector has been seen to fail on a planted break. |
-| Event log | Journal | Records are only ever added. A mistake is fixed with a later record, never an edit. |
-| Read model | Orient, regulate, Scope | Each is worked out from the specs and the journal, and stored nowhere. |
-| Context map | Structure view | Drawn from the references the language server finds, never by hand. |
-| Hotspot (EventStorming) | Conjecture | A puzzle written down while it is fresh, with the test that would settle it. |
-| Safe-to-fail probe | Experiment | Its success criteria are written before acting, and each needs evidence to close. |
-
 ## Make it yours
 
 Coherence supports these languages:
