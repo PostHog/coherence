@@ -362,17 +362,17 @@ test("in an adopter, the kernel practices are delivered beside the project's own
   assert.ok(!ids.includes("coherence:src/lifecycle/carry a lexicon change through"), "an internal practice never leaves Coherence's tree");
 });
 
-test("orient lists the practices with what fires each, and a project with none of its own is pointed at harvesting them", () => {
+test("orient names only the practices nothing fires on their own, and points a project with no spec at adopting Coherence", () => {
   const bare = project({ "src/widget/Widget.spec.md": SPEC });
   const ownless = practiceOrientText(bare, "coherence");
-  assert.match(ownless, /^Practices: \d+ of Coherence's kernel, delivered when they fire; none of this project's own yet\. To find the ones it already has: coherence query practice "harvest practices"/);
+  assert.match(ownless, /^Practices nothing fires on its own, to ask for by name when the work calls for one \(coherence query practice "<name>"\): [^\n]*harvest practices/, "Coherence's kernel practices that no tool use fires are named, since nothing would deliver them");
+  assert.doesNotMatch(ownless, /adopt Coherence/, "an adopted project is not pointed at adopting");
+  assert.doesNotMatch(ownless, /witness a refutation|kernel|enact/, "a practice a trigger fires is not named, nor counted, nor how to record one");
   const unadopted = project({ "README.md": "nothing declared yet\n" });
   assert.match(practiceOrientText(unadopted, "coherence"), /this project has no spec yet\. To adopt Coherence here, step by step: coherence query practice "adopt Coherence"/);
   const { root } = widget();
   const owned = practiceOrientText(root, "coherence");
-  assert.match(owned, /src\/widget\/oil the knob \[turn-knob, edit src\/widget\/\*\*\/\*\.ts adding knob\] \(candidate\)/);
-  assert.match(owned, /; and \d+ of Coherence's kernel\n/);
-  assert.doesNotMatch(owned, /none of this project's own/);
+  assert.doesNotMatch(owned, /oil the knob/, "a practice its command and its edit fire arrives when they do, so orient does not name it");
   assert.match(practiceAnswer(root, "oil the knob").text, /^Practice src\/widget\/oil the knob \(version [0-9a-f]{8}\)[\s\S]*candidate; enacted 0 times/);
 });
 

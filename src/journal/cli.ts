@@ -1,7 +1,7 @@
 /**
  * The journal's command surface: one command per verb plus the reader.
  *
- *   node src/cli.ts decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--cite <id>]...
+ *   node src/cli.ts decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--about <path>]... [--cite <id>]...
  *   node src/cli.ts retract <id> --because "<what refuted it>"
  *   node src/cli.ts conjecture "<observation>" [--could-be "<candidate>"]... --discriminated-by "<test>" [--cite <id>]...
  *   node src/cli.ts resolved <id> --because "<what the test showed>" [--as "<candidate>"]   (a defect: [--guard <component>/<invariant>] [--decision <id>])
@@ -155,7 +155,8 @@ export const JOURNAL_USAGE = [
   "journal verbs (each needs --session <id> --agent <name>; a write binds to the one active order its session owns, or to --work <id>):",
   "  (--cite <id>, repeatable, names an earlier journal or work record this one rests on or is about, in any worktree's journal or committed on another branch; an id found nowhere refuses the write)",
   "  (--human records words the agent attributes to a human, apart from its own because; it is not proof a human wrote them)",
-  '  decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--cite <id>]...',
+  '  decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--about <path>]... [--cite <id>]...',
+  "      --about names the components the decision applies to, told to a later session before it edits there; without it, the components this session wrote in, when there are three or fewer",
   '  retract <id> --because "<what refuted it>"',
   '  conjecture "<observation>" [--could-be "<candidate>"]... --discriminated-by "<test>" [--cite <id>]...',
   '  resolved <conjecture-id> --because "<what the test showed>" [--as "<candidate>"]',

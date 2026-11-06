@@ -16,7 +16,8 @@
  * attributes to a human, stored apart from its own because.
  */
 
-import { isAbsolute } from "node:path";
+import { existsSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
 import { JournalError, onePositional, parseFlags, required, type FlagShape, type Parsed } from "./args.ts";
 import {
   INSTRUMENT_IS_WRONG,
@@ -50,6 +51,7 @@ import {
   spoken,
 } from "./record.ts";
 import { componentFolders, componentHolding, loadSpecModel, projectFile, projectPractices } from "../spec/model.ts";
+import { filesWritten } from "../economy/trace.ts";
 import { originFields } from "./defects.ts";
 import { amendCommand, floorGaps, type ModelPractice } from "../spec/practices.ts";
 import { appendRecordTo, gitState, loadJournal, loadJournalAcrossWorktrees, type Loaded } from "./store.ts";
@@ -211,8 +213,49 @@ function refuseIfAnswered(loaded: Loaded, id: string, verb: string, kinds: reado
   }
 }
 
+/** The most components a decision is said to be about when the deciding session's writes decide it: a session that wrote across more decided nothing local to one. */
+export const ABOUT_INFERRED_MAX = 3;
+
+/**
+ * Where a decision is about: the components --about names (a path names the component holding it), else the components holding the files
+ * the deciding session had written, when they are few. What it settled is said beneath the record's id.
+ */
+function aboutOf(parsed: Parsed, ctx: Context, session: string): { about: string[]; said: string } {
+  let components: { folder: string }[] = [];
+  try {
+    components = loadSpecModel(ctx.cwd).components;
+  } catch {
+    // A spec that does not load places nothing; the decision stands without a place.
+  }
+  // A component's own folder names that component, not the one holding it.
+  const componentOf = (path: string): string | undefined => {
+    const file = projectFile(ctx.cwd, path) ?? path;
+    return components.find((c) => c.folder === file)?.folder ?? componentHolding(components, file)?.folder;
+  };
+  const named = parsed.many.get("about") ?? [];
+  // A path that is not there names nowhere, as an id that names no record is refused by --cite.
+  const missing = named.filter((p) => !existsSync(resolve(ctx.cwd, p)));
+  if (missing.length > 0) throw new JournalError(`decide: --about ${missing.join(", ")}: no such file or folder in the project; name a folder or file of the component the decision is about`);
+  if (named.length > 0) {
+    const about = [...new Set(named.map((p) => componentOf(p) ?? p))].sort();
+    return { about, said: `  about ${about.join(", ")}` };
+  }
+  // A session id that cannot name a trace has no writes to read; the write's own checks refuse it.
+  let written: string[] = [];
+  try {
+    written = filesWritten(ctx.cwd, session);
+  } catch {
+    written = [];
+  }
+  // The root holds every file, so a write places a decision about the components below it, never about the root.
+  const folders = [...new Set(written.flatMap((f) => componentOf(f) ?? []))].filter((f) => f !== ".").sort();
+  if (folders.length === 0) return { about: [], said: "  about no component: this session wrote nothing yet; --about <path> names where it applies" };
+  if (folders.length > ABOUT_INFERRED_MAX) return { about: [], said: `  about no component: this session wrote in ${folders.length}; --about <path> names where it applies` };
+  return { about: folders, said: `  about ${folders.join(", ")} (from this session's writes; --about <path> names it instead)` };
+}
+
 export function decide(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ over: "many", because: "one", human: "one", ...CITE }));
+  const parsed = parseFlags(argv, withCommon({ over: "many", because: "one", human: "one", about: "many", ...CITE }));
   const who = attribution(parsed);
   const chose = onePositional(parsed, "what was chosen");
   const because = required(parsed, "because", "a decision records why");
@@ -226,8 +269,9 @@ export function decide(argv: string[], ctx: Context): Written {
   } else {
     over = given;
   }
-  const record: Decision = { ...head("decision", who, ctx, chose), chose, over, because, ...humanWords(parsed), ...citations(parsed, ctx.cwd) };
-  return write(ctx, record);
+  const where = aboutOf(parsed, ctx, who.session);
+  const record: Decision = { ...head("decision", who, ctx, chose), chose, over, because, ...(where.about.length > 0 ? { about: where.about } : {}), ...humanWords(parsed), ...citations(parsed, ctx.cwd) };
+  return write(ctx, record, [where.said]);
 }
 
 export function retract(argv: string[], ctx: Context): Written {

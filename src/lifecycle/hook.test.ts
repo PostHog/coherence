@@ -102,7 +102,7 @@ test("the block after the lexicon is under 120 words: session, decide template, 
   assert.match(main, /--session <the id your harness shows> --agent main/);
 });
 
-test("SessionStart and SubagentStart inject both lexicons and the instruction as additionalContext", async () => {
+test("SessionStart and SubagentStart inject the project's lexicon and the instruction as additionalContext, and never Coherence's own vocabulary in an adopter", async () => {
   for (const event of ["SessionStart", "SubagentStart"] as const) {
     const result = await runHook(event, { cwd: root, session_id: "s1" }, tmpdir());
     assert.equal(result.exit, 0);
@@ -110,14 +110,13 @@ test("SessionStart and SubagentStart inject both lexicons and the instruction as
     const parsed = JSON.parse(result.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
     assert.equal(parsed.hookSpecificOutput.hookEventName, event);
     const context = parsed.hookSpecificOutput.additionalContext;
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts/, "no escalation: the lexicon comes first");
+    assert.match(context, /^Widgetry vocabulary \(1 concept/, "no escalation: the project's lexicon comes first");
     assert.match(context, /\n\nSession: s1\nEvery journal write needs --session s1 --agent main\./);
-    assert.match(context, /\nWidgetry vocabulary \(1 concept/);
     assert.match(context, /- widget: A thing with a knob\. \(also: gadget\)/);
     assert.match(context, /- rejected names: doohickey/);
     assert.ok(context.includes(`Read the project journal from the project root:\n  ${await cliName(root)} journal\n`));
     assert.ok(context.endsWith(`${ADOPTER_INSTRUCTION}\n`));
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts; the tool's terms, which restrict none of this project's words\):/m, "an adopter's header says Coherence's names restrict none of its words");
+    assert.doesNotMatch(context, /Coherence vocabulary|Named only here/, "an adopter is not delivered Coherence's own vocabulary, not even by name");
     assert.ok(context.length <= CONTEXT_BUDGET);
   }
 });
@@ -291,14 +290,14 @@ test("an unacknowledged escalation heads the start output; an acknowledged one d
   const before = await runHook("SubagentStart", { cwd: root, session_id: "s1", agent_type: "Plan" }, root);
   const context = (JSON.parse(before.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
   assert.match(context, /^Escalations awaiting a human \(1\); answer one with: acknowledge <id> --because/);
-  assert.match(context, new RegExp(`^▲ ${open[0]!.id}  main  the widget's name is contested — only the owner can settle a name\n\nCoherence vocabulary`, "m"));
+  assert.match(context, new RegExp(`^▲ ${open[0]!.id}  main  the widget's name is contested — only the owner can settle a name\n\nWidgetry vocabulary`, "m"));
   assert.match(context, /--session s1 --agent Plan/);
   assert.ok(context.length <= CONTEXT_BUDGET);
 
   const answered = journalVerbs["acknowledge"]!([open[0]!.id, "--because", "call it a widget", "--session", "s1", "--agent", "main"], io);
   assert.equal(answered, 0, printed.join("\n"));
   const after = await runHook("SessionStart", { cwd: root, session_id: "s1" }, root);
-  assert.match((JSON.parse(after.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext, /^Coherence vocabulary/);
+  assert.match((JSON.parse(after.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext, /^Widgetry vocabulary/);
 });
 
 test("an open escalation that cites a decision and a work order names each by id, kind and subject in the start output", async () => {
@@ -306,7 +305,7 @@ test("an open escalation that cites a decision and a work order names each by id
   const io = { cwd: root, out: (line: string) => printed.push(line), err: (line: string) => printed.push(line) };
   const who = ["--session", "s1", "--agent", "main"];
   assert.equal(journalVerbs["decide"]!(["the widget keeps one name", "--because", "two names split the docs", ...who], io), 0, printed.join("\n"));
-  const decision = printed.at(-2)!.split(/\s+/)[0]!;
+  const decision = printed.filter((line) => /^d-[0-9a-f]+ {2}/.test(line)).at(-1)!.split(/\s+/)[0]!;
   assert.equal(journalVerbs["work"]!(["create", "rename the widget", "--success", "one name in docs", "--boundary", "docs", ...who], io), 0, printed.join("\n"));
   const order = printed.at(-2)!.split(/\s+/)[0]!;
   assert.equal(journalVerbs["escalate"]!(["may the widget be renamed", "--because", "only the owner renames", "--cite", decision, "--cite", order, ...who], io), 0, printed.join("\n"));
@@ -337,7 +336,7 @@ test("the start injection stays under the budget with escalations present: the v
     const context = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
     assert.ok(context.length <= CONTEXT_BUDGET, `${context.length} characters against a budget of ${CONTEXT_BUDGET}`);
     for (let n = 0; n < 8; n += 1) assert.ok(context.includes(`▲ ${ids[n]}  scope  ${what(n)} — only the owner can retire a vertebra, and this is the ${n}th`), `escalation ${n} is shown whole`);
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts; the tool's terms, which restrict none of this project's words\):\n\d+ more: /m, "in an adopter Coherence's layer is not ranked, and its names go before any of the project's");
+    assert.doesNotMatch(context, /Coherence vocabulary/, "an adopter's window is the project's alone");
     assert.match(context, /^Widgetry vocabulary \(61 concepts, most recently named first; [^)]*\):\n/m, "the project's layer in the order the journal last named it");
     assert.match(context, /^(Named only here \(full entries: [^)]*\): |\d+ more, the least recently named: )/m, "the project's vocabulary decayed: not every concept keeps its line");
     const vocabulary = context.slice(context.indexOf("Widgetry vocabulary"));
@@ -347,15 +346,15 @@ test("the start injection stays under the budget with escalations present: the v
 
     // More escalations, until even the names do not fit: the vocabulary gives way to one line that points at the lexicon command.
     let pointed = context;
-    for (let n = 8; n < 40 && /^Coherence vocabulary/m.test(pointed); n += 1) {
+    for (let n = 8; n < 40 && /^Widgetry vocabulary/m.test(pointed); n += 1) {
       const printed: string[] = [];
       assert.equal(journalVerbs["escalate"]!([what(n), "--because", `only the owner can retire a vertebra, and this is the ${n}th`, "--session", `peer-${n}`, "--agent", "scope"], { ...io, out: (l) => printed.push(l) }), 0);
       ids.push(printed[0]!.split(/\s+/)[0]!);
       pointed = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
       // Each concept decays on its own, so every size on the way down still fits while any vocabulary is shown.
-      if (/^Coherence vocabulary/m.test(pointed)) assert.ok(pointed.length <= CONTEXT_BUDGET, `${n + 1} escalations: ${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
+      if (/^Widgetry vocabulary/m.test(pointed)) assert.ok(pointed.length <= CONTEXT_BUDGET, `${n + 1} escalations: ${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
     }
-    assert.doesNotMatch(pointed, /^Coherence vocabulary/m, "the names no longer fit");
+    assert.doesNotMatch(pointed, /^Widgetry vocabulary/m, "the names no longer fit");
     assert.ok(pointed.includes(`\n  ${await cliName(dir)} journal\n`), "the journal command survives the reduced vocabulary");
     assert.ok(pointed.includes(`\nVocabulary omitted to stay under the host budget; full entries: ${await cliName(dir)} lexicon\n`), "one line points at the lexicon command instead");
     // Past this point what overruns is what is never shortened: the escalations themselves.
@@ -367,7 +366,7 @@ test("the start injection stays under the budget with escalations present: the v
       const light = contextOf(await runHook("SessionStart", { cwd: one, session_id: "s-light" }, one));
       assert.ok(light.length <= CONTEXT_BUDGET);
       assert.match(light, /^Escalations awaiting a human \(1\)/);
-      assert.match(light, /^Coherence vocabulary \(\d+ concepts; the tool's terms, which restrict none of this project's words\):\nNamed only here \(full entries: [^)]*\): invariant, requirement, /m, "with room to spare an adopter still sees Coherence's concepts by name alone, in the file's order");
+      assert.doesNotMatch(light, /Coherence vocabulary|Named only here/, "with room to spare an adopter still is not delivered Coherence's concepts, not even by name");
       assert.doesNotMatch(light, /^- invariant: /m, "and never their whole lines");
     } finally {
       await rm(one, { recursive: true, force: true });
@@ -376,7 +375,7 @@ test("the start injection stays under the budget with escalations present: the v
     // No escalation and a project lexicon long enough that the host's budget would leave the vocabulary more than its own bound: the bound decides.
     const roomyRoot = await freshRoot();
     try {
-      await writeFile(join(roomyRoot, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, rejected: [], concepts: Array.from({ length: 70 }, (_, i) => ({ name: `thing${i}`, definition: `The ${i}th thing, described at some length so that the line is long. A second sentence follows.` })) }));
+      await writeFile(join(roomyRoot, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, rejected: [], concepts: Array.from({ length: 110 }, (_, i) => ({ name: `thing${i}`, definition: `The ${i}th thing, described at some length so that the line is long. A second sentence follows.` })) }));
       const roomy = await startReading(roomyRoot);
       assert.ok(roomy.text.includes(roomy.vocabulary));
       assert.ok(tokenEstimate(roomy.vocabulary).tokens <= VOCABULARY_TOKENS, `with room to spare the vocabulary still presents at most ${VOCABULARY_TOKENS} tokens: ${tokenEstimate(roomy.vocabulary).tokens}`);
@@ -554,10 +553,11 @@ test("orient prints the active order a session owns with the boundary rule, nudg
     verb(dir, "work", "move", id, "active", "--because", "taking it up", "--session", "child", "--agent", "Plan");
     const active = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir));
     const rule = BOUNDARY_RULE.replace(/[().:]/g, "\\$&");
-    assert.match(active, new RegExp(`^Work order ${id} \\(active; every journal write and run this session makes binds to it\\):\n  objective: ship the feed\n  success:   hook.test.ts covers the feed\n  boundary:  src/journal only\n  ${rule}\n\nCoherence vocabulary`));
+    assert.match(active, new RegExp(`^Work order ${id} \\(active; every journal write and run this session makes binds to it\\):\n  objective: ship the feed\n  success:   hook.test.ts covers the feed\n  boundary:  src/journal only\n  ${rule}\n\nWidgetry vocabulary`));
     assert.ok(active.length <= CONTEXT_BUDGET);
     const other = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "main-1" }, dir));
-    assert.doesNotMatch(other, /Work order/, "the order is the owner's, not the creator's");
+    assert.doesNotMatch(other, /^Work order \S+ (\(active|is open)/m, "the order is the owner's, not the creator's: nothing binds the creator to it");
+    assert.match(other, new RegExp(`^Work orders this session does not hold \\(1; [^\\n]*\\n  ${id} active, held by child since `, "m"), "the creator hears of it as work another session holds");
 
     for (const event of ["Stop", "SubagentStop"] as const) {
       const stop = await runHook(event, { cwd: dir, session_id: "child", agent_type: "Plan", stop_hook_active: false }, dir);

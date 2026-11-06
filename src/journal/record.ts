@@ -137,6 +137,13 @@ export interface Decision extends Head, Citing, HumanWords {
    */
   over: string[] | "none";
   because: string;
+  /**
+   * The components the decision is about, as their folders: where a later
+   * session is told it before an edit (lifecycle/carry-over.ts). Named with
+   * --about, or read at the write from the files the deciding session had
+   * written; absent when neither says, and on every decision written before.
+   */
+  about?: string[];
 }
 
 export interface Retraction extends Head {
@@ -498,7 +505,7 @@ const OUTCOME_ROLES = { result: "meta", evidence: "prose", because: "prose" } as
  * holds no prose (stores.ts), and nothing reads a run for words.
  */
 export const RECORD_ROLES: { readonly [K in AnyRecord["kind"]]: FieldRoles<Extract<AnyRecord, { kind: K }>> } = {
-  decision: { ...HEAD_ROLES, ...CITING_ROLES, ...HUMAN_ROLES, classifies: { fields: { ...ORIGIN_ROLES, of: "meta" } satisfies FieldRoles<NonNullable<Decision["classifies"]>> }, chose: "prose", over: "quoted", because: "prose" },
+  decision: { ...HEAD_ROLES, ...CITING_ROLES, ...HUMAN_ROLES, classifies: { fields: { ...ORIGIN_ROLES, of: "meta" } satisfies FieldRoles<NonNullable<Decision["classifies"]>> }, chose: "prose", over: "quoted", because: "prose", about: "meta" },
   retraction: { ...HEAD_ROLES, of: "meta", because: "prose" },
   conjecture: { ...HEAD_ROLES, ...CITING_ROLES, observation: "prose", couldBe: "prose", discriminatedBy: "prose" },
   resolution: { ...HEAD_ROLES, ...ORIGIN_ROLES, of: "meta", because: "prose", as: "prose", guard: "prose", decision: "meta" },

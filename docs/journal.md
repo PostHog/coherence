@@ -11,7 +11,7 @@ hit a wall, what a human must see. It is also how subagents compare notes
 Every writing verb takes `--session <id>` and `--agent <name>`, refused when
 absent. A single-value flag given twice is refused.
 
-- `decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--cite <id>]...`
+- `decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--about <path>]... [--cite <id>]...`: `--about` names the components the decision is about, told to a later session before it edits there; a path that is not there is refused. Without it, the components below the root this session wrote in, when there are three or fewer.
 - `retract <id> --because "<what refuted it>"`: points at a record; nothing is edited.
 - `conjecture "<observation>" [--could-be "<candidate>"]... --discriminated-by "<test>" [--cite <id>]...`: "the instrument is wrong" is always a candidate.
 - `resolved <id> --because "<what the test showed>" [--as "<candidate>"]`: resolves a conjecture.

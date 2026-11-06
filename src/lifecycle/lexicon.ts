@@ -30,7 +30,7 @@ export interface Concept {
   related: string[];
   /** The plugin whose lexicon layer brought the concept (src/plugins/lexicon.ts); absent for Coherence's own and the project's. */
   layer?: string;
-  /** First in the injection's order however long since the journal last named it, so the last to lose its whole line or its name (`"protected": true` in the file); in an adopter Coherence's own concepts are names alone, protected or not. */
+  /** First in the injection's order however long since the journal last named it, so the last to lose its whole line or its name (`"protected": true` in the file); in an adopter Coherence's own concepts are not delivered, protected or not. */
   protected?: boolean;
 }
 
@@ -385,24 +385,27 @@ export function renderCompact(
 ): string {
   const lines: string[] = [];
   const order = lastNamed.size > 0 ? ", most recently named first" : "";
-  // In Coherence's own repository its rejected names are defects everywhere; in an adopter they bind nothing, so they are not shown.
-  const rule = own ? "rejected names are defects" : "the tool's terms, which restrict none of this project's words";
-  // In an adopter Coherence's own concepts keep the file's order: the journal there names them in every record, so recency would rank the tool's vocabulary over the project's.
-  const mine = byRecency(coherence.concepts.filter((c) => c.layer === undefined), own ? lastNamed : new Map());
-  lines.push(`Coherence vocabulary (${mine.length} concepts${own ? order : ""}; ${rule}):`);
-  lines.push(...layerLines(mine, show, cli, own, own));
+  // Coherence's own vocabulary is this repository's domain, so it is delivered here, its rejected names defects everywhere.
+  // An adopter is not delivered it: its concepts restrict none of the adopter's words, and a list of the tool's names
+  // without their meaning taught the agent nothing it acts on; Coherence's terms reach it where they are used (a
+  // practice, a stop's report) and whole through the lexicon command.
+  if (own) {
+    const mine = byRecency(coherence.concepts.filter((c) => c.layer === undefined), lastNamed);
+    lines.push(`Coherence vocabulary (${mine.length} concepts${order}; rejected names are defects):`);
+    lines.push(...layerLines(mine, show, cli));
+  }
   // Each plugin's layer under its own header, between Coherence's and the project's; one whose surface the caller says is out of the way is left out.
   for (const layer of coherence.layers ?? []) {
     if (!shown(layer.name)) continue;
     const theirs = byRecency(coherence.concepts.filter((c) => c.layer === layer.name), lastNamed);
     if (theirs.length === 0) continue;
-    lines.push("", `Plugin ${layer.name} vocabulary (${theirs.length} concepts, ${layer.version}${order}):`);
+    lines.push(...(lines.length > 0 ? [""] : []), `Plugin ${layer.name} vocabulary (${theirs.length} concepts, ${layer.version}${order}):`);
     lines.push(...layerLines(theirs, show, cli));
   }
   if (project !== undefined) {
     const title = capitalize(project.project ?? "Project");
     const concepts = byRecency(project.concepts, lastNamed);
-    lines.push("", `${title} vocabulary (${concepts.length} concepts${order}; inside the project its sense of a name wins):`);
+    lines.push(...(lines.length > 0 ? [""] : []), `${title} vocabulary (${concepts.length} concepts${order}; inside the project its sense of a name wins):`);
     lines.push(...layerLines(concepts, show, cli));
     const topLevel = project.rejected.flatMap((r) => namesOfAlternative(r.alternative).map((n) => n.name));
     if (topLevel.length > 0) lines.push(`- rejected names: ${topLevel.join(", ")}`);
@@ -421,9 +424,7 @@ export function renderCompact(
  * and then out, and a protected one goes last; among concepts no record
  * tells apart, the project's outlast a plugin's, and a plugin's outlast
  * Coherence's own. In an adopter (`own` false) Coherence's own concepts are
- * not ranked at all: the window is the project's, so they are one line of
- * names after everything ranked, shown only while every ranked concept is
- * whole and they still fit, and otherwise counted out. When no name fits, one line points at the lexicon command (`cli` names
+ * not delivered at all: the window is the project's. When no name fits, one line points at the lexicon command (`cli` names
  * it); that line is returned even when it does not fit, so the caller always
  * has something to inject.
  */
@@ -437,8 +438,6 @@ export function renderCompactWithin(
   lastNamed: LastNamed = new Map(),
   maxTokens = Number.POSITIVE_INFINITY,
 ): { text: string; delivered: Delivered } {
-  // In an adopter Coherence's own concepts are not ranked: they are names alone, after everything ranked, kept only while every ranked concept is whole (d-980480e2).
-  const mine = own ? [] : coherence.concepts.filter((c) => c.layer === undefined);
   // Concepts no record tells apart keep this order: the project's first, whose rejected names bind in all of its text, then each shown plugin's, then Coherence's in its own repository.
   const visible = [
     ...(project?.concepts ?? []),
@@ -447,10 +446,10 @@ export function renderCompactWithin(
   ];
   const all = byRecency(visible, lastNamed);
   const rank = new Map(all.map((c, i) => [c, i]));
-  const render = (kept: number, whole: number, names = false): string =>
+  const render = (kept: number, whole: number): string =>
     renderCompact(coherence, project, own, shown, lastNamed, (c) => {
       const at = rank.get(c);
-      if (at === undefined) return names ? "name" : "out";
+      if (at === undefined) return "out";
       return at < whole ? "whole" : at < kept ? "name" : "out";
     }, cli);
   // The largest n in [0, max] whose render fits, scanning down: a count does not always lengthen the text (a layer's first name adds its "named only" line, its last one drops a "more" line), so a bisection could stop short.
@@ -459,14 +458,10 @@ export function renderCompactWithin(
     return 0;
   };
   const fits = (text: string): boolean => text.length <= maxChars && tokenEstimate(text).tokens <= maxTokens;
-  if (mine.length > 0) {
-    const withNames = render(all.length, all.length, true);
-    if (fits(withNames)) return { text: withNames, delivered: { whole: all.length, name: mine.length, out: 0 } };
-  }
   const kept = largest(all.length, (n) => fits(render(n, 0)));
-  if (kept === 0 && all.length + mine.length > 0) return { text: renderPointer(cli), delivered: { whole: 0, name: 0, out: all.length + mine.length } };
+  if (kept === 0 && all.length > 0) return { text: renderPointer(cli), delivered: { whole: 0, name: 0, out: all.length } };
   const whole = kept < all.length ? 0 : largest(kept, (n) => fits(render(kept, n)));
-  return { text: render(kept, whole), delivered: { whole, name: kept - whole, out: all.length - kept + mine.length } };
+  return { text: render(kept, whole), delivered: { whole, name: kept - whole, out: all.length - kept } };
 }
 
 /** The token estimate used throughout: bytes divided by four. */
