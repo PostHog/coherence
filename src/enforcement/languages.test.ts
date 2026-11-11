@@ -117,7 +117,7 @@ const CONFIG = {
     },
     {
       language: "typescript",
-      test: "node --disable-warning=ExperimentalWarning --test --test-name-pattern={filter} frontend/tokens.test.ts",
+      test: "node --disable-warning=ExperimentalWarning --test --test-reporter=tap --test-name-pattern={filter} frontend/tokens.test.ts",
       testMatch: "# pass [1-9][0-9]*",
       testJson: ["node", "--disable-warning=ExperimentalWarning", "--test", `--test-reporter=${REPORTER}`, "--test-reporter-destination={out}", "--test-name-pattern={filter}", "frontend/tokens.test.ts"],
     },

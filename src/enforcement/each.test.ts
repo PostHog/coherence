@@ -59,7 +59,7 @@ test("run --each runs each batched totality oracle's test in its own invocation 
     JSON.stringify({
       language: "typescript",
       testDir: "tests",
-      test: "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 --test-name-pattern={filter} tests/leftovers.test.mjs",
+      test: "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 --test-reporter=tap --test-name-pattern={filter} tests/leftovers.test.mjs",
       testMatch: "# pass [1-9][0-9]*",
       testJson: ["node", "--disable-warning=ExperimentalWarning", "--test", "--test-concurrency=1", `--test-reporter=${reporter}`, "--test-reporter-destination={out}", "--test-name-pattern={filter}", "tests/leftovers.test.mjs"],
     }),
@@ -103,7 +103,7 @@ test("run refuses an --invariant that names no bullet, running nothing, and take
   };
   write("tests/leftovers.test.mjs", LEFTOVERS);
   write("Fixture.spec.md", SPEC);
-  write("coherence.config.json", JSON.stringify({ language: "typescript", testDir: "tests", test: "node --test --test-concurrency=1 --test-name-pattern={filter} tests/leftovers.test.mjs", testMatch: "# pass [1-9][0-9]*" }));
+  write("coherence.config.json", JSON.stringify({ language: "typescript", testDir: "tests", test: "node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern={filter} tests/leftovers.test.mjs", testMatch: "# pass [1-9][0-9]*" }));
   const context = process.env["NODE_TEST_CONTEXT"];
   delete process.env["NODE_TEST_CONTEXT"];
   try {
