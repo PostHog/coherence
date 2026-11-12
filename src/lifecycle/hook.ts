@@ -1147,9 +1147,9 @@ export const WARM_UP = (root: string, language?: string): void => {
   }
 };
 
-/** The refresh the command line starts: this checkout's query structure, which records the reading it takes. */
+/** The refresh the command line starts: this checkout's query structure, warm-only so a refresh never starts a language server, which records the reading it takes. */
 export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
-  refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure"], fingerprint);
+  refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure", "--warm-only"], fingerprint);
 };
 
 /**
