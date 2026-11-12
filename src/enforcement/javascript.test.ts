@@ -12,7 +12,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
@@ -212,6 +212,38 @@ test("the default engine grades as tsserver does where TypeScript 7 answers othe
       await defaultAdapter.close();
       rmSync(dir, { recursive: true, force: true });
     }
+  }
+});
+
+/** A TypeScript project written into a fresh temporary folder, by its real path, so the paths tsgo reports are the paths the adapter asks with. */
+function tsProject(files: Record<string, string>): string {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "coherence-tsgo-")));
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text, "utf8");
+  }
+  return dir;
+}
+
+test("under tsgo a declaration outside the project is dropped before its file is read: the package declaration an augmentation merges with is never parsed", { timeout: 60_000 }, async () => {
+  const dir = tsProject({
+    "tsconfig.json": `{ "compilerOptions": { "strict": true, "module": "NodeNext", "moduleResolution": "NodeNext", "noEmit": true }, "include": ["src"] }`,
+    "node_modules/vendor/package.json": JSON.stringify({ name: "vendor", version: "1.0.0", types: "index.d.ts" }),
+    "node_modules/vendor/index.d.ts": "export interface Options { a: string }\n",
+    "src/augment.ts": 'import "vendor";\ndeclare module "vendor" {\n  interface Options {\n    secret: string;\n  }\n}\n',
+    "src/use.ts": 'import type { Options } from "vendor";\nexport const o: Options = { a: "", secret: "" };\n',
+  });
+  const tsgoAdapter = new TypeScriptAdapter(dir);
+  try {
+    await tsgoAdapter.ready();
+    assert.equal(tsgoAdapter.engine, "tsgo");
+    const sites = await tsgoAdapter.references({ name: "Options", kind: "symbol", file: "src/augment.ts", range: { start: { line: 2, character: 2 }, end: { line: 4, character: 3 } }, selection: { line: 2, character: 12 } });
+    assert.deepEqual(sites.map((site) => `${site.file}:${site.line}`), ["src/use.ts:1", "src/use.ts:2"]);
+    const read = [...(tsgoAdapter as unknown as { lineCache: Map<string, string[]> }).lineCache.keys()];
+    assert.deepEqual(read.filter((file) => file.includes("node_modules")), [], `the adapter read ${read.join(", ")}`);
+  } finally {
+    await tsgoAdapter.close();
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

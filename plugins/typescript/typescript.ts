@@ -634,14 +634,12 @@ export class TypeScriptAdapter implements LanguageAdapter {
     }
     const reported: Location[] = [];
     for (const position of starts) reported.push(...(await this.referenceLocations(client, definition, position)));
-    // Only the project's own files and its reference horizon's are evidence, and a site outside them is dropped before it is read or
-    // opened: opening a nested checkout's copy would load that checkout into the instrument as if it were this project.
-    const own = keepHorizonFiles(this.root, reported.map((location) => this.relative(location.uri)), this.listingNow(), this.horizon());
+    const own = this.evidence(reported);
     const seen = new Set<string>();
     const sites: ReferenceSite[] = [];
     for (const location of reported) {
       const file = this.relative(location.uri);
-      if (!(own.has(file) || this.probes.has(file)) || file.startsWith("node_modules/")) continue;
+      if (!own.has(file)) continue;
       const start = location.range.start;
       if (file === definition.file && rangeContains({ start: definition.selection, end: definition.selection }, start)) continue;
       const key = `${file}:${start.line}:${start.character}`;
@@ -663,6 +661,20 @@ export class TypeScriptAdapter implements LanguageAdapter {
     }
     sites.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character);
     return sites;
+  }
+
+  /**
+   * The files among the reported locations that are evidence: the project's
+   * own files, its reference horizon's, and a refutation's open probes. A site
+   * outside them is dropped before it is read or opened: opening a nested
+   * checkout's copy would load that checkout into the instrument as if it
+   * were this project, and reading a package's declarations costs a parse
+   * for no site.
+   */
+  private evidence(locations: readonly Location[]): Set<string> {
+    const files = locations.map((location) => this.relative(location.uri));
+    const own = keepHorizonFiles(this.root, files, this.listingNow(), this.horizon());
+    return new Set(files.filter((file) => (own.has(file) || this.probes.has(file)) && !file.startsWith("node_modules/")));
   }
 
   /** The folders outside the project the config's `references` adds to the search, absolute; read once. */
@@ -850,7 +862,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
    * import specifier out of that answer and lists it only among the
    * declarations, so under tsgo a declaration site counts only when it is a
    * name an import or export list binds; any other declaration, an
-   * augmentation in another file included, is no reference.
+   * augmentation in another file included, is no reference. A declaration
+   * outside the evidence is dropped before its file is read.
    */
   private async referenceLocations(client: JsonRpcClient, definition: Definition, position: Position): Promise<Location[]> {
     const ask = async (includeDeclaration: boolean): Promise<Location[]> =>
@@ -859,7 +872,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
     if (this.engine !== "tsgo") return references;
     const known = new Set(references.map(locationKey));
     const declarations = (await ask(true)).filter((location) => !known.has(locationKey(location)));
-    return [...references, ...declarations.filter((location) => this.bindsInStatement(this.relative(location.uri), location.range.start))];
+    const own = this.evidence(declarations);
+    return [...references, ...declarations.filter((location) => own.has(this.relative(location.uri)) && this.bindsInStatement(this.relative(location.uri), location.range.start))];
   }
 
   /** Whether a position names what an import, an export list or a wildcard re-export binds, read from the file's syntax: inside one of those statements, before its module specifier. */
