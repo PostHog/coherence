@@ -7,7 +7,7 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { COHERENCE_FROM, installedPackage, packageFile, projectFrom, typescriptCompiler } from "../../src/plugins/api.ts";
 
@@ -86,7 +86,15 @@ function trackedConfigs(root: string): string[] {
   try {
     return execFileSync("git", ["ls-files", "-z", "--", ...CONFIG_PATHSPECS], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter((file) => file !== "");
   } catch {
+    return rootConfigs(root);
+  }
+}
+
+function rootConfigs(root: string): string[] {
+  try {
     return readdirSync(root).filter((name) => ROOT_CONFIG.test(name)).sort();
+  } catch {
+    return [];
   }
 }
 
@@ -140,12 +148,20 @@ export function tsgoRefusal(tsgo: TsgoChoice, root: string): string | undefined 
   const inherited = inheritedConfigs(root, configs);
   const key = refusalKey(root, tsgo, configs, inherited);
   const probe = probeRefusal(tsgo, root, configs);
-  if (!probe.answered) return probe.refused;
-  mkdirSync(join(root, ".coherence"), { recursive: true });
-  const written = `${join(root, REFUSAL_RECORD)}.${process.pid}`;
-  writeFileSync(written, JSON.stringify({ key, inherited, refused: probe.refused ?? null }));
-  renameSync(written, join(root, REFUSAL_RECORD));
+  if (probe.answered) keepRefusal(root, JSON.stringify({ key, inherited, refused: probe.refused ?? null }));
   return probe.refused;
+}
+
+/** A root that is gone or read-only keeps no answer, and the next start probes again. */
+function keepRefusal(root: string, record: string): void {
+  const written = `${join(root, REFUSAL_RECORD)}.${process.pid}`;
+  try {
+    if (!existsSync(join(root, ".coherence"))) mkdirSync(join(root, ".coherence"));
+    writeFileSync(written, record);
+    renameSync(written, join(root, REFUSAL_RECORD));
+  } catch {
+    rmSync(written, { force: true });
+  }
 }
 
 /** Each config's program listing until one is refused; unanswered when tsgo could not list one, so nothing is kept from it. */
