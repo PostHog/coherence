@@ -227,9 +227,9 @@ export const TREE_SITTER_KEYS = ["parser", "alternate", "queries", "resolve", "p
 type TreeSitterKeyMissing = Exclude<keyof TreeSitterManifest, (typeof TREE_SITTER_KEYS)[number]>;
 export const TREE_SITTER_KEYS_COMPLETE: [TreeSitterKeyMissing] extends [never] ? true : TreeSitterKeyMissing = true;
 
-/** Every method of a language adapter, as the docs' adapter table must list them, held to the LanguageAdapter type (its two fields, language and ladder, are no methods). */
-export const ADAPTER_METHODS = ["ready", "resolve", "references", "visibility", "refute", "testFilter", "forget", "close", "serverPid", "topLevelSymbols"] as const satisfies readonly Exclude<keyof LanguageAdapter, "language" | "ladder">[];
-type AdapterMethodMissing = Exclude<keyof LanguageAdapter, "language" | "ladder" | (typeof ADAPTER_METHODS)[number]>;
+/** Every method of a language adapter, as the docs' adapter table must list them, held to the LanguageAdapter type (its fields, language, ladder and engine, are no methods). */
+export const ADAPTER_METHODS = ["ready", "resolve", "references", "visibility", "refute", "testFilter", "forget", "close", "serverPid", "topLevelSymbols"] as const satisfies readonly Exclude<keyof LanguageAdapter, "language" | "ladder" | "engine">[];
+type AdapterMethodMissing = Exclude<keyof LanguageAdapter, "language" | "ladder" | "engine" | (typeof ADAPTER_METHODS)[number]>;
 export const ADAPTER_METHODS_COMPLETE: [AdapterMethodMissing] extends [never] ? true : AdapterMethodMissing = true;
 
 /**

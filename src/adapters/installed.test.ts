@@ -8,13 +8,14 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { installedPackage, locateServer } from "./installed.ts";
-import { locateTsserver, tsserverNotice } from "../../plugins/typescript/tsserver.ts";
+import { locateTsgo, locateTsserver, tsgoRefusal, tsserverNotice } from "../../plugins/typescript/tsserver.ts";
 import { startContext, languageNoticeBlock as tsserverBlock } from "../lifecycle/hook.ts";
 
 // The real path: the resolver answers with real paths, and on macOS the temporary folder is a link.
@@ -103,11 +104,32 @@ test("a server neither the project nor Coherence holds is found on PATH, and its
   assert.equal(locateTsserver(root, coherenceFrom), undefined);
 });
 
-test("orient says once that Coherence reads with its own TypeScript when the project's is 7 or later", async () => {
+test("orient says once which compiler reads a TypeScript project when it is not the project's own: Coherence's TypeScript when the project's is 7 or later and tsgo is off or refused a config, tsgo when the project's is 5; nothing when tsgo answers a TypeScript 7 project", async (t) => {
+  const ts5 = join(scratch, "orient-ts5");
+  pkg(join(ts5, "node_modules", "typescript"), TS5("5.8.2"), ["lib/tsserver.js"]);
+  write(join(ts5, "package.json"), JSON.stringify({ name: "orient-ts5" }));
+  write(join(ts5, "coherence.config.json"), JSON.stringify({ name: "orient-ts5", language: "typescript" }));
+  assert.match(tsserverBlock(ts5), /^TypeScript: Coherence reads this project with tsgo 7\.\d+\.\d+, TypeScript's native compiler, not with its own TypeScript 5\.8\.2/);
+  write(join(ts5, "tsconfig.json"), "{}");
+  write(join(ts5, "tsconfig.app.json"), "{}");
+  execFileSync("git", ["init", "-q"], { cwd: ts5 });
+  execFileSync("git", ["add", "tsconfig.json", "tsconfig.app.json"], { cwd: ts5 });
+  rmSync(join(ts5, "tsconfig.app.json"));
+  assert.match(tsserverBlock(ts5), /^TypeScript: Coherence reads this project with tsgo/, "a tracked config deleted from the tree is read as missing");
   const root = join(scratch, "orient-ts7");
   pkg(join(root, "node_modules", "typescript"), TS7, TS7_FILES);
   write(join(root, "package.json"), JSON.stringify({ name: "orient-ts7" }));
   write(join(root, "coherence.config.json"), JSON.stringify({ name: "orient-ts7", language: "typescript" }));
+  assert.equal(tsserverBlock(root), "", "tsgo answers a TypeScript 7 project, so nothing is said");
+  write(join(root, "tsconfig.json"), JSON.stringify({ extends: "./base.json" }));
+  write(join(root, "base.json"), JSON.stringify({ compilerOptions: {} }));
+  assert.equal(tsgoRefusal(locateTsgo(root)!, root), undefined);
+  write(join(root, "base.json"), JSON.stringify({ compilerOptions: { baseUrl: "." } }));
+  assert.match(tsgoRefusal(locateTsgo(root)!, root) ?? "", /TS5102/, "a config the tsconfig extends gaining a removed option is probed again");
+  assert.match(tsserverBlock(root), /ships no tsserver, so Coherence is using its own TypeScript [\d.]+ for readings .* tsgo refused tsconfig\.json: .*TS5102/);
+  rmSync(join(root, "tsconfig.json"));
+  process.env["COHERENCE_TSGO"] = "0";
+  t.after(() => delete process.env["COHERENCE_TSGO"]);
   const own = (JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "node_modules", "typescript", "package.json"), "utf8")) as { version: string }).version;
   const line = `TypeScript: this project's TypeScript 7.0.2 ships no tsserver, so Coherence is using its own TypeScript ${own} for readings`;
   assert.ok(tsserverBlock(root).startsWith(line), tsserverBlock(root));

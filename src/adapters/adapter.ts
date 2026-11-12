@@ -235,6 +235,8 @@ export interface LanguageAdapter {
   close(): Promise<void>;
   /** The language server's process id while it runs, so a reading can bound that server's memory; absent where the adapter cannot say. */
   serverPid?(): number | undefined;
+  /** The language server that answers, where the adapter can drive more than one (TypeScript: tsgo, or tsserver as its fallback). */
+  readonly engine?: string | undefined;
   /**
    * The symbols the language server says a file declares at its top level,
    * each with its one-based line and LSP symbol kind: the independent account

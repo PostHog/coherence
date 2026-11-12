@@ -10,20 +10,25 @@
  */
 
 import assert from "node:assert/strict";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
 import { adapterFor, type Language } from "../../adapters/index.ts";
 import { computeMass, formatMass } from "../../economy/mass.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
+import { withWarmAdapters } from "../../enforcement/run.ts";
+import { serve } from "../../enforcement/server.ts";
 import type { Io } from "../../journal/cli.ts";
 import { formatObservationSummary } from "../../observation/observed.ts";
 import { buildObservation } from "../../observation/observe.ts";
 import { scaffoldCommand } from "../../scaffold/cli.ts";
 import { proposeClosures } from "../../scaffold/control.ts";
 import { loadSpecModel } from "../../spec/model.ts";
+import { queryCommand } from "../query/cli.ts";
 import { answerStructure } from "../query/query.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
-import { structureState } from "./gaps.ts";
+import { lastReading, STRUCTURE_DIR, structureFingerprint, structureState } from "./gaps.ts";
 import { bothVerified, mixedProject } from "./mixed-fixture.ts";
 import type { InterfaceReading } from "./model.ts";
 import { flowOf } from "./structure-flow.ts";
@@ -199,6 +204,31 @@ test("a single-language project reads as it always did: one language read, no la
     assert.equal(await scaffoldCommand(["control", "--all"], control), 0, control.errors.join("\n"));
     assert.doesNotMatch(control.lines.join("\n"), /languages read/);
   } finally {
+    remove();
+  }
+});
+
+test("a warm-only Structure refresh keeps a reading only when every language answered: one with no server loaded gives back its slot, one read inside its own bounds keeps it", { timeout: 180_000 }, async () => {
+  const { root, remove } = mixedProject();
+  const serving = await serve(root, { language: "typescript", idleMs: 120_000 });
+  const slot = join(root, STRUCTURE_DIR, "refresh.json");
+  const holdSlot = (): void => {
+    mkdirSync(dirname(slot), { recursive: true });
+    writeFileSync(slot, JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint: structureFingerprint(root) }));
+  };
+  try {
+    await withWarmAdapters(root, async (open) => void (await open("typescript")));
+    holdSlot();
+    await queryCommand(["structure", "--warm-only"], io(root));
+    assert.equal(lastReading(root), undefined, "a reading Python's unloaded server left half read is not kept as the tree's");
+    assert.equal(existsSync(slot), false, "its slot is given back, so a run with Python's server loaded reads the tree");
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "mixed", language: ["python", "typescript"], ignore: ["vendor"] }));
+    holdSlot();
+    await queryCommand(["structure", "--warm-only"], io(root));
+    assert.equal(lastReading(root), undefined, "nor one that leaves Python to its own bounds");
+    assert.equal(existsSync(slot), true, "no warm-only run reads Python inside its own bounds, so the slot is kept");
+  } finally {
+    await serving.stop();
     remove();
   }
 });

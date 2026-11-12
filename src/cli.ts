@@ -596,7 +596,8 @@ async function dispatch(argv: string[], call: CommandCall, root: string): Promis
     case "warm": {
       // Internal: the hook starts this detached so the instrument is loaded before the stop that needs it,
       // and so every file the project reads through a parser is parsed once and kept before a whole-project reading asks.
-      const instrument = warmInstrument(root);
+      const languageAt = rest.indexOf("--language");
+      const instrument = warmInstrument(root, languageAt === -1 ? undefined : rest[languageAt + 1]);
       try {
         warmProjectParses(root);
       } catch {
