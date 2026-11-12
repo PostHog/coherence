@@ -123,9 +123,9 @@ test("orient says once which compiler reads a TypeScript project when it is not 
   assert.equal(tsserverBlock(root), "", "tsgo answers a TypeScript 7 project, so nothing is said");
   write(join(root, "tsconfig.json"), JSON.stringify({ extends: "./base.json" }));
   write(join(root, "base.json"), JSON.stringify({ compilerOptions: {} }));
-  assert.equal(tsgoRefusal(locateTsgo(root)!, root), undefined);
+  assert.equal(await tsgoRefusal(locateTsgo(root)!, root), undefined);
   write(join(root, "base.json"), JSON.stringify({ compilerOptions: { baseUrl: "." } }));
-  assert.match(tsgoRefusal(locateTsgo(root)!, root) ?? "", /TS5102/, "a config the tsconfig extends gaining a removed option is probed again");
+  assert.match((await tsgoRefusal(locateTsgo(root)!, root)) ?? "", /TS5102/, "a config the tsconfig extends gaining a removed option is probed again");
   assert.match(tsserverBlock(root), /ships no tsserver, so Coherence is using its own TypeScript [\d.]+ for readings .* tsgo refused tsconfig\.json: .*TS5102/);
   rmSync(join(root, "tsconfig.json"));
   process.env["COHERENCE_TSGO"] = "0";
@@ -137,6 +137,27 @@ test("orient says once which compiler reads a TypeScript project when it is not 
   assert.equal(text.split(line).length - 1, 1, `orient carries the line exactly once:\n${text.slice(0, 600)}`);
   write(join(root, "coherence.config.json"), JSON.stringify({ name: "orient-ts7", language: "python" }));
   assert.equal(tsserverBlock(root), "", "a project that reads no TypeScript is told nothing about its TypeScript");
+});
+
+test("tsgo's refusal probe never holds the event loop and stops at its budget over every config together, keeping nothing it could not finish", async () => {
+  const root = join(scratch, "probe-budget");
+  for (const name of ["tsconfig.json", "tsconfig.a.json", "tsconfig.b.json"]) write(join(root, name), "{}");
+  // A tsgo that lists nothing for longer than the budget, as a monorepo's program listings would.
+  const slow = join(scratch, "slow-tsgo", "tsc");
+  write(slow, "#!/bin/sh\nexec sleep 5\n");
+  execFileSync("chmod", ["+x", slow]);
+  let ticks = 0;
+  const ticking = setInterval(() => (ticks += 1), 20);
+  const started = Date.now();
+  try {
+    assert.equal(await tsgoRefusal({ path: slow, version: "7.0.2", whose: "coherence" }, root, 600), undefined, "an unfinished probe refuses nothing, so tsgo reads");
+  } finally {
+    clearInterval(ticking);
+  }
+  const took = Date.now() - started;
+  assert.ok(ticks >= 10, `the event loop ran ${ticks} timer ticks in ${took} ms while the probe listed`);
+  assert.ok(took < 3_000, `the probe took ${took} ms over a 600 ms budget; three configs at 5 s each would take 15 s`);
+  assert.equal(readdirSync(root).includes(".coherence"), false, "an unfinished probe keeps no answer");
 });
 
 /** Every non-test TypeScript source under a folder. */

@@ -89,6 +89,24 @@ test("the language server binary is found (the adapter's precondition)", () => {
   assert.ok(serverPresent, "typescript-language-server must be installed: npm install");
 });
 
+test("an adapter closed while it starts leaves no language server running", { timeout: 60_000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-closing-"));
+  mkdirSync(join(dir, "src"));
+  writeFileSync(join(dir, "tsconfig.json"), `{ "compilerOptions": { "strict": true, "noEmit": true }, "include": ["src"] }`);
+  writeFileSync(join(dir, "src", "a.ts"), "export const a = 1;\n");
+  const closing = new TypeScriptAdapter(dir);
+  try {
+    const starting = closing.ready();
+    await closing.close();
+    const state = await starting;
+    assert.equal(closing.serverPid(), undefined, `a language server was started after the close: ${JSON.stringify(state)}`);
+    assert.equal(state.ok, false);
+  } finally {
+    await closing.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("a plain-JavaScript project is walked, its symbols resolve, and every site is classified as in the TypeScript fixture", async () => {
   const protectedThing = (await adapter.resolve("SECRET_COLUMNS", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
   const chokepoint = (await adapter.resolve("seal", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };

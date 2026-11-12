@@ -297,6 +297,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private tsgoFailures = 0;
   /** The config line tsgo refused, which keeps the adapter on tsserver: a removed option would silently drop the sites it resolves. */
   tsgoRefused: string | undefined;
+  /** How many times the adapter was closed: a start a close overtook starts no server, which nothing would stop. */
+  private closings = 0;
   readonly root: string;
 
   constructor(root: string) {
@@ -312,14 +314,16 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return this.starting;
   }
 
-  private async start(): Promise<{ ok: true } | { ok: false; reason: string }> {
+  /** Start a server unless the adapter is closed meanwhile: a close that overtakes the refusal probe or tsgo's initialize leaves nothing running and counts no tsgo failure. */
+  private async start(closings = this.closings): Promise<{ ok: true } | { ok: false; reason: string }> {
     const tsgo = this.tsgoFailures < TSGO_ATTEMPTS ? locateTsgo(this.root) : undefined;
-    this.tsgoRefused ??= tsgo === undefined ? undefined : tsgoRefusal(tsgo, this.root);
+    this.tsgoRefused ??= tsgo === undefined ? undefined : await tsgoRefusal(tsgo, this.root);
+    if (closings !== this.closings) return { ok: false, reason: "the adapter was closed while its language server started" };
     if (tsgo !== undefined && this.tsgoRefused === undefined) {
       const started = await this.startTsgo(tsgo);
-      if (started.ok) return started;
+      if (started.ok || closings !== this.closings) return started;
       this.tsgoFailures += 1;
-      return this.start();
+      return this.start(closings);
     }
     return this.startTsserver();
   }
@@ -985,6 +989,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
   }
 
   async close(): Promise<void> {
+    this.closings += 1;
     const client = this.client;
     this.client = undefined;
     this.starting = undefined;

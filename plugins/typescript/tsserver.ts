@@ -5,7 +5,7 @@
  * Coherence's own. Packages are found through installed.ts, by the resolver.
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -81,6 +81,13 @@ const CONFIG_PATHSPECS = ["tsconfig*.json", "*/tsconfig*.json", "jsconfig*.json"
 const ROOT_CONFIG = /^[tj]sconfig.*\.json$/;
 /** The last refusal probe's answer, kept with the configs and tsgo it was read from: the probe costs a program listing per config, seconds on a monorepo. */
 const REFUSAL_RECORD = join(".coherence", "typescript-engine.json");
+/**
+ * The most a refusal probe takes over every config together, the time a
+ * client grants a cold warm server to answer at all: past it the probe is
+ * unanswered, so nothing is kept and tsgo reads. One listing runs at a time,
+ * since each holds a whole program in memory.
+ */
+const PROBE_BUDGET_MS = 20_000;
 
 function trackedConfigs(root: string): string[] {
   try {
@@ -140,14 +147,20 @@ function keptRefusal(root: string, tsgo: TsgoChoice, configs: readonly string[])
   }
 }
 
-/** The first line tsgo refuses as a removed option in any tracked tsconfig*.json or jsconfig*.json, kept until tsgo, a config or a config one extends changes; undefined when it refuses none. */
-export function tsgoRefusal(tsgo: TsgoChoice, root: string): string | undefined {
+/**
+ * The first line tsgo refuses as a removed option in any tracked
+ * tsconfig*.json or jsconfig*.json, kept until tsgo, a config or a config one
+ * extends changes; undefined when it refuses none, or when the probe could
+ * not finish within its budget. The listings run as child processes the
+ * caller's event loop never waits on, so a warm server probing still answers.
+ */
+export async function tsgoRefusal(tsgo: TsgoChoice, root: string, budgetMs: number = PROBE_BUDGET_MS): Promise<string | undefined> {
   const configs = trackedConfigs(root);
   const kept = keptRefusal(root, tsgo, configs);
   if (kept !== undefined) return kept.refused ?? undefined;
   const inherited = inheritedConfigs(root, configs);
   const key = refusalKey(root, tsgo, configs, inherited);
-  const probe = probeRefusal(tsgo, root, configs);
+  const probe = await probeRefusal(tsgo, root, configs, Date.now() + budgetMs);
   if (probe.answered) keepRefusal(root, JSON.stringify({ key, inherited, refused: probe.refused ?? null }));
   return probe.refused;
 }
@@ -164,15 +177,35 @@ function keepRefusal(root: string, record: string): void {
   }
 }
 
-/** Each config's program listing until one is refused; unanswered when tsgo could not list one, so nothing is kept from it. */
-function probeRefusal(tsgo: TsgoChoice, root: string, configs: readonly string[]): { refused: string | undefined; answered: boolean } {
+/** Each config's program listing until one is refused; unanswered when tsgo could not list one before the deadline, so nothing is kept from it. */
+async function probeRefusal(tsgo: TsgoChoice, root: string, configs: readonly string[], deadline: number): Promise<{ refused: string | undefined; answered: boolean }> {
   for (const config of configs) {
-    const listed = spawnSync(tsgo.path, ["-p", join(root, config), "--listFilesOnly"], { cwd: root, encoding: "utf8", timeout: 60_000, maxBuffer: 256 * 1024 * 1024 });
-    const refused = `${listed.stdout ?? ""}\n${listed.stderr ?? ""}`.split("\n").find((line) => REMOVED_OPTION.test(line));
+    const listed = await listProgram(tsgo, root, config, deadline - Date.now());
+    if (listed === undefined) return { refused: undefined, answered: false };
+    const refused = listed.split("\n").find((line) => REMOVED_OPTION.test(line));
     if (refused !== undefined) return { refused: `${config}: ${refused.trim()}`, answered: true };
-    if (listed.error !== undefined || listed.signal !== null) return { refused: undefined, answered: false };
   }
   return { refused: undefined, answered: true };
+}
+
+/** What tsgo prints listing one config's program, its two streams together; undefined when it could not start, was killed, or outlived the time left. */
+function listProgram(tsgo: TsgoChoice, root: string, config: string, leftMs: number): Promise<string | undefined> {
+  if (leftMs <= 0) return Promise.resolve(undefined);
+  return new Promise((done) => {
+    const child = spawn(tsgo.path, ["-p", join(root, config), "--listFilesOnly"], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    const chunks: Buffer[] = [];
+    child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => chunks.push(chunk));
+    const timer = setTimeout(() => child.kill("SIGKILL"), leftMs);
+    child.on("error", () => {
+      clearTimeout(timer);
+      done(undefined);
+    });
+    child.on("close", (_code, signal) => {
+      clearTimeout(timer);
+      done(signal === null ? Buffer.concat(chunks).toString("utf8") : undefined);
+    });
+  });
 }
 
 /**
