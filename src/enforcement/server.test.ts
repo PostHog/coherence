@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import { budget } from "./test-budgets.ts";
 import { CODE_SALT_ENV, QUICK_REQUEST_MS, REQUEST_MS, codeFingerprint, connectAdapter, openLineClient, serve, serverPaths, type HttpAppFactory, type Serving } from "./server.ts";
-import { performRun } from "./run.ts";
+import { performRun, withWarmAdapter } from "./run.ts";
 import { stopWarmServers } from "./server-fixture.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
@@ -102,6 +102,22 @@ test("a client with spawning off fails plainly when nothing listens", async () =
   try {
     await assert.rejects(connectAdapter(other, { spawn: false }), /no warm server listening/);
   } finally {
+    rmSync(other, { recursive: true, force: true });
+  }
+});
+
+test("a server whose instrument could not load tells a client that would put its check off why, and nothing is put off", async () => {
+  const other = realpathSync(mkdtempSync(join(tmpdir(), "coherence-failed-")));
+  writeFileSync(join(other, "coherence.config.json"), JSON.stringify({ language: "toy", languages: { toy: { extensions: [".toy"], server: [process.execPath, "--eval", "process.exit(3)"] } } }));
+  const listening = new Promise<Serving>((resolveServing) => setTimeout(() => resolveServing(serve(other, { idleMs: 60_000 })), 300));
+  try {
+    let putOff = 0;
+    const reason = await withWarmAdapter(other, async (_adapter, _server, why) => why, { onNoServer: () => `put off ${++putOff}`, waitWarmMs: 20_000 });
+    assert.equal(putOff, 0, reason);
+    assert.doesNotMatch(reason ?? "", /put off/);
+    assert.ok(reason !== undefined && reason !== "", "the instrument's own failure is the reason, though the client asked before the server listened");
+  } finally {
+    await (await listening).stop();
     rmSync(other, { recursive: true, force: true });
   }
 });
