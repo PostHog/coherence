@@ -232,3 +232,35 @@ test("a warm-only Structure refresh keeps a reading only when every language ans
     remove();
   }
 });
+
+test("a warm-only Structure refresh reads a language with no server loaded from its kept answers, and keeps the reading when nothing had to be asked of that server", { timeout: 180_000 }, async () => {
+  const { root, remove } = mixedProject();
+  const serving = await serve(root, { language: "typescript", idleMs: 120_000 });
+  const slot = join(root, STRUCTURE_DIR, "refresh.json");
+  try {
+    // A reading that asked both languages' servers keeps every answer; the tree does not change after it.
+    read(await readComponentInterfaces(root));
+    await withWarmAdapters(root, async (open) => void (await open("typescript")));
+    mkdirSync(dirname(slot), { recursive: true });
+    writeFileSync(slot, JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint: structureFingerprint(root) }));
+    await queryCommand(["structure", "--warm-only"], io(root));
+    const recorded = lastReading(root);
+    assert.notEqual(recorded, undefined, "Python's kept answers answer every question, so the reading is whole and kept, though Python's server never loaded");
+    const reading = read(recorded!.reading);
+    assert.deepEqual(reading.languages?.read, ["python", "typescript"], "both languages read");
+    assert.equal(reading.kept?.asked, 0, "nothing was asked of any server");
+    assert.equal(reading.entrances.find((e) => e.name === "rows view")?.file, "backend/views.py", "the Python handler resolved from its kept answer");
+    assert.equal(existsSync(slot), true, "a kept reading keeps its slot: the same tree is not read again");
+    // Python read inside its own bounds: answers a bounded reading kept answer a warm-only refresh the same way.
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "mixed", language: ["python", "typescript"], ignore: ["vendor"] }));
+    read(await readComponentInterfaces(root));
+    writeFileSync(slot, JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint: structureFingerprint(root) }));
+    const before = lastReading(root)!.at;
+    await queryCommand(["structure", "--warm-only"], io(root));
+    assert.notEqual(lastReading(root)!.at, before, "Python read inside its own bounds from its kept answers: the reading is kept");
+    assert.deepEqual(read(lastReading(root)!.reading).languages?.read, ["python", "typescript"]);
+  } finally {
+    await serving.stop();
+    remove();
+  }
+});

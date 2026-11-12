@@ -20,6 +20,8 @@ import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { buildScopePage, projectNameOf } from "../scope/build.ts";
 import { BUDGET_FLAG_NAMES, budgetFlags, languageServerMemory, readComponentInterfaces, readsOwnBounds, type InterfaceBudget } from "../scope/component-interfaces.ts";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
+import type { Language } from "../../adapters/index.ts";
+import { ladderOf } from "../../plugins/languages.ts";
 import { RemoteAdapter } from "../../enforcement/server.ts";
 import type { InterfaceReading } from "../scope/model.ts";
 import { withWarmAdapters } from "../../enforcement/run.ts";
@@ -155,7 +157,38 @@ const STRUCTURE_WITHOUT_SERVER = "no language server was loaded for this project
 /** Why a warm-only reading left a language unread: no server loaded, which a later run can find, or a language read inside its own bounds, which no warm-only run reads. */
 type Unanswered = "no server" | "own bounds";
 
-/** The reading through the project's warm servers, never a second server beside a check's; warm-only, as a hook's refresh asks, it starts none, and notes why each language it leaves unread went unanswered. */
+/**
+ * The adapter a warm-only reading reads a language through when it has no
+ * server to ask: the reading answers every question it can from the kept
+ * answers, and the first one it would have to ask the server finds it not
+ * ready, notes why, and leaves the language unread.
+ */
+function keptAnswersOnly(language: Language, reason: string, unanswered: Set<Unanswered>, why: Unanswered): LanguageAdapter {
+  const refuse = (): Promise<never> => Promise.reject(new Error(reason));
+  return {
+    language,
+    ladder: ladderOf(language) ?? { top: "reference-choked", because: reason, rungs: [] },
+    ready: async () => {
+      unanswered.add(why);
+      return { ok: false, reason };
+    },
+    resolve: refuse,
+    references: refuse,
+    visibility: refuse,
+    refute: refuse,
+    testFilter: (via) => via,
+    forget: async () => {},
+    close: async () => {},
+  };
+}
+
+/**
+ * The reading through the project's warm servers, never a second server
+ * beside a check's. Warm-only, as a hook's refresh asks, it starts none: a
+ * language with no server loaded, or read inside its own bounds, is read
+ * from its kept answers alone, and is left unread, with why noted, only
+ * when a question has no kept answer.
+ */
 function readThroughWarmServers(root: string, budget: Partial<InterfaceBudget>, warmOnly: boolean, unanswered: Set<Unanswered>): Promise<InterfaceReading> {
   return withWarmAdapters(
     root,
@@ -164,14 +197,9 @@ function readThroughWarmServers(root: string, budget: Partial<InterfaceBudget>, 
         root,
         async (language) => {
           if (!warmOnly) return readsOwnBounds(root, language) ? undefined : (await open(language)).adapter;
-          if (readsOwnBounds(root, language)) {
-            unanswered.add("own bounds");
-            return `${language} is read inside its own bounds by a server of its own, and a warm-only reading starts none`;
-          }
+          if (readsOwnBounds(root, language)) return keptAnswersOnly(language, `${language} is read inside its own bounds by a server of its own, and a warm-only reading starts none`, unanswered, "own bounds");
           const opened = await open(language);
-          if (opened.adapter !== undefined) return opened.adapter;
-          unanswered.add("no server");
-          return opened.reason ?? STRUCTURE_WITHOUT_SERVER;
+          return opened.adapter ?? keptAnswersOnly(language, opened.reason ?? STRUCTURE_WITHOUT_SERVER, unanswered, "no server");
         },
         { budget, memory: warmServerMemory },
       ),
@@ -181,10 +209,10 @@ function readThroughWarmServers(root: string, budget: Partial<InterfaceBudget>, 
 
 /**
  * The reading recorded for the tree, only when every language answered: a
- * warm-only run that left one unread for want of a loaded server gives back
- * its refresh slot, so a later hook with that server loaded reads the tree
- * again, and one left unread inside its own bounds keeps the slot, since no
- * warm-only run reads it.
+ * warm-only run that had to ask a server no one loaded gives back its
+ * refresh slot, so a later hook with that server loaded reads the tree
+ * again, and one that had to ask a server of a language's own bounds keeps
+ * the slot, since no warm-only run reads it.
  */
 async function readStructure(root: string, budget: Partial<InterfaceBudget>, warmOnly: boolean): Promise<InterfaceReading> {
   const unanswered = new Set<Unanswered>();
