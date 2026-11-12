@@ -24,6 +24,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statS
 import { join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
+import { releaseRefresh } from "../readings/scope/gaps.ts";
 import { configIgnore, fileIdentity, keepProjectFiles, projectListing, underIgnored } from "../adapters/project-files.ts";
 import type { HookInput } from "../lifecycle/hook.ts";
 import { readerNaming } from "../lifecycle/host-tools.ts";
@@ -306,10 +307,25 @@ export function patchFingerprint(root: string, patch: readonly string[], filesRe
  * A session's snapshot through the warm instrument's one door, which starts
  * no server and waits on none still loading: a session that never edited a
  * chokepoint starts no language server. A door that cannot connect hands
- * back its reason, which the snapshot records.
+ * back its reason, which the snapshot records, and a snapshot taken with no
+ * server loaded gives back its slot, so a later stop on the same patch
+ * takes it again.
  */
 export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel, changed: readonly string[] = sessionPatch(root, session)): Promise<Snapshot | undefined> {
-  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }), { onNoServer: () => SNAPSHOT_WITHOUT_SERVER });
+  let foundNoServer = false;
+  const snapshot = await door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }), {
+    onNoServer: () => {
+      foundNoServer = true;
+      return SNAPSHOT_WITHOUT_SERVER;
+    },
+  });
+  if (foundNoServer) releaseRefresh(process.pid, snapshotSlot(root, session));
+  return snapshot;
+}
+
+/** Where the stop's background snapshot of a session keeps its mark. */
+export function snapshotSlot(root: string, session: string): string {
+  return traceFile(root, session).replace(/\.jsonl$/, ".snapshot.json");
 }
 
 const SNAPSHOT_WITHOUT_SERVER = "no language server was loaded for this project, and a snapshot starts none";

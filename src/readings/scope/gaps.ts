@@ -355,13 +355,18 @@ function markUnderWay(mark: RefreshMark | undefined, now: () => number): Refresh
   return alive(mark.pid) && now() - Date.parse(mark.at) < REFRESH_STALE_MS ? mark : undefined;
 }
 
-/** Give up the refresh slot a run held, so the same tree is tried again: a warm-only run that found no server read nothing it should be refused a retry for. */
-export function releaseRefresh(root: string, pid: number): void {
+/** Give up the slot a run held, so the same tree or patch is tried again: a warm-only run that found no server loaded read nothing it should be refused a retry for. */
+export function releaseRefresh(pid: number, slotPath: string): void {
   try {
-    if (readMark(refreshPath(root))?.pid === pid) rmSync(refreshPath(root), { force: true });
+    if (readMark(slotPath)?.pid === pid) rmSync(slotPath, { force: true });
   } catch {
     return;
   }
+}
+
+/** Give up the structure refresh's slot. */
+export function releaseStructureRefresh(root: string, pid: number): void {
+  releaseRefresh(pid, refreshPath(root));
 }
 
 /** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */
@@ -689,7 +694,7 @@ function plural(n: number, one: string): string {
  * Take a reading and keep it for the hooks: the fingerprint is taken as the
  * reading starts, so an edit made while it ran leaves nothing recorded.
  */
-export async function readAndRecord(root: string, read: () => Promise<InterfaceReading>): Promise<InterfaceReading> {
+export async function readAndRecord(root: string, read: () => Promise<InterfaceReading>, keep: () => boolean = () => true): Promise<InterfaceReading> {
   let before: string | undefined;
   try {
     before = structureFingerprint(root);
@@ -698,7 +703,7 @@ export async function readAndRecord(root: string, read: () => Promise<InterfaceR
   }
   const started = Date.now();
   const reading = await read();
-  if (before !== undefined) recordReading(root, reading, before, Date.now() - started);
+  if (before !== undefined && keep()) recordReading(root, reading, before, Date.now() - started);
   return reading;
 }
 

@@ -70,8 +70,11 @@
  * index of watched files from the spec model they already read.
  */
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { writeAtomically } from "../readings/scope/shared-structure.ts";
+import { userCacheDir } from "./user-dir.ts";
 import { closeWork, execFile, openWork, readProjectText, spawn } from "./work-meter.ts";
 import { promisify } from "node:util";
 import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
@@ -95,7 +98,7 @@ import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
 import { deadEndBlock, readDeadEnds } from "../journal/dead-ends.ts";
-import { filesRead, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotSession, snapshotTrace, traceFile, type Snapshot } from "../economy/trace.ts";
+import { filesRead, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotSession, snapshotSlot, snapshotTrace, type Snapshot } from "../economy/trace.ts";
 import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type JournalRecord, type Unable } from "../journal/record.ts";
@@ -629,6 +632,26 @@ export async function editContext(root: string, input: HookInput, options: HookO
   const own = keepProjectFiles(root, written);
   const files = written.filter((file) => own.has(file));
   if (files.length === 0) return "";
+  const session = sessionOf(input);
+  const found = touchedInvariants(root, files);
+  if (!("model" in found) || found.touched.length === 0) return found.said;
+  // Without a session no stop could make a check put off, so an edit with none waits on the server as before.
+  const putOff: PutOff = options.warm === undefined || session === undefined ? {} : {
+    onNoServer: (language) => {
+      options.warm?.(root, language);
+      deferEditCheck(root, session, files);
+      return SERVER_STARTING;
+    },
+  };
+  return found.said + (await checkAtEdit(root, input, options, files, found.model, found.touched, putOff));
+}
+
+/**
+ * The chokepoint invariants the files may touch, read the light way
+ * (chokepointIndex) and, when that cannot answer, from the whole spec model,
+ * with what was said about the fallback; only what was said when neither reads.
+ */
+function touchedInvariants(root: string, files: readonly string[]): { model: SpecModel; touched: string[]; said: string } | { said: string } {
   // A name in a file of none of the project's languages is prose, never a reference (a notes file that says "write"): only the
   // file's place in the latest run can tie it to an invariant. An unreadable config keeps every text, toward the slow path.
   const code = codeFiles(root);
@@ -636,27 +659,20 @@ export async function editContext(root: string, input: HookInput, options: HookO
     const absolute = resolve(root, file);
     return [file, existsSync(absolute) && code(file) ? readProjectText(absolute, "source") : undefined] as const;
   }));
-  // Every chokepoint invariant, read the light way (chokepointIndex): the specs and the run index, never the whole spec model or
-  // the run history. Anything that keeps that light way from answering falls back to the whole model, as before it existed, and
-  // the answer says so: an optimization of a check fails toward the slow, correct path, never toward silence.
-  let model: SpecModel;
-  let touched: string[];
-  let without: string | undefined;
+  // Anything that keeps the light way from answering falls back to the whole model, as before it existed, and the answer says
+  // so: an optimization of a check fails toward the slow, correct path, never toward silence.
   try {
     const entries = chokepointIndex(root, files);
-    touched = [...new Set(entries.filter((i) => files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name))];
+    const touched = [...new Set(entries.filter((i) => files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name))];
     // The run needs only the touched invariants, their components and their enforcements: never the whole model.
-    model = chokepointModel(root, entries.filter((i) => touched.includes(i.name)));
+    return { model: chokepointModel(root, entries.filter((i) => touched.includes(i.name))), touched, said: "" };
   } catch (error) {
-    without = `${error instanceof Error ? error.message : String(error)}; the whole spec model and run store were read instead`;
+    const without = `${error instanceof Error ? error.message : String(error)}; the whole spec model and run store were read instead`;
     const whole = specModelOrNull(root);
-    if ("error" in whole) return `Coherence checked this edit without its index: ${without}, and the spec is not readable (${whole.error})\n`;
-    model = whole;
-    touched = [...new Set(whole.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name)))];
+    if ("error" in whole) return { said: `Coherence checked this edit without its index: ${without}, and the spec is not readable (${whole.error})\n` };
+    const touched = [...new Set(whole.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name)))];
+    return { model: whole, touched, said: `Coherence checked this edit without its index: ${without}.\n` };
   }
-  const said = without === undefined ? "" : `Coherence checked this edit without its index: ${without}.\n`;
-  if (touched.length === 0) return said;
-  return said + (await checkAtEdit(root, input, options, files, model, touched));
 }
 
 /** Whether a project file is written in one of the project's languages, built-in, provided by a plugin or declared. */
@@ -682,58 +698,131 @@ function chokepointModel(root: string, entries: readonly ChokepointEntry[]): Spe
 /** Why an edit that found no loaded server checked nothing: one is starting, and this turn's stop makes the check. */
 const SERVER_STARTING = "no language server was loaded for this project, so one is starting now; this turn's stop checks this edit";
 
-/** Where a session keeps the files whose edit check waited for a language server to load. */
-function deferredCheckPath(root: string, session: string): string {
-  return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.deferred.json`);
+/** How long a stop waits for a server an edit started to finish loading: tsgo loads in about 2 s on the projects measured, tsserver on a monorepo in 40 s, which the next stop catches. */
+const STOP_SERVER_WAIT_MS = 10_000;
+const STILL_LOADING = "the language server is still loading; the next stop checks these edits";
+const HANDED_ON = "the language server is still loading; the coordinator's next stop checks these edits";
+
+/** What an edit's check does when no server is loaded: put the check off, after waiting for a listening one this long. */
+interface PutOff {
+  onNoServer?: (language: string | undefined) => string;
+  waitWarmMs?: number;
+}
+
+/** Where a session keeps the files whose edit check waited for a language server to load, one file per path so concurrent hooks never rewrite each other's. */
+function deferredCheckFolder(root: string, session: string): string {
+  return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.deferred`);
+}
+
+function deferredEntry(root: string, session: string, file: string): string {
+  return join(deferredCheckFolder(root, session), `${createHash("sha256").update(file).digest("hex").slice(0, 32)}.json`);
 }
 
 function deferredFiles(root: string, session: string): string[] {
+  let names: string[];
   try {
-    const files: unknown = JSON.parse(readFileSync(deferredCheckPath(root, session), "utf8"));
-    return Array.isArray(files) ? files.filter((file): file is string => typeof file === "string") : [];
+    names = readdirSync(deferredCheckFolder(root, session));
   } catch {
     return [];
   }
+  return names.filter((name) => name.endsWith(".json")).flatMap((name) => {
+    try {
+      const file: unknown = JSON.parse(readFileSync(join(deferredCheckFolder(root, session), name), "utf8"));
+      return typeof file === "string" ? [file] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** Where a session lists the projects it put an edit check off in: a stop routes by its folder, an edit by its file, so the stop reads this list to drain them all. */
+function deferringFolder(session: string): string {
+  return join(userCacheDir(), "deferred", session.replace(/[^\w.-]/g, "_"));
+}
+
+function deferringEntry(root: string, session: string): string {
+  return join(deferringFolder(session), `${createHash("sha256").update(root).digest("hex").slice(0, 32)}.json`);
+}
+
+function deferringProjects(session: string): string[] {
+  let names: string[];
+  try {
+    names = readdirSync(deferringFolder(session));
+  } catch {
+    return [];
+  }
+  return names.filter((name) => name.endsWith(".json")).flatMap((name) => {
+    try {
+      const root: unknown = JSON.parse(readFileSync(join(deferringFolder(session), name), "utf8"));
+      return typeof root === "string" && existsSync(root) ? [root] : [];
+    } catch {
+      return [];
+    }
+  });
 }
 
 function deferEditCheck(root: string, session: string, files: readonly string[]): void {
-  const path = deferredCheckPath(root, session);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify([...new Set([...deferredFiles(root, session), ...files])]));
+  for (const file of files) writeAtomically(deferredEntry(root, session, file), JSON.stringify(file));
+  writeAtomically(deferringEntry(root, session), JSON.stringify(root));
+}
+
+/** A stop's drain of one project's put-off checks, which drops the project from the session's list once nothing is left there. */
+async function drainDeferred(root: string, input: HookInput, options: HookOptions, session: string): Promise<string> {
+  const made = await checkDeferredAtStop(root, input, options, session);
+  if (deferredFiles(root, session).length === 0) rmSync(deferringEntry(root, session), { force: true });
+  return made;
+}
+
+function undeferEditCheck(root: string, session: string, files: readonly string[]): void {
+  for (const file of files) rmSync(deferredEntry(root, session, file), { force: true });
 }
 
 /**
  * The edit checks a session's edits deferred while the language server
  * loaded, made at its stop before the spec is read, so a defect they find is
  * recorded and the stop's spec text reports it (and a subagent stop refuses
- * on it). A server still not loaded keeps them deferred to the next stop.
+ * on it). The stop waits a bounded time for a server still loading; past it a
+ * subagent hands its checks to its coordinator's next stop, and a session
+ * keeps them for its own.
  */
 async function checkDeferredAtStop(root: string, input: HookInput, options: HookOptions, session: string): Promise<string> {
-  const files = deferredFiles(root, session).filter((file) => existsSync(join(root, file)));
-  if (files.length === 0) {
-    rmSync(deferredCheckPath(root, session), { force: true });
-    return "";
+  const stored = deferredFiles(root, session);
+  const files = stored.filter((file) => existsSync(join(root, file)));
+  undeferEditCheck(root, session, stored.filter((file) => !files.includes(file)));
+  if (files.length === 0) return "";
+  const found = touchedInvariants(root, files);
+  if (!("model" in found) || found.touched.length === 0) {
+    undeferEditCheck(root, session, files);
+    return found.said;
   }
-  const texts = new Map(files.map((file) => [file, readFileSync(join(root, file), "utf8")]));
-  const entries = chokepointIndex(root, files);
-  const touched = [...new Set(entries.filter((i) => files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name))];
-  rmSync(deferredCheckPath(root, session), { force: true });
-  if (touched.length === 0) return "";
-  const text = await checkAtEdit(root, input, options, files, chokepointModel(root, entries.filter((i) => touched.includes(i.name))), touched);
-  return text.replace(/\bat this edit\b/g, "at an edit before this stop").replace(SERVER_STARTING, "the language server is still loading; the next stop checks these edits");
+  const coordinator = !isMainThread(input) && typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
+  const putOff: PutOff = {
+    waitWarmMs: options.stopWaitMs ?? STOP_SERVER_WAIT_MS,
+    onNoServer: (language) => {
+      options.warm?.(root, language);
+      if (coordinator === undefined) return STILL_LOADING;
+      deferEditCheck(root, coordinator, files);
+      undeferEditCheck(root, session, files);
+      return HANDED_ON;
+    },
+  };
+  const text = found.said + (await checkAtEdit(root, input, options, files, found.model, found.touched, putOff));
+  return text.replace(/\bat this edit\b/g, "at an edit before this stop");
 }
 
 /** The chokepoint check of the touched invariants at an edit, as text: what it could not check, and any structural defect it found. */
-async function checkAtEdit(root: string, input: HookInput, options: HookOptions, files: readonly string[], model: SpecModel, touched: readonly string[]): Promise<string> {
-  const session = sessionOf(input) ?? "unknown-session";
+async function checkAtEdit(root: string, input: HookInput, options: HookOptions, files: readonly string[], model: SpecModel, touched: readonly string[], putOff: PutOff): Promise<string> {
+  const session = sessionOf(input);
   const agent = agentOf(input);
-  // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
-  const deferral = options.warm === undefined ? undefined : (language: string | undefined): string => {
-    options.warm?.(root, language);
-    deferEditCheck(root, session, files);
-    return SERVER_STARTING;
+  let wasPutOff = false;
+  const onNoServer = putOff.onNoServer === undefined ? undefined : (language: string | undefined): string => {
+    wasPutOff = true;
+    return putOff.onNoServer?.(language) ?? "";
   };
-  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false, occasion: "edit", onNoServer: deferral });
+  // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
+  const outcome = await performRun(root, { session: session ?? "unknown-session", agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false, occasion: "edit", onNoServer, waitWarmMs: putOff.waitWarmMs });
+  // A check made answers for every earlier edit of the same files that was put off, so a stop does not report it again.
+  if (!wasPutOff && session !== undefined) undeferEditCheck(root, session, files);
   if (outcome.instrumentReason !== undefined) options.onEditCheck?.({ checked: 0, failed: [], unchecked: touched.length, reason: outcome.instrumentReason });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
@@ -1025,6 +1114,8 @@ export interface HookOptions {
   door?: WarmDoor | undefined;
   /** How long a session start may wait for a nearly done refresh; START_WAIT_MS by default. */
   startWaitMs?: number | undefined;
+  /** How long a stop waits for a server an edit started; STOP_SERVER_WAIT_MS by default. */
+  stopWaitMs?: number | undefined;
   /**
    * Start one language's instrument without waiting for it, called by an
    * edit that needs it and finds none loaded, so a session that never edits a
@@ -1159,7 +1250,7 @@ export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
  */
 export const ECONOMY_SNAPSHOT = (root: string, session: string, fingerprint: string): void => {
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
-  const mark = traceFile(root, session).replace(/\.jsonl$/, ".snapshot.json");
+  const mark = snapshotSlot(root, session);
   const ownCommand = new RegExp(`(?:^|\\s)economy\\s+--snapshot\\s+${escapeRegExp(session)}\\s*$`);
   refreshInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "economy", "--snapshot", session], fingerprint, Date.now, { path: mark, command: ownCommand });
 };
@@ -1583,7 +1674,15 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const fingerprint = session ? patchFingerprint(root, patch, filesRead(root, session).length) : undefined;
         if (session && fingerprint !== undefined) await snapshotAtStop(root, session, patch, fingerprint, options);
         const snapshot = session ? lastSnapshot(root, session) : undefined;
-        const deferredText = session ? await checkDeferredAtStop(root, input, options, session) : "";
+        // A stop routes by its folder and an edit by its file, so the checks put off in every project the session listed, or above several the stop sits in, are made here too.
+        const entered = session ? [...new Set([...(routed?.kind === "several" ? routed.projects : []), ...deferringProjects(session)])].filter((project) => project !== root) : [];
+        const elsewhereTexts = session ? await Promise.all(entered.map(async (project) => {
+          const made = await drainDeferred(project, input, options, session);
+          return made === "" ? "" : `In ${project}:\n${made}`;
+        })) : [];
+        const deferredText = (session ? await drainDeferred(root, input, options, session) : "") + elsewhereTexts.join("");
+        // A check made here may have recorded a run, which the spec text below must read.
+        if (deferredText !== "") eventModels?.delete(root);
         const walls = unableWalls(root, input);
         const spec = specStopText(root, changed.files, walls);
         const lexicon = lexiconStopText(report, walls);
