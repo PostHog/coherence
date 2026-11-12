@@ -105,4 +105,8 @@ export class PluginAdapter implements LanguageAdapter {
   serverPid(): number | undefined {
     return this.loaded?.serverPid?.() ?? this.base?.serverPid?.();
   }
+
+  get engine(): string | undefined {
+    return this.loaded?.engine ?? this.base?.engine;
+  }
 }

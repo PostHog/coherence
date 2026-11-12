@@ -103,11 +103,14 @@ test("a server neither the project nor Coherence holds is found on PATH, and its
   assert.equal(locateTsserver(root, coherenceFrom), undefined);
 });
 
-test("orient says once that Coherence reads with its own TypeScript when the project's is 7 or later", async () => {
+test("orient says once that Coherence reads with its own TypeScript when the project's is 7 or later and tsgo is off, and nothing when tsgo answers", async (t) => {
   const root = join(scratch, "orient-ts7");
   pkg(join(root, "node_modules", "typescript"), TS7, TS7_FILES);
   write(join(root, "package.json"), JSON.stringify({ name: "orient-ts7" }));
   write(join(root, "coherence.config.json"), JSON.stringify({ name: "orient-ts7", language: "typescript" }));
+  assert.doesNotMatch(tsserverBlock(root), /ships no tsserver/, "tsgo answers, so no tsserver is passed over");
+  process.env["COHERENCE_TSGO"] = "0";
+  t.after(() => delete process.env["COHERENCE_TSGO"]);
   const own = (JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "node_modules", "typescript", "package.json"), "utf8")) as { version: string }).version;
   const line = `TypeScript: this project's TypeScript 7.0.2 ships no tsserver, so Coherence is using its own TypeScript ${own} for readings`;
   assert.ok(tsserverBlock(root).startsWith(line), tsserverBlock(root));

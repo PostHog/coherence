@@ -92,7 +92,8 @@ const CLI = join(CODE_DIR, `cli${extname(fileURLToPath(import.meta.url))}`);
  * The fingerprint a project's warm server answers with and a client asks
  * for: Coherence's code and the folder of every plugin the project runs
  * (none when the config names none or refuses them), so an edited plugin
- * replaces the server as an edited Coherence does.
+ * replaces the server as an edited Coherence does, and the engine choice a
+ * client makes with COHERENCE_TSGO, which a running server would not see.
  */
 export function serverFingerprint(root: string): string {
   let dirs: string[] = [];
@@ -101,7 +102,8 @@ export function serverFingerprint(root: string): string {
   } catch {
     // A config the server refuses starts no server; the fingerprint is Coherence's alone.
   }
-  return codeFingerprint(dirs);
+  const engineChoice = process.env["COHERENCE_TSGO"];
+  return engineChoice === undefined ? codeFingerprint(dirs) : `${codeFingerprint(dirs)}+COHERENCE_TSGO=${engineChoice}`;
 }
 
 // The fingerprint lives beside the parses keyed by it; the server reports it and replaces a server running other code.
@@ -616,7 +618,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
     const params = sent.map((p) => (p === null ? undefined : p));
     switch (method) {
       case "status":
-        return { language: adapter.language, ladder: adapter.ladder, warm, pid: process.pid, startedAt, fingerprint, root, enumeration: (adapter as { enumeration?: { sourceFiles: number; latency: number } }).enumeration ?? null };
+        return { language: adapter.language, ladder: adapter.ladder, warm, pid: process.pid, startedAt, fingerprint, root, enumeration: (adapter as { enumeration?: { sourceFiles: number; latency: number } }).enumeration ?? null, engine: adapter.engine ?? null };
       case "ready":
         return adapter.ready();
       case "resolve":
@@ -988,4 +990,6 @@ interface ServerStatus {
   /** Absent on a server that predates the fingerprint: it counts as other code. */
   fingerprint?: string;
   root?: string;
+  /** The language server that answers when a plugin drives more than one (TypeScript: tsgo or tsserver); null for the rest. */
+  engine?: string | null;
 }
