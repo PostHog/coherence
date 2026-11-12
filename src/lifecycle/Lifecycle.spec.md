@@ -801,12 +801,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   refuted: made the session start judge a matcher against the five writing tools 1.7.0 knew, listed by hand -> "a PreToolUse matcher that leaves out a tool that writes is named by the check and at the session start with the reinstall, and a wider one is not" went red in install.test.ts on its own assertion (no line for the narrow matcher); restored (cmp), green batched and alone (2026-10-11)
   kinds: none
 
-- a turn's instrument is warmed before its stop: A session start and every prompt start warming the instrument in the background and never wait for it; no other event does in a project at the folder holding the hooks (a nested project's first tool use is the other, under entering a nested project warms its instrument).
-  over: SessionStart, UserPromptSubmit, PreToolUse and PostToolUse
-  via: a session start and every prompt warm the instrument without waiting for it, and no other event does
-  because: the stop regulates with the economy prediction, which needs the warm server; it idles out after five minutes, and every turn begins with a prompt, so warming there makes the stop find it loaded without the hook ever waiting on it
-  refuted: stopped warming the instrument at a prompt -> "a session start and every prompt warm the instrument without waiting for it, and no other event does" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
-  kinds: none
+- an instrument starts at the first edit that needs it: No session start, prompt, entry into a nested project or stop snapshot starts the instrument; an edit whose chokepoint check finds no server loaded for its language starts one detached, checks nothing, and says so, and the first stop that finds the server loaded makes that check.
+  over: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse and Stop, a tool use that writes nothing and an edit that touches a chokepoint invariant
+  via: the instrument starts at the first edit whose check finds no server loaded, never at a session start or prompt, and the stop makes the check the edit deferred
+  because: warming at every start and prompt kept one language server per session root alive for sessions that never edit a chokepoint's code (six tsservers, 3.4 GB on a 14 GiB machine with ten sessions); an edit that waited on a cold project load would blow the 3 s hook budget (3.1 s on PostHog), so it starts the server and defers its check to the stop, before the spec is read, so a defect it finds is reported there and refuses a subagent stop
+  refuted: checkAtEdit stopped passing onNoServer -> the same test went red on its own assertion (nothing started); the stop stopped making the deferred check -> it went red on "a stop never starts or waits on the server"; each restored byte for byte, green batched and alone (2026-11-11)
+  kinds: budget
 - a stop never waits on its snapshot: A stop with a non-empty patch starts the session's read-trace snapshot detached and reports the newest one already recorded, never asking the instrument itself; the same patch keeps its fingerprint, so a repeated stop starts no second closure.
   over: Stop
   via: a stop starts the snapshot detached, with a fingerprint that moves only with the patch, and reports the newest one already recorded
@@ -964,12 +964,6 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: hooks install with a registry writes the host settings once, at the repository top, and an ignore file in each leaf
   because: the registry's top is the one place a host launched at the repository root reads, every leaf is routed from there, and the top is no project, so a .coherence there would be a second store
   refuted: settingsRoots named the leaf beside the repository top under a registry -> "hooks install with a registry writes the host settings once, at the repository top, and an ignore file in each leaf" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
-  kinds: none
-- entering a nested project warms its instrument: The first tool use of a session inside a project nested below the folder holding the hooks starts warming that project's instrument in the background, beside the orient it delivers, and never waits for it; later tool uses there do not.
-  over: the first and second tool use of a session at a registry's top inside one leaf
-  via: the first tool use inside a nested project warms its instrument, once
-  because: a session at a registry's top above several leaves has no start or prompt that belongs to a project, so nothing warmed the language server before the first edit's check; on PostHog that edit took 3.1 s cold against the 3 s latency budget, and 2.4 s once the entry had warmed it
-  refuted: the first tool use inside a nested project delivered orient without warming its instrument -> "the first tool use inside a nested project warms its instrument, once" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
 - a tool use that writes nothing pays only for its own budget at any size: Around a tool use that writes no file, a Read or an ls, PreToolUse and PostToolUse take no corpus read, no coverage reading and no spec model, read no project file but the config and, for a command, the practice files, and beside ten times the components, practices and history grow only in what each must name one by one: a command its practice files and the specs they pair with, PostToolUse the journal's file list and the feed's memo of it; every other count, through the work meter and at the file system, a read weighed by its bytes, a listing by its entries and a spawn by its output's bytes, does not grow at all, and a spawn whose work is the project's (git listing, searching or comparing the tree) is budgeted by count at both sizes: one practice listing for a command, none for the rest. The history grows inside its files as well as in their number, and its bytes are in no budget.
   over: a Read and an ls, at PreToolUse and at PostToolUse, over the sized fixture at 1× and at 10× (the same folder depth), after the session's start and its first command

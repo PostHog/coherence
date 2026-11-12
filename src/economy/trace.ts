@@ -302,7 +302,14 @@ export function patchFingerprint(root: string, patch: readonly string[], filesRe
   return `${identities.join("\n")}\nread ${filesReadCount}`;
 }
 
-/** A session's snapshot through the warm instrument's one door; a door that cannot connect hands back its reason, which the snapshot records. */
+/**
+ * A session's snapshot through the warm instrument's one door, which starts
+ * no server and waits on none still loading: a session that never edited a
+ * chokepoint starts no language server. A door that cannot connect hands
+ * back its reason, which the snapshot records.
+ */
 export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel, changed: readonly string[] = sessionPatch(root, session)): Promise<Snapshot | undefined> {
-  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }));
+  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }), { onNoServer: () => SNAPSHOT_WITHOUT_SERVER });
 }
+
+const SNAPSHOT_WITHOUT_SERVER = "no language server was loaded for this project, and a snapshot starts none";
