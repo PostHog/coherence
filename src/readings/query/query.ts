@@ -54,7 +54,7 @@ export const QUERY_USAGE = [
   "  query invariants <path...>     which invariants touch these files, by component and by reference site",
   "  query relies-on <chokepoint>   who references this chokepoint, from the latest run",
   "  query spine                    trust levels and every crossing-bearing invariant, in Structure order",
-  `  query structure ${BUDGET_FLAGS}   the structural routes, core dependencies, interface identifiers and component interfaces Structure draws, and the placement; the interface reading is bounded to the declared components and says when a budget left it partial`,
+  `  query structure ${BUDGET_FLAGS} [--warm-only]   the structural routes, core dependencies, interface identifiers and component interfaces Structure draws, and the placement; the interface reading is bounded to the declared components and says when a budget left it partial; --warm-only reads only through language servers already loaded, starting none`,
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what it cites, what binds to it, and what cites it",

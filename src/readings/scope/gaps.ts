@@ -48,7 +48,7 @@
 
 import { spawn } from "../../lifecycle/work-meter.ts";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { execFileSync } from "../../lifecycle/work-meter.ts";
 import { basename, join } from "node:path";
 import { configIgnore, projectFiles } from "../../adapters/project-files.ts";
@@ -340,7 +340,7 @@ export interface RefreshSlot {
 }
 
 // The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
-const STRUCTURE_QUERY = /(?:^|\s)query\s+structure\s*$/;
+const STRUCTURE_QUERY = /(?:^|\s)query\s+structure(?:\s+--warm-only)?\s*$/;
 
 function readMark(path: string): RefreshMark | undefined {
   try {
@@ -353,6 +353,15 @@ function readMark(path: string): RefreshMark | undefined {
 function markUnderWay(mark: RefreshMark | undefined, now: () => number): RefreshMark | undefined {
   if (mark === undefined) return undefined;
   return alive(mark.pid) && now() - Date.parse(mark.at) < REFRESH_STALE_MS ? mark : undefined;
+}
+
+/** Give up the refresh slot a run held, so the same tree is tried again: a warm-only run that found no server read nothing it should be refused a retry for. */
+export function releaseRefresh(root: string, pid: number): void {
+  try {
+    if (readMark(refreshPath(root))?.pid === pid) rmSync(refreshPath(root), { force: true });
+  } catch {
+    return;
+  }
 }
 
 /** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */

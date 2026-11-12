@@ -727,13 +727,18 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
   const started = Date.now();
   const ignore = configIgnore(root);
   const languages = config.languages;
-  const adapterOf = async (language: Language): Promise<LanguageAdapter | undefined> => (typeof given === "function" ? await given(language) : language === languages[0] ? given : undefined);
+  const adapterOf = async (language: Language): Promise<LanguageAdapter | undefined | string> => (typeof given === "function" ? await given(language) : language === languages[0] ? given : undefined);
+  const readOne = async (language: Language, owns: LanguagePart["owns"]): Promise<InterfaceReading> => {
+    const adapter = await adapterOf(language);
+    if (typeof adapter === "string") return { kind: "unread", because: adapter };
+    return readLanguage(root, language, adapter, options, { model, budget, started, owns });
+  };
   const candidates = (): EntranceCandidate[] => detectedEntrances(root, model, languages, config.testFolders, ignore);
   // A project that names only languages its config declares has no built-in to read with: said, never an empty reading.
   if (languages.length === 0) return { kind: "unread", because: `the project names no built-in language: ${DECLARED_NOT_READ}` };
   if (languages.length === 1) {
     // One language: the reading it always was, with the one language read.
-    const reading = await readLanguage(root, languages[0]!, await adapterOf(languages[0]!), options, { model, budget, started, owns: () => true });
+    const reading = await readOne(languages[0]!, () => true);
     return reading.kind === "read" ? { ...reading, languages: languagesRead(languages, new Map(), unscannedOf(config)), candidates: candidates() } : reading;
   }
   // Several languages: each one's component code is read through its own adapter, started only when the language has
@@ -751,14 +756,14 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
   const parts: { language: Language; reading: InterfaceReading }[] = [];
   for (const language of languages) {
     if (!held.has(language)) continue;
-    const reading = await readLanguage(root, language, await adapterOf(language), options, { model, budget, started, owns: (_component, entrance) => owner(entrance) === language });
+    const reading = await readOne(language, (_component, entrance) => owner(entrance) === language);
     parts.push({ language, reading });
   }
   return mergeLanguages(languages, parts, model, candidates(), unscannedOf(config));
 }
 
-/** An adapter for each language a multi-language reading asks, started by the caller (who closes it); undefined lets the reading start its own. */
-export type ReadingAdapters = (language: Language) => LanguageAdapter | undefined | Promise<LanguageAdapter | undefined>;
+/** An adapter for each language a multi-language reading asks, started by the caller (who closes it); undefined lets the reading start its own, and a string leaves that language unread for the reason it gives. */
+export type ReadingAdapters = (language: Language) => LanguageAdapter | undefined | string | Promise<LanguageAdapter | undefined | string>;
 
 /** What one language's reading shares with the reading of the whole project. */
 interface LanguagePart {
