@@ -18,7 +18,11 @@ import { economyFor, queryEconomyCommand, type EconomyOf } from "../../economy/c
 import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { buildScopePage, projectNameOf } from "../scope/build.ts";
-import { BUDGET_FLAG_NAMES, budgetFlags, readComponentInterfaces } from "../scope/component-interfaces.ts";
+import { BUDGET_FLAG_NAMES, budgetFlags, languageServerMemory, readComponentInterfaces, readsOwnBounds, type InterfaceBudget } from "../scope/component-interfaces.ts";
+import type { LanguageAdapter } from "../../adapters/adapter.ts";
+import { RemoteAdapter } from "../../enforcement/server.ts";
+import type { InterfaceReading } from "../scope/model.ts";
+import { withWarmAdapters } from "../../enforcement/run.ts";
 import { readAndRecord } from "../scope/gaps.ts";
 import { keptLine } from "../scope/kept-answers.ts";
 import { observedCommand } from "../../observation/observed.ts";
@@ -133,7 +137,7 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
     window: false,
     // Only the Structure question needs every component interface, read through the language adapter.
     // The real reading is kept for the hooks (gaps.ts); an injected one is a test's, and never kept.
-    ...(question === "structure" ? { componentInterfaces: deps.interfaces !== undefined ? await deps.interfaces(root, undefined, { budget }) : await readAndRecord(root, () => readComponentInterfaces(root, undefined, { budget })) } : {}),
+    ...(question === "structure" ? { componentInterfaces: deps.interfaces !== undefined ? await deps.interfaces(root, undefined, { budget }) : await readAndRecord(root, () => readThroughWarmServers(root, budget)) } : {}),
   });
   // What the reading reused of the language server's kept answers, and what it asked anew: never reused silently.
   const kept = state.componentInterfaces.kind === "read" ? keptLine(state.componentInterfaces.kept) : undefined;
@@ -142,4 +146,15 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
   if (result.code === 0) io.out(result.text);
   else io.err(result.text);
   return result.code;
+}
+
+/** The reading through the project's warm servers, so a structure question never starts a second language server beside a check's; a language read inside its own bounds keeps its own. */
+function readThroughWarmServers(root: string, budget: Partial<InterfaceBudget>): Promise<InterfaceReading> {
+  return withWarmAdapters(root, (open) => readComponentInterfaces(root, async (language) => (readsOwnBounds(root, language) ? undefined : (await open(language)).adapter), { budget, memory: warmServerMemory }));
+}
+
+/** A warm server is no child of this process, so its memory is measured from the pid it reports, not the pid an adapter of its own would hold. */
+async function warmServerMemory(adapter: LanguageAdapter): Promise<number | undefined> {
+  if (!(adapter instanceof RemoteAdapter)) return languageServerMemory(adapter.serverPid?.());
+  return languageServerMemory((await adapter.status()).pid);
 }
