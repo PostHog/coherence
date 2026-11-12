@@ -899,6 +899,20 @@ export interface Connected {
   failed?: string | undefined;
 }
 
+/**
+ * Whether a warm server is recorded for the root's primary language and its
+ * process lives: one file read and a signal, never a connection, so a hook
+ * may ask it at every stop. It may still be loading.
+ */
+export function serverRecorded(rootGiven: string): boolean {
+  try {
+    const pointer = JSON.parse(readFileSync(serverPaths(rootGiven).pointer, "utf8")) as Pointer;
+    return typeof pointer.pid === "number" && pidAlive(pointer.pid);
+  } catch {
+    return false;
+  }
+}
+
 /** Wait for a process to exit; signal it when asking was not enough. True once it is gone. */
 async function awaitExit(pid: number): Promise<boolean> {
   const gone = async (ms: number): Promise<boolean> => {

@@ -24,7 +24,9 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statS
 import { join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
-import { releaseRefresh } from "../readings/scope/gaps.ts";
+import { refreshFoundNoServer, refreshInBackground } from "../readings/scope/gaps.ts";
+import { serverRecorded } from "../enforcement/server.ts";
+import { escapeRegExp } from "../enforcement/totality.ts";
 import { configIgnore, fileIdentity, keepProjectFiles, projectListing, underIgnored } from "../adapters/project-files.ts";
 import type { HookInput } from "../lifecycle/hook.ts";
 import { readerNaming } from "../lifecycle/host-tools.ts";
@@ -308,8 +310,8 @@ export function patchFingerprint(root: string, patch: readonly string[], filesRe
  * no server and waits on none still loading: a session that never edited a
  * chokepoint starts no language server. A door that cannot connect hands
  * back its reason, which the snapshot records, and a snapshot taken with no
- * server loaded gives back its slot, so a later stop on the same patch
- * takes it again.
+ * server loaded marks its slot so: a later stop on the same patch starts none
+ * while no server is recorded, and takes it again once one is.
  */
 export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel, changed: readonly string[] = sessionPatch(root, session)): Promise<Snapshot | undefined> {
   let foundNoServer = false;
@@ -319,13 +321,25 @@ export async function snapshotSession(root: string, session: string, door: typeo
       return SNAPSHOT_WITHOUT_SERVER;
     },
   });
-  if (foundNoServer) releaseRefresh(process.pid, snapshotSlot(root, session));
+  if (foundNoServer) refreshFoundNoServer(process.pid, snapshotSlot(root, session));
   return snapshot;
 }
 
 /** Where the stop's background snapshot of a session keeps its mark. */
 export function snapshotSlot(root: string, session: string): string {
   return traceFile(root, session).replace(/\.jsonl$/, ".snapshot.json");
+}
+
+/**
+ * Start a session's snapshot detached through `command` (the CLI's economy
+ * --snapshot), one per session, a newer patch superseding an older one; the
+ * same patch is started again only after a snapshot that found no server
+ * loaded, and only once a server is recorded for the project. Returns
+ * whether one started.
+ */
+export function snapshotInBackground(root: string, session: string, fingerprint: string, command: readonly string[]): boolean {
+  const ownCommand = new RegExp(`(?:^|\\s)economy\\s+--snapshot\\s+${escapeRegExp(session)}\\s*$`);
+  return refreshInBackground(root, command, fingerprint, Date.now, { path: snapshotSlot(root, session), command: ownCommand, retry: () => serverRecorded(root) });
 }
 
 const SNAPSHOT_WITHOUT_SERVER = "no language server was loaded for this project, and a snapshot starts none";

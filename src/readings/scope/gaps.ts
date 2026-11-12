@@ -315,6 +315,8 @@ interface RefreshMark {
   pid: number;
   at: string;
   fingerprint: string;
+  /** Set by a run that found no language server loaded: the same fingerprint is tried again only when its slot's retry says a server now is. */
+  noServer?: boolean;
 }
 
 /** How long a refresh may run before another may start in its place. */
@@ -337,6 +339,8 @@ function refreshPath(root: string): string {
 export interface RefreshSlot {
   path: string;
   command: RegExp;
+  /** Whether a run of the same fingerprint that found no server loaded is worth starting again, asked only then; never, when absent. */
+  retry?: (() => boolean) | undefined;
 }
 
 // The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
@@ -359,6 +363,20 @@ function markUnderWay(mark: RefreshMark | undefined, now: () => number): Refresh
 export function releaseRefresh(pid: number, slotPath: string): void {
   try {
     if (readMark(slotPath)?.pid === pid) rmSync(slotPath, { force: true });
+  } catch {
+    return;
+  }
+}
+
+/**
+ * Keep the slot a run held, marked as having found no language server
+ * loaded: the same fingerprint is not started again while none is, and is
+ * once its slot's retry says one is.
+ */
+export function refreshFoundNoServer(pid: number, slotPath: string): void {
+  try {
+    const mark = readMark(slotPath);
+    if (mark?.pid === pid) writeAtomically(slotPath, JSON.stringify({ ...mark, noServer: true } satisfies RefreshMark));
   } catch {
     return;
   }
@@ -409,14 +427,17 @@ function supersede(pid: number, ownCommand: RegExp): boolean {
  * reading that could not finish is not retried until the tree changes).
  * `command` is the argv that records a reading (the CLI's query structure);
  * `slot` is the structure refresh's own unless another kind of run passes its
- * mark and command line. Returns whether one started.
+ * mark and command line. A run that found no server loaded is started again
+ * for the same tree only when the slot's retry says one now is. Returns
+ * whether one started.
  */
 export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now, slot: RefreshSlot = { path: refreshPath(root), command: STRUCTURE_QUERY }): boolean {
   try {
     const mark = readMark(slot.path);
     if (mark !== undefined) {
-      if (mark.fingerprint === fingerprint) return false;
-      if (markUnderWay(mark, now) !== undefined && !supersede(mark.pid, slot.command)) return false;
+      if (mark.fingerprint === fingerprint && !(mark.noServer === true && slot.retry?.() === true)) return false;
+      // A run that marked its slot as having found no server has finished reading, so it holds the slot no longer while it exits.
+      if (mark.noServer !== true && markUnderWay(mark, now) !== undefined && !supersede(mark.pid, slot.command)) return false;
     }
     const [program, ...args] = command;
     if (program === undefined) return false;

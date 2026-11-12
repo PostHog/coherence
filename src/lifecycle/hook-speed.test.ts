@@ -11,14 +11,14 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { patchFingerprint, recordWriteTrace, sessionPatch, snapshotSession, snapshotSlot, traceFile, type Snapshot } from "../economy/trace.ts";
+import { patchFingerprint, recordWriteTrace, sessionPatch, snapshotInBackground, snapshotSession, snapshotSlot, traceFile, type Snapshot } from "../economy/trace.ts";
 import { WARM_UP, economyStopText, editContext, runHook } from "./hook.ts";
 import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
 import { lastHookWork } from "./work-meter.ts";
-import { serve, type Serving } from "../enforcement/server.ts";
+import { serve, serverPaths, type Serving } from "../enforcement/server.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
 
 function repo(files: Record<string, string>): string {
@@ -76,9 +76,17 @@ test("a stop starts the snapshot detached, with a fingerprint that moves only wi
     assert.equal(started.length, 3);
     assert.equal(started[0], started[1], "an unchanged patch keeps its fingerprint, so no second closure starts");
     assert.notEqual(started[1], started[2], "an edit moves it, so the newer patch supersedes");
-    writeFileSync(snapshotSlot(root, "s1"), JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint: started[2] }));
+    // What the production stop starts, with a command that exits at once standing in for economy --snapshot.
+    const fingerprint = patchFingerprint(root, ["src/a.ts"], 0);
+    const quick = [process.execPath, "-e", ""];
+    writeFileSync(snapshotSlot(root, "s1"), JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint }));
     await snapshotSession(root, "s1", ((_root, take, given) => take(undefined, undefined, given?.onNoServer?.(undefined))) as typeof withWarmAdapter);
-    assert.equal(existsSync(snapshotSlot(root, "s1")), false, "a snapshot that found no server loaded gives back its slot, so the next stop on the same patch takes it");
+    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), false, "a stop on the same patch with no server loaded starts no snapshot process");
+    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), false, "nor at any stop after it");
+    mkdirSync(dirname(serverPaths(root).pointer), { recursive: true });
+    writeFileSync(serverPaths(root).pointer, JSON.stringify({ pid: process.pid }));
+    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), true, "a snapshot that found no server loaded is taken again on the same patch once a server is recorded");
+    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), false, "and once only");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
