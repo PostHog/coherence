@@ -9,7 +9,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { COHERENCE_FROM, installedPackage, packageFile, projectFrom, typescriptCompiler } from "../../src/plugins/api.ts";
+import { COHERENCE_FROM, exclusionOf, installedPackage, keepProjectFiles, packageFile, projectFrom, typescriptCompiler, walkBounds } from "../../src/plugins/api.ts";
 
 /** The first number of a version. */
 function major(version: string): number {
@@ -89,12 +89,23 @@ const REFUSAL_RECORD = join(".coherence", "typescript-engine.json");
  */
 const PROBE_BUDGET_MS = 20_000;
 
+/**
+ * The configs that decide which engine reads: every tsconfig*.json and
+ * jsconfig*.json git tracks that is the project's own (outside a nested
+ * checkout or a plugin's folder) and that a walk bounded by the config's
+ * ignore list reads. A fixture's, an example's or a vendored package's config
+ * in a folder the adoption ignores never sends the whole project to tsserver.
+ */
 function trackedConfigs(root: string): string[] {
+  const bounds = walkBounds(root);
+  let listed: string[];
   try {
-    return execFileSync("git", ["ls-files", "-z", "--", ...CONFIG_PATHSPECS], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter((file) => file !== "");
+    listed = execFileSync("git", ["ls-files", "-z", "--", ...CONFIG_PATHSPECS], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter((file) => file !== "");
   } catch {
-    return rootConfigs(root);
+    listed = rootConfigs(root);
   }
+  const own = keepProjectFiles(root, listed);
+  return listed.filter((file) => own.has(file) && exclusionOf(file, bounds) === undefined);
 }
 
 function rootConfigs(root: string): string[] {

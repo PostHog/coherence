@@ -160,6 +160,22 @@ test("tsgo's refusal probe never holds the event loop and stops at its budget ov
   assert.equal(readdirSync(root).includes(".coherence"), false, "an unfinished probe keeps no answer");
 });
 
+test("a config in a folder the config ignores or inside a nested checkout never decides which engine reads; one the walk reads does", async () => {
+  const root = join(scratch, "probe-bounds");
+  const removed = JSON.stringify({ compilerOptions: { baseUrl: "." } });
+  write(join(root, "tsconfig.json"), "{}");
+  write(join(root, "fixtures", "legacy", "tsconfig.json"), removed);
+  write(join(root, "nested", "tsconfig.json"), removed);
+  write(join(root, "coherence.config.json"), JSON.stringify({ name: "probe-bounds", language: "typescript", ignore: ["fixtures"] }));
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  execFileSync("git", ["add", "."], { cwd: root });
+  execFileSync("git", ["init", "-q"], { cwd: join(root, "nested") });
+  const tsgo = locateTsgo(root)!;
+  assert.equal(await tsgoRefusal(tsgo, root), undefined, "the ignored fixture's and the nested checkout's removed baseUrl leave tsgo reading");
+  write(join(root, "coherence.config.json"), JSON.stringify({ name: "probe-bounds", language: "typescript" }));
+  assert.match((await tsgoRefusal(tsgo, root)) ?? "", /^fixtures\/legacy\/tsconfig\.json: .*TS5102/, "the same fixture, no longer ignored, is read and decides");
+});
+
 /** Every non-test TypeScript source under a folder. */
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
