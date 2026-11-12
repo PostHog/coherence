@@ -95,7 +95,7 @@ test("the instrument starts at the first edit whose check finds no server loaded
   let serving: Serving | undefined;
   try {
     const warmed: string[] = [];
-    const options = { stopWaitMs: 300, warm: (r: string) => void warmed.push(r) };
+    const options = { stopWaitMs: 300, editWaitMs: 300, warm: (r: string) => void warmed.push(r) };
     for (const event of ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"] as const) {
       (await runHook(event, { cwd: root, session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } }, root, options)).commit?.();
     }
@@ -121,6 +121,29 @@ test("the instrument starts at the first edit whose check finds no server loaded
   }
 });
 
+test("an edit whose server loads within the latency budget makes its check at the edit, and puts nothing off to the stop", { timeout: 120_000 }, async () => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const root = repo({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    "coherence.config.json": JSON.stringify({ language: "typescript" }),
+    "Fixture.spec.md": spec,
+    "src/a.ts": "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  let serving: Serving | undefined;
+  try {
+    // The edit's start stands in for WARM_UP: it starts the server detached and returns, and the edit waits for it to load.
+    const options = { editWaitMs: 60_000, stopWaitMs: 300, warm: (r: string) => void serve(r, { idleMs: 120_000 }).then((s) => (serving = s)) };
+    const edit = await runHook("PostToolUse", { cwd: root, session_id: "s2", tool_name: "Edit", tool_input: { file_path: join(root, "src/a.ts") } }, root, options);
+    assert.match(edit.stdout, /could not check 1 chokepoint invariant at this edit:\\n\s+○ [^:]*ghost door: /, "the check is made at the edit once the server it started has loaded");
+    assert.doesNotMatch(edit.stdout, /this turn's stop checks this edit/);
+    const stop = await runHook("Stop", { cwd: root, session_id: "s2" }, root, options);
+    assert.doesNotMatch(stop.stdout, /before this stop|still loading/, "nothing was put off, so the stop makes no check");
+  } finally {
+    await serving?.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a stop makes the check an edit put off in a sibling project, whatever folder the stop routes to", { timeout: 120_000 }, async (t) => {
   const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
   const project = (name: string): Record<string, string> => ({
@@ -135,7 +158,7 @@ test("a stop makes the check an edit put off in a sibling project, whatever fold
   t.after(() => delete process.env["CLAUDE_PROJECT_DIR"]);
   let serving: Serving | undefined;
   try {
-    const options = { warm: () => undefined };
+    const options = { editWaitMs: 300, warm: () => undefined };
     const edit = await runHook("PostToolUse", { cwd: pb, session_id: "sib", tool_name: "Edit", tool_input: { file_path: join(pa, "src/a.ts") } }, root, options);
     assert.match(edit.stdout, /this turn's stop checks this edit/, "the edit in the sibling project puts its check off");
     serving = await serve(pa, { idleMs: 120_000 });

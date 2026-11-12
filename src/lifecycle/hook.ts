@@ -636,9 +636,12 @@ export async function editContext(root: string, input: HookInput, options: HookO
   const found = touchedInvariants(root, files);
   if (!("model" in found) || found.touched.length === 0) return found.said;
   // Without a session no stop could make a check put off, so an edit with none waits on the server as before.
+  // With one, an edit that finds no server starts it and waits what is left of the latency budget: tsgo loads inside
+  // it, so the defect is said at the edit that made it; a server that loads past it has its check put off to the stop.
   const putOff: PutOff = options.warm === undefined || session === undefined ? {} : {
-    onNoServer: (language) => {
-      options.warm?.(root, language);
+    start: (language) => options.warm?.(root, language),
+    waitWarmMs: options.editWaitMs ?? editServerWaitMs(root, options.startedAt),
+    onNoServer: () => {
       deferEditCheck(root, session, files);
       return SERVER_STARTING;
     },
@@ -703,10 +706,20 @@ const STOP_SERVER_WAIT_MS = 10_000;
 const STILL_LOADING = "the language server is still loading; the next stop checks these edits";
 const HANDED_ON = "the language server is still loading; the coordinator's next stop checks these edits";
 
-/** What an edit's check does when no server is loaded: put the check off, after waiting for a listening one this long. */
+/** What an edit's check does when no server is loaded: start one when none listens, wait this long for it, then put the check off. */
 interface PutOff {
+  start?: (language: string | undefined) => void;
   onNoServer?: (language: string | undefined) => string;
   waitWarmMs?: number;
+}
+
+/** What an edit's check keeps of the latency budget for itself once its server has loaded: the check's own reads, measured at well under a second. */
+const EDIT_CHECK_RESERVE_MS = 1_000;
+
+/** How long an edit waits for a server it found loading or just started: the latency budget less the hook's time so far and the check's reserve. */
+function editServerWaitMs(root: string, startedAt: number | undefined): number {
+  const spent = startedAt === undefined ? 0 : Date.now() - startedAt;
+  return Math.max(0, latencyBudget(root) * 1000 - spent - EDIT_CHECK_RESERVE_MS);
 }
 
 /** Where a session keeps the files whose edit check waited for a language server to load, one file per path so concurrent hooks never rewrite each other's. */
@@ -797,9 +810,9 @@ async function checkDeferredAtStop(root: string, input: HookInput, options: Hook
   }
   const coordinator = !isMainThread(input) && typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
   const putOff: PutOff = {
+    start: (language) => options.warm?.(root, language),
     waitWarmMs: options.stopWaitMs ?? STOP_SERVER_WAIT_MS,
-    onNoServer: (language) => {
-      options.warm?.(root, language);
+    onNoServer: () => {
       if (coordinator === undefined) return STILL_LOADING;
       deferEditCheck(root, coordinator, files);
       undeferEditCheck(root, session, files);
@@ -820,7 +833,7 @@ async function checkAtEdit(root: string, input: HookInput, options: HookOptions,
     return putOff.onNoServer?.(language) ?? "";
   };
   // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
-  const outcome = await performRun(root, { session: session ?? "unknown-session", agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false, occasion: "edit", onNoServer, waitWarmMs: putOff.waitWarmMs });
+  const outcome = await performRun(root, { session: session ?? "unknown-session", agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false, occasion: "edit", onNoServer, waitWarmMs: putOff.waitWarmMs, startServer: putOff.start });
   // A check made answers for every earlier edit of the same files that was put off, so a stop does not report it again.
   if (!wasPutOff && session !== undefined) undeferEditCheck(root, session, files);
   if (outcome.instrumentReason !== undefined) options.onEditCheck?.({ checked: 0, failed: [], unchecked: touched.length, reason: outcome.instrumentReason });
@@ -1116,6 +1129,8 @@ export interface HookOptions {
   startWaitMs?: number | undefined;
   /** How long a stop waits for a server an edit started; STOP_SERVER_WAIT_MS by default. */
   stopWaitMs?: number | undefined;
+  /** How long an edit waits for a server it started or found loading; what is left of the latency budget by default. */
+  editWaitMs?: number | undefined;
   /**
    * Start one language's instrument without waiting for it, called by an
    * edit that needs it and finds none loaded, so a session that never edits a
@@ -1590,7 +1605,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
           // What this tool use wrote is the session's own patch, which the stop predicts for.
           recordWriteTrace(root, session, written);
         }
-        const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host }) : "";
+        const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host, startedAt: began }) : "";
         // A hand list declared as a mirror, read again only when this edit wrote a file it watches: one lookup otherwise.
         const mirror = event === "PostToolUse" ? mirrorAlarm(root, written, session) : { text: "", commit: () => {} };
         // A spec or practice file this edit wrote is parsed again, alone, and its problems said now: never the whole model at an edit.

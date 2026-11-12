@@ -887,6 +887,8 @@ export interface ConnectOptions {
   language?: string | undefined;
   /** How long to wait for a listening server's instrument to finish loading before answering cold. */
   waitWarmMs?: number | undefined;
+  /** With spawn off: called once, the first time no server listens, so a caller can start one detached and wait for it within this same call. */
+  onAbsent?: (() => void) | undefined;
 }
 
 export interface Connected {
@@ -934,6 +936,7 @@ export async function connectAdapter(rootGiven: string, options: ConnectOptions 
   let spawns = 0;
   let deadline = Date.now() + SPAWN_WAIT_MS;
   const warmDeadline = Date.now() + (options.waitWarmMs ?? 0);
+  let absent = false;
   let lastError: unknown;
   for (;;) {
     let socket: Socket | undefined;
@@ -976,6 +979,10 @@ export async function connectAdapter(rootGiven: string, options: ConnectOptions 
       }
     }
     if (options.spawn === false) {
+      if (!absent) {
+        absent = true;
+        options.onAbsent?.();
+      }
       if (Date.now() >= warmDeadline) throw new Error(`no warm server listening for ${root}; start one with: serve`);
       await sleep(100);
       continue;
