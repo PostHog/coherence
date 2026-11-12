@@ -62,6 +62,8 @@ export interface RunOptions {
   idleMs?: number | undefined;
   /** Given, the run never spawns a warm server nor waits on one: with none listening it calls this to start one detached and checks nothing. */
   onNoServer?: ((language: string | undefined) => string) | undefined;
+  /** With onNoServer: how long to wait for a listening server's instrument to load before calling it. */
+  waitWarmMs?: number | undefined;
   /** How often to keep the warm server awake during the test pass; the default is well inside the shortest sane idle. */
   heartbeatMs?: number | undefined;
   /** Observe the batched pass (src/observation): coverage rides the same one invocation, and one observation record is appended. */
@@ -595,6 +597,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
         refresh: options.refresh ?? [],
         idleMs: options.idleMs,
         onNoServer: options.onNoServer,
+        waitWarmMs: options.waitWarmMs,
       });
     }
     const given = options.adapter ?? options.adapters?.[config.language];
@@ -624,7 +627,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
       });
       return pass(instruments, undefined, undefined);
     },
-    { idleMs: options.idleMs, onNoServer: options.onNoServer },
+    { idleMs: options.idleMs, onNoServer: options.onNoServer, waitWarmMs: options.waitWarmMs },
   );
 }
 
@@ -719,7 +722,7 @@ async function confirmEach(
 export async function withWarmAdapter<T>(
   root: string,
   fn: (adapter: RemoteAdapter | undefined, server: "cold" | "warm" | undefined, reason: string | undefined) => Promise<T>,
-  options: { refresh?: readonly string[] | undefined; idleMs?: number | undefined; language?: string | undefined; onNoServer?: ((language: string | undefined) => string) | undefined } = {},
+  options: { refresh?: readonly string[] | undefined; idleMs?: number | undefined; language?: string | undefined; onNoServer?: ((language: string | undefined) => string) | undefined; waitWarmMs?: number | undefined } = {},
 ): Promise<T> {
   return withWarmAdapters(
     root,
@@ -735,7 +738,7 @@ export async function withWarmAdapter<T>(
       }
       return fn(door.adapter, door.server, reason);
     },
-    { idleMs: options.idleMs, onNoServer: options.onNoServer },
+    { idleMs: options.idleMs, onNoServer: options.onNoServer, waitWarmMs: options.waitWarmMs },
   );
 }
 
@@ -751,25 +754,37 @@ export async function withWarmAdapter<T>(
 export async function withWarmAdapters<T>(
   root: string,
   fn: (open: (language?: string) => Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>) => Promise<T>,
-  options: { idleMs?: number | undefined; onNoServer?: ((language: string | undefined) => string) | undefined } = {},
+  options: { idleMs?: number | undefined; onNoServer?: ((language: string | undefined) => string) | undefined; waitWarmMs?: number | undefined } = {},
 ): Promise<T> {
   const remotes: RemoteAdapter[] = [];
   const opened = new Map<string, Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>>();
   const open = (language?: string): Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }> => {
     let door = opened.get(language ?? "");
     if (door === undefined) {
-      door = connectAdapter(root, { ...(language === undefined ? {} : { language }), ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }), ...(options.onNoServer === undefined ? {} : { spawn: false }) }).then(
+      const noServer = options.onNoServer;
+      const without = (failed: string | undefined): string => {
+        if (failed !== undefined || noServer === undefined) return failed ?? "no language server answered";
+        try {
+          return noServer(language);
+        } catch (error) {
+          return `no language server was loaded, and the check could not be put off to the stop: ${error instanceof Error ? error.message : String(error)}`;
+        }
+      };
+      door = connectAdapter(root, { ...(language === undefined ? {} : { language }), ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }), ...(noServer === undefined ? {} : { spawn: false, waitWarmMs: options.waitWarmMs }) }).then(
         async (connected) => {
-          if (options.onNoServer === undefined || connected.server === "warm") {
+          if (noServer === undefined || connected.server === "warm") {
             remotes.push(connected.adapter);
             return { adapter: connected.adapter, server: connected.server };
           }
-          await connected.adapter.close();
-          return { adapter: undefined, reason: options.onNoServer(language) };
+          const reason = without(connected.failed);
+          return connected.adapter.close().then(
+            () => ({ adapter: undefined, reason }),
+            (error: unknown) => ({ adapter: undefined, reason: `${reason}; closing the connection failed: ${error instanceof Error ? error.message : String(error)}` }),
+          );
         },
         (error: unknown) => {
-          if (options.onNoServer === undefined) return { adapter: undefined, reason: error instanceof Error ? error.message : String(error) };
-          return { adapter: undefined, reason: options.onNoServer(language) };
+          if (noServer === undefined) return { adapter: undefined, reason: error instanceof Error ? error.message : String(error) };
+          return { adapter: undefined, reason: without(undefined) };
         },
       );
       opened.set(language ?? "", door);
