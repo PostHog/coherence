@@ -128,19 +128,6 @@ test("with a registry, events from the repository top route to the leaf with the
   }
 });
 
-test("the first tool use inside a nested project warms its instrument, once", async () => {
-  const top = monorepo();
-  try {
-    const warmed: string[] = [];
-    const options = { warm: (root: string) => void warmed.push(root) };
-    const edit = { cwd: top, session_id: "s1", tool_name: "Edit", tool_input: { file_path: join(top, "products/errors/src/door.ts"), new_string: "x" } };
-    for (let i = 0; i < 2; i++) (await runHook("PreToolUse", edit, top, options)).commit?.();
-    assert.deepEqual(warmed, [join(top, "products/errors")]);
-  } finally {
-    rmSync(top, { recursive: true, force: true });
-  }
-});
-
 test("an event outside every leaf of a registry spawns no git and writes nothing", async () => {
   const top = monorepo();
   const counted = countingGit();

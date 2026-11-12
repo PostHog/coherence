@@ -18,6 +18,8 @@ import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
 import { lastHookWork } from "./work-meter.ts";
+import { serve, type Serving } from "../enforcement/server.ts";
+import { withWarmAdapter } from "../enforcement/run.ts";
 
 function repo(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-hook-speed-"));
@@ -79,16 +81,35 @@ test("a stop starts the snapshot detached, with a fingerprint that moves only wi
   }
 });
 
-test("a session start and every prompt warm the instrument without waiting for it, and no other event does", async () => {
-  const root = repo({ "README.md": "x\n" });
+test("the instrument starts at the first edit whose check finds no server loaded, never at a session start or prompt, and the stop makes the check the edit deferred", { timeout: 120_000 }, async () => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const root = repo({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    "coherence.config.json": JSON.stringify({ language: "typescript" }),
+    "Fixture.spec.md": spec,
+    "src/a.ts": "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  let serving: Serving | undefined;
   try {
     const warmed: string[] = [];
     const options = { warm: (r: string) => void warmed.push(r) };
     for (const event of ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"] as const) {
-      await runHook(event, { cwd: root, session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } }, root, options);
+      (await runHook(event, { cwd: root, session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } }, root, options)).commit?.();
     }
-    assert.deepEqual(warmed, [root, root], "the start and the prompt, once each");
+    assert.deepEqual(warmed, [], "no start, prompt or tool use that writes nothing starts it");
+    const edit = await runHook("PostToolUse", { cwd: root, session_id: "s1", tool_name: "Edit", tool_input: { file_path: join(root, "src/a.ts") } }, root, options);
+    assert.deepEqual(warmed, [root], "the edit that needs it starts it");
+    assert.match(edit.stdout, /could not check 1 chokepoint invariant at this edit: no language server was loaded for this project, so one is starting now; this turn's stop checks this edit/);
+    const early = await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    assert.match(early.stdout, /the language server is still loading; the next stop checks these edits/, "a stop never starts or waits on the server");
+    serving = await serve(root, { idleMs: 120_000 });
+    await withWarmAdapter(root, async () => {});
+    const stop = await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    assert.match(stop.stdout, /could not check 1 chokepoint invariant at an edit before this stop:\\n\s+○ [^:]*ghost door: /, "the loaded server makes the deferred check");
+    const again = await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    assert.doesNotMatch(again.stdout, /before this stop/, "a check made is not made again");
   } finally {
+    await serving?.stop();
     rmSync(root, { recursive: true, force: true });
   }
 });

@@ -70,7 +70,7 @@
  * index of watched files from the spec model they already read.
  */
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { closeWork, execFile, openWork, readProjectText, spawn } from "./work-meter.ts";
 import { promisify } from "node:util";
@@ -679,12 +679,61 @@ function chokepointModel(root: string, entries: readonly ChokepointEntry[]): Spe
   return { root, components } as unknown as SpecModel;
 }
 
+/** Why an edit that found no loaded server checked nothing: one is starting, and this turn's stop makes the check. */
+const SERVER_STARTING = "no language server was loaded for this project, so one is starting now; this turn's stop checks this edit";
+
+/** Where a session keeps the files whose edit check waited for a language server to load. */
+function deferredCheckPath(root: string, session: string): string {
+  return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.deferred.json`);
+}
+
+function deferredFiles(root: string, session: string): string[] {
+  try {
+    const files: unknown = JSON.parse(readFileSync(deferredCheckPath(root, session), "utf8"));
+    return Array.isArray(files) ? files.filter((file): file is string => typeof file === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function deferEditCheck(root: string, session: string, files: readonly string[]): void {
+  const path = deferredCheckPath(root, session);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify([...new Set([...deferredFiles(root, session), ...files])]));
+}
+
+/**
+ * The edit checks a session's edits deferred while the language server
+ * loaded, made at its stop before the spec is read, so a defect they find is
+ * recorded and the stop's spec text reports it (and a subagent stop refuses
+ * on it). A server still not loaded keeps them deferred to the next stop.
+ */
+async function checkDeferredAtStop(root: string, input: HookInput, options: HookOptions, session: string): Promise<string> {
+  const files = deferredFiles(root, session).filter((file) => existsSync(join(root, file)));
+  if (files.length === 0) {
+    rmSync(deferredCheckPath(root, session), { force: true });
+    return "";
+  }
+  const texts = new Map(files.map((file) => [file, readFileSync(join(root, file), "utf8")]));
+  const entries = chokepointIndex(root, files);
+  const touched = [...new Set(entries.filter((i) => files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name))];
+  rmSync(deferredCheckPath(root, session), { force: true });
+  if (touched.length === 0) return "";
+  const text = await checkAtEdit(root, input, options, files, chokepointModel(root, entries.filter((i) => touched.includes(i.name))), touched);
+  return text.replace(/\bat this edit\b/g, "at an edit before this stop").replace(SERVER_STARTING, "the language server is still loading; the next stop checks these edits");
+}
+
 /** The chokepoint check of the touched invariants at an edit, as text: what it could not check, and any structural defect it found. */
 async function checkAtEdit(root: string, input: HookInput, options: HookOptions, files: readonly string[], model: SpecModel, touched: readonly string[]): Promise<string> {
   const session = sessionOf(input) ?? "unknown-session";
   const agent = agentOf(input);
   // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
-  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false, occasion: "edit" });
+  const deferral = options.warm === undefined ? undefined : (language: string | undefined): string => {
+    options.warm?.(root, language);
+    deferEditCheck(root, session, files);
+    return SERVER_STARTING;
+  };
+  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false, occasion: "edit", onNoServer: deferral });
   if (outcome.instrumentReason !== undefined) options.onEditCheck?.({ checked: 0, failed: [], unchecked: touched.length, reason: outcome.instrumentReason });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
@@ -977,12 +1026,12 @@ export interface HookOptions {
   /** How long a session start may wait for a nearly done refresh; START_WAIT_MS by default. */
   startWaitMs?: number | undefined;
   /**
-   * Start warming the instrument without waiting for it: at a session's
-   * start and at each prompt, so the stop that ends the turn finds the warm
-   * server loaded and its idle timer fresh. The command line passes
-   * WARM_UP; absent (a test), nothing is started.
+   * Start one language's instrument without waiting for it, called by an
+   * edit that needs it and finds none loaded, so a session that never edits a
+   * chokepoint's code starts no language server. The command line passes
+   * WARM_UP; absent (a test), the edit's check starts the server itself.
    */
-  warm?: ((root: string) => void) | undefined;
+  warm?: ((root: string, language?: string) => void) | undefined;
   /** When the hook's process started (epoch ms), so a call's time counts loading the code; the call's own start when absent. */
   startedAt?: number | undefined;
   /**
@@ -1087,10 +1136,10 @@ export function economyStopText(snapshot: Snapshot | undefined, currentFingerpri
  * sets it, since a detached server started in a fixture outlives the test
  * and writes into a folder the test is removing.
  */
-export const WARM_UP = (root: string): void => {
+export const WARM_UP = (root: string, language?: string): void => {
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
   try {
-    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "warm"], { cwd: root, detached: true, stdio: "ignore" });
+    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "warm", ...(language === undefined ? [] : ["--language", language])], { cwd: root, detached: true, stdio: "ignore" });
     child.on("error", () => {});
     child.unref();
   } catch {
@@ -1105,9 +1154,8 @@ export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
 
 /**
  * The snapshot the command line starts at a stop: this checkout's economy
- * --snapshot, one per session, a newer patch superseding an older one. It
- * starts the warm server when none listens, so COHERENCE_NO_WARM_UP=1 starts
- * nothing here either.
+ * --snapshot, one per session, a newer patch superseding an older one.
+ * COHERENCE_NO_WARM_UP=1 starts nothing here either.
  */
 export const ECONOMY_SNAPSHOT = (root: string, session: string, fingerprint: string): void => {
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
@@ -1361,8 +1409,6 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     const session = sessionOf(input);
     if (session === undefined || oriented(place.root, session)) return result;
     const root = place.root;
-    // The session has just entered the project, which no start or prompt warmed: its instrument starts now, before the edit that needs it.
-    options.warm?.(root);
     const reading = await keptReading(root, await loadProjectLexicons(root));
     const gaps = await gapReading(root);
     const start = await startReading(root, input, reading, gaps);
@@ -1396,7 +1442,6 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     switch (event) {
       case "SessionStart":
       case "SubagentStart": {
-        if (event === "SessionStart") options.warm?.(root);
         const reading=await keptReading(root, await loadProjectLexicons(root));
         // Only a session start waits, and only for a refresh of this tree that is nearly done; a subagent starts at once.
         let gaps = await gapReading(root, event === "SessionStart" ? { waitMs: options.startWaitMs ?? START_WAIT_MS } : {});
@@ -1454,7 +1499,6 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
           // What this tool use wrote is the session's own patch, which the stop predicts for.
           recordWriteTrace(root, session, written);
         }
-        if (event === "UserPromptSubmit") options.warm?.(root);
         const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host }) : "";
         // A hand list declared as a mirror, read again only when this edit wrote a file it watches: one lookup otherwise.
         const mirror = event === "PostToolUse" ? mirrorAlarm(root, written, session) : { text: "", commit: () => {} };
@@ -1539,6 +1583,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const fingerprint = session ? patchFingerprint(root, patch, filesRead(root, session).length) : undefined;
         if (session && fingerprint !== undefined) await snapshotAtStop(root, session, patch, fingerprint, options);
         const snapshot = session ? lastSnapshot(root, session) : undefined;
+        const deferredText = session ? await checkDeferredAtStop(root, input, options, session) : "";
         const walls = unableWalls(root, input);
         const spec = specStopText(root, changed.files, walls);
         const lexicon = lexiconStopText(report, walls);
@@ -1559,6 +1604,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const latencyText = hookLatencyStopText(root, session);
         const parts: string[] = [];
         if (changedText !== "") parts.push(changedText);
+        if (deferredText !== "") parts.push(deferredText.trimEnd());
         if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
         if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
         if (workText !== "") parts.push(`Work:\n${workText}`);

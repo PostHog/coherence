@@ -60,6 +60,8 @@ export interface RunOptions {
   now?: (() => Date) | undefined;
   /** The idle timeout to spawn the warm server with, when this run spawns it. */
   idleMs?: number | undefined;
+  /** Given, the run never spawns a warm server nor waits on one: with none listening it calls this to start one detached and checks nothing. */
+  onNoServer?: ((language: string | undefined) => string) | undefined;
   /** How often to keep the warm server awake during the test pass; the default is well inside the shortest sane idle. */
   heartbeatMs?: number | undefined;
   /** Observe the batched pass (src/observation): coverage rides the same one invocation, and one observation record is appended. */
@@ -592,6 +594,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
       return withWarmAdapter(root, (remote, server, reason) => pass(one({ adapter: remote, server, reason }), { language: remote?.language ?? config.language, server: server ?? "none" }, reason), {
         refresh: options.refresh ?? [],
         idleMs: options.idleMs,
+        onNoServer: options.onNoServer,
       });
     }
     const given = options.adapter ?? options.adapters?.[config.language];
@@ -621,7 +624,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
       });
       return pass(instruments, undefined, undefined);
     },
-    { idleMs: options.idleMs },
+    { idleMs: options.idleMs, onNoServer: options.onNoServer },
   );
 }
 
@@ -716,7 +719,7 @@ async function confirmEach(
 export async function withWarmAdapter<T>(
   root: string,
   fn: (adapter: RemoteAdapter | undefined, server: "cold" | "warm" | undefined, reason: string | undefined) => Promise<T>,
-  options: { refresh?: readonly string[] | undefined; idleMs?: number | undefined; language?: string | undefined } = {},
+  options: { refresh?: readonly string[] | undefined; idleMs?: number | undefined; language?: string | undefined; onNoServer?: ((language: string | undefined) => string) | undefined } = {},
 ): Promise<T> {
   return withWarmAdapters(
     root,
@@ -732,7 +735,7 @@ export async function withWarmAdapter<T>(
       }
       return fn(door.adapter, door.server, reason);
     },
-    { idleMs: options.idleMs },
+    { idleMs: options.idleMs, onNoServer: options.onNoServer },
   );
 }
 
@@ -742,24 +745,32 @@ export async function withWarmAdapter<T>(
  * first time it is asked, spawning it detached when none listens, never
  * before, and every connection is ended after `fn`. A language whose server
  * cannot be reached answers with the reason, so a caller says so rather than
- * crashing. Nothing else connects.
+ * crashing. With `onNoServer`, nothing is spawned and a server not listening
+ * or still loading is not waited on: the caller says why. Nothing else connects.
  */
 export async function withWarmAdapters<T>(
   root: string,
   fn: (open: (language?: string) => Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>) => Promise<T>,
-  options: { idleMs?: number | undefined } = {},
+  options: { idleMs?: number | undefined; onNoServer?: ((language: string | undefined) => string) | undefined } = {},
 ): Promise<T> {
   const remotes: RemoteAdapter[] = [];
   const opened = new Map<string, Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>>();
   const open = (language?: string): Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }> => {
     let door = opened.get(language ?? "");
     if (door === undefined) {
-      door = connectAdapter(root, { ...(language === undefined ? {} : { language }), ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }) }).then(
-        (connected) => {
-          remotes.push(connected.adapter);
-          return { adapter: connected.adapter, server: connected.server };
+      door = connectAdapter(root, { ...(language === undefined ? {} : { language }), ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }), ...(options.onNoServer === undefined ? {} : { spawn: false }) }).then(
+        async (connected) => {
+          if (options.onNoServer === undefined || connected.server === "warm") {
+            remotes.push(connected.adapter);
+            return { adapter: connected.adapter, server: connected.server };
+          }
+          await connected.adapter.close();
+          return { adapter: undefined, reason: options.onNoServer(language) };
         },
-        (error: unknown) => ({ adapter: undefined, reason: error instanceof Error ? error.message : String(error) }),
+        (error: unknown) => {
+          if (options.onNoServer === undefined) return { adapter: undefined, reason: error instanceof Error ? error.message : String(error) };
+          return { adapter: undefined, reason: options.onNoServer(language) };
+        },
       );
       opened.set(language ?? "", door);
     }
@@ -773,14 +784,14 @@ export async function withWarmAdapters<T>(
 }
 
 /**
- * Warm the project's instrument: connect to its warm server, which a
- * connection spawns when none listens and which loads the project as it
- * starts, then let go. A hook starts this detached at a session's start and
- * at each prompt, so the stop that ends the turn finds the server loaded and
- * its idle timer fresh. Nothing is printed and nothing is recorded.
+ * Warm one language's instrument (the primary's when none is named): connect
+ * to its warm server, which a connection spawns when none listens and which
+ * loads the project as it starts, then let go. A hook starts this detached at
+ * the first edit that found no server loaded, so the stop that ends the turn
+ * finds it loaded. Nothing is printed and nothing is recorded.
  */
-export async function warmInstrument(root: string): Promise<void> {
-  await withWarmAdapter(root, async () => {});
+export async function warmInstrument(root: string, language?: string): Promise<void> {
+  await withWarmAdapter(root, async () => {}, { language });
 }
 
 /**
