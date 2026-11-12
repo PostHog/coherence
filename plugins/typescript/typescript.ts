@@ -845,13 +845,20 @@ export class TypeScriptAdapter implements LanguageAdapter {
     }
   }
 
-  /** The first published diagnostic on a file that refuses the reference, within the window; the server publishes an empty set first. */
+  /**
+   * The first diagnostic on a file that refuses the reference, within the
+   * window. tsserver publishes an empty set first and the refusal after, so
+   * its published diagnostics are read until one refuses or the window
+   * closes. tsgo answers a pull only once its project holds the document, so
+   * its first answer is final, and the window bounds only pulls that fail.
+   */
   private async awaitRefusal(file: string, timeoutMs = 15_000): Promise<string | undefined> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      if (this.engine === "tsgo") await this.pullDiagnostics(file);
+      const answered = this.engine === "tsgo" && (await this.pullDiagnostics(file, deadline - Date.now()));
       const refusal = (this.diagnostics.get(file) ?? []).find((d) => refusesReference(d));
       if (refusal !== undefined) return refusal.message;
+      if (answered) return undefined;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     return undefined;
@@ -901,10 +908,23 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return binds;
   }
 
-  /** tsgo publishes no diagnostics for an opened document; it answers when asked. */
-  private async pullDiagnostics(file: string): Promise<void> {
-    const report = await this.client?.request<{ items?: Diagnostic[] } | null>("textDocument/diagnostic", { textDocument: { uri: this.uri(file) } });
-    this.diagnostics.set(file, report?.items ?? []);
+  /**
+   * tsgo publishes no diagnostics for an opened document; it answers when
+   * asked. Whether it answered within the time left: a pull the live server
+   * cancels or leaves unanswered is asked again, and a server that died
+   * throws.
+   */
+  private async pullDiagnostics(file: string, leftMs: number): Promise<boolean> {
+    const client = this.client;
+    if (client === undefined || leftMs <= 0) return false;
+    try {
+      const report = await client.request<{ items?: Diagnostic[] } | null>("textDocument/diagnostic", { textDocument: { uri: this.uri(file) } }, leftMs);
+      this.diagnostics.set(file, report?.items ?? []);
+      return true;
+    } catch (error) {
+      if (!client.alive) throw error;
+      return false;
+    }
   }
 
   /** Stage the two synthetic sites the import ruling could otherwise swallow, in one references query, and restore. */

@@ -247,6 +247,31 @@ test("under tsgo a declaration outside the project is dropped before its file is
   }
 });
 
+test("under tsgo a refutation answers from one diagnostic pull: one that draws no refusal comes back unseen without waiting out the window", { timeout: 60_000 }, async () => {
+  // SECRET's export shares its line with an import, which visibilityOf reads as not exported, so the refutation asks the compiler to refuse an import it accepts.
+  const dir = tsProject({
+    "tsconfig.json": `{ "compilerOptions": { "strict": true, "module": "NodeNext", "moduleResolution": "NodeNext", "noEmit": true }, "include": ["src"] }`,
+    "src/store/dep.ts": "export const base = 1;\n",
+    "src/store/secrets.ts": 'import { base } from "./dep.js"; export const SECRET = { a: base };\nexport function seal() { return SECRET; }\n',
+  });
+  const tsgoAdapter = new TypeScriptAdapter(dir);
+  try {
+    await tsgoAdapter.ready();
+    assert.equal(tsgoAdapter.engine, "tsgo");
+    const resolved = await tsgoAdapter.resolve("SECRET", hint);
+    assert.ok(resolved.ok);
+    const started = Date.now();
+    const refutation = await tsgoAdapter.refute(resolved.definition, undefined);
+    const took = Date.now() - started;
+    assert.equal(refutation.seen, false, refutation.account);
+    assert.match(refutation.account, /drew no diagnostic from the compiler/);
+    assert.ok(took < 5_000, `the refutation took ${took} ms; its window is 15 s`);
+  } finally {
+    await tsgoAdapter.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("grades on JavaScript: broken with a bypass, then a pass once the bypass is gone; the automatic refutation stages .mjs documents the project can see", async () => {
   const broken = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root });
   assert.equal(broken.grade, "broken", broken.reason);
