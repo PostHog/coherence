@@ -129,7 +129,7 @@ test("with tsgo turned off the same check grades the same through tsserver, and 
   assert.equal(grades[0]!.replace(/^tsgo/, "tsserver"), grades[1], grades.join("\n"));
 });
 
-test("the default engine grades as tsserver does where TypeScript 7 answers otherwise, a removed baseUrl and an augmentation in another file, and lists a declaration on an import's line", { timeout: 60_000 }, async () => {
+test("the default engine grades as tsserver does where TypeScript 7 answers otherwise: a removed baseUrl in a tsconfig, a jsconfig or a referenced config, an augmentation in another file, and a re-export after another statement, a comment or a BOM, and lists a declaration on an import's line", { timeout: 120_000 }, async () => {
   const nodeNext = `{ "compilerOptions": { "strict": true, "module": "NodeNext", "moduleResolution": "NodeNext", "noEmit": true }, "include": ["src"] }`;
   const projects = [
     {
@@ -148,6 +148,33 @@ test("the default engine grades as tsserver does where TypeScript 7 answers othe
       expected: [
         { protects: "Shape", chokepoint: "makeShape", graded: "reference-choked []" },
       ],
+    },
+    {
+      files: {
+        "tsconfig.json": nodeNext,
+        "src/store/s.ts": "export const SECRET = { a: 1 };\nexport const OTHER = 2;\nexport const THIRD = 3;\nexport function seal() { return SECRET; }\n",
+        "src/api/barrel.ts": 'export { seal } from "../store/s.js"; export { SECRET } from "../store/s.js";\n',
+        "src/api/commented.ts": '/* public */ export { OTHER } from "../store/s.js";\n',
+        "src/api/bom.ts": '\uFEFFexport { THIRD } from "../store/s.js";\n',
+      },
+      expected: [
+        { protects: "SECRET", chokepoint: "seal", graded: 'broken ["src/api/barrel.ts:1"]' },
+        { protects: "OTHER", chokepoint: "seal", graded: 'broken ["src/api/commented.ts:1"]' },
+        { protects: "THIRD", chokepoint: "seal", graded: 'broken ["src/api/bom.ts:1"]' },
+      ],
+    },
+    {
+      files: { "jsconfig.json": `{ "compilerOptions": { "allowJs": true, "baseUrl": "src", "module": "commonjs", "moduleResolution": "node", "noEmit": true }, "include": ["src"] }`, "src/store/s.js": "export const SECRET = { a: 1 };\nexport function seal() { return SECRET; }\n", "src/api/leak.js": 'import { SECRET } from "store/s";\nexport const leaked = SECRET;\n' },
+      expected: [{ protects: "SECRET", chokepoint: "seal", graded: 'broken ["src/api/leak.js:1","src/api/leak.js:2"]' }],
+    },
+    {
+      files: {
+        "tsconfig.json": `{ "files": [], "references": [{ "path": "./tsconfig.app.json" }] }`,
+        "tsconfig.app.json": `{ "compilerOptions": { "composite": true, "baseUrl": "src", "module": "commonjs", "moduleResolution": "node", "strict": true, "outDir": "out" }, "include": ["src"] }`,
+        "src/store/s.ts": "export const SECRET = { a: 1 };\nexport function seal() { return SECRET; }\n",
+        "src/api/leak.ts": 'import { SECRET } from "store/s";\nexport const leaked = SECRET;\n',
+      },
+      expected: [{ protects: "SECRET", chokepoint: "seal", graded: 'broken ["src/api/leak.ts:1","src/api/leak.ts:2"]' }],
     },
   ];
   for (const project of projects) {

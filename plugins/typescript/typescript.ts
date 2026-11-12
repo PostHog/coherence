@@ -23,17 +23,18 @@
  * unreachable from any other module, so the top rung is visibility-choked.
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash, randomBytes } from "node:crypto";
+import type * as TS from "typescript";
 import {
   isTestPath,
   outsideOfFolder,
   parseName,
   rangeContains,
   statementStartLine,
+  typescriptCompiler,
   withinFolder,
   type Definition,
   type Ladder,
@@ -50,7 +51,7 @@ import {
   type Visibility,
 } from "../../src/plugins/api.ts";
 import { locateServer as locateInstalled, type ServerLocation } from "../../src/plugins/api.ts";
-import { locateTsgo, locateTsserver, type TsgoChoice } from "./tsserver.ts";
+import { locateTsgo, locateTsserver, tsgoRefusal, type TsgoChoice } from "./tsserver.ts";
 import manifest from "./plugin.json" with { type: "json" };
 import { JsonRpcClient } from "../../src/plugins/api.ts";
 import { fileIdentity, hintedFiles, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
@@ -258,29 +259,6 @@ function flatten(symbols: DocumentSymbol[], prefix: string[] = []): { path: stri
   return out;
 }
 
-const BINDING_STATEMENT = /^(import\b|export\s+(type\s+)?\{|export\s+\*)/;
-
-/** A config option TypeScript 7 removed, which tsgo refuses and tsserver still honors: baseUrl resolution, node10 resolution. */
-const REMOVED_OPTION = /error TS5\d{3}: .*has been removed/;
-
-function trackedTsconfigs(root: string): string[] {
-  try {
-    return execFileSync("git", ["ls-files", "--", "tsconfig.json", "*/tsconfig.json"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter((file) => file !== "");
-  } catch {
-    return existsSync(join(root, "tsconfig.json")) ? ["tsconfig.json"] : [];
-  }
-}
-
-/** The first tsconfig line tsgo refuses as a removed option, read without type-checking; undefined when tsgo reads every config as the project's own compiler does. */
-function tsgoRefusal(tsgo: TsgoChoice, root: string): string | undefined {
-  for (const config of trackedTsconfigs(root)) {
-    const listed = spawnSync(tsgo.path, ["-p", join(root, config), "--listFilesOnly"], { cwd: root, encoding: "utf8", timeout: 60_000, maxBuffer: 256 * 1024 * 1024 });
-    const refused = `${listed.stdout ?? ""}\n${listed.stderr ?? ""}`.split("\n").find((line) => REMOVED_OPTION.test(line));
-    if (refused !== undefined) return `${config}: ${refused.trim()}`;
-  }
-  return undefined;
-}
-
 function locationKey(location: Location): string {
   return `${location.uri}:${location.range.start.line}:${location.range.start.character}`;
 }
@@ -297,6 +275,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private readonly documents = new Map<string, { identity: string | undefined; hash: string }>();
   private readonly symbolCache = new Map<string, DocumentSymbol[]>();
   private readonly lineCache = new Map<string, string[]>();
+  /** Each file's syntax, parsed once per text the line cache holds. */
+  private readonly parsed = new WeakMap<string[], TS.SourceFile>();
   /** The document version last sent per open file; a change carries the next one. */
   private readonly versions = new Map<string, number>();
   /** The first source file, kept open so the project stays loaded. */
@@ -878,12 +858,29 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return [...references, ...declarations.filter((location) => this.bindsInStatement(this.relative(location.uri), location.range.start))];
   }
 
-  /** Whether a position names what an import, an export list or a wildcard re-export binds: its statement opens with one, and no semicolon or module specifier ends it before the position. */
+  /** Whether a position names what an import, an export list or a wildcard re-export binds, read from the file's syntax: inside one of those statements, before its module specifier. */
   private bindsInStatement(file: string, position: Position): boolean {
+    const ts = typescriptCompiler("tsgo's reference sites are told apart from its declarations with its parser");
     const lines = this.linesOf(file);
-    const start = statementStartLine(lines, position.line);
-    const before = [...lines.slice(start, position.line), (lines[position.line] ?? "").slice(0, position.character)].join("\n");
-    return BINDING_STATEMENT.test(before) && !/;|\bfrom\s*["'][^"']*["']/.test(before);
+    if (lines.length === 0) return false;
+    const parsed = this.parsed.get(lines) ?? ts.createSourceFile(file, lines.join("\n"), ts.ScriptTarget.Latest, true);
+    this.parsed.set(lines, parsed);
+    const offset = parsed.getPositionOfLineAndCharacter(Math.min(position.line, lines.length - 1), 0) + position.character;
+    let binds = false;
+    const visit = (node: TS.Node): void => {
+      if (offset < node.getStart(parsed) || offset >= node.getEnd()) return;
+      if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+        binds = node.moduleSpecifier === undefined || offset < node.moduleSpecifier.getStart(parsed);
+        return;
+      }
+      if (ts.isImportEqualsDeclaration(node)) {
+        binds = offset < node.name.getEnd();
+        return;
+      }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(parsed, visit);
+    return binds;
   }
 
   /** tsgo publishes no diagnostics for an opened document; it answers when asked. */
