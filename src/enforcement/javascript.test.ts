@@ -106,6 +106,70 @@ test("a plain-JavaScript project is walked, its symbols resolve, and every site 
   ]);
 });
 
+test("with tsgo turned off the same check grades the same through tsserver, and each adapter names the engine that answered", async () => {
+  const grades: string[] = [];
+  for (const tsgo of [undefined, "0"]) {
+    const previous = process.env["COHERENCE_TSGO"];
+    if (tsgo === undefined) delete process.env["COHERENCE_TSGO"];
+    if (tsgo !== undefined) process.env["COHERENCE_TSGO"] = tsgo;
+    const engineAdapter = new TypeScriptAdapter(root);
+    try {
+      await engineAdapter.ready();
+      const broken = await checkChokepoint(engineAdapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root });
+      const hidden = await checkChokepoint(engineAdapter, { protects: "HIDDEN", chokepoint: "peek", ...hint, root });
+      grades.push(`${engineAdapter.engine}: ${broken.grade} ${JSON.stringify(broken.bypasses)} ${broken.refutation}; ${hidden.grade} ${hidden.refutation}`);
+    } finally {
+      await engineAdapter.close();
+      if (previous === undefined) delete process.env["COHERENCE_TSGO"];
+      if (previous !== undefined) process.env["COHERENCE_TSGO"] = previous;
+    }
+  }
+  assert.match(grades[0]!, /^tsgo: /);
+  assert.match(grades[1]!, /^tsserver: /);
+  assert.equal(grades[0]!.replace(/^tsgo/, "tsserver"), grades[1], grades.join("\n"));
+});
+
+test("the default engine grades as tsserver does where TypeScript 7 answers otherwise, a removed baseUrl and an augmentation in another file, and lists a declaration on an import's line", { timeout: 60_000 }, async () => {
+  const nodeNext = `{ "compilerOptions": { "strict": true, "module": "NodeNext", "moduleResolution": "NodeNext", "noEmit": true }, "include": ["src"] }`;
+  const projects = [
+    {
+      files: { "tsconfig.json": `{ "compilerOptions": { "baseUrl": "src", "moduleResolution": "node", "module": "commonjs", "strict": true, "noEmit": true }, "include": ["src"] }`, "src/lib/secrets.ts": "export const SECRET_COLUMNS = 1;\nexport function seal() { return SECRET_COLUMNS; }\n", "src/leak.ts": 'import { SECRET_COLUMNS } from "lib/secrets";\nexport const leaked = SECRET_COLUMNS;\n' },
+      expected: [{ protects: "SECRET_COLUMNS", chokepoint: "seal", graded: 'broken ["src/leak.ts:1","src/leak.ts:2"]' }],
+    },
+    {
+      files: {
+        "tsconfig.json": nodeNext,
+        "src/a.ts": "export interface Shape { size: number }\nexport function makeShape(): Shape { return { size: 1 }; }\n",
+        "src/b.ts": 'import { makeShape } from "./a.js";\ndeclare module "./a.js" {\n  interface Shape { color?: string }\n}\nexport const made = makeShape();\n',
+        "src/store/dep.ts": "export const base = 1;\n",
+        "src/store/secrets.ts": 'import { base } from "./dep.js"; export const SECRET = { a: base };\nexport function seal() { return SECRET; }\n',
+        "src/api/render.ts": 'import { SECRET } from "../store/secrets.js";\nexport const leaked = SECRET;\n',
+      },
+      expected: [
+        { protects: "Shape", chokepoint: "makeShape", graded: "reference-choked []" },
+      ],
+    },
+  ];
+  for (const project of projects) {
+    const dir = mkdtempSync(join(tmpdir(), "coherence-tsgo-parity-"));
+    for (const [path, text] of Object.entries(project.files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(join(dir, path), text, "utf8");
+    }
+    const defaultAdapter = new TypeScriptAdapter(dir);
+    try {
+      for (const expected of project.expected) {
+        const checked = await checkChokepoint(defaultAdapter, { protects: expected.protects, chokepoint: expected.chokepoint, ...hint, root: dir });
+        assert.equal(`${checked.grade} ${JSON.stringify(checked.bypasses.map((bypass) => `${bypass.file}:${bypass.line}`))}`, expected.graded, `${expected.protects} through ${defaultAdapter.engine}`);
+      }
+      if ("src/store/secrets.ts" in project.files) assert.ok((await defaultAdapter.topLevelSymbols("src/store/secrets.ts")).some((symbol) => symbol.name === "SECRET"), `SECRET through ${defaultAdapter.engine}`);
+    } finally {
+      await defaultAdapter.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("grades on JavaScript: broken with a bypass, then a pass once the bypass is gone; the automatic refutation stages .mjs documents the project can see", async () => {
   const broken = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root });
   assert.equal(broken.grade, "broken", broken.reason);
