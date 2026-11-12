@@ -638,10 +638,17 @@ export async function editContext(root: string, input: HookInput, options: HookO
   // Without a session no stop could make a check put off, so an edit with none waits on the server as before.
   // With one, an edit that finds no server starts it and waits what is left of the latency budget: tsgo loads inside
   // it, so the defect is said at the edit that made it; a server that loads past it has its check put off to the stop.
-  const putOff: PutOff = options.warm === undefined || session === undefined ? {} : {
-    start: (language) => options.warm?.(root, language),
+  // A warm-up that started nothing puts nothing off: no stop would find a server to make the check.
+  const warm = options.warm;
+  let unstarted = false;
+  const putOff: PutOff = warm === undefined || session === undefined ? {} : {
+    start: (language) => {
+      unstarted = !warm(root, language);
+      return !unstarted;
+    },
     waitWarmMs: options.editWaitMs ?? editServerWaitMs(root, options.startedAt),
     onNoServer: () => {
+      if (unstarted) return NONE_STARTED;
       deferEditCheck(root, session, files);
       return SERVER_STARTING;
     },
@@ -701,6 +708,10 @@ function chokepointModel(root: string, entries: readonly ChokepointEntry[]): Spe
 /** Why an edit that found no loaded server checked nothing: one is starting, and this turn's stop makes the check. */
 const SERVER_STARTING = "no language server was loaded for this project, so one is starting now; this turn's stop checks this edit";
 
+/** Why an edit or stop that found no loaded server checked nothing when none could be started: no later stop would make the check either. */
+const NONE_STARTED = "no language server was loaded for this project, and none could be started, so nothing checks this edit";
+const NONE_STARTED_AT_STOP = "no language server is loaded for this project, and none could be started, so nothing checks these edits";
+
 /** How long a stop waits for a server an edit started to finish loading: tsgo loads in about 2 s on the projects measured, tsserver on a monorepo in 40 s, which the next stop catches. */
 const STOP_SERVER_WAIT_MS = 10_000;
 const STILL_LOADING = "the language server is still loading; the next stop checks these edits";
@@ -708,7 +719,8 @@ const HANDED_ON = "the language server is still loading; the coordinator's next 
 
 /** What an edit's check does when no server is loaded: start one when none listens, wait this long for it, then put the check off. */
 interface PutOff {
-  start?: (language: string | undefined) => void;
+  /** Whether it started a server: false puts nothing off, since no wait would see one load. */
+  start?: (language: string | undefined) => boolean;
   onNoServer?: (language: string | undefined) => string;
   waitWarmMs?: number;
 }
@@ -809,10 +821,19 @@ async function checkDeferredAtStop(root: string, input: HookInput, options: Hook
     return found.said;
   }
   const coordinator = !isMainThread(input) && typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
+  let unstarted = false;
   const putOff: PutOff = {
-    start: (language) => options.warm?.(root, language),
+    start: (language) => {
+      unstarted = options.warm?.(root, language) === false;
+      return !unstarted;
+    },
     waitWarmMs: options.stopWaitMs ?? STOP_SERVER_WAIT_MS,
     onNoServer: () => {
+      // A check no server will make is dropped, said once, rather than kept for stops that would each wait for nothing.
+      if (unstarted) {
+        undeferEditCheck(root, session, files);
+        return NONE_STARTED_AT_STOP;
+      }
       if (coordinator === undefined) return STILL_LOADING;
       deferEditCheck(root, coordinator, files);
       undeferEditCheck(root, session, files);
@@ -1134,10 +1155,12 @@ export interface HookOptions {
   /**
    * Start one language's instrument without waiting for it, called by an
    * edit that needs it and finds none loaded, so a session that never edits a
-   * chokepoint's code starts no language server. The command line passes
-   * WARM_UP; absent (a test), the edit's check starts the server itself.
+   * chokepoint's code starts no language server. Returns whether it started
+   * one: an edit or stop whose warm-up started nothing puts no check off. The
+   * command line passes WARM_UP; absent (a test), the edit's check starts the
+   * server itself.
    */
-  warm?: ((root: string, language?: string) => void) | undefined;
+  warm?: ((root: string, language?: string) => boolean) | undefined;
   /** When the hook's process started (epoch ms), so a call's time counts loading the code; the call's own start when absent. */
   startedAt?: number | undefined;
   /**
@@ -1238,18 +1261,20 @@ export function economyStopText(snapshot: Snapshot | undefined, currentFingerpri
 
 /**
  * The warm-up the command line starts: this checkout's warm verb, detached
- * and never waited on. COHERENCE_NO_WARM_UP=1 starts nothing: the test suite
- * sets it, since a detached server started in a fixture outlives the test
- * and writes into a folder the test is removing.
+ * and never waited on; returns whether it started one. COHERENCE_NO_WARM_UP=1
+ * starts nothing: the test suite sets it, since a detached server started in a
+ * fixture outlives the test and writes into a folder the test is removing.
  */
-export const WARM_UP = (root: string, language?: string): void => {
-  if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
+export const WARM_UP = (root: string, language?: string): boolean => {
+  if (process.env["COHERENCE_NO_WARM_UP"] === "1") return false;
   try {
     const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "warm", ...(language === undefined ? [] : ["--language", language])], { cwd: root, detached: true, stdio: "ignore" });
     child.on("error", () => {});
     child.unref();
+    return child.pid !== undefined;
   } catch {
-    // A warm-up that cannot start only means the stop starts the server itself.
+    // A warm-up that cannot start says so: the edit then checks nothing and puts nothing off, since the stop starts no server either.
+    return false;
   }
 };
 

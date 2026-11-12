@@ -64,8 +64,8 @@ export interface RunOptions {
   onNoServer?: ((language: string | undefined) => string) | undefined;
   /** With onNoServer: how long to wait for a listening server's instrument to load before calling it. */
   waitWarmMs?: number | undefined;
-  /** With onNoServer: start a language's server detached when none listens, before the waitWarmMs wait, so the wait can see it load. */
-  startServer?: ((language: string | undefined) => void) | undefined;
+  /** With onNoServer: start a language's server detached when none listens, before the waitWarmMs wait, so the wait can see it load; false when it started none, so nothing waits for it. */
+  startServer?: ((language: string | undefined) => boolean | void) | undefined;
   /** How often to keep the warm server awake during the test pass; the default is well inside the shortest sane idle. */
   heartbeatMs?: number | undefined;
   /** Observe the batched pass (src/observation): coverage rides the same one invocation, and one observation record is appended. */
@@ -725,7 +725,7 @@ async function confirmEach(
 export async function withWarmAdapter<T>(
   root: string,
   fn: (adapter: RemoteAdapter | undefined, server: "cold" | "warm" | undefined, reason: string | undefined) => Promise<T>,
-  options: { refresh?: readonly string[] | undefined; idleMs?: number | undefined; language?: string | undefined; onNoServer?: ((language: string | undefined) => string) | undefined; waitWarmMs?: number | undefined; startServer?: ((language: string | undefined) => void) | undefined } = {},
+  options: { refresh?: readonly string[] | undefined; idleMs?: number | undefined; language?: string | undefined; onNoServer?: ((language: string | undefined) => string) | undefined; waitWarmMs?: number | undefined; startServer?: ((language: string | undefined) => boolean | void) | undefined } = {},
 ): Promise<T> {
   return withWarmAdapters(
     root,
@@ -757,7 +757,7 @@ export async function withWarmAdapter<T>(
 export async function withWarmAdapters<T>(
   root: string,
   fn: (open: (language?: string) => Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>) => Promise<T>,
-  options: { idleMs?: number | undefined; onNoServer?: ((language: string | undefined) => string) | undefined; waitWarmMs?: number | undefined; startServer?: ((language: string | undefined) => void) | undefined } = {},
+  options: { idleMs?: number | undefined; onNoServer?: ((language: string | undefined) => string) | undefined; waitWarmMs?: number | undefined; startServer?: ((language: string | undefined) => boolean | void) | undefined } = {},
 ): Promise<T> {
   const remotes: RemoteAdapter[] = [];
   const opened = new Map<string, Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>>();

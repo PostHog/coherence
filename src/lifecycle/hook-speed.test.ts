@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { patchFingerprint, recordWriteTrace, sessionPatch, snapshotSession, snapshotSlot, traceFile, type Snapshot } from "../economy/trace.ts";
-import { economyStopText, editContext, runHook } from "./hook.ts";
+import { WARM_UP, economyStopText, editContext, runHook } from "./hook.ts";
 import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
@@ -95,7 +95,7 @@ test("the instrument starts at the first edit whose check finds no server loaded
   let serving: Serving | undefined;
   try {
     const warmed: string[] = [];
-    const options = { stopWaitMs: 300, editWaitMs: 300, warm: (r: string) => void warmed.push(r) };
+    const options = { stopWaitMs: 300, editWaitMs: 300, warm: (r: string) => warmed.push(r) > 0 };
     for (const event of ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"] as const) {
       (await runHook(event, { cwd: root, session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } }, root, options)).commit?.();
     }
@@ -132,7 +132,7 @@ test("an edit whose server loads within the latency budget makes its check at th
   let serving: Serving | undefined;
   try {
     // The edit's start stands in for WARM_UP: it starts the server detached and returns, and the edit waits for it to load.
-    const options = { editWaitMs: 60_000, stopWaitMs: 300, warm: (r: string) => void serve(r, { idleMs: 120_000 }).then((s) => (serving = s)) };
+    const options = { editWaitMs: 60_000, stopWaitMs: 300, warm: (r: string) => (void serve(r, { idleMs: 120_000 }).then((s) => (serving = s)), true) };
     const edit = await runHook("PostToolUse", { cwd: root, session_id: "s2", tool_name: "Edit", tool_input: { file_path: join(root, "src/a.ts") } }, root, options);
     assert.match(edit.stdout, /could not check 1 chokepoint invariant at this edit:\\n\s+○ [^:]*ghost door: /, "the check is made at the edit once the server it started has loaded");
     assert.doesNotMatch(edit.stdout, /this turn's stop checks this edit/);
@@ -140,6 +140,43 @@ test("an edit whose server loads within the latency budget makes its check at th
     assert.doesNotMatch(stop.stdout, /before this stop|still loading/, "nothing was put off, so the stop makes no check");
   } finally {
     await serving?.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an edit or stop whose warm-up started no server says so at once and puts nothing off, so no later stop waits for it", { timeout: 120_000 }, async (t) => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const root = repo({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    "coherence.config.json": JSON.stringify({ language: "typescript" }),
+    "Fixture.spec.md": spec,
+    "src/a.ts": "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  const was = process.env["COHERENCE_NO_WARM_UP"];
+  process.env["COHERENCE_NO_WARM_UP"] = "1";
+  t.after(() => (was === undefined ? delete process.env["COHERENCE_NO_WARM_UP"] : (process.env["COHERENCE_NO_WARM_UP"] = was)));
+  try {
+    assert.equal(WARM_UP(root), false, "the command line's warm-up says it started nothing when the suite turns it off");
+    const edited = { cwd: root, session_id: "s3", tool_name: "Edit", tool_input: { file_path: join(root, "src/a.ts") } };
+    const none = { editWaitMs: 20_000, stopWaitMs: 20_000, warm: () => false };
+    let began = Date.now();
+    const edit = await runHook("PostToolUse", edited, root, none);
+    assert.ok(Date.now() - began < 10_000, `the edit waits for no server none will start (${Date.now() - began} ms)`);
+    assert.match(edit.stdout, /could not check 1 chokepoint invariant at this edit: no language server was loaded for this project, and none could be started, so nothing checks this edit/);
+    assert.doesNotMatch(edit.stdout, /one is starting now|this turn's stop checks this edit/);
+    began = Date.now();
+    const stop = await runHook("Stop", { cwd: root, session_id: "s3" }, root, none);
+    assert.ok(Date.now() - began < 10_000, `the stop waits on nothing the edit did not put off (${Date.now() - began} ms)`);
+    assert.doesNotMatch(stop.stdout, /before this stop|still loading/, "nothing was put off");
+    // A check put off while a server was starting, whose stop then can start none, is said once and dropped.
+    await runHook("PostToolUse", edited, root, { editWaitMs: 300, warm: () => true });
+    began = Date.now();
+    const dropped = await runHook("Stop", { cwd: root, session_id: "s3" }, root, none);
+    assert.ok(Date.now() - began < 10_000, `the stop waits for no server none will start (${Date.now() - began} ms)`);
+    assert.match(dropped.stdout, /none could be started, so nothing checks these edits/);
+    const after = await runHook("Stop", { cwd: root, session_id: "s3" }, root, none);
+    assert.doesNotMatch(after.stdout, /before this stop|still loading/, "a dropped check is not kept for the next stop");
+  } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
@@ -158,7 +195,7 @@ test("a stop makes the check an edit put off in a sibling project, whatever fold
   t.after(() => delete process.env["CLAUDE_PROJECT_DIR"]);
   let serving: Serving | undefined;
   try {
-    const options = { editWaitMs: 300, warm: () => undefined };
+    const options = { editWaitMs: 300, warm: () => true };
     const edit = await runHook("PostToolUse", { cwd: pb, session_id: "sib", tool_name: "Edit", tool_input: { file_path: join(pa, "src/a.ts") } }, root, options);
     assert.match(edit.stdout, /this turn's stop checks this edit/, "the edit in the sibling project puts its check off");
     serving = await serve(pa, { idleMs: 120_000 });
