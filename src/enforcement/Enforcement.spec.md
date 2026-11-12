@@ -393,3 +393,9 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
 - a via that maps to no test is said, never graded as a fail: When a run's batched pass finds no reported test whose title, or a group's title above it, is a bullet's via, while the same via run alone selects a test by pattern and passes, run --each names the via as naming no test exactly, with the titles it selected alone, instead of printing a fail batched beside a pass alone.
   because: three bullets read 'no test ran' in every full batched run and passed alone, and run --each printed both verdicts without saying they disagreed, so the floor graded them failing while each targeted run passed (df-03839b92)
   kinds: none
+- a peer's file is read where it lives: A totality oracle whose bullet names a file of another repository (a peer: line) runs only against the checkout the config's peers name, hands every test command that checkout's path, and records the commit and blob it read beside the verdict; a checkout that is not there, or that does not hold the file, reads not run with how to get it, never pass.
+  over: a project beside a peer checkout, read with the checkout as committed, with the peer's file changed in it, with the checkout moved away, and with the file removed
+  via: a test that reads a peer's file runs against the peer's checkout, records what it read, goes red when the peer changes, and reads not run without the checkout
+  because: hogtower kept a hand copy of 4 of the 12 token vectors hoglake owns, and its check read the copy, so a change hoglake made to its own vectors would have stayed green in hogtower; reading the vectors where they live, the same change turned hogtower's check red, and the run names which commit of hoglake it held against (2026-11-12)
+  crossing: project-source -> record
+  kinds: none

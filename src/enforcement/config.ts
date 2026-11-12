@@ -42,6 +42,8 @@
  *   plugins    the plugins the project runs, each name mapped to "bundled"
  *              or a path to its folder (src/plugins, docs/plugins.md); the
  *              project's own key, never inherited from a registry
+ *   peers      the other repositories its invariants rely on, each name
+ *              mapped to { repository, checkout, env? } (src/enforcement/peers.ts)
  */
 
 import { isAbsolute } from "node:path";
@@ -53,6 +55,7 @@ import { FROM_FORM, parseFrom, type ChokepointFrom } from "../spec/grammar.ts";
 import type { LoadedPlugin } from "../plugins/plugin.ts";
 import { pluginLanguages, readPlugins } from "../plugins/registry.ts";
 import { defaultLanguage, registerProjectPlugins } from "../plugins/languages.ts";
+import { peerEnvironment, readPeers, type Peer } from "./peers.ts";
 
 export { languageOfFile } from "../adapters/language-files.ts";
 
@@ -72,6 +75,8 @@ export interface TestSetup {
   testJson: string[] | string | undefined;
   testFilterForm: "regex" | "pytest";
   testFolders: string[];
+  /** The variables its commands are given beside the process's own: each peer's checkout under its env name (peers.ts); absent without peers. */
+  env?: Record<string, string>;
 }
 
 export interface EnforcementConfig {
@@ -101,6 +106,8 @@ export interface EnforcementConfig {
   latencyBudget: number | undefined;
   /** Which references a chokepoint governs when its bullet says nothing (a from: line); undefined is anywhere. */
   chokepointFrom: ChokepointFrom | undefined;
+  /** The other repositories the project's invariants rely on (peers.ts); empty without a peers key. */
+  peers: Peer[];
 }
 
 function commandValue(value: unknown): string[] | string | undefined {
@@ -160,7 +167,7 @@ function testSetupOf(raw: Record<string, unknown>, path: string, where: string):
 export function readEnforcementConfig(root: string): EnforcementConfig {
   // A project whose config names no language reads the bundled defaults' primary one (plugins/defaults.json).
   const primary = defaultLanguage();
-  const config: EnforcementConfig = { language: primary, languages: [primary], declared: [], enforced: [primary], plugins: [], provided: [], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined };
+  const config: EnforcementConfig = { language: primary, languages: [primary], declared: [], enforced: [primary], plugins: [], provided: [], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined, peers: [] };
   config.tests = [{ language: undefined, files: undefined, cwd: undefined, test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] }];
   // The project's own config over its registry's keys (project-config.ts), each inherited path rebased to the project.
   const found = effectiveConfig(root);
@@ -211,6 +218,7 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
     if (parsed === undefined) throw new Error(`${path}: chokepointFrom reads ${FROM_FORM}`);
     config.chokepointFrom = parsed;
   }
+  config.peers = readPeers(root, record["peers"], path);
   const tests = record["tests"];
   if (tests !== undefined) {
     if (!Array.isArray(tests) || tests.length === 0 || !tests.every((t) => typeof t === "object" && t !== null && !Array.isArray(t))) throw new Error(`${path}: tests is a list of test setups, each an object with test or testJson`);
@@ -246,5 +254,10 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   config.testMatch = first.testMatch;
   config.testFilterForm = first.testFilterForm;
   config.testFolders = [...new Set(config.tests.flatMap((t) => t.testFolders))];
+  // Every runner is handed each peer's checkout, so a test reads the other repository where the config says it lives.
+  if (config.peers.length > 0) {
+    const env = peerEnvironment(config.peers);
+    for (const setup of config.tests) setup.env = env;
+  }
   return config;
 }

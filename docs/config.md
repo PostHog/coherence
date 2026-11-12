@@ -142,6 +142,7 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 | `interfaceBudget` | `{ "seconds": 600, "memoryMB": 12288 }` | The most time and memory the Structure reading's interface pass may take; when it runs out, the reading says it is partial. |
 | `telemetry` | none | `false` refuses fleet telemetry for this project, whatever each user chose with `coherence telemetry on`; a registry's `false` refuses for every leaf. Telemetry is off unless a user opts in; see [telemetry.md](telemetry.md) for what is sent. |
 | `latencyBudget` | `3` | The latency budget: the most seconds a tool hook (PreToolUse, PostToolUse) or a stop may take, counted from its process's start. A tool hook over it says so in its own answer; regulate names the session's calls and stops over it, and orient the last week's calls. These hooks run around every tool call, and a call cycle that feels sluggish is how a hook gets switched off. |
+| `peers` | none | The other repositories the project's invariants rely on, each name mapped to `{ "repository": "<owner/name>", "checkout": "<folder relative to the root>", "env": "<VARIABLE>" }`. A bullet's `peer: <name> <path>` line names a file of that repository its test reads; every test command is given the checkout's absolute path in `env` (default `<NAME>_CHECKOUT`), and the run records the commit and blob it read. A checkout that is not there, or does not hold the file, reads not run with how to clone it, never pass. See [spec.md](spec.md#another-repositorys-file). |
 
 ## Tests: how a totality oracle is run
 

@@ -32,6 +32,7 @@ import { basename, join } from "node:path";
 import { appendWhole, storeLines } from "../journal/append.ts";
 import { shardFor } from "../journal/shards.ts";
 import { isStoreFile, storeDir } from "../journal/stores.ts";
+import type { PeerReading } from "./peers.ts";
 import { heldSites, noteRunAppend, noteSitesAppend, runFileIdentity, type HeldSites } from "./run-index.ts";
 
 export const RUNS_DIR = storeDir("runs");
@@ -178,6 +179,8 @@ export interface RunEntry {
   plugins?: { name: string; version: string }[];
   /** Totality oracle form, a via a plugin proved: what kind of evidence its pass is, as the plugin's manifest labels the form. */
   evidence?: string;
+  /** Totality oracle form, a bullet with peer: lines: what the test read of each other repository (src/enforcement/peers.ts), so the verdict names the version of the other side it held against. */
+  peers?: PeerReading[];
 }
 
 export interface RunRecord {

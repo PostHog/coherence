@@ -22,7 +22,7 @@ import { join, resolve } from "node:path";
 import type { TestSetup } from "./config.ts";
 
 /** What running a test needs from a setup: its commands, and the folder it runs from (relative to the root; the root when absent). The whole config is one, for its first setup. */
-export type RunnerSetup = Pick<TestSetup, "test" | "testJson" | "testMatch" | "testFilterForm"> & { cwd?: string | undefined };
+export type RunnerSetup = Pick<TestSetup, "test" | "testJson" | "testMatch" | "testFilterForm" | "env"> & { cwd?: string | undefined };
 
 /** The folder a setup's runner starts in. */
 export function runnerCwd(root: string, setup: RunnerSetup): string {
@@ -77,7 +77,7 @@ export async function runTotalityOracle(root: string, config: RunnerSetup, filte
     };
     let child;
     try {
-      child = spawn(spec.command, spec.args, { cwd: runnerCwd(root, config), shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1" } });
+      child = spawn(spec.command, spec.args, { cwd: runnerCwd(root, config), shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1", ...config.env } });
     } catch (error) {
       finish({ verdict: "not run", reason: `test command could not start: ${error instanceof Error ? error.message : String(error)}`, command: shown, tail: "" });
       return;
@@ -306,7 +306,7 @@ export async function runTotalityBatch(root: string, config: RunnerSetup, filter
   try {
     const output = await new Promise<{ code: number | null; text: string }>((resolve, reject) => {
       let text = "";
-      const child = spawn(spec.command, spec.args, { cwd: runnerCwd(root, config), shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1", ...spec.env } });
+      const child = spawn(spec.command, spec.args, { cwd: runnerCwd(root, config), shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1", ...config.env, ...spec.env } });
       const timer = setTimeout(() => {
         // The runner's own children (a test file each) outlive a killed parent and keep looping: the whole tree goes.
         killTree(child.pid);

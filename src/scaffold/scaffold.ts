@@ -123,6 +123,7 @@ const PLACEHOLDERS: Record<Key, string> = {
   unless: "<the option a call passes as true to switch the check off>",
   over: "<the whole set the detector checks; a spot check is not enforcement>",
   via: "<the test that fails when the invariant is broken>",
+  peer: "<peer> <path>: a file of another repository the test reads",
   because: "<why this exists; what it protects against>",
   crossing: "<trust level> -> <trust level>",
   entrances: "<the entrances whose work its test checks, comma separated, or none>",
@@ -146,7 +147,8 @@ export function renderInvariant(seed: Seed, options: InvariantOptions): Invarian
   const formKeys: readonly Key[] = options.form === "chokepoint" ? ["protects", "chokepoint", "from"] : ["over", "via"];
   for (const key of KEYS) {
     // An option that switches the check off is rare and named by hand where callers have one; no slot is printed for it.
-    if (key === "unless") continue;
+    // So is a peer file: a test that reads another repository is the exception, and its line is written where one does.
+    if (key === "unless" || key === "peer") continue;
     if (key === "protects" || key === "chokepoint" || key === "from" || key === "over" || key === "via") {
       if (!formKeys.includes(key)) continue;
       lines.push(`  ${key}: ${PLACEHOLDERS[key]}`);
