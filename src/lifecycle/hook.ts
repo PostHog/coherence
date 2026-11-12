@@ -1716,11 +1716,12 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const snapshot = session ? lastSnapshot(root, session) : undefined;
         // A stop routes by its folder and an edit by its file, so the checks put off in every project the session listed, or above several the stop sits in, are made here too.
         const entered = session ? [...new Set([...(routed?.kind === "several" ? routed.projects : []), ...deferringProjects(session)])].filter((project) => project !== root) : [];
-        const elsewhereTexts = session ? await Promise.all(entered.map(async (project) => {
+        // Every project drains at once, so a stop waits for a loading server once in all, never once per project; its own project is said first.
+        const [hereText = "", ...elsewhereTexts] = session ? await Promise.all([drainDeferred(root, input, options, session), ...entered.map(async (project) => {
           const made = await drainDeferred(project, input, options, session);
           return made === "" ? "" : `In ${project}:\n${made}`;
-        })) : [];
-        const deferredText = (session ? await drainDeferred(root, input, options, session) : "") + elsewhereTexts.join("");
+        })]) : [];
+        const deferredText = hereText + elsewhereTexts.join("");
         // A check made here may have recorded a run, which the spec text below must read.
         if (deferredText !== "") eventModels?.delete(root);
         const walls = unableWalls(root, input);

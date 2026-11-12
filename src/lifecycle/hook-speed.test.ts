@@ -208,6 +208,36 @@ test("a stop makes the check an edit put off in a sibling project, whatever fold
   }
 });
 
+test("a stop drains its own project and every sibling's put-off checks at once, so it waits for a loading server once, not once per project", { timeout: 120_000 }, async (t) => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const project = (name: string): Record<string, string> => ({
+    [`${name}/tsconfig.json`]: JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    [`${name}/coherence.config.json`]: JSON.stringify({ language: "typescript" }),
+    [`${name}/Fixture.spec.md`]: spec,
+    [`${name}/src/a.ts`]: "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  const root = realpathSync(repo({ ...project("pa"), ...project("pb") }));
+  const [pa, pb] = [join(root, "pa"), join(root, "pb")];
+  process.env["CLAUDE_PROJECT_DIR"] = root;
+  t.after(() => delete process.env["CLAUDE_PROJECT_DIR"]);
+  try {
+    const edit = { editWaitMs: 300, warm: () => true };
+    for (const project of [pa, pb]) await runHook("PostToolUse", { cwd: pb, session_id: "both", tool_name: "Edit", tool_input: { file_path: join(project, "src/a.ts") } }, root, edit);
+    // Nothing ever listens, so each project's drain waits the whole stopWaitMs; its warm-up marks when that wait began.
+    const began = new Map<string, number>();
+    const stopWaitMs = 3_000;
+    const stop = await runHook("Stop", { cwd: pb, session_id: "both" }, root, { stopWaitMs, warm: (r: string) => (began.set(r, Date.now()), true) });
+    assert.deepEqual([...began.keys()].sort(), [pa, pb], "both projects' drains waited");
+    const apart = Math.abs((began.get(pa) ?? 0) - (began.get(pb) ?? 0));
+    assert.ok(apart < stopWaitMs / 2, `the two waits ran together, not one after the other (${apart} ms apart)`);
+    const here = stop.stdout.indexOf("the language server is still loading");
+    const there = stop.stdout.indexOf(`In ${pa}:`);
+    assert.ok(here >= 0 && there > here, "the stop's own project is said first, then each sibling");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("practice delivery reads the same practices as the spec model, through git's listing of practice files alone", () => {
   const spec = "# Widget\n\nWidgets turn.\n\n## invariants\n";
   const practice = (name: string) => `- ${name}: A knob is oiled before it turns.\n  when: command turn-knob\n  step: oil it\n  learned: d-0000abcd\n  because: dry knobs seize\n`;
