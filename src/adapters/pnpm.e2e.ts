@@ -21,7 +21,7 @@ import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const CHECKOUT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TYPESCRIPT_7 = "typescript@7.0.2";
@@ -33,11 +33,12 @@ interface Ran {
   stderr: string;
 }
 
-function sh(label: string, command: string, args: string[], cwd: string, input?: string): Ran {
+function sh(label: string, command: string, args: string[], cwd: string, input?: string, env: Record<string, string> = {}): Ran {
   const inherited = { ...process.env };
   delete inherited["NODE_TEST_CONTEXT"];
   delete inherited["COHERENCE_HOME"];
-  const result = spawnSync(command, args, { cwd, input, encoding: "utf8", env: { ...inherited, COHERENCE_NO_WARM_UP: "1", COHERENCE_TELEMETRY: "0" }, maxBuffer: 64 * 1024 * 1024, timeout: 600_000 });
+  delete inherited["COHERENCE_TSGO"];
+  const result = spawnSync(command, args, { cwd, input, encoding: "utf8", env: { ...inherited, COHERENCE_NO_WARM_UP: "1", COHERENCE_TELEMETRY: "0", ...env }, maxBuffer: 64 * 1024 * 1024, timeout: 600_000 });
   return { label, code: result.status ?? (result.error ? 127 : 1), stdout: result.stdout ?? "", stderr: (result.stderr ?? "") + (result.error ? `\n${result.error.message}` : "") };
 }
 
@@ -77,7 +78,7 @@ The fixture's one component.
   kinds: none
 `;
 
-test("a pnpm project on TypeScript 7 starts the TypeScript instrument and grades a chokepoint, told once that Coherence reads with its own TypeScript", { timeout: 1_200_000 }, () => {
+test("a pnpm project on TypeScript 7 grades a chokepoint through its own tsgo, told nothing, and through Coherence's own tsserver with tsgo off, told so once", { timeout: 1_200_000 }, () => {
   const pnpm = sh("pnpm --version", "pnpm", ["--version"], CHECKOUT);
   assert.equal(pnpm.code, 0, `pnpm is not installed; this test needs it (the Upgrade workflow installs it pinned)\n${shown(pnpm)}`);
   const scratch = realpathSync(mkdtempSync(join(tmpdir(), "coherence-pnpm-")));
@@ -95,15 +96,23 @@ test("a pnpm project on TypeScript 7 starts the TypeScript instrument and grades
     assert.equal(installed.code, 0, shown(installed));
 
     const cli = join(root, "node_modules", "@posthog", "coherence", "dist", "cli.js");
-    const run = sh("coherence run --form chokepoint", process.execPath, [cli, "run", "--form", "chokepoint", "--no-server", "--session", "pnpm-e2e", "--agent", "pnpm-e2e"], root);
-    assert.doesNotMatch(run.stdout + run.stderr, /failed to initialize|not found; looked|Could not find a valid TypeScript/, shown(run));
-    assert.match(run.stdout, /chokepoint reveal protects SECRET in vault\.ts: visibility-choked \(enforced by the compiler\) — pass/, shown(run));
-    assert.equal(run.code, 0, shown(run));
+    const installedAdapter = pathToFileURL(join(root, "node_modules", "@posthog", "coherence", "dist", "bundled", "typescript", "typescript.js")).href;
+    const engineProbe = `const { TypeScriptAdapter } = await import(${JSON.stringify(installedAdapter)}); const adapter = new TypeScriptAdapter(process.cwd()); const ready = await adapter.ready(); await adapter.close(); process.stdout.write(ready.ok ? String(adapter.engine) : ready.reason);`;
+    const ownTypeScriptNotice = /TypeScript: this project's TypeScript 7\.0\.2 ships no tsserver, so Coherence is using its own TypeScript \d+\.\d+\.\d+ for readings/g;
+    for (const [engine, env, noticesExpected] of [["tsgo", {}, 0], ["tsserver", { COHERENCE_TSGO: "0" }, 1]] as const) {
+      const run = sh(`coherence run --form chokepoint (${engine})`, process.execPath, [cli, "run", "--form", "chokepoint", "--no-server", "--session", "pnpm-e2e", "--agent", "pnpm-e2e"], root, undefined, env);
+      assert.doesNotMatch(run.stdout + run.stderr, /failed to initialize|not found; looked|Could not find a valid TypeScript/, shown(run));
+      assert.match(run.stdout, /chokepoint reveal protects SECRET in vault\.ts: visibility-choked \(enforced by the compiler\) — pass/, shown(run));
+      assert.equal(run.code, 0, shown(run));
 
-    const start = sh("hook SessionStart", process.execPath, [cli, "hook", "SessionStart"], root, JSON.stringify({ session_id: "pnpm-e2e", hook_event_name: "SessionStart", source: "startup", cwd: root }));
-    assert.equal(start.code, 0, shown(start));
-    const said = start.stdout.match(/TypeScript: this project's TypeScript 7\.0\.2 ships no tsserver, so Coherence is using its own TypeScript \d+\.\d+\.\d+ for readings/g) ?? [];
-    assert.equal(said.length, 1, `orient names Coherence's own TypeScript exactly once\n${shown(start)}`);
+      const answered = sh(`engine probe (${engine})`, process.execPath, ["--input-type=module", "--eval", engineProbe], root, undefined, env);
+      assert.equal(answered.stdout, engine, shown(answered));
+
+      const start = sh(`hook SessionStart (${engine})`, process.execPath, [cli, "hook", "SessionStart"], root, JSON.stringify({ session_id: `pnpm-e2e-${engine}`, hook_event_name: "SessionStart", source: "startup", cwd: root }), env);
+      assert.equal(start.code, 0, shown(start));
+      const said = start.stdout.match(ownTypeScriptNotice) ?? [];
+      assert.equal(said.length, noticesExpected, `orient names Coherence's own TypeScript ${noticesExpected} time(s) under ${engine}\n${shown(start)}`);
+    }
   } finally {
     if (process.env["COHERENCE_PNPM_KEEP"] === undefined) rmSync(scratch, { recursive: true, force: true });
     else process.stderr.write(`kept ${scratch}\n`);
