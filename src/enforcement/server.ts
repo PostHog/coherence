@@ -619,7 +619,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
     const params = sent.map((p) => (p === null ? undefined : p));
     switch (method) {
       case "status":
-        return { language: adapter.language, ladder: adapter.ladder, warm, pid: process.pid, startedAt, fingerprint, root, enumeration: (adapter as { enumeration?: { sourceFiles: number; latency: number } }).enumeration ?? null, engine: adapter.engine ?? null, failed };
+        return { language: adapter.language, ladder: adapter.ladder, warm, pid: process.pid, serverPid: adapter.serverPid?.() ?? null, startedAt, fingerprint, root, enumeration: (adapter as { enumeration?: { sourceFiles: number; latency: number } }).enumeration ?? null, engine: adapter.engine ?? null, failed };
       case "ready":
         return adapter.ready();
       case "resolve":
@@ -1021,7 +1021,10 @@ interface ServerStatus {
   language: string;
   ladder: Ladder;
   warm: boolean;
+  /** The warm server's own process. */
   pid: number;
+  /** The language server's process, which the warm server started; null while it is not running or where the adapter cannot say. */
+  serverPid?: number | null;
   startedAt: string;
   /** Absent on a server that predates the fingerprint: it counts as other code. */
   fingerprint?: string;

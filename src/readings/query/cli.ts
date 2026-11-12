@@ -221,8 +221,15 @@ async function readStructure(root: string, budget: Partial<InterfaceBudget>, war
   return reading;
 }
 
-/** A warm server is no child of this process, so its memory is measured from the pid it reports, not the pid an adapter of its own would hold. */
-async function warmServerMemory(adapter: LanguageAdapter): Promise<number | undefined> {
-  if (!(adapter instanceof RemoteAdapter)) return languageServerMemory(adapter.serverPid?.());
-  return languageServerMemory((await adapter.status()).pid);
+/**
+ * A warm server is no child of this process, so its language server's memory
+ * is measured from the pid the warm server reports for it: the language
+ * server's process tree alone, never the warm server's own process, whose
+ * parse store and loaded compiler are no part of the language server's
+ * budget. Undefined when the warm server cannot name it.
+ */
+export async function warmServerMemory(adapter: LanguageAdapter, measure: (pid?: number) => Promise<number | undefined> = languageServerMemory): Promise<number | undefined> {
+  if (!(adapter instanceof RemoteAdapter)) return measure(adapter.serverPid?.());
+  const { serverPid } = await adapter.status();
+  return serverPid === undefined || serverPid === null ? undefined : measure(serverPid);
 }

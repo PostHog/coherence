@@ -4,8 +4,11 @@
  */
 
 import assert from "node:assert/strict";
-
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
+import { connectAdapter, serve } from "../../enforcement/server.ts";
 import { predictClosure } from "../../economy/closure.ts";
 import { economyFor } from "../../economy/cli.ts";
 import type { Io } from "../../journal/cli.ts";
@@ -16,7 +19,7 @@ import type { Coverage } from "../../lifecycle/lexicon-coverage.ts";
 import { projectLexiconCoverage } from "../scope/lexicon-projection.ts";
 import { structureOf } from "../scope/derive.ts";
 import type { LexiconCoverage, RecordedSite, ShellState } from "../scope/model.ts";
-import { QUERY_DEPENDENCIES, queryCommand } from "./cli.ts";
+import { QUERY_DEPENDENCIES, queryCommand, warmServerMemory } from "./cli.ts";
 import { answer, answerLexicon, answerSpine, QUESTIONS } from "./query.ts";
 
 let fixture: Fixture;
@@ -237,4 +240,37 @@ test("an unknown question is refused with the fixed set", () => {
   const result = answer(state, "everything", []);
   assert.equal(result.code, 64);
   for (const question of QUESTIONS) assert.ok(result.text.includes(`query ${question}`));
+});
+
+test("a reading through a warm server measures the language server's process tree, never the warm server's own process", { timeout: 120_000 }, async () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-warm-memory-"));
+  const write = (path: string, text: string): void => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text, "utf8");
+  };
+  write("tsconfig.json", `{ "compilerOptions": { "strict": true, "noEmit": true, "module": "NodeNext", "moduleResolution": "NodeNext", "allowImportingTsExtensions": true }, "include": ["src/**/*.ts"] }\n`);
+  write("src/door.ts", "export function open(): number {\n  return 1;\n}\n");
+  // Served in this process: the warm server's own pid is this test's, whose memory is no part of the language server's.
+  const serving = await serve(root, { idleMs: 60_000 });
+  try {
+    const { adapter } = await connectAdapter(root, { spawn: false });
+    try {
+      const ready = await adapter.ready();
+      assert.equal(ready.ok, true, JSON.stringify(ready));
+      const status = await adapter.status();
+      assert.equal(typeof status.serverPid, "number", "the warm server names its language server's process");
+      assert.notEqual(status.serverPid, status.pid, "the language server is a process of its own");
+      const measured: (number | undefined)[] = [];
+      await warmServerMemory(adapter, async (pid) => {
+        measured.push(pid);
+        return 0;
+      });
+      assert.deepEqual(measured, [status.serverPid], "the memory is measured from the language server's pid alone");
+    } finally {
+      await adapter.close();
+    }
+  } finally {
+    await serving.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
 });
