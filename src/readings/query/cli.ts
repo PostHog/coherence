@@ -22,10 +22,10 @@ import { BUDGET_FLAG_NAMES, budgetFlags, languageServerMemory, readComponentInte
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
 import { ladderOf } from "../../plugins/languages.ts";
-import { RemoteAdapter } from "../../enforcement/server.ts";
+import { RemoteAdapter, recordedServers } from "../../enforcement/server.ts";
 import type { InterfaceReading } from "../scope/model.ts";
 import { withWarmAdapters } from "../../enforcement/run.ts";
-import { readAndRecord, releaseStructureRefresh } from "../scope/gaps.ts";
+import { readAndRecord, structureRefreshFoundNoServer } from "../scope/gaps.ts";
 import { keptLine } from "../scope/kept-answers.ts";
 import { observedCommand } from "../../observation/observed.ts";
 import { answer, answerLexicon, QUERY_USAGE } from "./query.ts";
@@ -209,15 +209,16 @@ function readThroughWarmServers(root: string, budget: Partial<InterfaceBudget>, 
 
 /**
  * The reading recorded for the tree, only when every language answered: a
- * warm-only run that had to ask a server no one loaded gives back its
- * refresh slot, so a later hook with that server loaded reads the tree
- * again, and one that had to ask a server of a language's own bounds keeps
- * the slot, since no warm-only run reads it.
+ * warm-only run that had to ask a server no one loaded marks its refresh
+ * slot with the warm servers recorded then, so a later hook reads the same
+ * tree again once another server is recorded and not before, and one that
+ * had to ask a server of a language's own bounds keeps the slot, since no
+ * warm-only run reads it.
  */
 async function readStructure(root: string, budget: Partial<InterfaceBudget>, warmOnly: boolean): Promise<InterfaceReading> {
   const unanswered = new Set<Unanswered>();
   const reading = await readAndRecord(root, () => readThroughWarmServers(root, budget, warmOnly, unanswered), () => unanswered.size === 0);
-  if (unanswered.has("no server")) releaseStructureRefresh(root, process.pid);
+  if (unanswered.has("no server")) structureRefreshFoundNoServer(root, process.pid, recordedServers(root));
   return reading;
 }
 

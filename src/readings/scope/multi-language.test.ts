@@ -10,7 +10,8 @@
  */
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
@@ -18,7 +19,7 @@ import { adapterFor, type Language } from "../../adapters/index.ts";
 import { computeMass, formatMass } from "../../economy/mass.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { withWarmAdapters } from "../../enforcement/run.ts";
-import { serve } from "../../enforcement/server.ts";
+import { recordedServers, serve } from "../../enforcement/server.ts";
 import type { Io } from "../../journal/cli.ts";
 import { formatObservationSummary } from "../../observation/observed.ts";
 import { buildObservation } from "../../observation/observe.ts";
@@ -28,7 +29,7 @@ import { loadSpecModel } from "../../spec/model.ts";
 import { queryCommand } from "../query/cli.ts";
 import { answerStructure } from "../query/query.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
-import { lastReading, STRUCTURE_DIR, structureFingerprint, structureState } from "./gaps.ts";
+import { lastReading, refreshInBackground, STRUCTURE_DIR, structureFingerprint, structureRefreshSlot, structureState } from "./gaps.ts";
 import { bothVerified, mixedProject } from "./mixed-fixture.ts";
 import type { InterfaceReading } from "./model.ts";
 import { flowOf } from "./structure-flow.ts";
@@ -208,7 +209,7 @@ test("a single-language project reads as it always did: one language read, no la
   }
 });
 
-test("a warm-only Structure refresh keeps a reading only when every language answered: one with no server loaded gives back its slot, one read inside its own bounds keeps it", { timeout: 180_000 }, async () => {
+test("a warm-only Structure refresh keeps a reading only when every language answered: one with no server loaded keeps its slot until another server is recorded, one read inside its own bounds keeps it", { timeout: 180_000 }, async () => {
   const { root, remove } = mixedProject();
   const serving = await serve(root, { language: "typescript", idleMs: 120_000 });
   const slot = join(root, STRUCTURE_DIR, "refresh.json");
@@ -221,7 +222,18 @@ test("a warm-only Structure refresh keeps a reading only when every language ans
     holdSlot();
     await queryCommand(["structure", "--warm-only"], io(root));
     assert.equal(lastReading(root), undefined, "a reading Python's unloaded server left half read is not kept as the tree's");
-    assert.equal(existsSync(slot), false, "its slot is given back, so a run with Python's server loaded reads the tree");
+    const command = [process.execPath, "-e", ""];
+    const retrying = structureRefreshSlot(root, () => recordedServers(root));
+    assert.equal(refreshInBackground(root, command, structureFingerprint(root), Date.now, retrying), false, "a stop on the same tree with no new server starts no second refresh");
+    const python = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60_000)"], { stdio: "ignore" });
+    try {
+      mkdirSync(join(root, ".coherence", "run"), { recursive: true });
+      writeFileSync(join(root, ".coherence", "run", "server-python.json"), JSON.stringify({ pid: python.pid, socket: "", language: "python", startedAt: new Date().toISOString(), fingerprint: "" }));
+      assert.equal(refreshInBackground(root, command, structureFingerprint(root), Date.now, retrying), true, "once Python's server is recorded, the same tree is read again");
+    } finally {
+      python.kill();
+      rmSync(join(root, ".coherence", "run", "server-python.json"), { force: true });
+    }
     writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "mixed", language: ["python", "typescript"], ignore: ["vendor"] }));
     holdSlot();
     await queryCommand(["structure", "--warm-only"], io(root));

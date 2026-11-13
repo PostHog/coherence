@@ -317,6 +317,8 @@ interface RefreshMark {
   fingerprint: string;
   /** Set by a run that found no language server loaded: the same fingerprint is tried again only when its slot's retry says a server now is. */
   noServer?: boolean;
+  /** With noServer: the warm servers recorded when the run found the one it needed missing, so a retry asks for one recorded since. */
+  servers?: number[];
 }
 
 /** How long a refresh may run before another may start in its place. */
@@ -339,8 +341,8 @@ function refreshPath(root: string): string {
 export interface RefreshSlot {
   path: string;
   command: RegExp;
-  /** Whether a run of the same fingerprint that found no server loaded is worth starting again, asked only then; never, when absent. */
-  retry?: (() => boolean) | undefined;
+  /** Whether a run of the same fingerprint that found no server loaded is worth starting again, asked only then with its mark; never, when absent. */
+  retry?: ((mark: { servers?: number[] | undefined }) => boolean) | undefined;
 }
 
 // The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
@@ -373,18 +375,27 @@ export function releaseRefresh(pid: number, slotPath: string): void {
  * loaded: the same fingerprint is not started again while none is, and is
  * once its slot's retry says one is.
  */
-export function refreshFoundNoServer(pid: number, slotPath: string): void {
+export function refreshFoundNoServer(pid: number, slotPath: string, servers?: readonly number[]): void {
   try {
     const mark = readMark(slotPath);
-    if (mark?.pid === pid) writeAtomically(slotPath, JSON.stringify({ ...mark, noServer: true } satisfies RefreshMark));
+    if (mark?.pid === pid) writeAtomically(slotPath, JSON.stringify({ ...mark, noServer: true, ...(servers === undefined ? {} : { servers: [...servers] }) } satisfies RefreshMark));
   } catch {
     return;
   }
 }
 
-/** Give up the structure refresh's slot. */
-export function releaseStructureRefresh(root: string, pid: number): void {
-  releaseRefresh(pid, refreshPath(root));
+/** Keep the structure refresh's slot, marked as having found a server it needed missing while these warm servers were recorded. */
+export function structureRefreshFoundNoServer(root: string, pid: number, servers: readonly number[]): void {
+  refreshFoundNoServer(pid, refreshPath(root), servers);
+}
+
+/**
+ * The structure refresh's slot, tried again for the same tree once a warm
+ * server is recorded that was not when a run found the one it needed
+ * missing: a stop on an unchanged tree with no new server starts nothing.
+ */
+export function structureRefreshSlot(root: string, recorded: () => readonly number[]): RefreshSlot {
+  return { path: refreshPath(root), command: STRUCTURE_QUERY, retry: (mark) => recorded().some((pid) => !(mark.servers ?? []).includes(pid)) };
 }
 
 /** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */
@@ -435,7 +446,7 @@ export function refreshInBackground(root: string, command: readonly string[], fi
   try {
     const mark = readMark(slot.path);
     if (mark !== undefined) {
-      if (mark.fingerprint === fingerprint && !(mark.noServer === true && slot.retry?.() === true)) return false;
+      if (mark.fingerprint === fingerprint && !(mark.noServer === true && slot.retry?.(mark) === true)) return false;
       // A run that marked its slot as having found no server has finished reading, so it holds the slot no longer while it exits.
       if (mark.noServer !== true && markUnderWay(mark, now) !== undefined && !supersede(mark.pid, slot.command)) return false;
     }

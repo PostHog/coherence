@@ -913,6 +913,32 @@ export function serverRecorded(rootGiven: string): boolean {
   }
 }
 
+/**
+ * The pids of every language's warm server recorded at the root whose
+ * process lives, ascending: one folder listing and a signal each, never a
+ * connection, so a hook may ask it at every stop.
+ */
+export function recordedServers(rootGiven: string): number[] {
+  const { dir } = serverPaths(rootGiven);
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  return names
+    .filter((name) => /^server(?:-[\w.-]+)?\.json$/.test(name))
+    .flatMap((name) => {
+      try {
+        const pointer = JSON.parse(readFileSync(join(dir, name), "utf8")) as Pointer;
+        return typeof pointer.pid === "number" && pidAlive(pointer.pid) ? [pointer.pid] : [];
+      } catch {
+        return [];
+      }
+    })
+    .sort((a, b) => a - b);
+}
+
 /** Wait for a process to exit; signal it when asking was not enough. True once it is gone. */
 async function awaitExit(pid: number): Promise<boolean> {
   const gone = async (ms: number): Promise<boolean> => {

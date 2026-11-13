@@ -80,6 +80,7 @@ import { promisify } from "node:util";
 import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
+import { recordedServers } from "../enforcement/server.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
@@ -110,7 +111,7 @@ import { keepStateFiles } from "./state-files.ts";
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { currentReading, editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
 import { mirrorBlock, refreshMirrorsInBackground } from "../readings/mirrors/recorded.ts";
-import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
+import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, structureRefreshSlot, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, rankNow, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
 import { baselinePath, coverageChanges, deliverCandidates, heldCandidates, holdCandidates, introducedCandidates, pendingCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
@@ -1279,7 +1280,7 @@ export const WARM_UP = (root: string, language?: string): boolean => {
 
 /** The refresh the command line starts: this checkout's query structure, warm-only so a refresh never starts a language server, which records the reading it takes. */
 export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
-  refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure", "--warm-only"], fingerprint);
+  refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure", "--warm-only"], fingerprint, Date.now, structureRefreshSlot(root, () => recordedServers(root)));
 };
 
 /**
