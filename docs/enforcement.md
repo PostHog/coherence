@@ -352,10 +352,12 @@ report) and maps results back by name; the record says so. One test per
 invocation of `test` is the fallback when a runner cannot report per test.
 Not configured is reported, never assumed passing. node:test ships no JSON
 reporter, so `src/enforcement/node-test-reporter.ts` writes the jest-shaped
-report from its events; Coherence's own config names it.
+report from its events; Coherence's own config names it. Its one-test-per-invocation
+`test` command names `--test-reporter=tap`, because the `testMatch` that reads
+it is the TAP summary and node:test's default reporter off a terminal is TAP on
+Node 22 and the spec reporter on Node 26.
 
 ## Revelation at the edit
-
 The warm server holds the language server open across hook invocations:
 `serve` runs it in the foreground; a client connects over a unix socket
 under `.coherence/run/` and spawns it detached when none listens; it shuts

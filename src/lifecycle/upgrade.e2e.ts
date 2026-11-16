@@ -212,7 +212,7 @@ function practiceText(cite: string): string {
  */
 const IGNORE = ["dist", "build", "coverage", ".venv", "packages/web/dist", "CHANGELOG.md"];
 
-const CONFIG = JSON.stringify({ name: "widgets", language: "typescript", test: "node --test --test-name-pattern={filter} 'src/**/*.test.ts'", testMatch: "# pass [1-9][0-9]*", ignore: IGNORE }, null, 2);
+const CONFIG = JSON.stringify({ name: "widgets", language: "typescript", test: "node --test --test-reporter=tap --test-name-pattern={filter} 'src/**/*.test.ts'", testMatch: "# pass [1-9][0-9]*", ignore: IGNORE }, null, 2);
 
 function write(root: string, path: string, text: string): void {
   mkdirSync(dirname(join(root, path)), { recursive: true });
