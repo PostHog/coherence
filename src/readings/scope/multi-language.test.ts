@@ -10,20 +10,26 @@
  */
 
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
 import { adapterFor, type Language } from "../../adapters/index.ts";
 import { computeMass, formatMass } from "../../economy/mass.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
+import { withWarmAdapters } from "../../enforcement/run.ts";
+import { recordedServers, serve } from "../../enforcement/server.ts";
 import type { Io } from "../../journal/cli.ts";
 import { formatObservationSummary } from "../../observation/observed.ts";
 import { buildObservation } from "../../observation/observe.ts";
 import { scaffoldCommand } from "../../scaffold/cli.ts";
 import { proposeClosures } from "../../scaffold/control.ts";
 import { loadSpecModel } from "../../spec/model.ts";
+import { queryCommand } from "../query/cli.ts";
 import { answerStructure } from "../query/query.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
-import { structureState } from "./gaps.ts";
+import { lastReading, refreshInBackground, STRUCTURE_DIR, structureFingerprint, structureRefreshSlot, structureState } from "./gaps.ts";
 import { bothVerified, mixedProject } from "./mixed-fixture.ts";
 import type { InterfaceReading } from "./model.ts";
 import { flowOf } from "./structure-flow.ts";
@@ -199,6 +205,74 @@ test("a single-language project reads as it always did: one language read, no la
     assert.equal(await scaffoldCommand(["control", "--all"], control), 0, control.errors.join("\n"));
     assert.doesNotMatch(control.lines.join("\n"), /languages read/);
   } finally {
+    remove();
+  }
+});
+
+test("a warm-only Structure refresh keeps a reading only when every language answered: one with no server loaded keeps its slot until another server is recorded, one read inside its own bounds keeps it", { timeout: 180_000 }, async () => {
+  const { root, remove } = mixedProject();
+  const serving = await serve(root, { language: "typescript", idleMs: 120_000 });
+  const slot = join(root, STRUCTURE_DIR, "refresh.json");
+  const holdSlot = (): void => {
+    mkdirSync(dirname(slot), { recursive: true });
+    writeFileSync(slot, JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint: structureFingerprint(root) }));
+  };
+  try {
+    await withWarmAdapters(root, async (open) => void (await open("typescript")));
+    holdSlot();
+    await queryCommand(["structure", "--warm-only"], io(root));
+    assert.equal(lastReading(root), undefined, "a reading Python's unloaded server left half read is not kept as the tree's");
+    const command = [process.execPath, "-e", ""];
+    const retrying = structureRefreshSlot(root, () => recordedServers(root));
+    assert.equal(refreshInBackground(root, command, structureFingerprint(root), Date.now, retrying), false, "a stop on the same tree with no new server starts no second refresh");
+    const python = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60_000)"], { stdio: "ignore" });
+    try {
+      mkdirSync(join(root, ".coherence", "run"), { recursive: true });
+      writeFileSync(join(root, ".coherence", "run", "server-python.json"), JSON.stringify({ pid: python.pid, socket: "", language: "python", startedAt: new Date().toISOString(), fingerprint: "" }));
+      assert.equal(refreshInBackground(root, command, structureFingerprint(root), Date.now, retrying), true, "once Python's server is recorded, the same tree is read again");
+    } finally {
+      python.kill();
+      rmSync(join(root, ".coherence", "run", "server-python.json"), { force: true });
+    }
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "mixed", language: ["python", "typescript"], ignore: ["vendor"] }));
+    holdSlot();
+    await queryCommand(["structure", "--warm-only"], io(root));
+    assert.equal(lastReading(root), undefined, "nor one that leaves Python to its own bounds");
+    assert.equal(existsSync(slot), true, "no warm-only run reads Python inside its own bounds, so the slot is kept");
+  } finally {
+    await serving.stop();
+    remove();
+  }
+});
+
+test("a warm-only Structure refresh reads a language with no server loaded from its kept answers, and keeps the reading when nothing had to be asked of that server", { timeout: 180_000 }, async () => {
+  const { root, remove } = mixedProject();
+  const serving = await serve(root, { language: "typescript", idleMs: 120_000 });
+  const slot = join(root, STRUCTURE_DIR, "refresh.json");
+  try {
+    // A reading that asked both languages' servers keeps every answer; the tree does not change after it.
+    read(await readComponentInterfaces(root));
+    await withWarmAdapters(root, async (open) => void (await open("typescript")));
+    mkdirSync(dirname(slot), { recursive: true });
+    writeFileSync(slot, JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint: structureFingerprint(root) }));
+    await queryCommand(["structure", "--warm-only"], io(root));
+    const recorded = lastReading(root);
+    assert.notEqual(recorded, undefined, "Python's kept answers answer every question, so the reading is whole and kept, though Python's server never loaded");
+    const reading = read(recorded!.reading);
+    assert.deepEqual(reading.languages?.read, ["python", "typescript"], "both languages read");
+    assert.equal(reading.kept?.asked, 0, "nothing was asked of any server");
+    assert.equal(reading.entrances.find((e) => e.name === "rows view")?.file, "backend/views.py", "the Python handler resolved from its kept answer");
+    assert.equal(existsSync(slot), true, "a kept reading keeps its slot: the same tree is not read again");
+    // Python read inside its own bounds: answers a bounded reading kept answer a warm-only refresh the same way.
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "mixed", language: ["python", "typescript"], ignore: ["vendor"] }));
+    read(await readComponentInterfaces(root));
+    writeFileSync(slot, JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint: structureFingerprint(root) }));
+    const before = lastReading(root)!.at;
+    await queryCommand(["structure", "--warm-only"], io(root));
+    assert.notEqual(lastReading(root)!.at, before, "Python read inside its own bounds from its kept answers: the reading is kept");
+    assert.deepEqual(read(lastReading(root)!.reading).languages?.read, ["python", "typescript"]);
+  } finally {
+    await serving.stop();
     remove();
   }
 });

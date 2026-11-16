@@ -18,8 +18,14 @@ import { economyFor, queryEconomyCommand, type EconomyOf } from "../../economy/c
 import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { buildScopePage, projectNameOf } from "../scope/build.ts";
-import { BUDGET_FLAG_NAMES, budgetFlags, readComponentInterfaces } from "../scope/component-interfaces.ts";
-import { readAndRecord } from "../scope/gaps.ts";
+import { BUDGET_FLAG_NAMES, budgetFlags, languageServerMemory, readComponentInterfaces, readsOwnBounds, type InterfaceBudget } from "../scope/component-interfaces.ts";
+import type { LanguageAdapter } from "../../adapters/adapter.ts";
+import type { Language } from "../../adapters/index.ts";
+import { ladderOf } from "../../plugins/languages.ts";
+import { RemoteAdapter, recordedServers } from "../../enforcement/server.ts";
+import type { InterfaceReading } from "../scope/model.ts";
+import { withWarmAdapters } from "../../enforcement/run.ts";
+import { readAndRecord, structureRefreshFoundNoServer } from "../scope/gaps.ts";
 import { keptLine } from "../scope/kept-answers.ts";
 import { observedCommand } from "../../observation/observed.ts";
 import { answer, answerLexicon, QUERY_USAGE } from "./query.ts";
@@ -48,11 +54,12 @@ interface Parsed {
   root: string | undefined;
   /** The interface reading's budget flags (structure), by BUDGET_FLAG_NAMES. */
   budget: Map<string, string>;
+  warmOnly: boolean;
 }
 
 
 function parse(argv: string[]): Parsed {
-  const parsed: Parsed = { positionals: [], session: undefined, root: undefined, budget: new Map() };
+  const parsed: Parsed = { positionals: [], session: undefined, root: undefined, budget: new Map(), warmOnly: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     const flag = arg.startsWith("--") ? arg.slice(2).split("=")[0]! : "";
@@ -68,7 +75,8 @@ function parse(argv: string[]): Parsed {
       const value = arg.includes("=") ? arg.slice(arg.indexOf("=") + 1) : argv[++i];
       if (value === undefined || value === "") throw new Error(`--${flag} needs a value`);
       parsed.budget.set(flag, value);
-    } else if (arg.startsWith("--")) throw new Error(`unknown flag ${arg}`);
+    } else if (arg === "--warm-only") parsed.warmOnly = true;
+    else if (arg.startsWith("--")) throw new Error(`unknown flag ${arg}`);
     else parsed.positionals.push(arg);
   }
   return parsed;
@@ -133,7 +141,7 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
     window: false,
     // Only the Structure question needs every component interface, read through the language adapter.
     // The real reading is kept for the hooks (gaps.ts); an injected one is a test's, and never kept.
-    ...(question === "structure" ? { componentInterfaces: deps.interfaces !== undefined ? await deps.interfaces(root, undefined, { budget }) : await readAndRecord(root, () => readComponentInterfaces(root, undefined, { budget })) } : {}),
+    ...(question === "structure" ? { componentInterfaces: deps.interfaces !== undefined ? await deps.interfaces(root, undefined, { budget }) : await readStructure(root, budget, parsed.warmOnly) } : {}),
   });
   // What the reading reused of the language server's kept answers, and what it asked anew: never reused silently.
   const kept = state.componentInterfaces.kind === "read" ? keptLine(state.componentInterfaces.kept) : undefined;
@@ -142,4 +150,87 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
   if (result.code === 0) io.out(result.text);
   else io.err(result.text);
   return result.code;
+}
+
+const STRUCTURE_WITHOUT_SERVER = "no language server was loaded for this project, and a warm-only reading starts none";
+
+/** Why a warm-only reading left a language unread: no server loaded, which a later run can find, or a language read inside its own bounds, which no warm-only run reads. */
+type Unanswered = "no server" | "own bounds";
+
+/**
+ * The adapter a warm-only reading reads a language through when it has no
+ * server to ask: the reading answers every question it can from the kept
+ * answers, and the first one it would have to ask the server finds it not
+ * ready, notes why, and leaves the language unread.
+ */
+function keptAnswersOnly(language: Language, reason: string, unanswered: Set<Unanswered>, why: Unanswered): LanguageAdapter {
+  const refuse = (): Promise<never> => Promise.reject(new Error(reason));
+  return {
+    language,
+    ladder: ladderOf(language) ?? { top: "reference-choked", because: reason, rungs: [] },
+    ready: async () => {
+      unanswered.add(why);
+      return { ok: false, reason };
+    },
+    resolve: refuse,
+    references: refuse,
+    visibility: refuse,
+    refute: refuse,
+    testFilter: (via) => via,
+    forget: async () => {},
+    close: async () => {},
+  };
+}
+
+/**
+ * The reading through the project's warm servers, never a second server
+ * beside a check's. Warm-only, as a hook's refresh asks, it starts none: a
+ * language with no server loaded, or read inside its own bounds, is read
+ * from its kept answers alone, and is left unread, with why noted, only
+ * when a question has no kept answer.
+ */
+function readThroughWarmServers(root: string, budget: Partial<InterfaceBudget>, warmOnly: boolean, unanswered: Set<Unanswered>): Promise<InterfaceReading> {
+  return withWarmAdapters(
+    root,
+    (open) =>
+      readComponentInterfaces(
+        root,
+        async (language) => {
+          if (!warmOnly) return readsOwnBounds(root, language) ? undefined : (await open(language)).adapter;
+          if (readsOwnBounds(root, language)) return keptAnswersOnly(language, `${language} is read inside its own bounds by a server of its own, and a warm-only reading starts none`, unanswered, "own bounds");
+          const opened = await open(language);
+          return opened.adapter ?? keptAnswersOnly(language, opened.reason ?? STRUCTURE_WITHOUT_SERVER, unanswered, "no server");
+        },
+        { budget, memory: warmServerMemory },
+      ),
+    warmOnly ? { onNoServer: () => STRUCTURE_WITHOUT_SERVER } : {},
+  );
+}
+
+/**
+ * The reading recorded for the tree, only when every language answered: a
+ * warm-only run that had to ask a server no one loaded marks its refresh
+ * slot with the warm servers recorded then, so a later hook reads the same
+ * tree again once another server is recorded and not before, and one that
+ * had to ask a server of a language's own bounds keeps the slot, since no
+ * warm-only run reads it.
+ */
+async function readStructure(root: string, budget: Partial<InterfaceBudget>, warmOnly: boolean): Promise<InterfaceReading> {
+  const unanswered = new Set<Unanswered>();
+  const reading = await readAndRecord(root, () => readThroughWarmServers(root, budget, warmOnly, unanswered), () => unanswered.size === 0);
+  if (unanswered.has("no server")) structureRefreshFoundNoServer(root, process.pid, recordedServers(root));
+  return reading;
+}
+
+/**
+ * A warm server is no child of this process, so its language server's memory
+ * is measured from the pid the warm server reports for it: the language
+ * server's process tree alone, never the warm server's own process, whose
+ * parse store and loaded compiler are no part of the language server's
+ * budget. Undefined when the warm server cannot name it.
+ */
+export async function warmServerMemory(adapter: LanguageAdapter, measure: (pid?: number) => Promise<number | undefined> = languageServerMemory): Promise<number | undefined> {
+  if (!(adapter instanceof RemoteAdapter)) return measure(adapter.serverPid?.());
+  const { serverPid } = await adapter.status();
+  return serverPid === undefined || serverPid === null ? undefined : measure(serverPid);
 }

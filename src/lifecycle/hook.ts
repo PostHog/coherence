@@ -70,13 +70,17 @@
  * index of watched files from the spec model they already read.
  */
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { writeAtomically } from "../readings/scope/shared-structure.ts";
+import { userCacheDir } from "./user-dir.ts";
 import { closeWork, execFile, openWork, readProjectText, spawn } from "./work-meter.ts";
 import { promisify } from "node:util";
 import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
+import { recordedServers } from "../enforcement/server.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
@@ -90,12 +94,11 @@ import { readPlugins } from "../plugins/registry.ts";
 import { changesSince, PLUGIN_API } from "../plugins/plugin.ts";
 import { coreLanguageOfExtension, LANGUAGES } from "../adapters/language-files.ts";
 import { readConfigFile } from "../adapters/project-config.ts";
-import { escapeRegExp } from "../enforcement/totality.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
 import { deadEndBlock, readDeadEnds } from "../journal/dead-ends.ts";
-import { filesRead, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotSession, snapshotTrace, traceFile, type Snapshot } from "../economy/trace.ts";
+import { filesRead, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotInBackground, snapshotSession, snapshotTrace, type Snapshot } from "../economy/trace.ts";
 import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type JournalRecord, type Unable } from "../journal/record.ts";
@@ -108,7 +111,7 @@ import { keepStateFiles } from "./state-files.ts";
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { currentReading, editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
 import { mirrorBlock, refreshMirrorsInBackground } from "../readings/mirrors/recorded.ts";
-import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
+import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, structureRefreshSlot, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, rankNow, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
 import { baselinePath, coverageChanges, deliverCandidates, heldCandidates, holdCandidates, introducedCandidates, pendingCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
@@ -629,6 +632,36 @@ export async function editContext(root: string, input: HookInput, options: HookO
   const own = keepProjectFiles(root, written);
   const files = written.filter((file) => own.has(file));
   if (files.length === 0) return "";
+  const session = sessionOf(input);
+  const found = touchedInvariants(root, files);
+  if (!("model" in found) || found.touched.length === 0) return found.said;
+  // Without a session no stop could make a check put off, so an edit with none waits on the server as before.
+  // With one, an edit that finds no server starts it and waits what is left of the latency budget: tsgo loads inside
+  // it, so the defect is said at the edit that made it; a server that loads past it has its check put off to the stop.
+  // A warm-up that started nothing puts nothing off: no stop would find a server to make the check.
+  const warm = options.warm;
+  let unstarted = false;
+  const putOff: PutOff = warm === undefined || session === undefined ? {} : {
+    start: (language) => {
+      unstarted = !warm(root, language);
+      return !unstarted;
+    },
+    waitWarmMs: options.editWaitMs ?? editServerWaitMs(root, options.startedAt),
+    onNoServer: () => {
+      if (unstarted) return NONE_STARTED;
+      deferEditCheck(root, session, files);
+      return SERVER_STARTING;
+    },
+  };
+  return found.said + (await checkAtEdit(root, input, options, files, found.model, found.touched, putOff));
+}
+
+/**
+ * The chokepoint invariants the files may touch, read the light way
+ * (chokepointIndex) and, when that cannot answer, from the whole spec model,
+ * with what was said about the fallback; only what was said when neither reads.
+ */
+function touchedInvariants(root: string, files: readonly string[]): { model: SpecModel; touched: string[]; said: string } | { said: string } {
   // A name in a file of none of the project's languages is prose, never a reference (a notes file that says "write"): only the
   // file's place in the latest run can tie it to an invariant. An unreadable config keeps every text, toward the slow path.
   const code = codeFiles(root);
@@ -636,27 +669,20 @@ export async function editContext(root: string, input: HookInput, options: HookO
     const absolute = resolve(root, file);
     return [file, existsSync(absolute) && code(file) ? readProjectText(absolute, "source") : undefined] as const;
   }));
-  // Every chokepoint invariant, read the light way (chokepointIndex): the specs and the run index, never the whole spec model or
-  // the run history. Anything that keeps that light way from answering falls back to the whole model, as before it existed, and
-  // the answer says so: an optimization of a check fails toward the slow, correct path, never toward silence.
-  let model: SpecModel;
-  let touched: string[];
-  let without: string | undefined;
+  // Anything that keeps the light way from answering falls back to the whole model, as before it existed, and the answer says
+  // so: an optimization of a check fails toward the slow, correct path, never toward silence.
   try {
     const entries = chokepointIndex(root, files);
-    touched = [...new Set(entries.filter((i) => files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name))];
+    const touched = [...new Set(entries.filter((i) => files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name))];
     // The run needs only the touched invariants, their components and their enforcements: never the whole model.
-    model = chokepointModel(root, entries.filter((i) => touched.includes(i.name)));
+    return { model: chokepointModel(root, entries.filter((i) => touched.includes(i.name))), touched, said: "" };
   } catch (error) {
-    without = `${error instanceof Error ? error.message : String(error)}; the whole spec model and run store were read instead`;
+    const without = `${error instanceof Error ? error.message : String(error)}; the whole spec model and run store were read instead`;
     const whole = specModelOrNull(root);
-    if ("error" in whole) return `Coherence checked this edit without its index: ${without}, and the spec is not readable (${whole.error})\n`;
-    model = whole;
-    touched = [...new Set(whole.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name)))];
+    if ("error" in whole) return { said: `Coherence checked this edit without its index: ${without}, and the spec is not readable (${whole.error})\n` };
+    const touched = [...new Set(whole.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name)))];
+    return { model: whole, touched, said: `Coherence checked this edit without its index: ${without}.\n` };
   }
-  const said = without === undefined ? "" : `Coherence checked this edit without its index: ${without}.\n`;
-  if (touched.length === 0) return said;
-  return said + (await checkAtEdit(root, input, options, files, model, touched));
 }
 
 /** Whether a project file is written in one of the project's languages, built-in, provided by a plugin or declared. */
@@ -679,12 +705,158 @@ function chokepointModel(root: string, entries: readonly ChokepointEntry[]): Spe
   return { root, components } as unknown as SpecModel;
 }
 
+/** Why an edit that found no loaded server checked nothing: one is starting, and this turn's stop makes the check. */
+const SERVER_STARTING = "no language server was loaded for this project, so one is starting now; this turn's stop checks this edit";
+
+/** Why an edit or stop that found no loaded server checked nothing when none could be started: no later stop would make the check either. */
+const NONE_STARTED = "no language server was loaded for this project, and none could be started, so nothing checks this edit";
+const NONE_STARTED_AT_STOP = "no language server is loaded for this project, and none could be started, so nothing checks these edits";
+
+/** How long a stop waits for a server an edit started to finish loading: tsgo loads in about 2 s on the projects measured, tsserver on a monorepo in 40 s, which the next stop catches. */
+const STOP_SERVER_WAIT_MS = 10_000;
+const STILL_LOADING = "the language server is still loading; the next stop checks these edits";
+const HANDED_ON = "the language server is still loading; the coordinator's next stop checks these edits";
+
+/** What an edit's check does when no server is loaded: start one when none listens, wait this long for it, then put the check off. */
+interface PutOff {
+  /** Whether it started a server: false puts nothing off, since no wait would see one load. */
+  start?: (language: string | undefined) => boolean;
+  onNoServer?: (language: string | undefined) => string;
+  waitWarmMs?: number;
+}
+
+/** What an edit's check keeps of the latency budget for itself once its server has loaded: the check's own reads, measured at well under a second. */
+const EDIT_CHECK_RESERVE_MS = 1_000;
+
+/** How long an edit waits for a server it found loading or just started: the latency budget less the hook's time so far and the check's reserve. */
+function editServerWaitMs(root: string, startedAt: number | undefined): number {
+  const spent = startedAt === undefined ? 0 : Date.now() - startedAt;
+  return Math.max(0, latencyBudget(root) * 1000 - spent - EDIT_CHECK_RESERVE_MS);
+}
+
+/** Where a session keeps the files whose edit check waited for a language server to load, one file per path so concurrent hooks never rewrite each other's. */
+function deferredCheckFolder(root: string, session: string): string {
+  return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.deferred`);
+}
+
+function deferredEntry(root: string, session: string, file: string): string {
+  return join(deferredCheckFolder(root, session), `${createHash("sha256").update(file).digest("hex").slice(0, 32)}.json`);
+}
+
+function deferredFiles(root: string, session: string): string[] {
+  let names: string[];
+  try {
+    names = readdirSync(deferredCheckFolder(root, session));
+  } catch {
+    return [];
+  }
+  return names.filter((name) => name.endsWith(".json")).flatMap((name) => {
+    try {
+      const file: unknown = JSON.parse(readFileSync(join(deferredCheckFolder(root, session), name), "utf8"));
+      return typeof file === "string" ? [file] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** Where a session lists the projects it put an edit check off in: a stop routes by its folder, an edit by its file, so the stop reads this list to drain them all. */
+function deferringFolder(session: string): string {
+  return join(userCacheDir(), "deferred", session.replace(/[^\w.-]/g, "_"));
+}
+
+function deferringEntry(root: string, session: string): string {
+  return join(deferringFolder(session), `${createHash("sha256").update(root).digest("hex").slice(0, 32)}.json`);
+}
+
+function deferringProjects(session: string): string[] {
+  let names: string[];
+  try {
+    names = readdirSync(deferringFolder(session));
+  } catch {
+    return [];
+  }
+  return names.filter((name) => name.endsWith(".json")).flatMap((name) => {
+    try {
+      const root: unknown = JSON.parse(readFileSync(join(deferringFolder(session), name), "utf8"));
+      return typeof root === "string" && existsSync(root) ? [root] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+function deferEditCheck(root: string, session: string, files: readonly string[]): void {
+  for (const file of files) writeAtomically(deferredEntry(root, session, file), JSON.stringify(file));
+  writeAtomically(deferringEntry(root, session), JSON.stringify(root));
+}
+
+/** A stop's drain of one project's put-off checks, which drops the project from the session's list once nothing is left there. */
+async function drainDeferred(root: string, input: HookInput, options: HookOptions, session: string): Promise<string> {
+  const made = await checkDeferredAtStop(root, input, options, session);
+  if (deferredFiles(root, session).length === 0) rmSync(deferringEntry(root, session), { force: true });
+  return made;
+}
+
+function undeferEditCheck(root: string, session: string, files: readonly string[]): void {
+  for (const file of files) rmSync(deferredEntry(root, session, file), { force: true });
+}
+
+/**
+ * The edit checks a session's edits deferred while the language server
+ * loaded, made at its stop before the spec is read, so a defect they find is
+ * recorded and the stop's spec text reports it (and a subagent stop refuses
+ * on it). The stop waits a bounded time for a server still loading; past it a
+ * subagent hands its checks to its coordinator's next stop, and a session
+ * keeps them for its own.
+ */
+async function checkDeferredAtStop(root: string, input: HookInput, options: HookOptions, session: string): Promise<string> {
+  const stored = deferredFiles(root, session);
+  const files = stored.filter((file) => existsSync(join(root, file)));
+  undeferEditCheck(root, session, stored.filter((file) => !files.includes(file)));
+  if (files.length === 0) return "";
+  const found = touchedInvariants(root, files);
+  if (!("model" in found) || found.touched.length === 0) {
+    undeferEditCheck(root, session, files);
+    return found.said;
+  }
+  const coordinator = !isMainThread(input) && typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
+  let unstarted = false;
+  const putOff: PutOff = {
+    start: (language) => {
+      unstarted = options.warm?.(root, language) === false;
+      return !unstarted;
+    },
+    waitWarmMs: options.stopWaitMs ?? STOP_SERVER_WAIT_MS,
+    onNoServer: () => {
+      // A check no server will make is dropped, said once, rather than kept for stops that would each wait for nothing.
+      if (unstarted) {
+        undeferEditCheck(root, session, files);
+        return NONE_STARTED_AT_STOP;
+      }
+      if (coordinator === undefined) return STILL_LOADING;
+      deferEditCheck(root, coordinator, files);
+      undeferEditCheck(root, session, files);
+      return HANDED_ON;
+    },
+  };
+  const text = found.said + (await checkAtEdit(root, input, options, files, found.model, found.touched, putOff));
+  return text.replace(/\bat this edit\b/g, "at an edit before this stop");
+}
+
 /** The chokepoint check of the touched invariants at an edit, as text: what it could not check, and any structural defect it found. */
-async function checkAtEdit(root: string, input: HookInput, options: HookOptions, files: readonly string[], model: SpecModel, touched: readonly string[]): Promise<string> {
-  const session = sessionOf(input) ?? "unknown-session";
+async function checkAtEdit(root: string, input: HookInput, options: HookOptions, files: readonly string[], model: SpecModel, touched: readonly string[], putOff: PutOff): Promise<string> {
+  const session = sessionOf(input);
   const agent = agentOf(input);
+  let wasPutOff = false;
+  const onNoServer = putOff.onNoServer === undefined ? undefined : (language: string | undefined): string => {
+    wasPutOff = true;
+    return putOff.onNoServer?.(language) ?? "";
+  };
   // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
-  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false, occasion: "edit" });
+  const outcome = await performRun(root, { session: session ?? "unknown-session", agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false, occasion: "edit", onNoServer, waitWarmMs: putOff.waitWarmMs, startServer: putOff.start });
+  // A check made answers for every earlier edit of the same files that was put off, so a stop does not report it again.
+  if (!wasPutOff && session !== undefined) undeferEditCheck(root, session, files);
   if (outcome.instrumentReason !== undefined) options.onEditCheck?.({ checked: 0, failed: [], unchecked: touched.length, reason: outcome.instrumentReason });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
@@ -976,13 +1148,19 @@ export interface HookOptions {
   door?: WarmDoor | undefined;
   /** How long a session start may wait for a nearly done refresh; START_WAIT_MS by default. */
   startWaitMs?: number | undefined;
+  /** How long a stop waits for a server an edit started; STOP_SERVER_WAIT_MS by default. */
+  stopWaitMs?: number | undefined;
+  /** How long an edit waits for a server it started or found loading; what is left of the latency budget by default. */
+  editWaitMs?: number | undefined;
   /**
-   * Start warming the instrument without waiting for it: at a session's
-   * start and at each prompt, so the stop that ends the turn finds the warm
-   * server loaded and its idle timer fresh. The command line passes
-   * WARM_UP; absent (a test), nothing is started.
+   * Start one language's instrument without waiting for it, called by an
+   * edit that needs it and finds none loaded, so a session that never edits a
+   * chokepoint's code starts no language server. Returns whether it started
+   * one: an edit or stop whose warm-up started nothing puts no check off. The
+   * command line passes WARM_UP; absent (a test), the edit's check starts the
+   * server itself.
    */
-  warm?: ((root: string) => void) | undefined;
+  warm?: ((root: string, language?: string) => boolean) | undefined;
   /** When the hook's process started (epoch ms), so a call's time counts loading the code; the call's own start when absent. */
   startedAt?: number | undefined;
   /**
@@ -1083,37 +1261,37 @@ export function economyStopText(snapshot: Snapshot | undefined, currentFingerpri
 
 /**
  * The warm-up the command line starts: this checkout's warm verb, detached
- * and never waited on. COHERENCE_NO_WARM_UP=1 starts nothing: the test suite
- * sets it, since a detached server started in a fixture outlives the test
- * and writes into a folder the test is removing.
+ * and never waited on; returns whether it started one. COHERENCE_NO_WARM_UP=1
+ * starts nothing: the test suite sets it, since a detached server started in a
+ * fixture outlives the test and writes into a folder the test is removing.
  */
-export const WARM_UP = (root: string): void => {
-  if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
+export const WARM_UP = (root: string, language?: string): boolean => {
+  if (process.env["COHERENCE_NO_WARM_UP"] === "1") return false;
   try {
-    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "warm"], { cwd: root, detached: true, stdio: "ignore" });
+    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "warm", ...(language === undefined ? [] : ["--language", language])], { cwd: root, detached: true, stdio: "ignore" });
     child.on("error", () => {});
     child.unref();
+    return child.pid !== undefined;
   } catch {
-    // A warm-up that cannot start only means the stop starts the server itself.
+    // A warm-up that cannot start says so: the edit then checks nothing and puts nothing off, since the stop starts no server either.
+    return false;
   }
 };
 
-/** The refresh the command line starts: this checkout's query structure, which records the reading it takes. */
+/** The refresh the command line starts: this checkout's query structure, warm-only so a refresh never starts a language server, which records the reading it takes. */
 export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
-  refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure"], fingerprint);
+  refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure", "--warm-only"], fingerprint, Date.now, structureRefreshSlot(root, () => recordedServers(root)));
 };
 
 /**
  * The snapshot the command line starts at a stop: this checkout's economy
- * --snapshot, one per session, a newer patch superseding an older one. It
- * starts the warm server when none listens, so COHERENCE_NO_WARM_UP=1 starts
- * nothing here either.
+ * --snapshot, one per session, a newer patch superseding an older one, and
+ * the same patch again only once a server is recorded after a snapshot that
+ * found none. COHERENCE_NO_WARM_UP=1 starts nothing here either.
  */
 export const ECONOMY_SNAPSHOT = (root: string, session: string, fingerprint: string): void => {
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
-  const mark = traceFile(root, session).replace(/\.jsonl$/, ".snapshot.json");
-  const ownCommand = new RegExp(`(?:^|\\s)economy\\s+--snapshot\\s+${escapeRegExp(session)}\\s*$`);
-  refreshInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "economy", "--snapshot", session], fingerprint, Date.now, { path: mark, command: ownCommand });
+  snapshotInBackground(root, session, fingerprint, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "economy", "--snapshot", session]);
 };
 
 /** The mirror refresh the command line starts: this checkout's query mirrors --refresh, which reads only when the kept reading is of another commit. */
@@ -1361,8 +1539,6 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     const session = sessionOf(input);
     if (session === undefined || oriented(place.root, session)) return result;
     const root = place.root;
-    // The session has just entered the project, which no start or prompt warmed: its instrument starts now, before the edit that needs it.
-    options.warm?.(root);
     const reading = await keptReading(root, await loadProjectLexicons(root));
     const gaps = await gapReading(root);
     const start = await startReading(root, input, reading, gaps);
@@ -1396,7 +1572,6 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     switch (event) {
       case "SessionStart":
       case "SubagentStart": {
-        if (event === "SessionStart") options.warm?.(root);
         const reading=await keptReading(root, await loadProjectLexicons(root));
         // Only a session start waits, and only for a refresh of this tree that is nearly done; a subagent starts at once.
         let gaps = await gapReading(root, event === "SessionStart" ? { waitMs: options.startWaitMs ?? START_WAIT_MS } : {});
@@ -1454,8 +1629,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
           // What this tool use wrote is the session's own patch, which the stop predicts for.
           recordWriteTrace(root, session, written);
         }
-        if (event === "UserPromptSubmit") options.warm?.(root);
-        const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host }) : "";
+        const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host, startedAt: began }) : "";
         // A hand list declared as a mirror, read again only when this edit wrote a file it watches: one lookup otherwise.
         const mirror = event === "PostToolUse" ? mirrorAlarm(root, written, session) : { text: "", commit: () => {} };
         // A spec or practice file this edit wrote is parsed again, alone, and its problems said now: never the whole model at an edit.
@@ -1539,6 +1713,16 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const fingerprint = session ? patchFingerprint(root, patch, filesRead(root, session).length) : undefined;
         if (session && fingerprint !== undefined) await snapshotAtStop(root, session, patch, fingerprint, options);
         const snapshot = session ? lastSnapshot(root, session) : undefined;
+        // A stop routes by its folder and an edit by its file, so the checks put off in every project the session listed, or above several the stop sits in, are made here too.
+        const entered = session ? [...new Set([...(routed?.kind === "several" ? routed.projects : []), ...deferringProjects(session)])].filter((project) => project !== root) : [];
+        // Every project drains at once, so a stop waits for a loading server once in all, never once per project; its own project is said first.
+        const [hereText = "", ...elsewhereTexts] = session ? await Promise.all([drainDeferred(root, input, options, session), ...entered.map(async (project) => {
+          const made = await drainDeferred(project, input, options, session);
+          return made === "" ? "" : `In ${project}:\n${made}`;
+        })]) : [];
+        const deferredText = hereText + elsewhereTexts.join("");
+        // A check made here may have recorded a run, which the spec text below must read.
+        if (deferredText !== "") eventModels?.delete(root);
         const walls = unableWalls(root, input);
         const spec = specStopText(root, changed.files, walls);
         const lexicon = lexiconStopText(report, walls);
@@ -1559,6 +1743,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const latencyText = hookLatencyStopText(root, session);
         const parts: string[] = [];
         if (changedText !== "") parts.push(changedText);
+        if (deferredText !== "") parts.push(deferredText.trimEnd());
         if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
         if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
         if (workText !== "") parts.push(`Work:\n${workText}`);

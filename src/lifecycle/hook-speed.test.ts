@@ -7,17 +7,19 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { patchFingerprint, recordWriteTrace, sessionPatch, traceFile, type Snapshot } from "../economy/trace.ts";
-import { economyStopText, editContext, runHook } from "./hook.ts";
+import { patchFingerprint, recordWriteTrace, sessionPatch, snapshotInBackground, snapshotSession, snapshotSlot, traceFile, type Snapshot } from "../economy/trace.ts";
+import { WARM_UP, economyStopText, editContext, runHook } from "./hook.ts";
 import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
 import { lastHookWork } from "./work-meter.ts";
+import { serve, serverPaths, type Serving } from "../enforcement/server.ts";
+import { withWarmAdapter } from "../enforcement/run.ts";
 
 function repo(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-hook-speed-"));
@@ -74,20 +76,171 @@ test("a stop starts the snapshot detached, with a fingerprint that moves only wi
     assert.equal(started.length, 3);
     assert.equal(started[0], started[1], "an unchanged patch keeps its fingerprint, so no second closure starts");
     assert.notEqual(started[1], started[2], "an edit moves it, so the newer patch supersedes");
+    // What the production stop starts, with a command that exits at once standing in for economy --snapshot.
+    const fingerprint = patchFingerprint(root, ["src/a.ts"], 0);
+    const quick = [process.execPath, "-e", ""];
+    writeFileSync(snapshotSlot(root, "s1"), JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint }));
+    await snapshotSession(root, "s1", ((_root, take, given) => take(undefined, undefined, given?.onNoServer?.(undefined))) as typeof withWarmAdapter);
+    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), false, "a stop on the same patch with no server loaded starts no snapshot process");
+    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), false, "nor at any stop after it");
+    mkdirSync(dirname(serverPaths(root).pointer), { recursive: true });
+    writeFileSync(serverPaths(root).pointer, JSON.stringify({ pid: process.pid }));
+    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), true, "a snapshot that found no server loaded is taken again on the same patch once a server is recorded");
+    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), false, "and once only");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("a session start and every prompt warm the instrument without waiting for it, and no other event does", async () => {
-  const root = repo({ "README.md": "x\n" });
+test("the instrument starts at the first edit whose check finds no server loaded, never at a session start or prompt, and the stop makes the check the edit deferred", { timeout: 120_000 }, async () => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const root = repo({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    "coherence.config.json": JSON.stringify({ language: "typescript" }),
+    "Fixture.spec.md": spec,
+    "src/a.ts": "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  let serving: Serving | undefined;
   try {
     const warmed: string[] = [];
-    const options = { warm: (r: string) => void warmed.push(r) };
+    const options = { stopWaitMs: 300, editWaitMs: 300, warm: (r: string) => warmed.push(r) > 0 };
     for (const event of ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"] as const) {
-      await runHook(event, { cwd: root, session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } }, root, options);
+      (await runHook(event, { cwd: root, session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } }, root, options)).commit?.();
     }
-    assert.deepEqual(warmed, [root, root], "the start and the prompt, once each");
+    assert.deepEqual(warmed, [], "no start, prompt or tool use that writes nothing starts it");
+    const edit = await runHook("PostToolUse", { cwd: root, session_id: "s1", tool_name: "Edit", tool_input: { file_path: join(root, "src/a.ts") } }, root, options);
+    assert.deepEqual(warmed, [root], "the edit that needs it starts it");
+    assert.match(edit.stdout, /could not check 1 chokepoint invariant at this edit: no language server was loaded for this project, so one is starting now; this turn's stop checks this edit/);
+    const subagent = { cwd: root, session_id: "s1", agent_id: "a1", agent_type: "worker" };
+    await runHook("PostToolUse", { ...subagent, tool_name: "Edit", tool_input: { file_path: join(root, "src/a.ts") } }, root, options);
+    const subagentStop = await runHook("SubagentStop", { ...subagent, hook_event_name: "SubagentStop" }, root, options);
+    assert.match(subagentStop.stdout, /the language server is still loading; the coordinator's next stop checks these edits/, "a subagent that stops before the server loads hands its check on");
+    const early = await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    assert.match(early.stdout, /the language server is still loading; the next stop checks these edits/, "a stop with no server listening starts it again and keeps the check");
+    serving = await serve(root, { idleMs: 120_000 });
+    await withWarmAdapter(root, async () => {});
+    const stop = await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    assert.match(stop.stdout, /could not check 1 chokepoint invariant at an edit before this stop:\\n\s+○ [^:]*ghost door: /, "the loaded server makes the deferred check, the subagent's handed on with it");
+    const again = await runHook("Stop", { cwd: root, session_id: "s1" }, root, options);
+    assert.doesNotMatch(again.stdout, /before this stop/, "a check made is not made again");
+  } finally {
+    await serving?.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an edit whose server loads within the latency budget makes its check at the edit, and puts nothing off to the stop", { timeout: 120_000 }, async () => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const root = repo({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    "coherence.config.json": JSON.stringify({ language: "typescript" }),
+    "Fixture.spec.md": spec,
+    "src/a.ts": "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  let serving: Serving | undefined;
+  try {
+    // The edit's start stands in for WARM_UP: it starts the server detached and returns, and the edit waits for it to load.
+    const options = { editWaitMs: 60_000, stopWaitMs: 300, warm: (r: string) => (void serve(r, { idleMs: 120_000 }).then((s) => (serving = s)), true) };
+    const edit = await runHook("PostToolUse", { cwd: root, session_id: "s2", tool_name: "Edit", tool_input: { file_path: join(root, "src/a.ts") } }, root, options);
+    assert.match(edit.stdout, /could not check 1 chokepoint invariant at this edit:\\n\s+○ [^:]*ghost door: /, "the check is made at the edit once the server it started has loaded");
+    assert.doesNotMatch(edit.stdout, /this turn's stop checks this edit/);
+    const stop = await runHook("Stop", { cwd: root, session_id: "s2" }, root, options);
+    assert.doesNotMatch(stop.stdout, /before this stop|still loading/, "nothing was put off, so the stop makes no check");
+  } finally {
+    await serving?.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an edit or stop whose warm-up started no server says so at once and puts nothing off, so no later stop waits for it", { timeout: 120_000 }, async (t) => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const root = repo({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    "coherence.config.json": JSON.stringify({ language: "typescript" }),
+    "Fixture.spec.md": spec,
+    "src/a.ts": "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  const was = process.env["COHERENCE_NO_WARM_UP"];
+  process.env["COHERENCE_NO_WARM_UP"] = "1";
+  t.after(() => (was === undefined ? delete process.env["COHERENCE_NO_WARM_UP"] : (process.env["COHERENCE_NO_WARM_UP"] = was)));
+  try {
+    assert.equal(WARM_UP(root), false, "the command line's warm-up says it started nothing when the suite turns it off");
+    const edited = { cwd: root, session_id: "s3", tool_name: "Edit", tool_input: { file_path: join(root, "src/a.ts") } };
+    const none = { editWaitMs: 20_000, stopWaitMs: 20_000, warm: () => false };
+    let began = Date.now();
+    const edit = await runHook("PostToolUse", edited, root, none);
+    assert.ok(Date.now() - began < 10_000, `the edit waits for no server none will start (${Date.now() - began} ms)`);
+    assert.match(edit.stdout, /could not check 1 chokepoint invariant at this edit: no language server was loaded for this project, and none could be started, so nothing checks this edit/);
+    assert.doesNotMatch(edit.stdout, /one is starting now|this turn's stop checks this edit/);
+    began = Date.now();
+    const stop = await runHook("Stop", { cwd: root, session_id: "s3" }, root, none);
+    assert.ok(Date.now() - began < 10_000, `the stop waits on nothing the edit did not put off (${Date.now() - began} ms)`);
+    assert.doesNotMatch(stop.stdout, /before this stop|still loading/, "nothing was put off");
+    // A check put off while a server was starting, whose stop then can start none, is said once and dropped.
+    await runHook("PostToolUse", edited, root, { editWaitMs: 300, warm: () => true });
+    began = Date.now();
+    const dropped = await runHook("Stop", { cwd: root, session_id: "s3" }, root, none);
+    assert.ok(Date.now() - began < 10_000, `the stop waits for no server none will start (${Date.now() - began} ms)`);
+    assert.match(dropped.stdout, /none could be started, so nothing checks these edits/);
+    const after = await runHook("Stop", { cwd: root, session_id: "s3" }, root, none);
+    assert.doesNotMatch(after.stdout, /before this stop|still loading/, "a dropped check is not kept for the next stop");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a stop makes the check an edit put off in a sibling project, whatever folder the stop routes to", { timeout: 120_000 }, async (t) => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const project = (name: string): Record<string, string> => ({
+    [`${name}/tsconfig.json`]: JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    [`${name}/coherence.config.json`]: JSON.stringify({ language: "typescript" }),
+    [`${name}/Fixture.spec.md`]: spec,
+    [`${name}/src/a.ts`]: "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  const root = realpathSync(repo({ ...project("pa"), ...project("pb") }));
+  const [pa, pb] = [join(root, "pa"), join(root, "pb")];
+  process.env["CLAUDE_PROJECT_DIR"] = root;
+  t.after(() => delete process.env["CLAUDE_PROJECT_DIR"]);
+  let serving: Serving | undefined;
+  try {
+    const options = { editWaitMs: 300, warm: () => true };
+    const edit = await runHook("PostToolUse", { cwd: pb, session_id: "sib", tool_name: "Edit", tool_input: { file_path: join(pa, "src/a.ts") } }, root, options);
+    assert.match(edit.stdout, /this turn's stop checks this edit/, "the edit in the sibling project puts its check off");
+    serving = await serve(pa, { idleMs: 120_000 });
+    await withWarmAdapter(pa, async () => {});
+    const stop = await runHook("Stop", { cwd: pb, session_id: "sib" }, root, options);
+    assert.match(stop.stdout, /In \S*\/pa:\\nCoherence could not check 1 chokepoint invariant at an edit before this stop/, "the stop routed to the folder it sits in still makes the sibling's check");
+  } finally {
+    await serving?.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a stop drains its own project and every sibling's put-off checks at once, so it waits for a loading server once, not once per project", { timeout: 120_000 }, async (t) => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
+  const project = (name: string): Record<string, string> => ({
+    [`${name}/tsconfig.json`]: JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    [`${name}/coherence.config.json`]: JSON.stringify({ language: "typescript" }),
+    [`${name}/Fixture.spec.md`]: spec,
+    [`${name}/src/a.ts`]: "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
+  });
+  const root = realpathSync(repo({ ...project("pa"), ...project("pb") }));
+  const [pa, pb] = [join(root, "pa"), join(root, "pb")];
+  process.env["CLAUDE_PROJECT_DIR"] = root;
+  t.after(() => delete process.env["CLAUDE_PROJECT_DIR"]);
+  try {
+    const edit = { editWaitMs: 300, warm: () => true };
+    for (const project of [pa, pb]) await runHook("PostToolUse", { cwd: pb, session_id: "both", tool_name: "Edit", tool_input: { file_path: join(project, "src/a.ts") } }, root, edit);
+    // Nothing ever listens, so each project's drain waits the whole stopWaitMs; its warm-up marks when that wait began.
+    const began = new Map<string, number>();
+    const stopWaitMs = 3_000;
+    const stop = await runHook("Stop", { cwd: pb, session_id: "both" }, root, { stopWaitMs, warm: (r: string) => (began.set(r, Date.now()), true) });
+    assert.deepEqual([...began.keys()].sort(), [pa, pb], "both projects' drains waited");
+    const apart = Math.abs((began.get(pa) ?? 0) - (began.get(pb) ?? 0));
+    assert.ok(apart < stopWaitMs / 2, `the two waits ran together, not one after the other (${apart} ms apart)`);
+    const here = stop.stdout.indexOf("the language server is still loading");
+    const there = stop.stdout.indexOf(`In ${pa}:`);
+    assert.ok(here >= 0 && there > here, "the stop's own project is said first, then each sibling");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

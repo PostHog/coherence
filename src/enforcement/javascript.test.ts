@@ -12,7 +12,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
@@ -89,6 +89,24 @@ test("the language server binary is found (the adapter's precondition)", () => {
   assert.ok(serverPresent, "typescript-language-server must be installed: npm install");
 });
 
+test("an adapter closed while it starts leaves no language server running", { timeout: 60_000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-closing-"));
+  mkdirSync(join(dir, "src"));
+  writeFileSync(join(dir, "tsconfig.json"), `{ "compilerOptions": { "strict": true, "noEmit": true }, "include": ["src"] }`);
+  writeFileSync(join(dir, "src", "a.ts"), "export const a = 1;\n");
+  const closing = new TypeScriptAdapter(dir);
+  try {
+    const starting = closing.ready();
+    await closing.close();
+    const state = await starting;
+    assert.equal(closing.serverPid(), undefined, `a language server was started after the close: ${JSON.stringify(state)}`);
+    assert.equal(state.ok, false);
+  } finally {
+    await closing.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("a plain-JavaScript project is walked, its symbols resolve, and every site is classified as in the TypeScript fixture", async () => {
   const protectedThing = (await adapter.resolve("SECRET_COLUMNS", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
   const chokepoint = (await adapter.resolve("seal", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
@@ -104,6 +122,154 @@ test("a plain-JavaScript project is walked, its symbols resolve, and every site 
     "src/api/render.mjs:5 bypass",
     "src/store/secrets.mjs:8 inside",
   ]);
+});
+
+test("with tsgo turned off the same check grades the same through tsserver, and each adapter names the engine that answered", async () => {
+  const grades: string[] = [];
+  for (const tsgo of [undefined, "0"]) {
+    const previous = process.env["COHERENCE_TSGO"];
+    if (tsgo === undefined) delete process.env["COHERENCE_TSGO"];
+    if (tsgo !== undefined) process.env["COHERENCE_TSGO"] = tsgo;
+    const engineAdapter = new TypeScriptAdapter(root);
+    try {
+      await engineAdapter.ready();
+      const broken = await checkChokepoint(engineAdapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root });
+      const hidden = await checkChokepoint(engineAdapter, { protects: "HIDDEN", chokepoint: "peek", ...hint, root });
+      grades.push(`${engineAdapter.engine}: ${broken.grade} ${JSON.stringify(broken.bypasses)} ${broken.refutation}; ${hidden.grade} ${hidden.refutation}`);
+    } finally {
+      await engineAdapter.close();
+      if (previous === undefined) delete process.env["COHERENCE_TSGO"];
+      if (previous !== undefined) process.env["COHERENCE_TSGO"] = previous;
+    }
+  }
+  assert.match(grades[0]!, /^tsgo: /);
+  assert.match(grades[1]!, /^tsserver: /);
+  assert.equal(grades[0]!.replace(/^tsgo/, "tsserver"), grades[1], grades.join("\n"));
+});
+
+test("the default engine grades as tsserver does where TypeScript 7 answers otherwise: a removed baseUrl in a tsconfig, a jsconfig or a referenced config, an augmentation in another file, and a re-export after another statement, a comment or a BOM, and lists a declaration on an import's line", { timeout: 120_000 }, async () => {
+  const nodeNext = `{ "compilerOptions": { "strict": true, "module": "NodeNext", "moduleResolution": "NodeNext", "noEmit": true }, "include": ["src"] }`;
+  const projects = [
+    {
+      files: { "tsconfig.json": `{ "compilerOptions": { "baseUrl": "src", "moduleResolution": "node", "module": "commonjs", "strict": true, "noEmit": true }, "include": ["src"] }`, "src/lib/secrets.ts": "export const SECRET_COLUMNS = 1;\nexport function seal() { return SECRET_COLUMNS; }\n", "src/leak.ts": 'import { SECRET_COLUMNS } from "lib/secrets";\nexport const leaked = SECRET_COLUMNS;\n' },
+      expected: [{ protects: "SECRET_COLUMNS", chokepoint: "seal", graded: 'broken ["src/leak.ts:1","src/leak.ts:2"]' }],
+    },
+    {
+      files: {
+        "tsconfig.json": nodeNext,
+        "src/a.ts": "export interface Shape { size: number }\nexport function makeShape(): Shape { return { size: 1 }; }\n",
+        "src/b.ts": 'import { makeShape } from "./a.js";\ndeclare module "./a.js" {\n  interface Shape { color?: string }\n}\nexport const made = makeShape();\n',
+        "src/store/dep.ts": "export const base = 1;\n",
+        "src/store/secrets.ts": 'import { base } from "./dep.js"; export const SECRET = { a: base };\nexport function seal() { return SECRET; }\n',
+        "src/api/render.ts": 'import { SECRET } from "../store/secrets.js";\nexport const leaked = SECRET;\n',
+      },
+      expected: [
+        { protects: "Shape", chokepoint: "makeShape", graded: "reference-choked []" },
+      ],
+    },
+    {
+      files: {
+        "tsconfig.json": nodeNext,
+        "src/store/s.ts": "export const SECRET = { a: 1 };\nexport const OTHER = 2;\nexport const THIRD = 3;\nexport function seal() { return SECRET; }\n",
+        "src/api/barrel.ts": 'export { seal } from "../store/s.js"; export { SECRET } from "../store/s.js";\n',
+        "src/api/commented.ts": '/* public */ export { OTHER } from "../store/s.js";\n',
+        "src/api/bom.ts": '\uFEFFexport { THIRD } from "../store/s.js";\n',
+      },
+      expected: [
+        { protects: "SECRET", chokepoint: "seal", graded: 'broken ["src/api/barrel.ts:1"]' },
+        { protects: "OTHER", chokepoint: "seal", graded: 'broken ["src/api/commented.ts:1"]' },
+        { protects: "THIRD", chokepoint: "seal", graded: 'broken ["src/api/bom.ts:1"]' },
+      ],
+    },
+    {
+      files: { "jsconfig.json": `{ "compilerOptions": { "allowJs": true, "baseUrl": "src", "module": "commonjs", "moduleResolution": "node", "noEmit": true }, "include": ["src"] }`, "src/store/s.js": "export const SECRET = { a: 1 };\nexport function seal() { return SECRET; }\n", "src/api/leak.js": 'import { SECRET } from "store/s";\nexport const leaked = SECRET;\n' },
+      expected: [{ protects: "SECRET", chokepoint: "seal", graded: 'broken ["src/api/leak.js:1","src/api/leak.js:2"]' }],
+    },
+    {
+      files: {
+        "tsconfig.json": `{ "files": [], "references": [{ "path": "./tsconfig.app.json" }] }`,
+        "tsconfig.app.json": `{ "compilerOptions": { "composite": true, "baseUrl": "src", "module": "commonjs", "moduleResolution": "node", "strict": true, "outDir": "out" }, "include": ["src"] }`,
+        "src/store/s.ts": "export const SECRET = { a: 1 };\nexport function seal() { return SECRET; }\n",
+        "src/api/leak.ts": 'import { SECRET } from "store/s";\nexport const leaked = SECRET;\n',
+      },
+      expected: [{ protects: "SECRET", chokepoint: "seal", graded: 'broken ["src/api/leak.ts:1","src/api/leak.ts:2"]' }],
+    },
+  ];
+  for (const project of projects) {
+    const dir = mkdtempSync(join(tmpdir(), "coherence-tsgo-parity-"));
+    for (const [path, text] of Object.entries(project.files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(join(dir, path), text, "utf8");
+    }
+    const defaultAdapter = new TypeScriptAdapter(dir);
+    try {
+      for (const expected of project.expected) {
+        const checked = await checkChokepoint(defaultAdapter, { protects: expected.protects, chokepoint: expected.chokepoint, ...hint, root: dir });
+        assert.equal(`${checked.grade} ${JSON.stringify(checked.bypasses.map((bypass) => `${bypass.file}:${bypass.line}`))}`, expected.graded, `${expected.protects} through ${defaultAdapter.engine}`);
+      }
+      if ("src/store/secrets.ts" in project.files) assert.ok((await defaultAdapter.topLevelSymbols("src/store/secrets.ts")).some((symbol) => symbol.name === "SECRET"), `SECRET through ${defaultAdapter.engine}`);
+    } finally {
+      await defaultAdapter.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+/** A TypeScript project written into a fresh temporary folder, by its real path, so the paths tsgo reports are the paths the adapter asks with. */
+function tsProject(files: Record<string, string>): string {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "coherence-tsgo-")));
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text, "utf8");
+  }
+  return dir;
+}
+
+test("under tsgo a declaration outside the project is dropped before its file is read: the package declaration an augmentation merges with is never parsed", { timeout: 60_000 }, async () => {
+  const dir = tsProject({
+    "tsconfig.json": `{ "compilerOptions": { "strict": true, "module": "NodeNext", "moduleResolution": "NodeNext", "noEmit": true }, "include": ["src"] }`,
+    "node_modules/vendor/package.json": JSON.stringify({ name: "vendor", version: "1.0.0", types: "index.d.ts" }),
+    "node_modules/vendor/index.d.ts": "export interface Options { a: string }\n",
+    "src/augment.ts": 'import "vendor";\ndeclare module "vendor" {\n  interface Options {\n    secret: string;\n  }\n}\n',
+    "src/use.ts": 'import type { Options } from "vendor";\nexport const o: Options = { a: "", secret: "" };\n',
+  });
+  const tsgoAdapter = new TypeScriptAdapter(dir);
+  try {
+    await tsgoAdapter.ready();
+    assert.equal(tsgoAdapter.engine, "tsgo");
+    const sites = await tsgoAdapter.references({ name: "Options", kind: "symbol", file: "src/augment.ts", range: { start: { line: 2, character: 2 }, end: { line: 4, character: 3 } }, selection: { line: 2, character: 12 } });
+    assert.deepEqual(sites.map((site) => `${site.file}:${site.line}`), ["src/use.ts:1", "src/use.ts:2"]);
+    const read = [...(tsgoAdapter as unknown as { lineCache: Map<string, string[]> }).lineCache.keys()];
+    assert.deepEqual(read.filter((file) => file.includes("node_modules")), [], `the adapter read ${read.join(", ")}`);
+  } finally {
+    await tsgoAdapter.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("under tsgo a refutation answers from one diagnostic pull: one that draws no refusal comes back unseen without waiting out the window", { timeout: 60_000 }, async () => {
+  // SECRET's export shares its line with an import, which visibilityOf reads as not exported, so the refutation asks the compiler to refuse an import it accepts.
+  const dir = tsProject({
+    "tsconfig.json": `{ "compilerOptions": { "strict": true, "module": "NodeNext", "moduleResolution": "NodeNext", "noEmit": true }, "include": ["src"] }`,
+    "src/store/dep.ts": "export const base = 1;\n",
+    "src/store/secrets.ts": 'import { base } from "./dep.js"; export const SECRET = { a: base };\nexport function seal() { return SECRET; }\n',
+  });
+  const tsgoAdapter = new TypeScriptAdapter(dir);
+  try {
+    await tsgoAdapter.ready();
+    assert.equal(tsgoAdapter.engine, "tsgo");
+    const resolved = await tsgoAdapter.resolve("SECRET", hint);
+    assert.ok(resolved.ok);
+    const started = Date.now();
+    const refutation = await tsgoAdapter.refute(resolved.definition, undefined);
+    const took = Date.now() - started;
+    assert.equal(refutation.seen, false, refutation.account);
+    assert.match(refutation.account, /drew no diagnostic from the compiler/);
+    assert.ok(took < 5_000, `the refutation took ${took} ms; its window is 15 s`);
+  } finally {
+    await tsgoAdapter.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("grades on JavaScript: broken with a bypass, then a pass once the bypass is gone; the automatic refutation stages .mjs documents the project can see", async () => {

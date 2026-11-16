@@ -8,13 +8,14 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { installedPackage, locateServer } from "./installed.ts";
-import { locateTsserver, tsserverNotice } from "../../plugins/typescript/tsserver.ts";
+import { locateTsgo, locateTsserver, tsgoRefusal, tsserverNotice } from "../../plugins/typescript/tsserver.ts";
 import { startContext, languageNoticeBlock as tsserverBlock } from "../lifecycle/hook.ts";
 
 // The real path: the resolver answers with real paths, and on macOS the temporary folder is a link.
@@ -103,11 +104,32 @@ test("a server neither the project nor Coherence holds is found on PATH, and its
   assert.equal(locateTsserver(root, coherenceFrom), undefined);
 });
 
-test("orient says once that Coherence reads with its own TypeScript when the project's is 7 or later", async () => {
+test("orient says once which compiler reads a TypeScript project when it is not the project's own: Coherence's TypeScript when the project's is 7 or later and tsgo is off or refused a config, tsgo when the project's is 5; nothing when tsgo answers a TypeScript 7 project", async (t) => {
+  const ts5 = join(scratch, "orient-ts5");
+  pkg(join(ts5, "node_modules", "typescript"), TS5("5.8.2"), ["lib/tsserver.js"]);
+  write(join(ts5, "package.json"), JSON.stringify({ name: "orient-ts5" }));
+  write(join(ts5, "coherence.config.json"), JSON.stringify({ name: "orient-ts5", language: "typescript" }));
+  assert.match(tsserverBlock(ts5), /^TypeScript: Coherence reads this project with tsgo 7\.\d+\.\d+, TypeScript's native compiler, not with its own TypeScript 5\.8\.2/);
+  write(join(ts5, "tsconfig.json"), "{}");
+  write(join(ts5, "tsconfig.app.json"), "{}");
+  execFileSync("git", ["init", "-q"], { cwd: ts5 });
+  execFileSync("git", ["add", "tsconfig.json", "tsconfig.app.json"], { cwd: ts5 });
+  rmSync(join(ts5, "tsconfig.app.json"));
+  assert.match(tsserverBlock(ts5), /^TypeScript: Coherence reads this project with tsgo/, "a tracked config deleted from the tree is read as missing");
   const root = join(scratch, "orient-ts7");
   pkg(join(root, "node_modules", "typescript"), TS7, TS7_FILES);
   write(join(root, "package.json"), JSON.stringify({ name: "orient-ts7" }));
   write(join(root, "coherence.config.json"), JSON.stringify({ name: "orient-ts7", language: "typescript" }));
+  assert.equal(tsserverBlock(root), "", "tsgo answers a TypeScript 7 project, so nothing is said");
+  write(join(root, "tsconfig.json"), JSON.stringify({ extends: "./base.json" }));
+  write(join(root, "base.json"), JSON.stringify({ compilerOptions: {} }));
+  assert.equal(await tsgoRefusal(locateTsgo(root)!, root), undefined);
+  write(join(root, "base.json"), JSON.stringify({ compilerOptions: { baseUrl: "." } }));
+  assert.match((await tsgoRefusal(locateTsgo(root)!, root)) ?? "", /TS5102/, "a config the tsconfig extends gaining a removed option is probed again");
+  assert.match(tsserverBlock(root), /ships no tsserver, so Coherence is using its own TypeScript [\d.]+ for readings .* tsgo refused tsconfig\.json: .*TS5102/);
+  rmSync(join(root, "tsconfig.json"));
+  process.env["COHERENCE_TSGO"] = "0";
+  t.after(() => delete process.env["COHERENCE_TSGO"]);
   const own = (JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "node_modules", "typescript", "package.json"), "utf8")) as { version: string }).version;
   const line = `TypeScript: this project's TypeScript 7.0.2 ships no tsserver, so Coherence is using its own TypeScript ${own} for readings`;
   assert.ok(tsserverBlock(root).startsWith(line), tsserverBlock(root));
@@ -115,6 +137,43 @@ test("orient says once that Coherence reads with its own TypeScript when the pro
   assert.equal(text.split(line).length - 1, 1, `orient carries the line exactly once:\n${text.slice(0, 600)}`);
   write(join(root, "coherence.config.json"), JSON.stringify({ name: "orient-ts7", language: "python" }));
   assert.equal(tsserverBlock(root), "", "a project that reads no TypeScript is told nothing about its TypeScript");
+});
+
+test("tsgo's refusal probe never holds the event loop and stops at its budget over every config together, keeping nothing it could not finish", async () => {
+  const root = join(scratch, "probe-budget");
+  for (const name of ["tsconfig.json", "tsconfig.a.json", "tsconfig.b.json"]) write(join(root, name), "{}");
+  // A tsgo that lists nothing for longer than the budget, as a monorepo's program listings would.
+  const slow = join(scratch, "slow-tsgo", "tsc");
+  write(slow, "#!/bin/sh\nexec sleep 5\n");
+  execFileSync("chmod", ["+x", slow]);
+  let ticks = 0;
+  const ticking = setInterval(() => (ticks += 1), 20);
+  const started = Date.now();
+  try {
+    assert.equal(await tsgoRefusal({ path: slow, version: "7.0.2", whose: "coherence" }, root, 600), undefined, "an unfinished probe refuses nothing, so tsgo reads");
+  } finally {
+    clearInterval(ticking);
+  }
+  const took = Date.now() - started;
+  assert.ok(ticks >= 10, `the event loop ran ${ticks} timer ticks in ${took} ms while the probe listed`);
+  assert.ok(took < 3_000, `the probe took ${took} ms over a 600 ms budget; three configs at 5 s each would take 15 s`);
+  assert.equal(readdirSync(root).includes(".coherence"), false, "an unfinished probe keeps no answer");
+});
+
+test("a config in a folder the config ignores or inside a nested checkout never decides which engine reads; one the walk reads does", async () => {
+  const root = join(scratch, "probe-bounds");
+  const removed = JSON.stringify({ compilerOptions: { baseUrl: "." } });
+  write(join(root, "tsconfig.json"), "{}");
+  write(join(root, "fixtures", "legacy", "tsconfig.json"), removed);
+  write(join(root, "nested", "tsconfig.json"), removed);
+  write(join(root, "coherence.config.json"), JSON.stringify({ name: "probe-bounds", language: "typescript", ignore: ["fixtures"] }));
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  execFileSync("git", ["add", "."], { cwd: root });
+  execFileSync("git", ["init", "-q"], { cwd: join(root, "nested") });
+  const tsgo = locateTsgo(root)!;
+  assert.equal(await tsgoRefusal(tsgo, root), undefined, "the ignored fixture's and the nested checkout's removed baseUrl leave tsgo reading");
+  write(join(root, "coherence.config.json"), JSON.stringify({ name: "probe-bounds", language: "typescript" }));
+  assert.match((await tsgoRefusal(tsgo, root)) ?? "", /^fixtures\/legacy\/tsconfig\.json: .*TS5102/, "the same fixture, no longer ignored, is read and decides");
 });
 
 /** Every non-test TypeScript source under a folder. */

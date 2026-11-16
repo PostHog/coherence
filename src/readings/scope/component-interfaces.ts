@@ -76,6 +76,7 @@
 
 import { execFile } from "../../lifecycle/work-meter.ts";
 import { existsSync, readFileSync } from "node:fs";
+import { totalmem } from "node:os";
 import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite, type ResolveHint, type Resolved } from "../../adapters/adapter.ts";
 import { detectEntranceCandidates, escape, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
@@ -335,9 +336,14 @@ export const HEAP_HEADROOM_MB = 2048;
  * tsconfig's project either way, and no bounds means the whole workspace).
  */
 export function interfaceAdapter(root: string, language: Language): { adapter: LanguageAdapter; bounds: string } | undefined {
+  if (!readsOwnBounds(root, language)) return undefined;
   const ignore = configIgnore(root);
-  if (syntaxOf(language, "interfaces")?.serverBounds !== true || ignore.length === 0) return undefined;
   return { adapter: boundedAdapter(language, root, ignore, configuredBudget(root).memoryMB), bounds: ignore.join("\n") };
+}
+
+/** Whether a reading of this language needs a server of its own, narrowed to the config's ignore list, rather than the warm one. */
+export function readsOwnBounds(root: string, language: Language): boolean {
+  return syntaxOf(language, "interfaces")?.serverBounds === true && configIgnore(root).length > 0;
 }
 
 /** The bounds interfaceAdapter would build for the root now, to tell when a kept one is stale. */
@@ -486,6 +492,8 @@ export interface InterfaceBudget {
   memoryMB: number;
 }
 
+const INTERFACE_MEMORY_CEILING_MB = 12288;
+
 /**
  * The default budget. Ten minutes is the totality oracle's own ceiling
  * (TOTALITY_TIMEOUT_MS) and some forty times what Coherence's own reading
@@ -494,10 +502,16 @@ export interface InterfaceBudget {
  * imports and sat pinned at its default ~4 GB Node heap, so the owner
  * ruled (2026-09-23) a bigger heap over a sparse view of the bounded files;
  * the bounded server's heap is raised to the budget plus HEAP_HEADROOM_MB so
- * the budget, not the heap limit, stops the reading. The development
- * machines are Apple Silicon with 48 GB.
+ * the budget, not the heap limit, stops the reading. That ruling was for
+ * 48 GB machines; a smaller one gets a quarter of its memory, so the bounded
+ * server cannot grow past what the machine holds beside its other sessions.
  */
-export const DEFAULT_INTERFACE_BUDGET: InterfaceBudget = { seconds: 600, memoryMB: 12288 };
+export const DEFAULT_INTERFACE_BUDGET: InterfaceBudget = { seconds: 600, memoryMB: defaultInterfaceMemoryMB(totalmem()) };
+
+/** The default memory budget for a machine with this many bytes: a quarter of them, never above the 12 GB ruling. */
+function defaultInterfaceMemoryMB(totalMemoryBytes: number): number {
+  return Math.min(INTERFACE_MEMORY_CEILING_MB, Math.floor(totalMemoryBytes / 1048576 / 4));
+}
 
 /** The config key that overrides the budget: `"interfaceBudget": { "seconds": 600, "memoryMB": 12288 }`. */
 export const BUDGET_KEY = "interfaceBudget";
@@ -652,7 +666,7 @@ function budgetOf(root: string, given: Partial<InterfaceBudget> = {}): Interface
  * started the first time a reading asks for it, never before, and the caller
  * closes them all.
  */
-export function readingAdapters(root: string, budget: Partial<InterfaceBudget> = {}): { of: ReadingAdapters; close: () => Promise<void> } {
+export function readingAdapters(root: string, budget: Partial<InterfaceBudget> = {}): { of: (language: Language) => LanguageAdapter; close: () => Promise<void> } {
   const started = new Map<Language, LanguageAdapter>();
   return {
     of: (language) => {
@@ -713,13 +727,18 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
   const started = Date.now();
   const ignore = configIgnore(root);
   const languages = config.languages;
-  const adapterOf = (language: Language): LanguageAdapter | undefined => (typeof given === "function" ? given(language) : language === languages[0] ? given : undefined);
+  const adapterOf = async (language: Language): Promise<LanguageAdapter | undefined | string> => (typeof given === "function" ? await given(language) : language === languages[0] ? given : undefined);
+  const readOne = async (language: Language, owns: LanguagePart["owns"]): Promise<InterfaceReading> => {
+    const adapter = await adapterOf(language);
+    if (typeof adapter === "string") return { kind: "unread", because: adapter };
+    return readLanguage(root, language, adapter, options, { model, budget, started, owns });
+  };
   const candidates = (): EntranceCandidate[] => detectedEntrances(root, model, languages, config.testFolders, ignore);
   // A project that names only languages its config declares has no built-in to read with: said, never an empty reading.
   if (languages.length === 0) return { kind: "unread", because: `the project names no built-in language: ${DECLARED_NOT_READ}` };
   if (languages.length === 1) {
     // One language: the reading it always was, with the one language read.
-    const reading = await readLanguage(root, languages[0]!, adapterOf(languages[0]!), options, { model, budget, started, owns: () => true });
+    const reading = await readOne(languages[0]!, () => true);
     return reading.kind === "read" ? { ...reading, languages: languagesRead(languages, new Map(), unscannedOf(config)), candidates: candidates() } : reading;
   }
   // Several languages: each one's component code is read through its own adapter, started only when the language has
@@ -737,14 +756,14 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
   const parts: { language: Language; reading: InterfaceReading }[] = [];
   for (const language of languages) {
     if (!held.has(language)) continue;
-    const reading = await readLanguage(root, language, adapterOf(language), options, { model, budget, started, owns: (_component, entrance) => owner(entrance) === language });
+    const reading = await readOne(language, (_component, entrance) => owner(entrance) === language);
     parts.push({ language, reading });
   }
   return mergeLanguages(languages, parts, model, candidates(), unscannedOf(config));
 }
 
-/** An adapter for each language a multi-language reading asks, started by the caller (who closes it); undefined lets the reading start its own. */
-export type ReadingAdapters = (language: Language) => LanguageAdapter | undefined;
+/** An adapter for each language a multi-language reading asks, started by the caller (who closes it); undefined lets the reading start its own, and a string leaves that language unread for the reason it gives. */
+export type ReadingAdapters = (language: Language) => LanguageAdapter | undefined | string | Promise<LanguageAdapter | undefined | string>;
 
 /** What one language's reading shares with the reading of the whole project. */
 interface LanguagePart {

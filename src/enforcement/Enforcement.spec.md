@@ -117,7 +117,7 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   chokepoint: withWarmAdapters
   over: every hook event that re-checks a chokepoint and every reading that needs the instrument itself
   via: two clients ask the same questions; the second finds the server warm
-  because: a hook is short-lived and a cold project load is too slow for a check at the edit; every run and every reading (the economy's closure) connects through one door that finds the warm server or spawns it detached, so no hook and no reading can start its own cold instrument and wait on it
+  because: a hook is short-lived and a cold project load is too slow for a check at the edit; every run and every reading (the economy's closure, query structure) connects through one door that finds the warm server or spawns it detached, so no hook and no reading can start its own cold instrument and wait on it; only a reading narrowed to the config's ignore list (readsOwnBounds) starts a server of its own, since the warm one reads the whole workspace
   crossing: harness -> instrument
   refuted: made the second client report a cold server whether or not one was warm -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none

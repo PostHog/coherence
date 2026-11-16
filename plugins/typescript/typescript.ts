@@ -27,12 +27,14 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash, randomBytes } from "node:crypto";
+import type * as TS from "typescript";
 import {
   isTestPath,
   outsideOfFolder,
   parseName,
   rangeContains,
   statementStartLine,
+  typescriptCompiler,
   withinFolder,
   type Definition,
   type Ladder,
@@ -49,7 +51,7 @@ import {
   type Visibility,
 } from "../../src/plugins/api.ts";
 import { locateServer as locateInstalled, type ServerLocation } from "../../src/plugins/api.ts";
-import { locateTsserver } from "./tsserver.ts";
+import { locateTsgo, locateTsserver, tsgoRefusal, type TsgoChoice } from "./tsserver.ts";
 import manifest from "./plugin.json" with { type: "json" };
 import { JsonRpcClient } from "../../src/plugins/api.ts";
 import { fileIdentity, hintedFiles, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
@@ -257,6 +259,13 @@ function flatten(symbols: DocumentSymbol[], prefix: string[] = []): { path: stri
   return out;
 }
 
+function locationKey(location: Location): string {
+  return `${location.uri}:${location.range.start.line}:${location.range.start.character}`;
+}
+
+/** How many times tsgo is started before the adapter reads with tsserver instead. */
+const TSGO_ATTEMPTS = 2;
+
 export class TypeScriptAdapter implements LanguageAdapter {
   readonly language = "typescript";
   readonly ladder = TYPESCRIPT_LADDER;
@@ -266,6 +275,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private readonly documents = new Map<string, { identity: string | undefined; hash: string }>();
   private readonly symbolCache = new Map<string, DocumentSymbol[]>();
   private readonly lineCache = new Map<string, string[]>();
+  /** Each file's syntax, parsed once per text the line cache holds. */
+  private readonly parsed = new WeakMap<string[], TS.SourceFile>();
   /** The document version last sent per open file; a change carries the next one. */
   private readonly versions = new Map<string, number>();
   /** The first source file, kept open so the project stays loaded. */
@@ -281,6 +292,13 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private listing: { taken: ProjectListing | undefined } | undefined;
   /** The last diagnostics the server published, by project-relative file. */
   private readonly diagnostics = new Map<string, Diagnostic[]>();
+  /** Which server answers: tsgo, TypeScript's native one, until it fails twice, then tsserver through the language server for the adapter's life. */
+  engine: "tsgo" | "tsserver" | undefined;
+  private tsgoFailures = 0;
+  /** The config line tsgo refused, which keeps the adapter on tsserver: a removed option would silently drop the sites it resolves. */
+  tsgoRefused: string | undefined;
+  /** How many times the adapter was closed: a start a close overtook starts no server, which nothing would stop. */
+  private closings = 0;
   readonly root: string;
 
   constructor(root: string) {
@@ -296,14 +314,45 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return this.starting;
   }
 
-  private async start(): Promise<{ ok: true } | { ok: false; reason: string }> {
+  /** Start a server unless the adapter is closed meanwhile: a close that overtakes the refusal probe or tsgo's initialize leaves nothing running and counts no tsgo failure. */
+  private async start(closings = this.closings): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const tsgo = this.tsgoFailures < TSGO_ATTEMPTS ? locateTsgo(this.root) : undefined;
+    this.tsgoRefused ??= tsgo === undefined ? undefined : await tsgoRefusal(tsgo, this.root);
+    if (closings !== this.closings) return { ok: false, reason: "the adapter was closed while its language server started" };
+    if (tsgo !== undefined && this.tsgoRefused === undefined) {
+      const started = await this.startTsgo(tsgo);
+      if (started.ok || closings !== this.closings) return started;
+      this.tsgoFailures += 1;
+      return this.start(closings);
+    }
+    return this.startTsserver();
+  }
+
+  private startTsgo(tsgo: TsgoChoice): Promise<{ ok: true } | { ok: false; reason: string }> {
+    return this.initialize(JsonRpcClient.spawn(tsgo.path, ["--lsp", "--stdio"], this.root), "tsgo", `tsgo ${tsgo.version} at ${tsgo.path}`, {});
+  }
+
+  private startTsserver(): Promise<{ ok: true } | { ok: false; reason: string }> {
     const server = locateServer(this.root);
     if (!server.found) {
-      return { ok: false, reason: `${SERVER_BIN} not found; looked at ${server.looked.join("; ")}. Install it: npm install --save-dev typescript-language-server typescript` };
+      return Promise.resolve({ ok: false, reason: `${SERVER_BIN} not found; looked at ${server.looked.join("; ")}. Install it: npm install --save-dev typescript-language-server typescript` });
     }
     const tsserver = locateTsserver(this.root)?.path;
-    const client = JsonRpcClient.spawn(server.command, [...server.args, "--stdio"], this.root);
+    return this.initialize(JsonRpcClient.spawn(server.command, [...server.args, "--stdio"], this.root), "tsserver", `${SERVER_BIN} at ${server.path}`, {
+      // One semantic server only: the syntax server the language server pairs it with by default sees
+      // open documents alone, and workspace/symbol and references routed there answer for those.
+      tsserver: {
+        useSyntaxServer: "never",
+        ...(tsserver === undefined ? {} : { path: tsserver }),
+        ...(process.env["COHERENCE_TSSERVER_LOG"] === undefined ? {} : { logDirectory: process.env["COHERENCE_TSSERVER_LOG"], logVerbosity: "verbose" }),
+      },
+      preferences: { includeCompletionsForModuleExports: false },
+    });
+  }
+
+  private async initialize(client: JsonRpcClient, engine: "tsgo" | "tsserver", described: string, initializationOptions: Record<string, unknown>): Promise<{ ok: true } | { ok: false; reason: string }> {
     this.client = client;
+    this.engine = engine;
     client.onNotification = (method, params) => {
       if (method !== "textDocument/publishDiagnostics") return;
       const published = params as { uri?: string; diagnostics?: Diagnostic[] };
@@ -316,19 +365,10 @@ export class TypeScriptAdapter implements LanguageAdapter {
         rootUri: pathToFileURL(this.root).href,
         workspaceFolders: [{ uri: pathToFileURL(this.root).href, name: "project" }],
         capabilities: {
-          textDocument: { documentSymbol: { hierarchicalDocumentSymbolSupport: true }, publishDiagnostics: {} },
+          textDocument: { documentSymbol: { hierarchicalDocumentSymbolSupport: true }, publishDiagnostics: {}, diagnostic: {} },
           workspace: { symbol: {}, workspaceFolders: true },
         },
-        initializationOptions: {
-          // One semantic server only: the syntax server the language server pairs it with by default sees
-          // open documents alone, and workspace/symbol and references routed there answer for those.
-          tsserver: {
-            useSyntaxServer: "never",
-            ...(tsserver === undefined ? {} : { path: tsserver }),
-            ...(process.env["COHERENCE_TSSERVER_LOG"] === undefined ? {} : { logDirectory: process.env["COHERENCE_TSSERVER_LOG"], logVerbosity: "verbose" }),
-          },
-          preferences: { includeCompletionsForModuleExports: false },
-        },
+        initializationOptions,
       });
       client.notify("initialized", {});
       const seed = firstSourceFile(this.root);
@@ -338,7 +378,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
     } catch (error) {
       client.kill();
       this.client = undefined;
-      return { ok: false, reason: `${SERVER_BIN} at ${server.path} failed to initialize: ${error instanceof Error ? error.message : String(error)}` };
+      this.engine = undefined;
+      return { ok: false, reason: `${described} failed to initialize: ${error instanceof Error ? error.message : String(error)}` };
     }
   }
 
@@ -346,6 +387,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const state = await this.ready();
     if (!state.ok) throw new Error(state.reason);
     if (this.client === undefined || !this.client.alive) {
+      if (this.engine === "tsgo") this.tsgoFailures += 1;
       this.starting = undefined;
       this.opened.clear();
       this.versions.clear();
@@ -415,9 +457,10 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const client = await this.live();
     this.open(file);
     const result = await client.request<DocumentSymbol[] | SymbolInformation[] | null>("textDocument/documentSymbol", { textDocument: { uri: this.uri(file) } });
-    const symbols: DocumentSymbol[] = (result ?? []).map((s) =>
-      "location" in s ? { name: s.name, kind: s.kind, range: s.location.range, selectionRange: s.location.range, ...(s.containerName ? { nested: true as const } : {}) } : s,
-    );
+    // tsgo lists the names an import or an export list binds as symbols of the file; tsserver lists none, and neither statement declares anything.
+    const symbols: DocumentSymbol[] = (result ?? [])
+      .map((s) => ("location" in s ? { name: s.name, kind: s.kind, range: s.location.range, selectionRange: s.location.range, ...(s.containerName ? { nested: true as const } : {}) } : s))
+      .filter((symbol) => this.engine !== "tsgo" || !this.bindsInStatement(file, symbol.selectionRange.start));
     this.symbolCache.set(file, symbols);
     return symbols;
   }
@@ -590,22 +633,13 @@ export class TypeScriptAdapter implements LanguageAdapter {
       starts.push(definition.selection);
     }
     const reported: Location[] = [];
-    for (const position of starts) {
-      const locations = await client.request<Location[] | null>("textDocument/references", {
-        textDocument: { uri: this.uri(definition.file) },
-        position,
-        context: { includeDeclaration: false },
-      });
-      reported.push(...(locations ?? []));
-    }
-    // Only the project's own files and its reference horizon's are evidence, and a site outside them is dropped before it is read or
-    // opened: opening a nested checkout's copy would load that checkout into the instrument as if it were this project.
-    const own = keepHorizonFiles(this.root, reported.map((location) => this.relative(location.uri)), this.listingNow(), this.horizon());
+    for (const position of starts) reported.push(...(await this.referenceLocations(client, definition, position)));
+    const own = this.evidence(reported);
     const seen = new Set<string>();
     const sites: ReferenceSite[] = [];
     for (const location of reported) {
       const file = this.relative(location.uri);
-      if (!(own.has(file) || this.probes.has(file)) || file.startsWith("node_modules/")) continue;
+      if (!own.has(file)) continue;
       const start = location.range.start;
       if (file === definition.file && rangeContains({ start: definition.selection, end: definition.selection }, start)) continue;
       const key = `${file}:${start.line}:${start.character}`;
@@ -627,6 +661,20 @@ export class TypeScriptAdapter implements LanguageAdapter {
     }
     sites.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character);
     return sites;
+  }
+
+  /**
+   * The files among the reported locations that are evidence: the project's
+   * own files, its reference horizon's, and a refutation's open probes. A site
+   * outside them is dropped before it is read or opened: opening a nested
+   * checkout's copy would load that checkout into the instrument as if it
+   * were this project, and reading a package's declarations costs a parse
+   * for no site.
+   */
+  private evidence(locations: readonly Location[]): Set<string> {
+    const files = locations.map((location) => this.relative(location.uri));
+    const own = keepHorizonFiles(this.root, files, this.listingNow(), this.horizon());
+    return new Set(files.filter((file) => (own.has(file) || this.probes.has(file)) && !file.startsWith("node_modules/")));
   }
 
   /** The folders outside the project the config's `references` adds to the search, absolute; read once. */
@@ -797,15 +845,86 @@ export class TypeScriptAdapter implements LanguageAdapter {
     }
   }
 
-  /** The first published diagnostic on a file that refuses the reference, within the window; the server publishes an empty set first. */
+  /**
+   * The first diagnostic on a file that refuses the reference, within the
+   * window. tsserver publishes an empty set first and the refusal after, so
+   * its published diagnostics are read until one refuses or the window
+   * closes. tsgo answers a pull only once its project holds the document, so
+   * its first answer is final, and the window bounds only pulls that fail.
+   */
   private async awaitRefusal(file: string, timeoutMs = 15_000): Promise<string | undefined> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
+      const answered = this.engine === "tsgo" && (await this.pullDiagnostics(file, deadline - Date.now()));
       const refusal = (this.diagnostics.get(file) ?? []).find((d) => refusesReference(d));
       if (refusal !== undefined) return refusal.message;
+      if (answered) return undefined;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     return undefined;
+  }
+
+  /**
+   * The sites tsserver reports with includeDeclaration false. tsgo leaves an
+   * import specifier out of that answer and lists it only among the
+   * declarations, so under tsgo a declaration site counts only when it is a
+   * name an import or export list binds; any other declaration, an
+   * augmentation in another file included, is no reference. A declaration
+   * outside the evidence is dropped before its file is read.
+   */
+  private async referenceLocations(client: JsonRpcClient, definition: Definition, position: Position): Promise<Location[]> {
+    const ask = async (includeDeclaration: boolean): Promise<Location[]> =>
+      (await client.request<Location[] | null>("textDocument/references", { textDocument: { uri: this.uri(definition.file) }, position, context: { includeDeclaration } })) ?? [];
+    const references = await ask(false);
+    if (this.engine !== "tsgo") return references;
+    const known = new Set(references.map(locationKey));
+    const declarations = (await ask(true)).filter((location) => !known.has(locationKey(location)));
+    const own = this.evidence(declarations);
+    return [...references, ...declarations.filter((location) => own.has(this.relative(location.uri)) && this.bindsInStatement(this.relative(location.uri), location.range.start))];
+  }
+
+  /** Whether a position names what an import, an export list or a wildcard re-export binds, read from the file's syntax: inside one of those statements, before its module specifier. */
+  private bindsInStatement(file: string, position: Position): boolean {
+    const ts = typescriptCompiler("tsgo's reference sites are told apart from its declarations with its parser");
+    const lines = this.linesOf(file);
+    if (lines.length === 0) return false;
+    const parsed = this.parsed.get(lines) ?? ts.createSourceFile(file, lines.join("\n"), ts.ScriptTarget.Latest, true);
+    this.parsed.set(lines, parsed);
+    const offset = parsed.getPositionOfLineAndCharacter(Math.min(position.line, lines.length - 1), 0) + position.character;
+    let binds = false;
+    const visit = (node: TS.Node): void => {
+      if (offset < node.getStart(parsed) || offset >= node.getEnd()) return;
+      if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+        binds = node.moduleSpecifier === undefined || offset < node.moduleSpecifier.getStart(parsed);
+        return;
+      }
+      if (ts.isImportEqualsDeclaration(node)) {
+        binds = offset < node.name.getEnd();
+        return;
+      }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(parsed, visit);
+    return binds;
+  }
+
+  /**
+   * tsgo publishes no diagnostics for an opened document; it answers when
+   * asked. Whether it answered within the time left: a pull the live server
+   * cancels or leaves unanswered is asked again, and a server that died
+   * throws.
+   */
+  private async pullDiagnostics(file: string, leftMs: number): Promise<boolean> {
+    const client = this.client;
+    if (client === undefined || leftMs <= 0) return false;
+    try {
+      const report = await client.request<{ items?: Diagnostic[] } | null>("textDocument/diagnostic", { textDocument: { uri: this.uri(file) } }, leftMs);
+      this.diagnostics.set(file, report?.items ?? []);
+      return true;
+    } catch (error) {
+      if (!client.alive) throw error;
+      return false;
+    }
   }
 
   /** Stage the two synthetic sites the import ruling could otherwise swallow, in one references query, and restore. */
@@ -904,6 +1023,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
   }
 
   async close(): Promise<void> {
+    this.closings += 1;
     const client = this.client;
     this.client = undefined;
     this.starting = undefined;

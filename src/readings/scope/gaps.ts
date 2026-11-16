@@ -48,7 +48,7 @@
 
 import { spawn } from "../../lifecycle/work-meter.ts";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { execFileSync } from "../../lifecycle/work-meter.ts";
 import { basename, join } from "node:path";
 import { configIgnore, projectFiles } from "../../adapters/project-files.ts";
@@ -315,6 +315,10 @@ interface RefreshMark {
   pid: number;
   at: string;
   fingerprint: string;
+  /** Set by a run that found no language server loaded: the same fingerprint is tried again only when its slot's retry says a server now is. */
+  noServer?: boolean;
+  /** With noServer: the warm servers recorded when the run found the one it needed missing, so a retry asks for one recorded since. */
+  servers?: number[];
 }
 
 /** How long a refresh may run before another may start in its place. */
@@ -337,10 +341,12 @@ function refreshPath(root: string): string {
 export interface RefreshSlot {
   path: string;
   command: RegExp;
+  /** Whether a run of the same fingerprint that found no server loaded is worth starting again, asked only then with its mark; never, when absent. */
+  retry?: ((mark: { servers?: number[] | undefined }) => boolean) | undefined;
 }
 
 // The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
-const STRUCTURE_QUERY = /(?:^|\s)query\s+structure\s*$/;
+const STRUCTURE_QUERY = /(?:^|\s)query\s+structure(?:\s+--warm-only)?\s*$/;
 
 function readMark(path: string): RefreshMark | undefined {
   try {
@@ -353,6 +359,43 @@ function readMark(path: string): RefreshMark | undefined {
 function markUnderWay(mark: RefreshMark | undefined, now: () => number): RefreshMark | undefined {
   if (mark === undefined) return undefined;
   return alive(mark.pid) && now() - Date.parse(mark.at) < REFRESH_STALE_MS ? mark : undefined;
+}
+
+/** Give up the slot a run held, so the same tree or patch is tried again: a warm-only run that found no server loaded read nothing it should be refused a retry for. */
+export function releaseRefresh(pid: number, slotPath: string): void {
+  try {
+    if (readMark(slotPath)?.pid === pid) rmSync(slotPath, { force: true });
+  } catch {
+    return;
+  }
+}
+
+/**
+ * Keep the slot a run held, marked as having found no language server
+ * loaded: the same fingerprint is not started again while none is, and is
+ * once its slot's retry says one is.
+ */
+export function refreshFoundNoServer(pid: number, slotPath: string, servers?: readonly number[]): void {
+  try {
+    const mark = readMark(slotPath);
+    if (mark?.pid === pid) writeAtomically(slotPath, JSON.stringify({ ...mark, noServer: true, ...(servers === undefined ? {} : { servers: [...servers] }) } satisfies RefreshMark));
+  } catch {
+    return;
+  }
+}
+
+/** Keep the structure refresh's slot, marked as having found a server it needed missing while these warm servers were recorded. */
+export function structureRefreshFoundNoServer(root: string, pid: number, servers: readonly number[]): void {
+  refreshFoundNoServer(pid, refreshPath(root), servers);
+}
+
+/**
+ * The structure refresh's slot, tried again for the same tree once a warm
+ * server is recorded that was not when a run found the one it needed
+ * missing: a stop on an unchanged tree with no new server starts nothing.
+ */
+export function structureRefreshSlot(root: string, recorded: () => readonly number[]): RefreshSlot {
+  return { path: refreshPath(root), command: STRUCTURE_QUERY, retry: (mark) => recorded().some((pid) => !(mark.servers ?? []).includes(pid)) };
 }
 
 /** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */
@@ -395,14 +438,17 @@ function supersede(pid: number, ownCommand: RegExp): boolean {
  * reading that could not finish is not retried until the tree changes).
  * `command` is the argv that records a reading (the CLI's query structure);
  * `slot` is the structure refresh's own unless another kind of run passes its
- * mark and command line. Returns whether one started.
+ * mark and command line. A run that found no server loaded is started again
+ * for the same tree only when the slot's retry says one now is. Returns
+ * whether one started.
  */
 export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now, slot: RefreshSlot = { path: refreshPath(root), command: STRUCTURE_QUERY }): boolean {
   try {
     const mark = readMark(slot.path);
     if (mark !== undefined) {
-      if (mark.fingerprint === fingerprint) return false;
-      if (markUnderWay(mark, now) !== undefined && !supersede(mark.pid, slot.command)) return false;
+      if (mark.fingerprint === fingerprint && !(mark.noServer === true && slot.retry?.(mark) === true)) return false;
+      // A run that marked its slot as having found no server has finished reading, so it holds the slot no longer while it exits.
+      if (mark.noServer !== true && markUnderWay(mark, now) !== undefined && !supersede(mark.pid, slot.command)) return false;
     }
     const [program, ...args] = command;
     if (program === undefined) return false;
@@ -680,7 +726,7 @@ function plural(n: number, one: string): string {
  * Take a reading and keep it for the hooks: the fingerprint is taken as the
  * reading starts, so an edit made while it ran leaves nothing recorded.
  */
-export async function readAndRecord(root: string, read: () => Promise<InterfaceReading>): Promise<InterfaceReading> {
+export async function readAndRecord(root: string, read: () => Promise<InterfaceReading>, keep: () => boolean = () => true): Promise<InterfaceReading> {
   let before: string | undefined;
   try {
     before = structureFingerprint(root);
@@ -689,7 +735,7 @@ export async function readAndRecord(root: string, read: () => Promise<InterfaceR
   }
   const started = Date.now();
   const reading = await read();
-  if (before !== undefined) recordReading(root, reading, before, Date.now() - started);
+  if (before !== undefined && keep()) recordReading(root, reading, before, Date.now() - started);
   return reading;
 }
 

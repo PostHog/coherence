@@ -69,6 +69,12 @@
     "docs/how-coherence-works.md"
   ],
   "optionalDependencies": {
+    "@typescript/typescript-darwin-arm64": "^7.0.2",
+    "@typescript/typescript-darwin-x64": "^7.0.2",
+    "@typescript/typescript-linux-arm64": "^7.0.2",
+    "@typescript/typescript-linux-x64": "^7.0.2",
+    "@typescript/typescript-win32-arm64": "^7.0.2",
+    "@typescript/typescript-win32-x64": "^7.0.2",
     "pyright": "^1.1.414",
     "typescript": "^5.9.3",
     "typescript-language-server": "^5.3.0"

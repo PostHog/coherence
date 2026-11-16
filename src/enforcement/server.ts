@@ -92,7 +92,8 @@ const CLI = join(CODE_DIR, `cli${extname(fileURLToPath(import.meta.url))}`);
  * The fingerprint a project's warm server answers with and a client asks
  * for: Coherence's code and the folder of every plugin the project runs
  * (none when the config names none or refuses them), so an edited plugin
- * replaces the server as an edited Coherence does.
+ * replaces the server as an edited Coherence does, and the engine choice a
+ * client makes with COHERENCE_TSGO, which a running server would not see.
  */
 export function serverFingerprint(root: string): string {
   let dirs: string[] = [];
@@ -101,7 +102,7 @@ export function serverFingerprint(root: string): string {
   } catch {
     // A config the server refuses starts no server; the fingerprint is Coherence's alone.
   }
-  return codeFingerprint(dirs);
+  return process.env["COHERENCE_TSGO"] === "0" ? `${codeFingerprint(dirs)}+COHERENCE_TSGO=0` : codeFingerprint(dirs);
 }
 
 // The fingerprint lives beside the parses keyed by it; the server reports it and replaces a server running other code.
@@ -465,8 +466,10 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   }
   const startedAt = new Date().toISOString();
   let warm = false;
+  let failed: string | null = null;
   void adapter.ready().then((state) => {
     warm = state.ok;
+    failed = state.ok ? null : state.reason;
     log(state.ok ? `${adapter.language} adapter ready` : `${adapter.language} adapter not ready: ${state.reason}`);
     // An adapter whose instrument enumerates the workspace (Pyright) reports when that is done, for the measurement.
     const enumerating = (adapter as { indexed?: () => Promise<unknown>; enumeration?: { sourceFiles: number; latency: number } }).indexed;
@@ -616,7 +619,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
     const params = sent.map((p) => (p === null ? undefined : p));
     switch (method) {
       case "status":
-        return { language: adapter.language, ladder: adapter.ladder, warm, pid: process.pid, startedAt, fingerprint, root, enumeration: (adapter as { enumeration?: { sourceFiles: number; latency: number } }).enumeration ?? null };
+        return { language: adapter.language, ladder: adapter.ladder, warm, pid: process.pid, serverPid: adapter.serverPid?.() ?? null, startedAt, fingerprint, root, enumeration: (adapter as { enumeration?: { sourceFiles: number; latency: number } }).enumeration ?? null, engine: adapter.engine ?? null, failed };
       case "ready":
         return adapter.ready();
       case "resolve":
@@ -882,12 +885,58 @@ export interface ConnectOptions {
   idleMs?: number;
   /** The language whose server to connect to; the config's primary one when absent. */
   language?: string | undefined;
+  /** How long to wait for a listening server's instrument to finish loading before answering cold. */
+  waitWarmMs?: number | undefined;
+  /** With spawn off: called once, the first time no server listens, so a caller can start one detached and wait for it within this same call; false when it started none, so the call fails at once instead of waiting for a server nothing will start. */
+  onAbsent?: (() => boolean | void) | undefined;
 }
 
 export interface Connected {
   adapter: RemoteAdapter;
   /** cold when this call had to spawn the server or the instrument had not finished loading. */
   server: "cold" | "warm";
+  /** Why the server's instrument could not load, when it could not: no wait makes it warm. */
+  failed?: string | undefined;
+}
+
+/**
+ * Whether a warm server is recorded for the root's primary language and its
+ * process lives: one file read and a signal, never a connection, so a hook
+ * may ask it at every stop. It may still be loading.
+ */
+export function serverRecorded(rootGiven: string): boolean {
+  try {
+    const pointer = JSON.parse(readFileSync(serverPaths(rootGiven).pointer, "utf8")) as Pointer;
+    return typeof pointer.pid === "number" && pidAlive(pointer.pid);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The pids of every language's warm server recorded at the root whose
+ * process lives, ascending: one folder listing and a signal each, never a
+ * connection, so a hook may ask it at every stop.
+ */
+export function recordedServers(rootGiven: string): number[] {
+  const { dir } = serverPaths(rootGiven);
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  return names
+    .filter((name) => /^server(?:-[\w.-]+)?\.json$/.test(name))
+    .flatMap((name) => {
+      try {
+        const pointer = JSON.parse(readFileSync(join(dir, name), "utf8")) as Pointer;
+        return typeof pointer.pid === "number" && pidAlive(pointer.pid) ? [pointer.pid] : [];
+      } catch {
+        return [];
+      }
+    })
+    .sort((a, b) => a - b);
 }
 
 /** Wait for a process to exit; signal it when asking was not enough. True once it is gone. */
@@ -926,6 +975,8 @@ export async function connectAdapter(rootGiven: string, options: ConnectOptions 
   const want = serverFingerprint(root);
   let spawns = 0;
   let deadline = Date.now() + SPAWN_WAIT_MS;
+  const warmDeadline = Date.now() + (options.waitWarmMs ?? 0);
+  let absent = false;
   let lastError: unknown;
   for (;;) {
     let socket: Socket | undefined;
@@ -945,7 +996,12 @@ export async function connectAdapter(rootGiven: string, options: ConnectOptions 
         client.end();
       }
       if (status !== undefined) {
-        if (status.fingerprint === want) return { adapter: new RemoteAdapter(client, status.language, status.ladder), server: spawns > 0 || !status.warm ? "cold" : "warm" };
+        if (status.fingerprint === want && !status.warm && (status.failed ?? null) === null && Date.now() < warmDeadline) {
+          client.end();
+          await sleep(100);
+          continue;
+        }
+        if (status.fingerprint === want) return { adapter: new RemoteAdapter(client, status.language, status.ladder), server: spawns > 0 || !status.warm ? "cold" : "warm", ...(status.failed ? { failed: status.failed } : {}) };
         if (options.spawn === false) {
           client.end();
           throw new Error(`the warm server for ${root} (pid ${status.pid}) runs other code than the Coherence asking; connect with spawning on to replace it`);
@@ -962,7 +1018,15 @@ export async function connectAdapter(rootGiven: string, options: ConnectOptions 
         continue;
       }
     }
-    if (options.spawn === false) throw new Error(`no warm server listening for ${root}; start one with: serve`);
+    if (options.spawn === false) {
+      if (!absent) {
+        absent = true;
+        if (options.onAbsent?.() === false) throw new Error(`no warm server listening for ${root}, and none could be started`);
+      }
+      if (Date.now() >= warmDeadline) throw new Error(`no warm server listening for ${root}; start one with: serve`);
+      await sleep(100);
+      continue;
+    }
     if (Date.now() > deadline) {
       throw new Error(`the warm server did not answer within ${SPAWN_WAIT_MS / 1000} s (${lastError instanceof Error ? lastError.message : String(lastError)})`);
     }
@@ -983,9 +1047,16 @@ interface ServerStatus {
   language: string;
   ladder: Ladder;
   warm: boolean;
+  /** The warm server's own process. */
   pid: number;
+  /** The language server's process, which the warm server started; null while it is not running or where the adapter cannot say. */
+  serverPid?: number | null;
   startedAt: string;
   /** Absent on a server that predates the fingerprint: it counts as other code. */
   fingerprint?: string;
   root?: string;
+  /** The language server that answers when a plugin drives more than one (TypeScript: tsgo or tsserver); null for the rest. */
+  engine?: string | null;
+  /** Why the instrument could not load; null while it loads or once it has. */
+  failed?: string | null;
 }
