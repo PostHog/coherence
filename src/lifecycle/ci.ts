@@ -27,6 +27,7 @@ import { registryOf, repositoryTop } from "../adapters/project-config.ts";
 import { ciNotes, ciSteps, forProject } from "../plugins/languages.ts";
 import type { CiStep } from "../plugins/plugin.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
+import { loadSpecModel } from "../spec/model.ts";
 import type { Io } from "../journal/cli.ts";
 import { isCoherenceItself, PACKAGE_NAME } from "./project.ts";
 import { LOCKFILES, type PackageManager as AnyManager } from "./lockfiles.ts";
@@ -125,6 +126,33 @@ export interface CiPlan {
   notes: string[];
   /** The steps the language plugins the projects run ask the workflow to set up with (Go and gopls), after the install. */
   steps: CiStep[];
+  /** The invariants a totality oracle enforces, as <project>/<component>/<name> ("." parts left out): the workflow runs no tests, so it never grades them, and install says so. */
+  untested: string[];
+}
+
+/** Each bullet a totality oracle enforces across the projects the check covers, named where it lives. */
+function untestedBullets(top: string, dirs: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const dir of dirs) {
+    const project = slash(relative(top, dir));
+    for (const component of loadSpecModel(dir).components) {
+      for (const invariant of component.invariants) {
+        if (!invariant.enforcements.some((e) => e.form === "totality oracle")) continue;
+        out.push([project, component.folder, invariant.name].filter((part) => part !== "." && part !== "").join("/"));
+      }
+    }
+  }
+  return out;
+}
+
+/** What install says about the totality oracles the workflow will not run, or nothing when there are none. */
+export function untestedLine(plan: CiPlan): string | undefined {
+  if (plan.untested.length === 0) return undefined;
+  const n = plan.untested.length;
+  const them = n === 1 ? "it" : "them";
+  const shown = plan.untested.slice(0, 5).join(", ") + (n > 5 ? `, and ${n - 5} more` : "");
+  const said = plan.mode === "comment" ? `its report lists ${them} as not run here, never as passing` : `it never fails on ${them}`;
+  return `${n} invariant${n === 1 ? " is" : "s are"} checked by a test (${shown}); this workflow runs no tests, so ${said}. To grade ${them} in CI, add ${COMMANDS[plan.manager].cli} run --form totality-oracle --session "ci-\${{ github.run_id }}" --agent ci after a step that sets up the project's tests${plan.mode === "comment" ? ", before the report" : ""}.`;
 }
 
 function realOr(path: string): string {
@@ -260,6 +288,7 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
     nodeVersionFile: versionFile === undefined ? undefined : slash(relative(top, join(lock.dir, versionFile))),
     notes,
     steps,
+    untested: untestedBullets(top, registry === undefined ? [at] : registry.leaves.map(realOr)),
   };
 }
 
@@ -335,6 +364,8 @@ export function workflowText(plan: CiPlan): string {
     "",
   );
   for (const note of plan.notes) add(`      # ${note}`, "");
+  const untested = untestedLine(plan);
+  if (untested !== undefined) add(`      # ${untested}`, "");
   for (const step of plan.steps) add(...stepLines(step), "");
   const where = plan.workdir === "." ? [] : [`        working-directory: ${plan.workdir}`];
   if (!comment) {
@@ -492,6 +523,9 @@ export function ciInstallCommand(argv: string[], io: Io): number {
     return 1;
   }
   const shown = WORKFLOW_PATH.split(sep).join("/");
+  // Said whether the workflow is printed or written: an adopter whose invariants are all tests would otherwise read its first clean report as their pass.
+  const untested = untestedLine(plan);
+  if (untested !== undefined) io.err(`ci install: ${untested}`);
   if (!write) {
     io.out(workflowText(plan).trimEnd());
     io.err(`ci install: printed, not written; add --write to write ${shown}${existsSync(join(plan.top, WORKFLOW_PATH)) ? `, which already exists and would be kept` : ""}`);

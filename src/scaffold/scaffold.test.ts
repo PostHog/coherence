@@ -437,3 +437,24 @@ test("the root CLI awaits scaffold preview and propagates its asynchronous exit 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("a shape whose claim joins separate checks names the breaks to stage alone, at scaffold and after a refutation of a bullet that declares it", async () => {
+  const { renderGuidance } = await import("./scaffold.ts");
+  const { refuteGuidance } = await import("../enforcement/cli.ts");
+  const { parseSeed } = await import("../spec/seed.ts");
+  const authenticity = seed.shapes.find((s) => s.shape === "message-authenticity")!;
+  assert.match(authenticity.refute ?? "", /comparison[\s\S]*key choice[\s\S]*each alone[\s\S]*fresh and well-formed, wrong only in its signature/, "the webhook case: a stale forgery is refused whatever the comparison does");
+  assert.match(seed.shapes.find((s) => s.shape === "capability-authorization")!.refute ?? "", /once per kind/, "a boundary that accepts two credentials is refuted for each");
+
+  const guidance = renderGuidance(applicableShapes(seed, ["message"]));
+  assert.match(guidance, /\n {2}message-authenticity: [^\n]+\n {4}applies when [^\n]+\n {4}refute by the signature comparison/);
+  assert.doesNotMatch(renderGuidance(seed.shapes.filter((s) => s.refute === undefined).slice(0, 1)), /refute by/, "a shape of one check says nothing more");
+
+  const declared = { name: "a signed", checklist: [{ shape: "message-authenticity", outcome: "declared", as: "a signed" }, { shape: "capability-authorization", outcome: "declared", as: "another bullet" }, { shape: "redaction", outcome: "dismissed" }] };
+  const lines = refuteGuidance(declared);
+  assert.match(lines[0] ?? "", /stage each alone and refute again/);
+  assert.deepEqual(lines.slice(1).map((l) => l.trim().split(":")[0]), ["message-authenticity"], "only the shapes this bullet declares as itself");
+  assert.deepEqual(refuteGuidance({ name: "a door", checklist: [] }), [], "a bullet that declares no such shape gets no guidance");
+
+  assert.throws(() => parseSeed({ kinds: { message: "m" }, shapes: [{ shape: "x", kinds: ["message"], sentence: "s", applies_when: "a", excludes: "e", refute: 3 }] }, "seed"), /refute: expected text/);
+});

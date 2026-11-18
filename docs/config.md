@@ -148,7 +148,7 @@ A totality oracle names a test (its `via:` line); these keys say how to run one.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `test` | none | The command that runs tests whose name matches a filter: an argv array the filter is appended to, or a string containing `{filter}`. Without it, a totality oracle cannot run. |
+| `test` | none | The command that runs tests whose name matches a filter: an argv array the filter is appended to, or a string containing `{filter}`, which runs under `/bin/sh` (below). Without it, a totality oracle cannot run. |
 | `testMatch` | none | A regular expression the test output must match to count as a pass, for a runner that exits 0 when no test matched the filter. Without it, the exit code decides. |
 | `testJson` | none | One invocation for every test the bullets name at once: an argv array or a string with `{filter}` (a combined name pattern) and `{out}` (where the runner writes its report). The report may be jest-shaped JSON (`testResults[].assertionResults[]` with `ancestorTitles`, `title`, `status`), pytest's JUnit XML, or pytest-json-report's JSON. Without it, tests run one per invocation through `test`. |
 | `testFilterForm` | `regex` | How a name filter is written: `regex` (titles escaped and joined with `\|`, as jest, vitest and node:test read a name pattern) or `pytest` (a `-k` expression). |
@@ -156,6 +156,15 @@ A totality oracle names a test (its `via:` line); these keys say how to run one.
 
 A runner whose report is in none of those shapes (Playwright's JSON report,
 for one) works through `test` and `testMatch` alone, one test per invocation.
+
+A string `test` or `testJson` runs under `/bin/sh`, not your login shell: no
+`source`, no zsh or bash syntax, and no profile. In `sh`, a `.` of a file that
+is not there exits the shell at once, before any `||` after it is read, so
+`. ./.env || . ./.env.template` stops the command when `.env` is missing. Check
+first: `if [ -f .env ]; then . ./.env; else . ./.env.template; fi; pytest ...`,
+or move the setup into a script and name it. An argv array runs with no shell
+at all. When a batched command writes no report, the reason says that `/bin/sh`
+ran it and gives the first line it printed.
 
 ## More than one language
 

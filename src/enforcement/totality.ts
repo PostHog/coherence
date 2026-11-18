@@ -102,6 +102,18 @@ export async function runTotalityOracle(root: string, config: RunnerSetup, filte
   });
 }
 
+/**
+ * For a string command, which runs under /bin/sh: that it did, and the first
+ * line the command printed. A shell that exits before the runner starts (a
+ * failed `.` of a missing file exits sh before any `||` fallback) leaves no
+ * report, and without this the reason reads like a runner that never ran.
+ */
+export function shellSaid(shell: boolean, output: string): string {
+  if (!shell || process.platform === "win32") return "";
+  const first = output.split("\n").find((l) => l.trim() !== "");
+  return `; the command ran under /bin/sh, not your login shell${first === undefined ? ", and printed nothing" : `, and the first line it printed was: ${first.trim().slice(0, 200)}`}`;
+}
+
 function tailOf(output: string, lines = 12): string {
   return output.split("\n").filter((l) => l.trim() !== "").slice(-lines).join("\n");
 }
@@ -307,7 +319,7 @@ export async function runTotalityBatch(root: string, config: RunnerSetup, filter
         resolve({ code, text });
       });
     });
-    if (!existsSync(out)) return notRun(`${shown} exited ${output.code} and wrote no report at {out}`, tailOf(output.text));
+    if (!existsSync(out)) return notRun(`${shown} exited ${output.code} and wrote no report at {out}${shellSaid(spec.shell, output.text)}`, tailOf(output.text));
     try {
       parsed = parseReport(readFileSync(out, "utf8"));
     } catch (error) {

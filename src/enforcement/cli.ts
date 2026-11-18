@@ -22,6 +22,7 @@ import { JournalError, parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { verdictText } from "../spec/report.ts";
+import { loadSeed, shapeNamed } from "../spec/seed.ts";
 import { governedBy } from "./check.ts";
 import { readEnforcementConfig } from "./config.ts";
 import { latencyLines } from "./latency.ts";
@@ -471,5 +472,23 @@ export async function refuteCommand(argv: string[], io: Io): Promise<number> {
     io.out(`  recorded in ${RUNS_DIR}/${basename(files.get(record) ?? `${session}.jsonl`)} at ${record.at}`);
   }
   io.out("now restore the code and run: run — the refutation counts as witnessed once a later run finds the same totality oracle passing");
+  for (const line of refuteGuidance(invariant)) io.out(line);
   return 0;
+}
+
+/**
+ * The separate breaks the bullet's declared shapes say a refutation stages,
+ * each alone: one red over a wholesale break shows that some check ran, not
+ * that the detector catches each one the claim conjoins (PostHog/billing#2703:
+ * verification disabled wholesale went red, a broken comparison stayed green).
+ */
+export function refuteGuidance(invariant: { name: string; checklist: readonly { shape: string; outcome: string; as?: string }[] }): string[] {
+  const seed = loadSeed();
+  const own = invariant.checklist.filter((c) => c.outcome === "declared" && c.as === invariant.name);
+  const shapes = own.flatMap((c) => {
+    const shape = shapeNamed(seed, c.shape);
+    return shape?.refute === undefined ? [] : [shape];
+  });
+  if (shapes.length === 0) return [];
+  return ["this bullet declares a shape whose claim joins separate checks; one break covers one of them, so stage each alone and refute again, every forged input valid on every check but the one it breaks:", ...shapes.map((s) => `  ${s.shape}: ${s.refute}`)];
 }

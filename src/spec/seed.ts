@@ -22,6 +22,13 @@ export interface Shape {
   sentence: string;
   appliesWhen: string;
   excludes: string;
+  /**
+   * The breaks a refutation of this shape stages, each alone: the separate
+   * checks its sentence conjoins (a signature's freshness, its comparison, its
+   * key), so one wholesale break cannot stand for all of them. Absent when the
+   * shape names one check.
+   */
+  refute?: string;
 }
 
 export interface Seed {
@@ -60,6 +67,7 @@ export function parseSeed(input: unknown, path: string): Seed {
       sentence: text(raw["sentence"], `${where}.sentence`),
       appliesWhen: text(raw["applies_when"], `${where}.applies_when`),
       excludes: text(raw["excludes"], `${where}.excludes`),
+      ...(raw["refute"] === undefined ? {} : { refute: text(raw["refute"], `${where}.refute`) }),
     };
   });
   const names = new Set<string>();

@@ -3,7 +3,10 @@
  * pull request comment and the job summary, built from what Coherence
  * already holds. For each project (every project a registry lists, when run
  * at its top; else the one project): the spec problems spec --check names,
- * the chokepoint verdicts of the CI session's run, the spec gaps (entrances
+ * the verdicts of the CI session's run (chokepoints, and totality oracles
+ * when the workflow runs them), each enforcement the specs declare that the
+ * run never checked, named and counted apart so a zero never covers a rule
+ * that was not run, the spec gaps (entrances
  * with outside or unknown trust and no traced control, from the Structure
  * reading, taken when none describes the tree), and the guard failures of
  * the defect floor; and, as a neutral count beneath the findings, how many
@@ -16,7 +19,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { registryOf, registryProblems } from "../adapters/project-config.ts";
-import { loadRuns, type RunEntry, type RunRecord } from "../enforcement/record.ts";
+import { loadRuns, type Form, type RunEntry, type RunRecord } from "../enforcement/record.ts";
 import type { Io } from "../journal/cli.ts";
 import { readComponentInterfaces } from "../readings/scope/component-interfaces.ts";
 import { CLOSE_STEPS, currentGaps, gapsOf, readAndRecord, readGapBaseline, structureState, type Gap } from "../readings/scope/gaps.ts";
@@ -92,15 +95,51 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-function chokepointEntries(runs: readonly RunRecord[]): RunEntry[] {
-  // The latest entry per bullet in this session: a rerun replaces an earlier verdict.
+/** The session's verdicts, the latest per enforcement (bullet and form): a rerun replaces an earlier verdict. */
+function sessionEntries(runs: readonly RunRecord[]): RunEntry[] {
   const latest = new Map<string, RunEntry>();
-  for (const run of runs) for (const entry of run.invariants) if (entry.form === "chokepoint") latest.set(`${entry.component}\u0000${entry.name}`, entry);
+  for (const run of runs) for (const entry of run.invariants) latest.set(`${entry.component}\u0000${entry.name}\u0000${entry.form}`, entry);
   return [...latest.values()];
 }
 
+/** One verdict per bullet the session checked: fail when any of its forms failed, not run when none failed and one was not run, else pass. */
+function bulletVerdicts(runs: readonly RunRecord[]): Map<string, RunEntry["verdict"]> {
+  const out = new Map<string, RunEntry["verdict"]>();
+  const rank = { pass: 0, "not run": 1, fail: 2 } as const;
+  for (const e of sessionEntries(runs)) {
+    const key = `${e.component}\u0000${e.name}`;
+    const had = out.get(key);
+    if (had === undefined || rank[e.verdict] > rank[had]) out.set(key, e.verdict);
+  }
+  return out;
+}
+
+/** An enforcement the spec declares that the session's run never checked: a totality oracle, when the workflow runs only chokepoints. */
+interface NotRunHere {
+  component: string;
+  name: string;
+  form: Form;
+  /** The test a totality oracle names; undefined for a chokepoint. */
+  via: string | undefined;
+}
+
+/** Each enforcement the spec declares with no verdict of its form in the session's runs, once per bullet and form; none when the session recorded no run at all, which is said as unfinished instead. */
+function notRunHere(model: SpecModel, runs: readonly RunRecord[]): NotRunHere[] {
+  if (runs.length === 0) return [];
+  const checked = new Set(sessionEntries(runs).map((e) => `${e.component}\u0000${e.name}\u0000${e.form}`));
+  const out: NotRunHere[] = [];
+  for (const component of model.components) {
+    for (const invariant of component.invariants) {
+      const forms = new Map<Form, string | undefined>();
+      for (const e of invariant.enforcements) if (!forms.has(e.form)) forms.set(e.form, e.form === "totality oracle" ? e.via : undefined);
+      for (const [form, via] of forms) if (!checked.has(`${component.folder}\u0000${invariant.name}\u0000${form}`)) out.push({ component: component.folder, name: invariant.name, form, via });
+    }
+  }
+  return out;
+}
+
 /** A bullet as <component>/<name>, the entry component's without its "./". */
-function bullet(e: RunEntry): string {
+function bullet(e: { component: string; name: string }): string {
   return e.component === "." ? e.name : `${e.component}/${e.name}`;
 }
 
@@ -171,7 +210,7 @@ function projectSection(p: ProjectReport, session: string, showHeading: boolean)
     lines.push(...howToFix(`Coherence cannot read these lines in the spec files. Fix each line. Then run \`npx --no -- coherence spec --check\`${runIn} again.`));
   }
 
-  const entries = chokepointEntries(p.runs);
+  const entries = sessionEntries(p.runs);
   if (p.runs.length === 0) {
     unfinished.push(`no check run was recorded for session ${session}${where}`);
     lines.push(`${label("⛔", "Rules")} Coherence has no record of running its check (session ${code(session)})${where}, so it did not check the rules.`, "");
@@ -185,7 +224,10 @@ function projectSection(p: ProjectReport, session: string, showHeading: boolean)
         for (const b of e.bypasses.slice(0, BYPASSES)) lines.push(`  - used without the function at ${code(`${b.file}:${b.line}`)}, in ${cell(b.symbol)}`);
         if (e.bypasses.length > BYPASSES) lines.push(`  - and ${e.bypasses.length - BYPASSES} more. To see all of them, run \`npx --no -- coherence run --form chokepoint\`.`);
       }
-      lines.push(...howToFix("Each of these rules says that some code or data must only be used through one function. The code above uses it without that function. Fix the code so it uses the function. If the rule is wrong, fix the rule in the spec."));
+      const fix: string[] = [];
+      if (fails.some((e) => e.form === "chokepoint")) fix.push(`${fails.some((e) => e.form !== "chokepoint") ? "Some of these rules say" : "Each of these rules says"} that some code or data must only be used through one function. The code above uses it without that function. Fix the code so it uses the function. If the rule is wrong, fix the rule in the spec.`);
+      if (fails.some((e) => e.form === "totality oracle")) fix.push(`${fails.some((e) => e.form !== "totality oracle") ? "Some of these rules are" : "Each of these rules is"} checked by a test, and the test failed. Fix the code so the test passes. If the rule is wrong, fix the rule in the spec and its test.`);
+      lines.push(...howToFix(...fix));
     }
     if (notRun.length > 0) {
       lines.push(heading("⏸️", "Rules Coherence could not check", notRun.length), "");
@@ -193,6 +235,18 @@ function projectSection(p: ProjectReport, session: string, showHeading: boolean)
       lines.push("");
     }
     for (const e of notRun) unfinished.push(`rule ${bullet(e)}${where} was not checked: ${e.reason}`);
+    const skipped = notRunHere(p.model, p.runs);
+    if (skipped.length > 0) {
+      lines.push(heading("🧪", "Rules this check did not run", skipped.length), "");
+      for (const s of skipped) lines.push(`- ${MARK["not run"]} ${code(bullet(s))}: ${s.via === undefined ? "a rule about which function code must use" : `checked by the test ${code(s.via)}`}`);
+      const tests = skipped.some((s) => s.form === "totality oracle");
+      lines.push(
+        ...whatThisMeans(
+          "This check did not run these rules, so it cannot say if they hold. They are not counted as broken, and they are not counted as passing.",
+          ...(tests ? [`This check does not run the project's tests. To check these rules here, add a step after the project's tests are set up: \`npx --no -- coherence run --form totality-oracle --session "ci-\${{ github.run_id }}" --agent ci\`${p.name === "." ? "" : `, in ${code(p.name)}`}. Put it before the step that writes the report.`] : []),
+        ),
+      );
+    }
   }
 
   if ("unread" in p.gaps) {
@@ -245,13 +299,16 @@ function alert(kind: AlertKind, sentences: readonly string[]): string[] {
 }
 
 /** Whether there is anything to fix, and which findings this pull request's own files hold, when the report knows them. */
-function findingsLead(projects: readonly ProjectReport[], reads: readonly ChangedWhere[], findings: number, touched: number, unfinished: readonly string[]): string[] {
+function findingsLead(projects: readonly ProjectReport[], reads: readonly ChangedWhere[], findings: number, touched: number, unfinished: readonly string[], skipped: number): string[] {
+  const unran = skipped === 0 ? [] : [`This check did not run ${plural(skipped, "rule")}, so ${skipped === 1 ? "it is" : "they are"} not counted above. ${skipped === 1 ? "It is" : "They are"} listed under 🧪 below.`];
   if (findings === 0) {
-    if (unfinished.length > 0 || projects.some((p) => "unread" in p.gaps)) return alert("WARNING", ["Coherence could not check everything. This list can be incomplete."]);
+    if (unfinished.length > 0 || projects.some((p) => "unread" in p.gaps)) return alert("WARNING", ["Coherence could not check everything. This list can be incomplete.", ...unran]);
+    // "Nothing to fix" over rules that were never run would read as their pass: said only when every rule the specs enforce was checked.
+    if (skipped > 0) return alert("NOTE", ["Nothing to fix in what this check ran.", ...unran]);
     return alert("TIP", ["Nothing to fix."]);
   }
   const changed = reads.filter((r) => r.changed !== undefined);
-  if (changed.length === 0) return alert("NOTE", ["These findings do not make this check fail. Some findings can come from files that this pull request does not change."]);
+  if (changed.length === 0) return alert("NOTE", ["These findings do not make this check fail. Some findings can come from files that this pull request does not change.", ...unran]);
   const sentences = ["These findings do not make this check fail."];
   const allRead = changed.every((r) => "files" in r.changed!);
   for (const r of changed) if ("unread" in r.changed!) sentences.push(`Coherence could not find the files that this pull request changes${r.where}: ${cell(r.changed.unread)}.`);
@@ -260,7 +317,7 @@ function findingsLead(projects: readonly ProjectReport[], reads: readonly Change
     else if (touched === 1) sentences.push("1 finding is in a file that this pull request changes. It has the mark 📍 **changed in this pull request**.");
     else sentences.push(`${touched} findings are in files that this pull request changes. They have the mark 📍 **changed in this pull request**.`);
   }
-  return alert(touched > 0 ? "IMPORTANT" : "NOTE", sentences);
+  return alert(touched > 0 ? "IMPORTANT" : "NOTE", [...sentences, ...unran]);
 }
 
 /** Whether a registry problem's file is one this pull request changed. */
@@ -289,13 +346,15 @@ export function renderReport(
   const registryMarks = (registry?.problems ?? []).map((problem) => registryMark(problem, registry?.changed));
   touched += registryMarks.filter((m) => m !== "").length;
   const problems = projects.reduce((n, p) => n + p.model.problems.length, 0) + (registry?.problems.length ?? 0);
-  const fails = projects.reduce((n, p) => n + chokepointEntries(p.runs).filter((e) => e.verdict === "fail").length, 0);
+  const byBullet = projects.map((p) => bulletVerdicts(p.runs));
+  const fails = byBullet.reduce((n, b) => n + [...b.values()].filter((v) => v === "fail").length, 0);
+  const skipped = projects.reduce((n, p) => n + new Set(notRunHere(p.model, p.runs).map((s) => `${s.component}\u0000${s.name}`)).size, 0);
   const gaps = projects.reduce((n, p) => n + ("gaps" in p.gaps ? p.gaps.gaps.filter((g) => !p.baselined.has(`${g.component}\u0000${g.name}`)).length : 0), 0);
   const guards = projects.reduce((n, p) => n + (p.model.defects?.guardFailures.length ?? 0), 0);
   const components = projects.reduce((n, p) => n + p.model.counts.components, 0);
   const rules = projects.reduce((n, p) => n + p.model.counts.bullets, 0);
-  const checked = projects.reduce((n, p) => n + chokepointEntries(p.runs).length, 0);
-  const passing = projects.reduce((n, p) => n + chokepointEntries(p.runs).filter((e) => e.verdict === "pass").length, 0);
+  const checked = byBullet.reduce((n, b) => n + b.size, 0);
+  const passing = byBullet.reduce((n, b) => n + [...b.values()].filter((v) => v === "pass").length, 0);
   const read = `This check read ${plural(components, "part of the code", "parts of the code")} and ${plural(rules, "rule")}.`;
   const ran = checked === 0 ? "" : ` It checked ${plural(checked, "rule")}. ${plural(passing, "rule")} ${passing === 1 ? "passes" : "pass"}.`;
   const head = [REPORT_MARKER, "## Coherence", ""];
@@ -304,14 +363,14 @@ export function renderReport(
   // Undeclared is the normal state of a detected entrance, never a finding: a plain count beneath the findings, no icon and no alert, so it stays in view without reading as a fault.
   const surface = undeclared === 0 ? [] : [`Specs describe ${detected - undeclared} of the ${plural(detected, "place")} where work comes into the code. The other ${undeclared} ${undeclared === 1 ? "is" : "are"} not described yet. That is normal, and ${undeclared === 1 ? "it is" : "they are"} not counted above.`, ""];
   head.push(
-    `**📄 ${plural(problems, "spec file error")} · ⛔ ${plural(fails, "broken rule")} · 🚪 ${plural(gaps, "unchecked input")} · 🐛 ${plural(guards, "bug that came back", "bugs that came back")}**${projects.length > 1 ? ` in ${plural(projects.length, "project")}` : ""}`,
+    `**📄 ${plural(problems, "spec file error")} · ⛔ ${plural(fails, "broken rule")}${skipped === 0 ? "" : ` · 🧪 ${plural(skipped, "rule")} not run here`} · 🚪 ${plural(gaps, "unchecked input")} · 🐛 ${plural(guards, "bug that came back", "bugs that came back")}**${projects.length > 1 ? ` in ${plural(projects.length, "project")}` : ""}`,
     "",
     ...surface,
     ...folded("What is Coherence?", ABOUT, read + ran),
   );
   const reads: ChangedWhere[] = projects.map((p) => ({ where: p.name === "." ? "" : ` in ${cell(p.name)}`, changed: p.changed }));
   if (registry !== undefined && registry.problems.length > 0) reads.push({ where: " for the list of projects in `coherence.config.json`", changed: registry.changed });
-  head.push(...findingsLead(projects, reads, problems + fails + gaps + guards, touched, unfinished));
+  head.push(...findingsLead(projects, reads, problems + fails + gaps + guards, touched, unfinished, skipped));
   if (unfinished.length > 0) {
     head.push("> [!WARNING]", "> Coherence did not finish. This report is not complete, and the check fails:");
     for (const line of unfinished) head.push(`> - ${cell(line)}`);

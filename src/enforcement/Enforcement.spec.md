@@ -377,6 +377,12 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   because: the server forwarded the protected thing and the chokepoint alone, so a served refutation of a check that exempts a folder never staged its use from outside the folder, and the occasion an adapter is told would never have reached it
   refuted: made the server's client send the protected thing and the chokepoint alone, as before, dropping the exempt folder and the occasion (server.ts) -> "a served refutation stages what the adapter in process stages, the exempt folder and the occasion carried" went red in server.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-10-23)
   kinds: none
+- a shell that stops before the runner is said: When a string testJson command exits without writing its report, the not run reason says the command ran under /bin/sh, not the login shell, and gives the first line it printed; an argv command, which runs with no shell, and a command whose runner wrote its report say nothing of the shell.
+  over: a string testJson that sources a missing .env with an || fallback, and the same command checking for the file first
+  via: a string test command that exits before its runner says it ran under /bin/sh and what it printed first
+  because: a billing adopter's agent wrote a .env fallback with ||, which sh never reaches after a failed dot command, so all three tests read not run and nothing said that the shell, not the runner, had stopped (PostHog/billing#2703, 2026-11-13)
+  refuted: shellSaid in totality.ts said nothing for a string command -> "a string test command that exits before its runner says it ran under /bin/sh and what it printed first" went red in shell.test.ts on its own assertion; restored from a copy, byte for byte, green batched and alone (2026-11-18)
+  kinds: none
 - a via that maps to no test is said, never graded as a fail: When a run's batched pass finds no reported test whose title, or a group's title above it, is a bullet's via, while the same via run alone selects a test by pattern and passes, run --each names the via as naming no test exactly, with the titles it selected alone, instead of printing a fail batched beside a pass alone.
   because: three bullets read 'no test ran' in every full batched run and passed alone, and run --each printed both verdicts without saying they disagreed, so the floor graded them failing while each targeted run passed (df-03839b92)
   kinds: none
