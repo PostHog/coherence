@@ -196,6 +196,7 @@ export function renderGuidance(shapes: readonly Shape[]): string {
   for (const shape of shapes) {
     lines.push(`  ${shape.shape}: ${shape.sentence}`);
     lines.push(`    applies when ${shape.appliesWhen}`);
+    if (shape.refute !== undefined) lines.push(`    refute by ${shape.refute}`);
   }
   return lines.join("\n") + "\n";
 }

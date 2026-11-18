@@ -109,8 +109,24 @@ function pinnedOptionals(previous: string, cwd: string): string[] {
   const ranges = JSON.parse(viewed.stdout) as Record<string, string>;
   return Object.entries(ranges).flatMap(([name, range]) => {
     const floor = /^[\^~]?(\d+\.\d+\.\d+)$/.exec(range.trim())?.[1];
-    return floor === undefined ? [] : [`${name}@${floor}`];
+    if (floor === undefined) return [];
+    // An optional binary for another platform (1.14.0's tsgo builds) is skipped by npm when it installs optionals, and refused when it is named: pin only this platform's.
+    return runsHere(`${name}@${floor}`, cwd) ? [`${name}@${floor}`] : [];
   });
+}
+
+/** Whether a package's declared os and cpu admit this machine; one that declares neither runs anywhere. */
+function runsHere(spec: string, cwd: string): boolean {
+  // Asked one field at a time: npm prints a lone field's value bare, so two asked together are told apart only when both are declared.
+  const field = (name: "os" | "cpu"): string[] => {
+    const viewed = sh(`npm view ${spec} ${name} --json`, "npm", ["view", spec, name, "--json"], cwd);
+    if (viewed.code !== 0 || viewed.stdout.trim() === "") return [];
+    const value = JSON.parse(viewed.stdout) as string[] | string;
+    return Array.isArray(value) ? value : [value];
+  };
+  const admits = (list: string[], here: string): boolean =>
+    list.length === 0 || list.includes(here) || (list.every((entry) => entry.startsWith("!")) && !list.includes(`!${here}`));
+  return admits(field("os"), process.platform) && admits(field("cpu"), process.arch);
 }
 
 /** The release under test as a tarball: built, then packed from a checkout as npm publishes it, or the env's .tgz. */

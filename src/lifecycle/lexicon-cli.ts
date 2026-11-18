@@ -1,4 +1,5 @@
 /** Fixed lexicon workflows: observe, propose, record a ruling, and read the changed evidence back. */
+import { readLexiconSources, sourcesText, sourceUses } from "../adapters/lexicon-sources.ts";
 import {
   existsSync,
   mkdirSync,
@@ -558,14 +559,18 @@ export async function lexiconWorkCommand(
         entries.length === 0
           ? await liveUses(io.cwd, term!, json ? 1000 : 40)
           : undefined;
+      // The sources the config names are searched whether or not the term is a candidate: they are where its meaning is written down.
+      const sources = readLexiconSources(io.cwd);
+      const named = sourceUses(io.cwd, sources, term!, json ? 1000 : 40);
       if (json)
         print({
           term,
           entries,
           ...(live ? { liveUses: live.uses, liveUseCount: live.total } : {}),
+          ...(sources.paths.length + sources.elsewhere.length > 0 ? { sources: { paths: sources.paths, uses: named.uses, useCount: named.total, elsewhere: sources.elsewhere } } : {}),
           limits: report.population.limits,
         });
-      else io.out(coverageText(report, term, live));
+      else io.out(coverageText(report, term, live) + sourcesText(sources, named));
     } else if (json) print(report);
     else io.out(coverageText(report));
     return 0;

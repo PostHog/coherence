@@ -35,6 +35,7 @@ import { clashText, composeStack, pluginLayers } from "../plugins/lexicon.ts";
 import { parseLexicon } from "../lifecycle/lexicon.ts";
 import { COHERENCE_LEXICON } from "../lifecycle/project.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
+import { readLexiconSources } from "../adapters/lexicon-sources.ts";
 import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
 import { declaredClasses, declaredFamilies, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
 import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
@@ -451,6 +452,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   // One walk of the project serves the specs, the practice files and the ignore list's check.
   const walked = walkedProjectFiles(walkBounds(root, config.ignore));
   problems.push(...ignoreProblems(root, walked));
+  for (const message of readLexiconSources(root).problems) problems.push({ file: CONFIG_FILE, line: 1, message });
   for (const message of config.configProblems) problems.push({ file: CONFIG_FILE, line: 1, message });
   problems.push(...lexiconStackProblems(root, config.plugins));
   const storedName = storedNameProblems(root)[0];

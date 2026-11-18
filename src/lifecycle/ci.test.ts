@@ -223,6 +223,22 @@ test("ci install refuses what it cannot set up, and says what to do", () => {
   assert.match(noMode.err.join("\n"), /choose a mode: --mode fail to fail the check on a spec problem or a structural defect, or --mode comment to post one report comment/, "both modes are presented, neither assumed");
 });
 
+test("ci install names the invariants a test checks, which its workflow never runs, in the workflow and as it installs", () => {
+  const tested = `${SPEC("a")}- a signed: a webhook whose signature does not verify is refused.\n  over: every webhook path\n  via: a forged webhook is refused\n  because: a fixture\n  kinds: none\n`;
+  const top = repository({ "package.json": ADOPTER_PACKAGE, "package-lock.json": "{}\n", "A.spec.md": tested });
+  const comment = workflowText(planWorkflow(top, "github", "comment"));
+  assertWellFormed(comment);
+  assert.match(comment, /\n {6}# 1 invariant is checked by a test \(a signed\); this workflow runs no tests, so its report lists it as not run here, never as passing\. To grade it in CI, add npx --no -- coherence run --form totality-oracle --session "ci-\$\{\{ github\.run_id \}\}" --agent ci after a step that sets up the project's tests, before the report\.\n/);
+  assert.ok(!runs(comment).some((r) => r.includes("--form totality")), "the workflow says how to run them and never runs them itself: it cannot set up the project's tests");
+  assert.match(workflowText(planWorkflow(top, "github", "fail")), /so it never fails on it\. To grade it in CI/);
+  const installed = capture(top);
+  assert.equal(ciInstallCommand(["--host", "github", "--mode", "comment", "--write"], installed.io), 0);
+  assert.match(installed.err.join("\n"), /^ci install: 1 invariant is checked by a test \(a signed\)/m, "said where the agent installing it reads");
+
+  const chokepointsOnly = repository({ "package.json": ADOPTER_PACKAGE, "package-lock.json": "{}\n", "A.spec.md": SPEC("a") });
+  assert.doesNotMatch(workflowText(planWorkflow(chokepointsOnly, "github", "comment")), /checked by a test/, "nothing to say when every invariant is a chokepoint");
+});
+
 test("ci install prints without --write, writes with it, and never overwrites a workflow already there", () => {
   const top = repository({ "package.json": ADOPTER_PACKAGE, "package-lock.json": "{}\n" });
   const path = join(top, WORKFLOW_PATH);
@@ -330,6 +346,31 @@ test("ci report carries each project's problems, chokepoint verdicts, spec gaps 
 
 const UNNAMED = "# a\n\nThe a product.\n\n## invariants\n- ROWS leave only through door.\n";
 const WEBHOOK: Gap = { component: ".", name: "webhook", specPath: "A.spec.md", handler: "hook in src/hook.ts", file: "src/hook.ts", trust: ["outside"], route: { id: "r", first: "webhook", entrances: 1, stops: [".", "store"] } };
+
+test("ci report names each rule the session's run never checked and never counts it as passing or broken", () => {
+  // Two rules: one a chokepoint the run checked, one a test the workflow never ran (a billing adoption's three were all tests, and the report said nothing to fix).
+  const tested = `${SPEC("a")}- a signed: a webhook whose signature does not verify is refused.\n  over: every webhook path\n  via: a forged webhook is refused\n  because: a fixture\n  kinds: none\n`;
+  const root = repository({ "A.spec.md": tested });
+  const model = loadSpecModel(root);
+  const report = renderReport([{ name: ".", model, runs: [record("ci-7", [{ name: "a door" }])], gaps: { gaps: [] }, baselined: new Set() }], "ci-7", undefined);
+  const md = report.markdown;
+  assert.match(md, /\*\*📄 0 spec file errors · ⛔ 0 broken rules · 🧪 1 rule not run here · 🚪 0 unchecked inputs/);
+  assert.match(md, /This check read 1 part of the code and 2 rules\. It checked 1 rule\. 1 rule passes\./);
+  assert.match(md, /> \[!NOTE\]\n> Nothing to fix in what this check ran\.\n>\n> This check did not run 1 rule, so it is not counted above\. It is listed under 🧪 below\.\n/);
+  assert.doesNotMatch(md, /\[!TIP\]|> Nothing to fix\.\n/, "nothing to fix is never said over a rule that was not run");
+  assert.match(md, /\*\*🧪 Rules this check did not run \(1\)\*\*\n\n- ○ `a signed`: checked by the test `a forged webhook is refused`\n/);
+  assert.match(md, /This check does not run the project's tests\. To check these rules here, add a step after the project's tests are set up: `npx --no -- coherence run --form totality-oracle --session "ci-\$\{\{ github\.run_id \}\}" --agent ci`\./);
+  assert.deepEqual(report.unfinished, [], "a rule the workflow does not run is said, never an unfinished run");
+
+  // When the workflow does run the test, its verdict counts like any other: a failing test is a broken rule.
+  const ran = renderReport([{ name: ".", model, runs: [record("ci-7", [{ name: "a door" }, { name: "a signed", form: "totality oracle", verdict: "fail", reason: "the test failed: expected 401, got 200" }])], gaps: { gaps: [] }, baselined: new Set() }], "ci-7", undefined);
+  assert.match(ran.markdown, /⛔ 1 broken rule · 🚪/, "no rule is left unrun, so the 🧪 count is absent");
+  assert.match(ran.markdown, /- ✕ `a signed`: the test failed: expected 401, got 200\n/);
+  assert.match(ran.markdown, /Each of these rules is checked by a test, and the test failed\./);
+  assert.doesNotMatch(ran.markdown, /Rules this check did not run/);
+  const notRun = renderReport([{ name: ".", model, runs: [record("ci-7", [{ name: "a door" }, { name: "a signed", form: "totality oracle", verdict: "not run", reason: "the test command exited 2 before the runner wrote a report" }])], gaps: { gaps: [] }, baselined: new Set() }], "ci-7", undefined);
+  assert.deepEqual(notRun.unfinished, ["rule a signed was not checked: the test command exited 2 before the runner wrote a report"], "a test the workflow ran that could not run is unfinished, as a chokepoint is");
+});
 
 describe("ci report says what each finding means and what to do", () => {
   for (const { finding, spec, runs, gaps, baselined, changed, says } of [

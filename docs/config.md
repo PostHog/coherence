@@ -136,6 +136,7 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 | `ignore` | none | Folders and files that are not this project's code or prose: vendored code, generated output, fixtures, promo material, notes kept beside the project. A name with no `/` (`dist`, `CHANGELOG.md`, `schema.generated.ts`) matches every folder or file of that name anywhere in the project; an entry with a `/` (`src/generated`, `packages/web/CHANGELOG.md`) is a path from the root. Every walk (the spec, the lexicon check, the readings, mass) leaves them out, and an entry that names nothing is a spec problem. |
 | `lexicon` | `lexicon.json` | The project's lexicon file, relative to the root. |
 | `wellKnown` | none | Names the project vouches for as well known (its vendors, its own product names), so the lexicon check does not nominate them as nouns to declare. |
+| `lexiconSources` | none | Where the project's words are given their meaning, beyond its code: `{ "paths": [...], "elsewhere": [...] }`. `paths` are folders or files in the project (a knowledge base, a terms document, design docs) that `lexicon review <term>` searches for the term, read even when `ignore` keeps them out of the checks. `elsewhere` describes sources outside the repository (a Slack channel, a saved query), which Coherence never reads: review prints them, and an agent settling a term may read them, read-only, citing what it used. An agent consults no source the list does not name. A path outside the project, or one that names nothing, is a spec problem. |
 | `references` | `"project"` | Where a chokepoint check searches for references: `"project"` (the project alone), `"repository"` (the whole repository), or a list of folders relative to the repository top (`["posthog/api", "ee"]`), searched beside the project. A verdict over less than the whole repository names every folder it searched. Each folder adds to the language server's work: on PostHog, `products/notebooks` with `["posthog", "ee"]` took 15.5 s and 1.1 GB for one check, against 4.8 s and 380 MB for the project alone. |
 | `chokepointFrom` | `anywhere` | Which references a chokepoint governs when its bullet has no `from:` line: `anywhere`, `outside the component`, or `outside <folder>`. A bullet's own `from:` overrides it, and every run entry records which governed and who said it. Any other value is refused. See [spec.md](spec.md#which-references-a-chokepoint-governs). |
 | `interfaceBudget` | `{ "seconds": 600, "memoryMB": 12288 }` | The most time and memory the Structure reading's interface pass may take; when it runs out, the reading says it is partial. |
@@ -148,7 +149,7 @@ A totality oracle names a test (its `via:` line); these keys say how to run one.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `test` | none | The command that runs tests whose name matches a filter: an argv array the filter is appended to, or a string containing `{filter}`. Without it, a totality oracle cannot run. |
+| `test` | none | The command that runs tests whose name matches a filter: an argv array the filter is appended to, or a string containing `{filter}`, which runs under `/bin/sh` (below). Without it, a totality oracle cannot run. |
 | `testMatch` | none | A regular expression the test output must match to count as a pass, for a runner that exits 0 when no test matched the filter. Without it, the exit code decides. |
 | `testJson` | none | One invocation for every test the bullets name at once: an argv array or a string with `{filter}` (a combined name pattern) and `{out}` (where the runner writes its report). The report may be jest-shaped JSON (`testResults[].assertionResults[]` with `ancestorTitles`, `title`, `status`), pytest's JUnit XML, or pytest-json-report's JSON. Without it, tests run one per invocation through `test`. |
 | `testFilterForm` | `regex` | How a name filter is written: `regex` (titles escaped and joined with `\|`, as jest, vitest and node:test read a name pattern) or `pytest` (a `-k` expression). |
@@ -156,6 +157,15 @@ A totality oracle names a test (its `via:` line); these keys say how to run one.
 
 A runner whose report is in none of those shapes (Playwright's JSON report,
 for one) works through `test` and `testMatch` alone, one test per invocation.
+
+A string `test` or `testJson` runs under `/bin/sh`, not your login shell: no
+`source`, no zsh or bash syntax, and no profile. In `sh`, a `.` of a file that
+is not there exits the shell at once, before any `||` after it is read, so
+`. ./.env || . ./.env.template` stops the command when `.env` is missing. Check
+first: `if [ -f .env ]; then . ./.env; else . ./.env.template; fi; pytest ...`,
+or move the setup into a script and name it. An argv array runs with no shell
+at all. When a batched command writes no report, the reason says that `/bin/sh`
+ran it and gives the first line it printed.
 
 ## More than one language
 

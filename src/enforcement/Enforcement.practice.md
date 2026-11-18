@@ -3,6 +3,7 @@
   step: run the totality oracles being refuted in one batched run confirmed with run --each (run --invariant <name>... --each), and see each green batched and alone
     leaves: run record for the bullets, pass; per-test run record, pass
   step: stage the smallest break that changes the behavior the bullet claims, not the strings the detector reads; read the diff to confirm the edit touched only the lines you meant
+  step: when the claim joins separate checks (a signature's comparison, its key and its freshness; each credential a route accepts), stage one break per check and refute each alone, with every forged input valid on every check but the one it breaks; refute names the breaks a shape the bullet declares calls for
   step: refute <component>/<name> --broke "<what you changed>"; the detector fails on its own assertion, not by a hang, a kill, a timeout, or what an earlier test left behind
     leaves: run record for the bullet, refutation red
   step: restore the source byte for byte: from HEAD when the code under test is committed, and from a copy taken before the break when it is not
@@ -15,6 +16,7 @@
   pitfall: the red came from the selected test depending on what earlier tests appended, not from the break (d-c4be0b1a, df-9e673484)
   pitfall: a self-asserted refuted: line read as witnessed, and an automatic refutation proved the instrument reports a site, not that the classifier calls it a bypass (df-b9b2711b, df-87881a8d)
   pitfall: a break that turns a test red when the via does not test the claim refutes nothing; record unable instead (u-2e6ee400)
-  learned: d-4dafa61b, df-b9b2711b, d-828ddc83, d-c4be0b1a, d-082ff525
+  pitfall: disabling signature verification wholesale went red, while the test's forged input carried a stale timestamp, so a forced comparison and the wrong endpoint's secret each stayed green (df-740c905f)
+  learned: d-4dafa61b, df-b9b2711b, d-828ddc83, d-c4be0b1a, d-082ff525, df-740c905f
   reach: kernel
   because: a refutation is what turns a requirement into an invariant, and the step that slips is the one no command checks: that the red came from the break. 32 of 52 refutations were once unwitnessed, and vacuous ones were found three times after they had been recorded

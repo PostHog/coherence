@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "purpose": "Seed for the decomposition checklist: known invariant shapes an agent must declare or dismiss when a requirement of the matching kind is declared. Prose only; no ids, links, or assessments. Each shape carries kinds, the tags a requirement names to see only the shapes that apply.",
+  "purpose": "Seed for the decomposition checklist: known invariant shapes an agent must declare or dismiss when a requirement of the matching kind is declared. Prose only; no ids, links, or assessments. Each shape carries kinds, the tags a requirement names to see only the shapes that apply. A shape whose sentence joins separate checks carries refute: the breaks a refutation stages, each alone.",
   "source": "the reference implementation's inventory of invariant shapes, 36 entries, extracted 2026-09-17",
   "shapes": [
     {
@@ -11,7 +11,8 @@
       ],
       "sentence": "Ordinary reads through the named boundary return only records in the declared effective scope, and missing required context refuses.",
       "applies_when": "A read entry point undertakes to restrict a shared population using explicit scope context.",
-      "excludes": "Raw queries, alternate managers, and explicit cross-scope operations outside the bound entry point; context correctness needs its own evidence."
+      "excludes": "Raw queries, alternate managers, and explicit cross-scope operations outside the bound entry point; context correctness needs its own evidence.",
+      "refute": "returning a record from outside the scope, and accepting a read with the scope context missing, each alone; the outside record must otherwise match the query, so only the scope check can drop it."
     },
     {
       "shape": "capability-authorization",
@@ -21,7 +22,8 @@
       ],
       "sentence": "A credential authorizes only its declared resource, operation, audience and validity interval at the named acceptance boundary.",
       "applies_when": "A service accepts credentials carrying bounded permission.",
-      "excludes": "Legacy shared-secret and intentionally unauthenticated branches; authenticity alone does not confer permission."
+      "excludes": "Legacy shared-secret and intentionally unauthenticated branches; authenticity alone does not confer permission.",
+      "refute": "accepting a credential for the wrong resource, the wrong operation, the wrong audience, and outside its validity interval, each alone, with the credential valid in every other respect; and, where the boundary accepts more than one kind of credential, the same breaks once per kind, since a test that sends one kind says nothing of the others."
     },
     {
       "shape": "revalidated-permission",
@@ -32,7 +34,8 @@
       ],
       "sentence": "Deferred or resumed work revalidates the actor's current permission at the declared execution boundary rather than relying solely on the permission held when it was queued.",
       "applies_when": "A permission-changing interval separates acceptance from execution or resumption.",
-      "excludes": "Revocation of already-running work and remote invalidation of copied credentials; those require separate enforcement."
+      "excludes": "Revocation of already-running work and remote invalidation of copied credentials; those require separate enforcement.",
+      "refute": "letting resumed work run after the actor's permission was revoked between scheduling and execution, with every other precondition still met; a test that never revokes in between cannot tell a recheck from a check made once at scheduling."
     },
     {
       "shape": "destination-confinement",
@@ -42,7 +45,8 @@
       ],
       "sentence": "Outbound payload delivery remains inside the declared destination policy through redirects and other followed hops.",
       "applies_when": "A sender accepts a destination or follows a response that can change it.",
-      "excludes": "A URL allowlist alone does not prove DNS-rebinding resistance or confinement of uninspected transports."
+      "excludes": "A URL allowlist alone does not prove DNS-rebinding resistance or confinement of uninspected transports.",
+      "refute": "following a redirect to a destination outside the policy, and sending to an outside destination directly, each alone."
     },
     {
       "shape": "message-authenticity",
@@ -52,7 +56,8 @@
       ],
       "sentence": "A message is accepted only if its protected fields verify under the declared signing and trust policy.",
       "applies_when": "A receiver relies on a signed external message before applying effects.",
-      "excludes": "Replay freshness, authorization and truthful content from an authorized signer are not established by signature verification."
+      "excludes": "Replay freshness, authorization and truthful content from an authorized signer are not established by signature verification.",
+      "refute": "the signature comparison (force it to succeed) and the key choice (verify with another endpoint's key, or one rotated out), each alone; the forged message must be fresh and well-formed, wrong only in its signature, since a stale or malformed forgery is refused by the freshness or parse check whatever the comparison does; where the boundary also checks freshness, break that alone too."
     },
     {
       "shape": "encrypted-storage",
@@ -62,7 +67,8 @@
       ],
       "sentence": "The named persistence boundary encodes protected values as ciphertext under the configured key policy rather than persisting plaintext.",
       "applies_when": "A field or object is explicitly designated confidential at rest.",
-      "excludes": "Logs, process memory, backups, access control and cryptographic algorithm strength outside the declared boundary."
+      "excludes": "Logs, process memory, backups, access control and cryptographic algorithm strength outside the declared boundary.",
+      "refute": "writing the protected value in plaintext, and encrypting it under a key outside the configured policy, each alone; read the stored bytes, not the value the model returns, which decrypts either way."
     },
     {
       "shape": "key-rotation-compatibility",
@@ -73,7 +79,8 @@
       ],
       "sentence": "During the declared rotation stages, supported readers can decrypt retained data while new writes use the stage's designated key.",
       "applies_when": "Encrypted data must survive key changes and coexisting reader versions.",
-      "excludes": "Readability after deliberate removal of the only decrypting key, key compromise recovery and remote credential revocation."
+      "excludes": "Readability after deliberate removal of the only decrypting key, key compromise recovery and remote credential revocation.",
+      "refute": "a reader that cannot decrypt data written under the previous key, and a writer that still writes under the previous key after the stage moved on, each alone."
     },
     {
       "shape": "redaction",
@@ -83,7 +90,8 @@
       ],
       "sentence": "Output removes or replaces content designated sensitive by the declared recognition and allowlist policy across the bound representation paths.",
       "applies_when": "A representation is exported with an explicit scrubbing policy.",
-      "excludes": "Universal PII detection, irreversible anonymization, image/OCR coverage or representations absent from the binding."
+      "excludes": "Universal PII detection, irreversible anonymization, image/OCR coverage or representations absent from the binding.",
+      "refute": "each recognized kind of sensitive content let through, and an allowlisted value removed, each alone; one kind of secret in the fixture tests one recognizer."
     },
     {
       "shape": "input-validation",
@@ -93,7 +101,8 @@
       ],
       "sentence": "When the declared validation policy is enabled, invalid inputs do not enter the accepted processing path.",
       "applies_when": "A boundary has an explicit schema and reject or quarantine behavior.",
-      "excludes": "Unenforced schemas, unknown types explicitly allowed by policy, optional properties not checked, and semantic authorization."
+      "excludes": "Unenforced schemas, unknown types explicitly allowed by policy, optional properties not checked, and semantic authorization.",
+      "refute": "each validation rule the policy declares turned off alone, with an input that breaks only that rule; an input that breaks several shows only that one of them ran."
     },
     {
       "shape": "semantic-preservation",
@@ -141,7 +150,8 @@
       ],
       "sentence": "An actor cannot satisfy mutually exclusive roles in the same protected operation when the declared approval policy forbids it.",
       "applies_when": "A policy requires the requester and the approver to hold their permission independently.",
-      "excludes": "Policies allowing self-approval, proof that two accounts belong to different people, and enforcement outside the gated API."
+      "excludes": "Policies allowing self-approval, proof that two accounts belong to different people, and enforcement outside the gated API.",
+      "refute": "letting one actor hold both roles in one operation, with the approval otherwise complete and valid."
     },
     {
       "shape": "legal-state-succession",
@@ -150,7 +160,8 @@
       ],
       "sentence": "A state change commits only from a currently allowed predecessor state, rechecked within the serialization boundary.",
       "applies_when": "Concurrent actors may make competing terminal decisions about one stateful subject.",
-      "excludes": "External effects outside the transaction and proof of physical concurrency when a detector only simulates the locked state."
+      "excludes": "External effects outside the transaction and proof of physical concurrency when a detector only simulates the locked state.",
+      "refute": "a state change from a predecessor the policy does not allow, and a state change whose predecessor changed between the check and the commit, each alone."
     },
     {
       "shape": "supersession-safety",
@@ -160,7 +171,8 @@
       ],
       "sentence": "Late work publishes only while its declared precondition still holds; it cannot displace a superseding accepted value or clean up that winner's resources.",
       "applies_when": "Asynchronous operations compete to publish state at one subject.",
-      "excludes": "General linearizability and equal-value intermediate-write detection unless explicitly represented by the precondition."
+      "excludes": "General linearizability and equal-value intermediate-write detection unless explicitly represented by the precondition.",
+      "refute": "late work publishing after a superseding result was accepted, with its own precondition otherwise met."
     },
     {
       "shape": "retry-recognition",
@@ -180,7 +192,8 @@
       ],
       "sentence": "Within the declared horizon, competing claims for one deduplication identity receive the declared suppression outcome while permitted redelivery remains distinct.",
       "applies_when": "A boundary explicitly deduplicates logical events or requests.",
-      "excludes": "Global exactly-once processing, repeats after expiry and suppression during an explicitly fail-open store outage."
+      "excludes": "Global exactly-once processing, repeats after expiry and suppression during an explicitly fail-open store outage.",
+      "refute": "a second claim for the same identity inside the horizon admitted, and a claim after the horizon suppressed, each alone."
     },
     {
       "shape": "keyed-ordering",
@@ -200,7 +213,8 @@
       ],
       "sentence": "After ownership changes, work carrying the former ownership generation cannot commit through the fenced boundary.",
       "applies_when": "Workers may complete after a lease, assignment or change of ownership.",
-      "excludes": "Side effects outside the offset/store fence and proof that every worker operation checks the generation."
+      "excludes": "Side effects outside the offset/store fence and proof that every worker operation checks the generation.",
+      "refute": "work carrying the former ownership generation committing after ownership moved, with the work otherwise valid."
     },
     {
       "shape": "acknowledgment-barrier",
@@ -221,7 +235,8 @@
       ],
       "sentence": "An irreversible external effect is not issued before the transaction establishing its intent successfully commits.",
       "applies_when": "A transaction creates state whose existence authorizes external work.",
-      "excludes": "Eventual delivery after commit and effects issued on other code paths."
+      "excludes": "Eventual delivery after commit and effects issued on other code paths.",
+      "refute": "issuing the external effect before the commit, and issuing it when the transaction rolls back, each alone."
     },
     {
       "shape": "durable-dispatch-intent",
@@ -299,7 +314,8 @@
       ],
       "sentence": "Admission accounts for weighted consumption against every declared time window of the correct budget owner.",
       "applies_when": "Requests share an external or internal quota over time.",
-      "excludes": "Fleet-wide enforcement during per-process fallback and upstream limits omitted from the configured policy."
+      "excludes": "Fleet-wide enforcement during per-process fallback and upstream limits omitted from the configured policy.",
+      "refute": "each declared window left unaccounted alone, and consumption charged to the wrong budget owner, each alone; a test that saturates one window says nothing of the others."
     },
     {
       "shape": "memory-budget",
@@ -336,7 +352,8 @@
       ],
       "sentence": "A readiness claim requires current positive observations of every declared serving prerequisite, not merely a live process.",
       "applies_when": "A deployment or router admits traffic based on a readiness surface.",
-      "excludes": "Undeclared dependencies, all possible request success and liveness, which may intentionally remain true during dependency failure."
+      "excludes": "Undeclared dependencies, all possible request success and liveness, which may intentionally remain true during dependency failure.",
+      "refute": "each declared prerequisite reported ready without a current observation, alone, and a stale observation accepted as current."
     },
     {
       "shape": "declared-target-coverage",
@@ -347,7 +364,8 @@
       ],
       "sentence": "A fan-out operation accounts for every target in its declared live registry and refuses unsupported reachability instead of silently omitting a target.",
       "applies_when": "Work must reach a registry-defined set of stores, clusters or handlers.",
-      "excludes": "Proof that the registry contains every physical copy, backup, external destination or future replay source."
+      "excludes": "Proof that the registry contains every physical copy, backup, external destination or future replay source.",
+      "refute": "dropping one target from the fan-out, and accepting an unsupported target, each alone; a test whose registry holds one target cannot tell coverage of every target from coverage of the first."
     },
     {
       "shape": "completion-evidence",
@@ -357,7 +375,8 @@
       ],
       "sentence": "A work item enters completed only after the declared observer confirms the requested outcome across its bound target population.",
       "applies_when": "Submitting or queuing work can precede its actual effect.",
-      "excludes": "Permanent no-resurrection, deletion of undeclared copies and exact predicate support where the observer uses a conservative superset."
+      "excludes": "Permanent no-resurrection, deletion of undeclared copies and exact predicate support where the observer uses a conservative superset.",
+      "refute": "marking work complete without the observer's confirmation, and on a confirmation of a different outcome, each alone."
     }
   ],
   "kinds": {
