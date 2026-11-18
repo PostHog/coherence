@@ -925,3 +925,40 @@ test("an entry file outside the project is refused naming that entry file, not t
     rmSync(outside, { recursive: true, force: true });
   }
 });
+
+test("review searches the sources the config names for a term, ignored folders among them, and names the sources outside the repository without reading them; a source path that names nothing is a spec problem", async () => {
+  const { loadSpecModel } = await import("../spec/model.ts");
+  const root = mkdtempSync(join(tmpdir(), "coherence-lexicon-sources-"));
+  try {
+    mkdirSync(join(root, "billing/models"), { recursive: true });
+    mkdirSync(join(root, "knowledge"));
+    writeFileSync(join(root, "billing/models/credit.py"), "class Credit:\n    amount = 0\n");
+    // The knowledge base holds what the code does not say; the config keeps it out of the checks, and names it as a source.
+    writeFileSync(join(root, "knowledge/credits.yaml"), "title: Clawbacks\nbody: A clawback writes a Credit row with a negative amount.\n");
+    writeFileSync(join(root, "knowledge/unrelated.yaml"), "title: Invoices\n");
+    writeFileSync(join(root, "knowledge/blob.bin"), Buffer.from([0x63, 0x72, 0x65, 0x64, 0x69, 0x74, 0x00]));
+    writeFileSync(join(root, "knowledge/.env"), "CREDIT_API_KEY=sk_live_secret\n");
+    writeFileSync(
+      join(root, "coherence.config.json"),
+      JSON.stringify({ language: "python", ignore: ["knowledge"], lexiconSources: { paths: ["knowledge"], elsewhere: ["Slack #team-billing: decisions on credit semantics, by message link"] } }),
+    );
+    const review = await run(root, ["review", "credit"]);
+    assert.equal(review.code, 0, review.err);
+    assert.match(review.out, /Sources the config names for what the project's words mean \(lexiconSources\):\n {2}in the project \(knowledge\): 1 use\n {4}knowledge\/credits\.yaml:2 {2}body: A clawback writes a Credit row with a negative amount\.\n/);
+    assert.match(review.out, /outside the repository, read-only; cite what you use in the decision, and read nothing the list does not name:\n {4}Slack #team-billing: decisions on credit semantics, by message link\n/);
+    assert.doesNotMatch(review.out, /blob\.bin|unrelated\.yaml|sk_live/, "a binary file, a file that never uses the term, and an environment file are not shown");
+    const json = JSON.parse((await run(root, ["review", "credit", "--json"])).out) as { sources: { paths: string[]; useCount: number; elsewhere: string[] } };
+    assert.deepEqual([json.sources.paths, json.sources.useCount, json.sources.elsewhere.length], [["knowledge"], 1, 1]);
+    assert.deepEqual(loadSpecModel(root).problems.filter((p) => /lexiconSources/.test(p.message)), [], "a source that exists is no problem");
+
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ language: "python", lexiconSources: { paths: ["knowledg", "../elsewhere"], extra: [] } }));
+    const messages = loadSpecModel(root).problems.filter((p) => /lexiconSources/.test(p.message)).map((p) => p.message);
+    assert.equal(messages.length, 3, messages.join("\n"));
+    assert.ok(messages.some((m) => /"knowledg" names no file or folder in the project/.test(m)));
+    assert.ok(messages.some((m) => /"\.\.\/elsewhere" is outside the project; a source in another repository goes under elsewhere/.test(m)));
+    assert.ok(messages.some((m) => /has no key extra/.test(m)));
+    assert.doesNotMatch((await run(root, ["review", "credit"])).out, /\.\.\/elsewhere|Sources the config names/, "a path refused is never read");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

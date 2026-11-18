@@ -218,7 +218,13 @@ export function parseReport(text: string): JsonReport {
 export function belongsTo(result: AssertionResult, via: string): boolean {
   if (result.title === via || result.fullName === via) return true;
   if (result.ancestorTitles?.includes(via) === true) return true;
+  if (caseOf(result.title, via)) return true;
   return truncatedTo(result.title, via) || truncatedTo(result.fullName, via);
+}
+
+/** One case of a parametrized test, as pytest names it: the via, then its parameters in brackets (test_x[a-b]); never test_x_other. */
+function caseOf(reported: string | undefined, via: string): boolean {
+  return reported !== undefined && reported.length > via.length + 1 && reported.startsWith(`${via}[`) && reported.endsWith("]");
 }
 
 /** A title the runner cut short: the ellipsis it ends with, and the rest a prefix of the via. */
