@@ -99,7 +99,7 @@ export const DEFAULTS = {
   project: "Coherence",
 } as const;
 
-async function readLexicon(path: string): Promise<Lexicon> {
+async function readLexicon(path: string, defaultVersion?: number): Promise<Lexicon> {
   const text = await readFile(path, "utf8");
   let parsed: unknown;
   try {
@@ -107,6 +107,8 @@ async function readLexicon(path: string): Promise<Lexicon> {
   } catch (error) {
     throw new Error(`${path}: not valid JSON (${(error as Error).message})`);
   }
+  // A plugin's lexicon states no version; the lifecycle reading accepts that, so this one reads it as the first.
+  if (defaultVersion !== undefined && typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) && !("version" in parsed)) parsed = { version: defaultVersion, ...parsed };
   return parseLexicon(parsed, path);
 }
 
@@ -255,7 +257,7 @@ async function pluginLexiconLayers(root: string): Promise<Layer[]> {
   const layers: Layer[] = [];
   for (const plugin of plugins) {
     if (plugin.manifest.lexicon === undefined) continue;
-    layers.push({ kind: "present", id: `plugin ${plugin.name}`, title: `Plugin ${plugin.name} lexicon (${plugin.version})`, lexicon: await readLexicon(resolve(plugin.dir, plugin.manifest.lexicon)) });
+    layers.push({ kind: "present", id: `plugin ${plugin.name}`, title: `Plugin ${plugin.name} lexicon (${plugin.version})`, lexicon: await readLexicon(resolve(plugin.dir, plugin.manifest.lexicon), 1) });
   }
   return layers;
 }
