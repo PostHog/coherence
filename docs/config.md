@@ -99,7 +99,7 @@ To opt in several folders and state their shared settings once, put a
   | `name`, `entryDir`, `lexicon`, `projects`, `plugins` | Never inherited. Each belongs to the leaf; a plugin's path is the writer's. |
   | `ignore` | Combined. A name from the registry, a folder's or a file's, applies anywhere in the leaf. A path from the registry is kept only if it lies inside the leaf, and is rewritten relative to it. |
   | `wellKnown` | Combined. |
-  | `tests`, `test`, `testJson`, `testMatch`, `testFilterForm`, `testDir`, `testDirs` | One group. A leaf that sets any of them replaces the registry's whole group. An inherited setup's `cwd` is rewritten from the registry's folder to the leaf, so the registry's `"cwd": "."` runs the tests from the repository root. A setup without `cwd` runs in the leaf. |
+  | `tests`, `test`, `testJson`, `testMatch`, `testSkip`, `testFilterForm`, `testDir`, `testDirs` | One group. A leaf that sets any of them replaces the registry's whole group. An inherited setup's `cwd` is rewritten from the registry's folder to the leaf, so the registry's `"cwd": "."` runs the tests from the repository root. A setup without `cwd` runs in the leaf. |
   | everything else (`language`, `references`, `latencyBudget`, `interfaceBudget`, ...) | Replaced whole. |
 
   A relative path in an inherited key resolves against the file that
@@ -142,6 +142,7 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 | `interfaceBudget` | `{ "seconds": 600, "memoryMB": 12288 }` | The most time and memory the Structure reading's interface pass may take; when it runs out, the reading says it is partial. |
 | `telemetry` | none | `false` refuses fleet telemetry for this project, whatever each user chose with `coherence telemetry on`; a registry's `false` refuses for every leaf. Telemetry is off unless a user opts in; see [telemetry.md](telemetry.md) for what is sent. |
 | `latencyBudget` | `3` | The latency budget: the most seconds a tool hook (PreToolUse, PostToolUse) or a stop may take, counted from its process's start. A tool hook over it says so in its own answer; regulate names the session's calls and stops over it, and orient the last week's calls. These hooks run around every tool call, and a call cycle that feels sluggish is how a hook gets switched off. |
+| `peers` | none | The other repositories the project's invariants rely on, each name mapped to `{ "repository": "<owner/name>", "checkout": "<folder relative to the root>", "env": "<VARIABLE>" }`. A bullet's `peer: <name> <path>` line names a file of that repository its test reads; every test command is given the checkout's absolute path in `env` (default `<NAME>_CHECKOUT`), and the run records the commit and blob it read. A checkout that is not there, or does not hold the file, reads not run with how to clone it, never pass. See [spec.md](spec.md#another-repositorys-file). |
 
 ## Tests: how a totality oracle is run
 
@@ -151,6 +152,7 @@ A totality oracle names a test (its `via:` line); these keys say how to run one.
 |---|---|---|
 | `test` | none | The command that runs tests whose name matches a filter: an argv array the filter is appended to, or a string containing `{filter}`, which runs under `/bin/sh` (below). Without it, a totality oracle cannot run. |
 | `testMatch` | none | A regular expression the test output must match to count as a pass, for a runner that exits 0 when no test matched the filter. Without it, the exit code decides. |
+| `testSkip` | none | A regular expression a skipped test prints, for a runner that exits 0 when the test skipped: an exit 0 whose output matches it and not `testMatch` reads not run, with the skip's own line and the line before it as the reason, never a fail naming no test. For `go test -v`, `--- SKIP: ` beside a `testMatch` of `--- PASS: `. |
 | `testJson` | none | One invocation for every test the bullets name at once: an argv array or a string with `{filter}` (a combined name pattern) and `{out}` (where the runner writes its report). The report may be jest-shaped JSON (`testResults[].assertionResults[]` with `ancestorTitles`, `title`, `status`), pytest's JUnit XML, or pytest-json-report's JSON. Without it, tests run one per invocation through `test`. |
 | `testFilterForm` | `regex` | How a name filter is written: `regex` (titles escaped and joined with `\|`, as jest, vitest and node:test read a name pattern) or `pytest` (a `-k` expression). |
 | `testDir` / `testDirs` | `__tests__`, `test`, `tests` | A folder name, or a list, whose files are tests, beside the built-in ones. |
@@ -244,8 +246,8 @@ look found them, and reads only the files that changed. Without that memo,
 it reads every file.
 
 **Which setup runs a test.** Each test setup takes the keys of the table
-above (`test`, `testJson`, `testMatch`, `testFilterForm`, `testDir` /
-`testDirs`), and three of its own:
+above (`test`, `testJson`, `testMatch`, `testSkip`, `testFilterForm`,
+`testDir` / `testDirs`), and three of its own:
 
 | Key | Default | Meaning |
 |---|---|---|

@@ -99,7 +99,7 @@ and the detector went red.
   checks, not where it enters: a totality oracle counts as a control only on
   the entrances its `entrances:` line names.
 
-![The Invariants view: each invariant with its sentence, the reason it matters, its enforcement, and its latest verdict.](https://raw.githubusercontent.com/PostHog/coherence/main/docs/images/scope-invariants.jpg)
+![The Components view: one component read as its spec, each invariant a sentence with where it stands, its reason, enforcement and latest verdict a click away.](https://raw.githubusercontent.com/PostHog/coherence/main/docs/images/scope-components.jpg)
 
 ## Violations surface at the edit, not in review
 

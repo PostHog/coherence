@@ -325,15 +325,15 @@ test("the comparison seam measures what a change did: entrance, interface added,
 });
 
 
-test("links into the retired map and the security spine open the Structure view, and its Reliance view's links open the listing on the Invariants view", () => {
+test("links into the retired map and the security spine open the Structure view, and its Reliance view's links open the listing on the Components view", () => {
   const state = projectState();
   // The relief has no cards to land on: each opens the view alone, the masthead verdict's link among them.
   for (const link of [structureId("src/store", "single writer"), flowEntranceId(".", "run"), flowChokepointId("src/store", "single writer"), flowHealthId("verified")])
     assert.deepEqual(resolveHash(state, `#${link}`), { view: "structure", id: undefined }, link);
-  // Reliance is listed on its invariant's card: a reliance id lands there, and the retired view's own link opens Invariants.
+  // Reliance is listed in its bullet's detail on Components: a reliance id lands there, and the retired view's own link opens Components.
   const reliance = relianceId("src/store", "single writer");
-  assert.deepEqual(resolveHash(state, `#${reliance}`), { view: "invariants", id: reliance });
-  assert.deepEqual(resolveHash(state, "#reliance"), { view: "invariants", id: undefined });
+  assert.deepEqual(resolveHash(state, `#${reliance}`), { view: "components", id: reliance });
+  assert.deepEqual(resolveHash(state, "#reliance"), { view: "components", id: undefined });
 });
 
 

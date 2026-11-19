@@ -1,38 +1,22 @@
 /**
- * The Invariants view: every bullet with its lifecycle state, enforcement
- * form, chokepoint grade with the rung's enforcer, crossing, because,
- * refutation, checklist, and what it lacks. A structural defect shows its
- * bypass sites and the two honest options. A chokepoint invariant carries its
- * reliance listing, folded: every recorded reference site to the chokepoint
- * or the protected thing. Filtered by state and component, searched by text.
- * A pure function from the shell state to markup.
+ * What a bullet's detail says, on its component's page in the Components
+ * view: its crossing over the declared trust levels, each enforcement with
+ * its latest verdict and the chokepoint grade with the rung's enforcer, its
+ * refutations, its checklist, what it lacks, a structural defect's bypass
+ * sites and the two honest options, and a chokepoint's reliance listing,
+ * folded: every recorded reference site to the chokepoint or the protected
+ * thing. Pure functions from the shell state to markup.
  */
 
-import { allInvariants, componentId, defectsOf, invariantId, isKept, latestOf, latestRun, plural, relianceId, relianceOf, stamp, textMatches, type Reliance, type RelianceSite } from "./derive.ts";
+import { defectsOf, isKept, latestOf, plural, relianceId, relianceOf, stamp, type Reliance, type RelianceSite } from "./derive.ts";
 import { html, join, type Markup } from "./html.ts";
-import type { LatestEntry, LifecycleState, RunRecord, ShellState, SpecEnforcement, SpecInvariant, TrustLevel } from "./model.ts";
-
-const STATES: readonly LifecycleState[] = ["requirement", "invariant", "structural defect"];
-
-function invariantMatches(invariant: SpecInvariant, query: string, runs: readonly RunRecord[]): boolean {
-  return textMatches(
-    query,
-    invariant.name,
-    invariant.sentence,
-    invariant.because,
-    invariant.component,
-    invariant.state,
-    invariant.enforcements.map((e) => (e.form === "chokepoint" ? `${e.chokepoint} ${e.protects}` : `${e.via} ${e.over}`)),
-    invariant.crossing === undefined ? undefined : `${invariant.crossing.from} ${invariant.crossing.to}`,
-    latestOf(invariant, runs).flatMap((l) => l.bypasses.map((b) => `${b.file} ${b.symbol}`)),
-  );
-}
+import type { LatestEntry, RunRecord, ShellState, SpecEnforcement, SpecInvariant, TrustLevel } from "./model.ts";
 
 function levelMeaning(levels: readonly TrustLevel[], name: string): string | undefined {
   return levels.find((l) => l.name === name)?.meaning;
 }
 
-function renderCrossing(state: ShellState, invariant: SpecInvariant): Markup {
+export function renderCrossing(state: ShellState, invariant: SpecInvariant): Markup {
   const crossing = invariant.crossing;
   if (crossing === undefined) return html`<p class="crossing quiet">no crossing</p>`;
   const from = levelMeaning(state.spec.trustLevels, crossing.from);
@@ -116,7 +100,7 @@ export function renderRefutation(invariant: SpecInvariant, runs: readonly RunRec
   return html`<section class="refutations" data-field="refutation"><h4>Refutation</h4><ul>${parts}</ul></section>`;
 }
 
-function renderChecklist(invariant: SpecInvariant): Markup {
+export function renderChecklist(invariant: SpecInvariant): Markup {
   const kinds = invariant.kinds;
   if (kinds === undefined) return html`<section class="checklist" data-field="checklist"><h4>Checklist</h4><p class="quiet">No kinds line: the decomposition checklist was never run for this bullet.</p></section>`;
   const kindsText = kinds === "none" ? "none" : kinds.join(", ");
@@ -132,7 +116,7 @@ function renderChecklist(invariant: SpecInvariant): Markup {
   </section>`;
 }
 
-function renderLacks(invariant: SpecInvariant): Markup | null {
+export function renderLacks(invariant: SpecInvariant): Markup | null {
   if (invariant.lacks.length === 0 && invariant.unfilled.length === 0) return null;
   return html`<p class="lacks" data-field="lacks">
     ${invariant.lacks.length > 0 ? html`<span class="label">lacks</span> ${invariant.lacks.join(", ")}` : null}
@@ -141,7 +125,7 @@ function renderLacks(invariant: SpecInvariant): Markup | null {
 }
 
 /** A structural defect's evidence and the two honest options. */
-function renderDefect(invariant: SpecInvariant, runs: readonly RunRecord[]): Markup | null {
+export function renderDefect(invariant: SpecInvariant, runs: readonly RunRecord[]): Markup | null {
   if (invariant.state !== "structural defect") return null;
   const chokepoints = invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [e.chokepoint] : []));
   const failing = defectsOf(invariant, runs);
@@ -204,97 +188,13 @@ function renderRelianceOf(state: ShellState, reliance: Reliance): Markup {
  * acknowledging a retirement. Folded beneath the card, and open when a link
  * landed on it or the reader opened it, which the state keeps across renders.
  */
-function renderReliance(state: ShellState, invariant: SpecInvariant): Markup | null {
+export function renderReliance(state: ShellState, invariant: SpecInvariant): Markup | null {
   const readings = relianceOf(invariant, state.spec.components, state.runs.records);
   if (readings.length === 0) return null;
   const id = relianceId(invariant.component, invariant.name);
   const counted = readings.map((r) => (r.evidence.status === "unknown" ? "unknown" : plural(r.evidence.sites.length + r.evidence.left, "site", "sites")));
-  return html`<details class="record reliance" id="${id}" data-field="reliance" ${state.invariants.reliance === id ? "open" : ""}>
+  return html`<details class="record reliance" id="${id}" data-field="reliance" ${state.components.reliance === id ? "open" : ""}>
     <summary data-reliance-toggle="${id}"><span class="label">Reliance</span> who references this chokepoint <span class="quiet">${counted.join(", ")}</span></summary>
     ${join(readings.map((r) => html`<section data-reliance-of="${r.chokepoint}">${readings.length > 1 ? html`<h5><code>${r.chokepoint}</code> <span class="label">protects</span> <code>${r.protects}</code></h5>` : null}${renderRelianceOf(state, r)}</section>`))}
   </details>`;
-}
-
-function renderInvariant(state: ShellState, invariant: SpecInvariant): Markup {
-  const id = invariantId(invariant.component, invariant.name);
-  const component = state.spec.components.find((c) => c.folder === invariant.component);
-  return html`<article class="entry invariant" id="${id}" data-state="${invariant.state}">
-    <div class="margin">
-      <h3 class="headword"><a href="#${id}">${invariant.name}</a></h3>
-      <p class="status"><span class="state-mark" data-state="${invariant.state}">${invariant.state}</span></p>
-      <p class="defined-by"><a class="related-link" href="#${componentId(invariant.component)}">${component?.name ?? invariant.component}</a> <span class="quiet">${component?.specPath ?? invariant.component}:${invariant.line}</span></p>
-      ${renderCrossing(state, invariant)}
-    </div>
-    <div class="body">
-      <p class="definition" data-field="sentence">${invariant.sentence}</p>
-      ${invariant.because !== undefined
-        ? html`<p class="because" data-field="because"><span class="because-word">because</span> ${invariant.because}</p>`
-        : html`<p class="because quiet" data-field="because"><span class="because-word">because</span> not written: every invariant carries its own.</p>`}
-      <section class="enforcements" data-field="enforcements">
-        <h4>Enforcement</h4>
-        ${invariant.enforcements.length === 0
-          ? html`<p class="quiet">None: the bullet names no chokepoint and no totality oracle, so nothing detects a break.</p>`
-          : html`<ul>${invariant.enforcements.map((e) => renderEnforcement(state, invariant, e))}</ul>`}
-      </section>
-      ${renderDefect(invariant, state.runs.records)}
-      ${renderRefutation(invariant, state.runs.records)}
-      ${renderChecklist(invariant)}
-      ${renderLacks(invariant)}
-      ${renderReliance(state, invariant)}
-    </div>
-  </article>`;
-}
-
-export function renderInvariantsTools(state: ShellState): Markup {
-  const view = state.invariants;
-  return html`<div class="view-tools">
-    <label class="search">
-      <span class="label">Search</span>
-      <input type="search" data-search value="${view.query}" placeholder="name, sentence, because, chokepoint, file, or trust level" autocomplete="off" spellcheck="false">
-    </label>
-    <div class="filters">
-      <label class="filter"><span class="label">State</span>
-        <select data-filter="state">
-          <option value="" ${view.state === "" ? "selected" : ""}>every state</option>
-          ${STATES.map((s) => html`<option value="${s}" ${view.state === s ? "selected" : ""}>${s}</option>`)}
-        </select></label>
-      <label class="filter"><span class="label">Component</span>
-        <select data-filter="component">
-          <option value="" ${view.component === "" ? "selected" : ""}>every component</option>
-          ${state.spec.components.map((c) => html`<option value="${c.folder}" ${view.component === c.folder ? "selected" : ""}>${c.folder === "." ? c.name : c.folder}</option>`)}
-        </select></label>
-    </div>
-  </div>`;
-}
-
-/** The ladder, once, above the cards: each rung and who enforces it. */
-function renderLadder(state: ShellState): Markup {
-  const ladder = state.spec.ladder;
-  return html`<details class="record ladder" data-section="ladder">
-    <summary>Chokepoint grade ladder for ${ladder.language}: ${ladder.rungs.map((r) => r.grade).join(", ")}</summary>
-    <dl class="record-fields">${ladder.rungs.map((r) => html`<div class="record-field" data-grade="${r.grade}"><dt>${r.grade}</dt><dd>enforced by ${r.enforcedBy}</dd></div>`)}</dl>
-  </details>`;
-}
-
-export function renderInvariantsResults(state: ShellState): Markup {
-  const view = state.invariants;
-  const query = view.query.trim().toLowerCase();
-  const all = allInvariants(state.spec.components);
-  const shown = all.filter(
-    (i) => (view.state === "" || i.state === view.state) && (view.component === "" || i.component === view.component) && invariantMatches(i, query, state.runs.records),
-  );
-  const filtered = view.state !== "" || view.component !== "" || query !== "";
-  const counts = state.spec.counts;
-  const last = latestRun(state.runs.records);
-  return html`<section class="invariants" aria-labelledby="invariants-heading">
-    <h2 class="section-heading" id="invariants-heading">Invariants</h2>
-    <p class="section-lead">${plural(counts.bullets, "bullet", "bullets")}: ${counts.invariants} ${counts.invariants === 1 ? "invariant" : "invariants"}, ${counts.requirements} ${counts.requirements === 1 ? "requirement" : "requirements"}${counts.structuralDefects > 0 ? html`, <span class="defect-count">${plural(counts.structuralDefects, "structural defect", "structural defects")}</span>` : ""}. ${last === undefined ? "No run yet: every enforcement is declared, unverified." : `Verdicts from the run at ${stamp(last.at)} by ${last.agent}, and from earlier runs where it skipped an enforcement.`}</p>
-    ${renderLadder(state)}
-    ${!filtered
-      ? html`<p class="match-summary quiet">${plural(all.length, "bullet", "bullets")}.</p>`
-      : shown.length === 0
-        ? html`<p class="match-summary">No bullet matches${query !== "" ? ` “${view.query}”` : ""}${view.state !== "" ? ` in state ${view.state}` : ""}${view.component !== "" ? ` in ${view.component}` : ""}.</p>`
-        : html`<p class="match-summary">${shown.length} of ${plural(all.length, "bullet", "bullets")} shown.</p>`}
-    ${shown.map((i) => renderInvariant(state, i))}
-  </section>`;
 }

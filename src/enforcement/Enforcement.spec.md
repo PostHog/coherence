@@ -82,6 +82,12 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   crossing: instrument -> record
   refuted: made a missing test command report pass -> "the totality oracle pass: configured command with a filter and a match; not configured is reported, never passing" went red in enforcement.test.ts; restored, green (2026-09-17)
   kinds: none
+- a skipped test reads not run: A totality oracle whose test command exits 0 with output that matches the config's testSkip and not its testMatch reads not run, with the runner's own skip line and the line before it as the reason, never a pass and never a fail naming no test; without testSkip that output stays a fail, a matched pass stays a pass, and a failing exit stays a fail.
+  over: a go test -v transcript of a test that skipped with its message, the same transcript with no testSkip configured, a pass printed beside a skip, and a skip printed by a command that exits 1
+  via: a skipped test reads not run with the runner's own words for why, never a fail naming no test, and only where the config says what a skip prints
+  because: in hogtower's full run of 2026-11-12, 43 test-backed bullets read "fail: no test ran under that name" while Postgres refused connections and hogtower's Go tests skipped, not failed, for want of it; each passed alone, so the fail named a cause that was not there and hid the real one, the skip's own message (c-f31c7b67)
+  crossing: instrument -> record
+  kinds: none
 - one invocation for every test: When the config names a testJson command, every test the bullets name runs in one invocation, the results map back by name, and the record says which mode ran.
   protects: runTotalityBatch
   chokepoint: performRun
@@ -392,4 +398,10 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   kinds: none
 - a via that maps to no test is said, never graded as a fail: When a run's batched pass finds no reported test whose title, or a group's title above it, is a bullet's via, while the same via run alone selects a test by pattern and passes, run --each names the via as naming no test exactly, with the titles it selected alone, instead of printing a fail batched beside a pass alone.
   because: three bullets read 'no test ran' in every full batched run and passed alone, and run --each printed both verdicts without saying they disagreed, so the floor graded them failing while each targeted run passed (df-03839b92)
+  kinds: none
+- a peer's file is read where it lives: A totality oracle whose bullet names a file of another repository (a peer: line) runs only against the checkout the config's peers name, hands every test command that checkout's path, and records the commit and blob it read beside the verdict; a checkout that is not there, or that does not hold the file, reads not run with how to get it, never pass.
+  over: a project beside a peer checkout, read with the checkout as committed, with the peer's file changed in it, with the checkout moved away, and with the file removed
+  via: a test that reads a peer's file runs against the peer's checkout, records what it read, goes red when the peer changes, and reads not run without the checkout
+  because: hogtower kept a hand copy of 4 of the 12 token vectors hoglake owns, and its check read the copy, so a change hoglake made to its own vectors would have stayed green in hogtower; reading the vectors where they live, the same change turned hogtower's check red, and the run names which commit of hoglake it held against (2026-11-12)
+  crossing: project-source -> record
   kinds: none

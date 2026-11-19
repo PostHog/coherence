@@ -162,10 +162,12 @@ interface Config {
   plugins: LoadedPlugin[];
   /** Why the config's plugins were refused, each a problem on the config file. */
   configProblems: string[];
+  /** The peers' names the config declares, for peer: lines to resolve against; empty when the config does not read. */
+  peers: string[];
 }
 
 function readConfig(root: string): Config {
-  const config: Config = { ignore: [], entryDir: ".", plugins: [], configProblems: [] };
+  const config: Config = { ignore: [], entryDir: ".", plugins: [], configProblems: [], peers: [] };
   // The project's own config over its registry's keys (project-config.ts); a malformed file is refused with its path.
   const found = effectiveConfig(root);
   if (found === undefined) return config;
@@ -181,7 +183,7 @@ function readConfig(root: string): Config {
   // Read once the plugins are, it registers them, so a file of a language a plugin adds is read by that plugin's syntax slots.
   if (plugins.problems.length === 0) {
     try {
-      readEnforcementConfig(root);
+      config.peers = readEnforcementConfig(root).peers.map((peer) => peer.name);
     } catch (error) {
       config.configProblems = [error instanceof Error ? error.message : String(error)];
     }
@@ -525,6 +527,11 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
         if (e.form !== "totality oracle") continue;
         const refused = viaFormProblem(e.via, config.plugins);
         if (refused !== undefined) problems.push({ file: specPath, line: e.line, message: `invariant ${invariant.name}: ${refused}` });
+      }
+      for (const file of config.configProblems.length > 0 ? [] : (invariant.peerFiles ?? [])) {
+        if (config.peers.includes(file.peer)) continue;
+        const named = config.peers.length === 0 ? "the config names no peers" : `the config's peers are ${config.peers.join(", ")}`;
+        problems.push({ file: specPath, line: file.line, message: `peer: on ${invariant.name} names peer ${file.peer}; ${named}` });
       }
       if (invariant.crossing !== undefined) {
         for (const end of [invariant.crossing.from, invariant.crossing.to]) {

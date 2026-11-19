@@ -314,7 +314,6 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     relief: options.relief ?? { kind: "unread", because: "no relief was read when this page was built" },
     components: { query: "" },
     structure: { preview: options.structurePreview === undefined ? [] : options.structurePreview.map((proposal) => ({ ...proposal, crossing: { ...proposal.crossing }, ...(proposal.chokepoints === undefined ? {} : { chokepoints: proposal.chokepoints.map((entry) => ({ ...entry })) }) })) },
-    invariants: { query: "", state: "", component: "" },
     practices: loadPractices(root),
     howItWorks: readHowItWorks(),
     hookSaid: readAllSaid(root),

@@ -95,7 +95,7 @@ export const OWN_KEYS: ReadonlySet<string> = new Set(["name", "entryDir", "lexic
 /** The keys a leaf's own value adds to the registry's rather than replaces. */
 export const CONCATENATED: ReadonlySet<string> = new Set(["ignore", "wellKnown"]);
 /** The keys one test setup reads, top level or in each entry of tests; enforcement/config.ts reads a setup through these alone, so a key it reads is one this names. */
-export const SETUP_KEYS = ["test", "testJson", "testMatch", "testFilterForm", "testDir", "testDirs"] as const;
+export const SETUP_KEYS = ["test", "testJson", "testMatch", "testSkip", "testFilterForm", "testDir", "testDirs"] as const;
 export type SetupKey = (typeof SETUP_KEYS)[number];
 /** The test keys, inherited or replaced as one group: tests and every setup key. */
 export const TEST_KEYS: ReadonlySet<string> = new Set(["tests", ...SETUP_KEYS]);

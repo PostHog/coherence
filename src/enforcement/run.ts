@@ -27,6 +27,7 @@ import { enforcedLanguageOf, readEnforcementConfig, setupClaims, type Enforcemen
 import { appendRun, entryKey, loadRuns, machineLoad, type Form, type RunEntry, type RunRecord } from "./record.ts";
 import { enforcesOf } from "../spec/floor.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
+import { peerReadingText, readPeerFiles } from "./peers.ts";
 import { escapeRegExp, runTotalityBatch, runTotalityOracle, TOTALITY_TIMEOUT_MS, type TotalityResult } from "./totality.ts";
 import { answeringFor } from "../plugins/registry.ts";
 import { proveVia, viaForm } from "../plugins/verify.ts";
@@ -497,8 +498,26 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
         const filter = primary?.testFilter(via) ?? via;
         const index = chooseSetup(via);
         const setup = config.tests[index]!;
+        // A test that reads another repository runs only against a checkout that holds what it reads: else not run, with how to get it.
+        const peerRead = invariant.peerFiles === undefined ? undefined : readPeerFiles(config.peers, invariant.peerFiles);
+        if (peerRead !== undefined && "reason" in peerRead) {
+          details.push({
+            entry: entryOf(component, invariant.name, "totality oracle", {
+              verdict: "not run",
+              grade: undefined,
+              refutation: recorded.has(entryKey(component, invariant.name, "totality oracle")) ? "witnessed" : "missing",
+              bypasses: [],
+              testReferences: 0,
+              files: [],
+              latency: Date.now() - t0,
+              reason: `not run: ${peerRead.reason}`,
+            }),
+          });
+          continue;
+        }
         const fromBatch = batched.get(index)?.get(filter);
         const result = fromBatch ?? (await runTotalityOracle(root, setup, filter, options.timeoutMs));
+        const peers = peerRead?.readings;
         details.push({
           entry: {
             ...entryOf(component, invariant.name, "totality oracle", {
@@ -509,8 +528,9 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
               testReferences: 0,
               files: [],
               latency: fromBatch === undefined ? Date.now() - t0 : (batchLatency.get(index) ?? 0),
-              reason: result.reason,
+              reason: peers === undefined ? result.reason : `${result.reason}; read ${peers.map(peerReadingText).join(", ")}`,
               ...(multiSetup && setup.language !== undefined ? { language: setup.language } : {}),
+              ...(peers === undefined ? {} : { peers }),
             }),
             ...(result.testMs === undefined ? {} : { testMs: result.testMs }),
             mode: fromBatch === undefined ? "one-at-a-time" : "batched",
@@ -688,6 +708,7 @@ async function confirmEach(
             latency: Date.now() - t0,
             reason,
             ...(batched.entry.language === undefined ? {} : { language: batched.entry.language }),
+            ...(batched.entry.peers === undefined ? {} : { peers: batched.entry.peers }),
           }),
           mode: "one-at-a-time",
         },

@@ -266,6 +266,31 @@ names the whole set the detector is total over and the test:
   checklist: scoped-reads dismissed: reads are the capability invariant's
 ```
 
+### Another repository's file
+
+A service that spans repositories keeps each side a project of its own, with
+its own lexicon, specs and journal. What crosses between them is a file one
+side owns and the other's test reads: a token verifier's vectors, a schema, a
+generated client. The reading side names the other repository once, under
+`peers` in its config ([config.md](config.md)), and each bullet whose test
+reads such a file says so, one `peer:` line per file, on the totality oracle
+form alone:
+
+```markdown
+- events decode under the consumer's schema: Every event the producer emits decodes under the schema the consumer repository owns.
+  over: every event kind the consumer's schema file names, emitted by the producer and decoded under it
+  via: TestEventsDecodeUnderConsumerSchema
+  peer: consumer schema/events.json
+```
+
+The test reads the file where it lives, from the checkout whose path every
+test command is given in the peer's `env` variable, never from a copy kept in
+this repository: a copy stays green while its owner moves. The run checks
+each named file before the test, records the peer's commit, whether the file
+was changed in the checkout, and the file's blob beside the verdict, and
+reads not run, with how to clone the checkout, when it is not there. A
+`peer:` line naming a peer the config does not declare is a spec problem.
+
 ### Which references a chokepoint governs
 
 By default a chokepoint governs every reference to the protected thing: any

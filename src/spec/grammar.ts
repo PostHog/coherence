@@ -34,6 +34,7 @@
  *     unless: <option>                        optional; a call passing <option>: true switches the check off and earns no credit
  *     over: <the set the detector is total over>   totality oracle form, with
  *     via: <the test>
+ *     peer: <peer> <path>                     optional, many; a file of another repository the test reads (src/enforcement/peers.ts)
  *     because: <why it exists, what it protects against>
  *     crossing: <trust level> -> <trust level>
  *     entrances: <entrance, entrance> | none   optional; the entrances whose work it checks, by name, never by crossing alone
@@ -55,6 +56,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Seed } from "./seed.ts";
+import { parsePeerFile, type PeerFile } from "../enforcement/peers.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -78,9 +80,9 @@ export const INVARIANTS_SECTION = "invariants";
 const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances, ## mirrors, ## folded and ## invariants";
 
 /** The keys an invariant bullet may carry, in the order the scaffold prints them. */
-export const KEYS = ["protects", "chokepoint", "from", "unless", "over", "via", "because", "crossing", "entrances", "refuted", "kinds", "checklist"] as const;
+export const KEYS = ["protects", "chokepoint", "from", "unless", "over", "via", "peer", "because", "crossing", "entrances", "refuted", "kinds", "checklist"] as const;
 export type Key = (typeof KEYS)[number];
-const MANY: ReadonlySet<Key> = new Set<Key>(["refuted", "checklist"]);
+const MANY: ReadonlySet<Key> = new Set<Key>(["refuted", "checklist", "peer"]);
 
 export interface Problem {
   file: string;
@@ -306,6 +308,8 @@ export interface Invariant {
   checklist: ChecklistLine[];
   /** Keys whose value is still a placeholder, as written (a checklist entry names its shape). */
   unfilled: string[];
+  /** The files of other repositories its test reads, one peer: line each; absent when it names none. */
+  peerFiles?: PeerFile[];
 }
 
 export interface ParsedSpec {
@@ -810,6 +814,29 @@ function buildInvariant(bullet: RawBullet, problem: (line: number, message: stri
     else if (value !== undefined && chokepoint !== undefined && chokepoint.form === "chokepoint") chokepoint.unless = value;
   }
 
+  // The files of another repository its test reads: a totality oracle's alone, since a chokepoint is read in this project.
+  const peerFiles: PeerFile[] = [];
+  for (const field of many.get("peer") ?? []) {
+    if (isPlaceholder(field.value)) {
+      unfilled.push("peer");
+      continue;
+    }
+    if (!single.has("via")) {
+      problem(field.line, `peer: on ${bullet.name} belongs to the totality oracle form (over: and via:); it names a file of another repository the test reads`);
+      continue;
+    }
+    const parsed = parsePeerFile(field.value);
+    if (parsed === undefined) {
+      problem(field.line, `peer: on ${bullet.name} reads <peer> <path>, the peer's name in the config and a path inside its checkout; "${field.value}" is not that`);
+      continue;
+    }
+    if (peerFiles.some((f) => f.peer === parsed.peer && f.path === parsed.path)) {
+      problem(field.line, `peer: on ${bullet.name} names ${parsed.peer} ${parsed.path} twice`);
+      continue;
+    }
+    peerFiles.push({ ...parsed, line: field.line });
+  }
+
   const because = filled("because");
 
   let crossing: Crossing | undefined;
@@ -913,5 +940,6 @@ function buildInvariant(bullet: RawBullet, problem: (line: number, message: stri
     kinds,
     checklist,
     unfilled,
+    ...(peerFiles.length === 0 ? {} : { peerFiles }),
   };
 }

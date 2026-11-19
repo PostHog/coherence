@@ -275,6 +275,8 @@ export interface SpecInvariant {
   missingShapes: string[];
   state: LifecycleState;
   lacks: Lack[];
+  /** Files of a peer repository its test reads where they live (peer: lines); absent when it reads none. */
+  peerFiles?: { peer: string; path: string; line: number }[];
   /*
    * No latest, verified, or defects here. Those are the run records read by
    * enforcement and invariant name, and the run records are already in this
@@ -314,6 +316,8 @@ export interface SpecComponent {
   owners?: string[] | undefined;
   trustLevels: TrustLevel[] | undefined;
   entrances: SpecEntrance[];
+  /** The folders its spec folds into it, relative to its own folder, each with why. */
+  folded?: { folder: string; subtree: boolean; reason: string; line: number }[];
   invariants: SpecInvariant[];
   /** The practice file paired with the spec, when there is one; its practices are in the state's practices. */
   practicePath?: string | undefined;
@@ -475,19 +479,18 @@ export interface JournalData {
 
 export interface ComponentsViewState {
   query: string;
-  /** The folder of the selected component, whose invariants are shown. Absent until the reader selects one. */
+  /** The folder of the component whose spec is open. Absent until the reader picks one: the entry component's page. */
   selected?: string;
-}
-
-export interface InvariantsViewState {
-  query: string;
-  /** "" for every state. */
-  state: LifecycleState | "";
-  /** A component folder, or "" for every component. */
-  component: string;
-  /** The reliance listing open on its card, by its id: a link landed on it or the reader opened it. Absent while every listing is folded. */
+  /** Which bullets across every component to list instead of one component's page; "" lists none and shows the page. */
+  filter?: ComponentsFilter;
+  /** The bullets open to their detail, by invariant id; the state keeps them open across a live update's render. */
+  open?: string[];
+  /** The reliance listing open in its bullet's detail, by its id: a link landed on it or the reader opened it. Absent while every listing is folded. */
   reliance?: string;
 }
+
+/** The project-wide lists the Components view filters to. */
+export type ComponentsFilter = "" | "failing" | "requirement" | "no-enforcement" | "unrefuted" | "defects";
 
 /**
  * One symbol a component interface carries: declared at the top level of a
@@ -734,7 +737,6 @@ export interface ShellState {
   hookSaid?: Record<string, HookSaid[]>;
   components: ComponentsViewState;
   structure: StructureViewState;
-  invariants: InvariantsViewState;
   /** Every practice a session here may enact: the project's own and the kernel practices. */
   practices: PracticesData;
   practicesView: PracticesViewState;

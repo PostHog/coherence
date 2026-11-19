@@ -42,6 +42,8 @@
  *   plugins    the plugins the project runs, each name mapped to "bundled"
  *              or a path to its folder (src/plugins, docs/plugins.md); the
  *              project's own key, never inherited from a registry
+ *   peers      the other repositories its invariants rely on, each name
+ *              mapped to { repository, checkout, env? } (src/enforcement/peers.ts)
  */
 
 import { isAbsolute } from "node:path";
@@ -53,6 +55,7 @@ import { FROM_FORM, parseFrom, type ChokepointFrom } from "../spec/grammar.ts";
 import type { LoadedPlugin } from "../plugins/plugin.ts";
 import { pluginLanguages, readPlugins } from "../plugins/registry.ts";
 import { defaultLanguage, registerProjectPlugins } from "../plugins/languages.ts";
+import { peerEnvironment, readPeers, type Peer } from "./peers.ts";
 
 export { languageOfFile } from "../adapters/language-files.ts";
 
@@ -69,9 +72,13 @@ export interface TestSetup {
   cwd: string | undefined;
   test: string[] | string | undefined;
   testMatch: RegExp | undefined;
+  /** What a skipped test prints, for a runner that exits 0 when its test skipped: an exit 0 that matches it and not testMatch reads not run. */
+  testSkip?: RegExp | undefined;
   testJson: string[] | string | undefined;
   testFilterForm: "regex" | "pytest";
   testFolders: string[];
+  /** The variables its commands are given beside the process's own: each peer's checkout under its env name (peers.ts); absent without peers. */
+  env?: Record<string, string>;
 }
 
 export interface EnforcementConfig {
@@ -92,6 +99,7 @@ export interface EnforcementConfig {
   /** Undefined when no test command is configured. */
   test: string[] | string | undefined;
   testMatch: RegExp | undefined;
+  testSkip?: RegExp | undefined;
   /** One invocation reporting every test the bullets name, or undefined to run them one at a time. */
   testJson: string[] | string | undefined;
   /** How a name filter is written for the runner: an escaped regex (jest, vitest, node:test) or a pytest -k expression. */
@@ -101,6 +109,8 @@ export interface EnforcementConfig {
   latencyBudget: number | undefined;
   /** Which references a chokepoint governs when its bullet says nothing (a from: line); undefined is anywhere. */
   chokepointFrom: ChokepointFrom | undefined;
+  /** The other repositories the project's invariants rely on (peers.ts); empty without a peers key. */
+  peers: Peer[];
 }
 
 function commandValue(value: unknown): string[] | string | undefined {
@@ -142,14 +152,17 @@ function testSetupOf(raw: Record<string, unknown>, path: string, where: string):
   // Only the declared setup keys are read, so a key read here is one the registry inherits as a group.
   const record = raw as { readonly [K in SetupKey]?: unknown };
   const setup: TestSetup = { language: undefined, files: undefined, cwd: undefined, test: commandValue(record["test"]), testMatch: undefined, testJson: commandValue(record["testJson"]), testFilterForm: record["testFilterForm"] === "pytest" ? "pytest" : "regex", testFolders: [...DEFAULT_TEST_FOLDERS] };
-  const testMatch = record["testMatch"];
-  if (typeof testMatch === "string" && testMatch !== "") {
+  const pattern = (key: "testMatch" | "testSkip", value: unknown): RegExp | undefined => {
+    if (typeof value !== "string" || value === "") return undefined;
     try {
-      setup.testMatch = new RegExp(testMatch);
+      return new RegExp(value);
     } catch (error) {
-      throw new Error(`${path}: ${where}testMatch is not a regular expression (${(error as Error).message})`);
+      throw new Error(`${path}: ${where}${key} is not a regular expression (${(error as Error).message})`);
     }
-  }
+  };
+  setup.testMatch = pattern("testMatch", record["testMatch"]);
+  const testSkip = pattern("testSkip", record["testSkip"]);
+  if (testSkip !== undefined) setup.testSkip = testSkip;
   const folders = new Set(setup.testFolders);
   if (typeof record["testDir"] === "string") folders.add(record["testDir"]);
   if (Array.isArray(record["testDirs"])) for (const dir of record["testDirs"]) if (typeof dir === "string") folders.add(dir);
@@ -160,7 +173,7 @@ function testSetupOf(raw: Record<string, unknown>, path: string, where: string):
 export function readEnforcementConfig(root: string): EnforcementConfig {
   // A project whose config names no language reads the bundled defaults' primary one (plugins/defaults.json).
   const primary = defaultLanguage();
-  const config: EnforcementConfig = { language: primary, languages: [primary], declared: [], enforced: [primary], plugins: [], provided: [], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined };
+  const config: EnforcementConfig = { language: primary, languages: [primary], declared: [], enforced: [primary], plugins: [], provided: [], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined, peers: [] };
   config.tests = [{ language: undefined, files: undefined, cwd: undefined, test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] }];
   // The project's own config over its registry's keys (project-config.ts), each inherited path rebased to the project.
   const found = effectiveConfig(root);
@@ -211,6 +224,7 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
     if (parsed === undefined) throw new Error(`${path}: chokepointFrom reads ${FROM_FORM}`);
     config.chokepointFrom = parsed;
   }
+  config.peers = readPeers(root, record["peers"], path);
   const tests = record["tests"];
   if (tests !== undefined) {
     if (!Array.isArray(tests) || tests.length === 0 || !tests.every((t) => typeof t === "object" && t !== null && !Array.isArray(t))) throw new Error(`${path}: tests is a list of test setups, each an object with test or testJson`);
@@ -244,7 +258,13 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   config.test = first.test;
   config.testJson = first.testJson;
   config.testMatch = first.testMatch;
+  config.testSkip = first.testSkip;
   config.testFilterForm = first.testFilterForm;
   config.testFolders = [...new Set(config.tests.flatMap((t) => t.testFolders))];
+  // Every runner is handed each peer's checkout, so a test reads the other repository where the config says it lives.
+  if (config.peers.length > 0) {
+    const env = peerEnvironment(config.peers);
+    for (const setup of config.tests) setup.env = env;
+  }
   return config;
 }

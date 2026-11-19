@@ -274,6 +274,27 @@ test("the totality oracle pass: configured command with a filter and a match; no
   assert.match(argv.reason, /exited 3/);
 });
 
+test("a skipped test reads not run with the runner's own words for why, never a fail naming no test, and only where the config says what a skip prints", async () => {
+  const config = readEnforcementConfig(root);
+  // go test -v, for a test that skipped because its database is not there: it exits 0, prints no PASS line, and says why above its SKIP line.
+  const goSkip = ["sh", "-c", "printf '=== RUN   TestRows\\n    rows_test.go:12: postgres unavailable (set PG_DSN)\\n--- SKIP: TestRows (0.00s)\\nPASS\\nok  \\tdemo\\t0.2s\\n'"];
+  const skipped = await runTotalityOracle(root, { ...config, test: goSkip, testMatch: /--- PASS: /, testSkip: /--- SKIP: / }, "TestRows");
+  assert.equal(skipped.verdict, "not run", skipped.reason);
+  assert.match(skipped.reason, /the test skipped, so nothing was checked/);
+  assert.match(skipped.reason, /rows_test\.go:12: postgres unavailable \(set PG_DSN\); --- SKIP: TestRows/, "the runner's own words for why, and the skip line");
+  // Without testSkip the same output stays what it was: a fail that names no test, since Coherence cannot tell a skip from a misspelled name.
+  const unsaid = await runTotalityOracle(root, { ...config, test: goSkip, testMatch: /--- PASS: /, testSkip: undefined }, "TestRows");
+  assert.equal(unsaid.verdict, "fail");
+  assert.match(unsaid.reason, /no test ran under that name/);
+  // A pass beside a skip is a pass: testMatch decides first.
+  const both = await runTotalityOracle(root, { ...config, test: ["sh", "-c", "printf -- '--- PASS: TestA (0.00s)\\n--- SKIP: TestB (0.00s)\\n'"], testMatch: /--- PASS: /, testSkip: /--- SKIP: / }, "TestA|TestB");
+  assert.equal(both.verdict, "pass", both.reason);
+  // A failing exit is a fail whatever it printed.
+  const failed = await runTotalityOracle(root, { ...config, test: ["sh", "-c", "printf -- '--- SKIP: TestRows (0.00s)\\n'; exit 1"], testMatch: /--- PASS: /, testSkip: /--- SKIP: / }, "TestRows");
+  assert.equal(failed.verdict, "fail");
+  assert.match(failed.reason, /exited 1/);
+});
+
 test("the batched totality oracle pass: every test the bullets name in one invocation, mapped back by name; the record says which mode ran", async () => {
   const { combinedFilter, runTotalityBatch, verdictsFromReport } = await import("./totality.ts");
   assert.equal(combinedFilter(["a (b)", "c|d", "a (b)"]), "a \\(b\\)|c\\|d");
