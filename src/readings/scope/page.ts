@@ -21,8 +21,9 @@
  * the page's one script, so it must not rely on anything outside them.
  */
 
-import { CONNECTIONS_ID, CONNECTIONS_PREFIX, componentOfHash, journalId, resolveHash } from "./derive.ts";
-import type { JournalKind, JournalRecord, LifecycleState, RecordedSite, RunRecord, ShellState } from "./model.ts";
+import { CONNECTIONS_ID, CONNECTIONS_PREFIX, componentId, componentOfHash, invariantId, journalId, resolveHash } from "./derive.ts";
+import { componentOrder, invariantOfHash, shownBulletIds } from "./components-view.ts";
+import type { ComponentsFilter, JournalKind, JournalRecord, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { renderMasthead, renderShell, renderViewResults } from "./shell.ts";
 import { isReplaying, mountRelief, replayRelief, stopReplay, touchRelief, type Touch } from "./relief/mount.ts";
 import { replayFrames } from "./home-replay.ts";
@@ -57,9 +58,6 @@ function setQuery(state: ShellState, value: string): void {
     case "components":
       state.components.query = value;
       return;
-    case "invariants":
-      state.invariants.query = value;
-      return;
     case "practices":
       state.practicesView.query = value;
       return;
@@ -76,9 +74,8 @@ function setQuery(state: ShellState, value: string): void {
 
 /** A filter of the active view. Unknown names are ignored. */
 function setFilter(state: ShellState, name: string, value: string): void {
-  if (state.activeView === "invariants") {
-    if (name === "state") state.invariants.state = value as LifecycleState | "";
-    if (name === "component") state.invariants.component = value;
+  if (state.activeView === "components") {
+    if (name === "show") state.components.filter = value as ComponentsFilter;
   } else if (state.activeView === "journal") {
     if (name === "kind") state.journalView.kind = value as JournalKind | "";
     if (name === "agent") state.journalView.agent = value;
@@ -185,14 +182,27 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
     }
     if (target.id !== undefined) {
       const component = componentOfHash(state, target.id);
-      if (component !== undefined) state.components.selected = component.folder;
-      // A link to a reliance listing lands on it open.
-      if (target.id.startsWith("reliance-")) state.invariants.reliance = target.id;
+      if (component !== undefined) {
+        state.components.selected = component.folder;
+        // A component's page is read whole: a filter or search left on would hide it.
+        state.components.filter = "";
+        state.components.query = "";
+      }
+      // A link to a bullet lands on it open, on its component's page when no list is showing; a reliance link opens its listing too.
+      const bullet = invariantOfHash(state, target.id);
+      if (bullet !== undefined) {
+        if ((state.components.filter ?? "") === "" && state.components.query === "") state.components.selected = bullet.component;
+        const id = invariantId(bullet.component, bullet.name);
+        state.components.open = [...new Set([...(state.components.open ?? []), id])];
+      }
+      if (target.id.startsWith("reliance-")) state.components.reliance = target.id;
     }
     const changed = target.view !== state.activeView;
     state.activeView = target.view;
     if (changed || target.id !== undefined) renderAll();
-    if (target.id !== undefined) document.getElementById(decodeURIComponent(target.id))?.scrollIntoView();
+    // A component's page opens at the top of the reading, its masthead in view; any other card is scrolled to.
+    if (target.id?.startsWith("component-") === true && target.view === "components") window.scrollTo({ top: 0 });
+    else if (target.id !== undefined) document.getElementById(decodeURIComponent(target.id))?.scrollIntoView();
   };
 
   root.addEventListener("input", (event) => {
@@ -304,17 +314,30 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
     if (reliance !== null) {
       event.preventDefault();
       const id = reliance.dataset["relianceToggle"];
-      if (id === undefined || state.invariants.reliance === id) delete state.invariants.reliance;
-      else state.invariants.reliance = id;
+      if (id === undefined || state.components.reliance === id) delete state.components.reliance;
+      else state.components.reliance = id;
       renderResults();
       return;
     }
 
-    const select = target.closest<HTMLElement>("[data-select-component]");
-    if (select !== null) {
-      const folder = select.dataset["selectComponent"];
-      if (folder === undefined || state.components.selected === folder) delete state.components.selected;
-      else state.components.selected = folder;
+    // A chip narrows Components to one list across every component; pressed again, it returns to the component's page.
+    const chip = target.closest<HTMLElement>("[data-show]");
+    if (chip !== null) {
+      const show = chip.dataset["show"] as ComponentsFilter;
+      state.components.filter = state.components.filter === show ? "" : show;
+      for (const other of root.querySelectorAll<HTMLElement>("[data-show]")) other.setAttribute("aria-pressed", other.dataset["show"] === state.components.filter ? "true" : "false");
+      renderResults();
+      return;
+    }
+
+    // A bullet opens to its detail and folds again in the state, so a live update's render leaves it as the reader left it.
+    const toggle = target.closest<HTMLElement>("[data-bullet-toggle]");
+    if (toggle !== null) {
+      const id = toggle.dataset["bulletToggle"] ?? "";
+      const open = new Set(state.components.open ?? []);
+      if (open.has(id)) open.delete(id);
+      else open.add(id);
+      state.components.open = [...open];
       renderResults();
       return;
     }
@@ -336,6 +359,31 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
         event.preventDefault();
         followHash();
       }
+    }
+  });
+
+  // On the Components view, [ and ] step between components and e opens or folds every bullet shown, outside any field.
+  root.addEventListener("keydown", (event) => {
+    if (state.activeView !== "components" || event.metaKey || event.ctrlKey || event.altKey) return;
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) return;
+    if (event.key === "[" || event.key === "]") {
+      const order = componentOrder(state);
+      const at = Math.max(0, order.indexOf(state.components.selected ?? state.spec.entry ?? "."));
+      const next = order[Math.min(order.length - 1, Math.max(0, at + (event.key === "]" ? 1 : -1)))];
+      if (next !== undefined) location.hash = `#${componentId(next)}`;
+      event.preventDefault();
+    } else if (event.key === "e") {
+      const shown = shownBulletIds(state);
+      const open = new Set(state.components.open ?? []);
+      const opening = shown.some((id) => !open.has(id));
+      for (const id of shown) {
+        if (opening) open.add(id);
+        else open.delete(id);
+      }
+      state.components.open = [...open];
+      renderResults();
+      event.preventDefault();
     }
   });
 

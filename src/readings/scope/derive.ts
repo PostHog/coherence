@@ -110,8 +110,8 @@ export const CONNECTIONS_PREFIX = `${CONNECTIONS_ID}--`;
 /** The prefixes each view's card ids carry; a hash resolves to its view by them. */
 const ID_PREFIXES: [string, string][] = [
   ["component-", "components"],
-  ["invariant-", "invariants"],
-  ["reliance-", "invariants"],
+  ["invariant-", "components"],
+  ["reliance-", "components"],
   ["practice-", "practices"],
   ["run-", "runs"],
   ["journal-", "journal"],
@@ -134,7 +134,8 @@ export function resolveHash(state: ShellState, hash: string): HashTarget | undef
   if (text === "") return undefined;
   if (state.views.some((v) => v.id === text)) return { view: text, id: undefined };
   // A reliance listing is on its invariant's card (its id leads with reliance-, below), so the retired Reliance view's own link opens Invariants.
-  if (text === "reliance") return { view: "invariants", id: undefined };
+  // Invariants merged into Components: its bullets are read on their component's page, so the retired view's own links open Components.
+  if (text === "reliance" || text === "invariants") return { view: "components", id: undefined };
   // The relief has no cards: a link into the retired map or its security spine opens Structure.
   if (text.startsWith("structure-")) return { view: "structure", id: undefined };
   for (const [prefix, view] of ID_PREFIXES) {

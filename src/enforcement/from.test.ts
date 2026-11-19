@@ -23,6 +23,7 @@ import { readEnforcementConfig } from "./config.ts";
 import { performRun } from "./run.ts";
 import { answer } from "../readings/query/query.ts";
 import { DEFAULTS, scopeState } from "../readings/scope/build.ts";
+import { invariantId } from "../readings/scope/derive.ts";
 import { renderView } from "../readings/scope/shell.ts";
 
 const TSCONFIG = `{ "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "noEmit": true, "allowImportingTsExtensions": true }, "include": ["src/**/*.ts"] }\n`;
@@ -174,9 +175,11 @@ test("Scope and the agent query show which references governed: the from: line w
     rmSync(join(root, "coherence.config.json"));
   }
   const state = await scopeState({ root, lexiconPath: join(process.cwd(), DEFAULTS.lexiconPath), project: "Fixture", window: false });
-  assert.match(renderView(state, "components").text, /data-field="owners"><span class="label">Owners<\/span> team-notebooks, @ana</);
+  // The notebooks component's page on Components, with every bullet open to its detail.
+  const notebooks = { ...state, components: { ...state.components, selected: "src/notebooks", open: state.spec.components.flatMap((c) => c.invariants.map((i) => invariantId(i.component, i.name))) } };
+  assert.match(renderView(notebooks, "components").text, /data-field="owners"><span class="label">Owners<\/span> team-notebooks, @ana</);
   assert.match(
-    renderView(state, "invariants").text,
+    renderView(notebooks, "components").text,
     /data-field="from" data-exempt="src\/notebooks"><span class="label">from<\/span> outside the component <span class="quiet">\(the config default\): governs only references from outside <code>src\/notebooks<\/code>; 2 references from inside it exempt, reported and never a bypass/,
   );
   const relies = answer(state, "relies-on", ["NOTEBOOK_ROWS"]).text;

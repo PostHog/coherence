@@ -1,8 +1,8 @@
 # The Scope shell
 
 Scope is the reading: one surface that projects the model for a human, in
-views. Nine views ship, in the order the strip shows them: Home, Structure,
-Connections, Lexicon, Components, Invariants, Practices, Runs, and Journal.
+views. Eight views ship, in the order the strip shows them: Home, Structure,
+Connections, Lexicon, Components, Practices, Runs, and Journal.
 A page whose address names no view opens on Home. The masthead above them is
 the same on every view, the reading's name, the connection and the project,
 and says no verdict over the whole project.
@@ -58,7 +58,7 @@ is one `journal` command away. The reference sites the latest chokepoint
 entries carry share one window of 500 (`SITE_WINDOW`), bypass sites always
 listed; each entry counts the rest by component, endpoint, class and test
 mark, so every count the views and `query structure` derive from sites is exact, and
-the reliance listing on a chokepoint invariant's card in **Invariants** says
+the reliance listing in a chokepoint invariant's detail on **Components** says
 how many there are and how many it lists. Its "Load the other N" button
 fetches the rest of that entry's sites from `/api/sites` on a live page; a
 snapshot names `query relies-on` instead. So neither the code
@@ -78,9 +78,27 @@ renders, which a render only puts back into the host it leaves (below).
 
 ## The views
 
-**Components** is the tree with intent, counts per lifecycle state, and a
-mass line reserved for the economy's measurement (`mass: not measured` until
-it exists). Selecting a component shows its invariants.
+**Components** reads each component as its spec (the owner's ruling,
+d-1d176003, which merged the Invariants view into it). A rail lists every
+component in folder order, nested as the folders nest, beside one
+component's page: the entry component's until the reader picks one. The page
+carries the spec's path, the component's name and intent, a tally that is
+also the legend of the margin dots (invariants, requirements, failing, with no
+enforcement), its owners, trust levels, entrances, invariants and
+requirements, open journal defects that name none of its bullets, the
+components it contains and the folders it folds; the entry page ends with
+every component's intent. Each bullet is its name and sentence, a dot in the
+margin (filled when verified, red when broken, hollow for a requirement,
+dashed when nothing enforces it) and one quiet line of where it stands: its
+verdict and date, the test or chokepoint that checks it, the commit of a peer
+repository it read, what a requirement lacks, and its open defects. Opened,
+it shows the detail below. Chips above the page (Failing, Requirements, No
+enforcement, No refutation, Open defects), each with its count, and a search
+over every bullet list the matching bullets of every component, grouped by
+component, in place of the page; pressing a chip again returns to the page.
+`[` and `]` step between components and `e` opens or folds every bullet shown.
+A rail dot marks a component with a failing bullet or one an open defect
+names.
 
 **Structure** is the relief (`relief/`): a three.js scene of what the
 system is made of and where it changes. Each component is a block standing
@@ -233,23 +251,25 @@ The flow model both read:
   the declaring component, and a dispatcher's entrance is unreachable unless
   the component interface from the declaring component carries the handler.
 
-An invariant's enforcements, crossing, refutation and bypass sites are on its
-card in **Invariants**, with its reliance listing, which `query relies-on`
+An invariant's enforcements, crossing, refutation and bypass sites are in its
+detail on **Components**, with its reliance listing, which `query relies-on`
 also prints.
 
-**Invariants** shows every bullet: state, enforcement form with its latest
-verdict, the chokepoint grade with the rung's enforcer, crossing over the
-declared trust levels, because, refutation (witnessed, automatic from the
-run, or missing), checklist, and what it lacks. A structural defect shows
-its bypass sites and the two honest options: route through the chokepoint,
-or escalate a retirement, whose human acknowledges it with the reliance
-listing in view. A chokepoint invariant's card folds its reliance listing
-beneath it: every recorded reference site to the chokepoint or the protected
-thing, owner component first, each with its file, line, symbol, endpoint,
-classification, syntax form when known and test mark; unknown evidence is
-said as unknown, and only a complete empty list says zero. The listing opens
-when a `#reliance-…` link lands on it or the reader opens it, and the state
-keeps it open across a live update's render. Filters by state and component.
+A bullet's detail on **Components** (`invariant-detail.ts`) says its because,
+its crossing over the declared trust levels, the entrances it names, the files
+of a peer repository it reads, each enforcement with its latest verdict and
+the chokepoint grade with the rung's enforcer, refutation (witnessed,
+automatic from the run, or missing), checklist, what it lacks, and the line
+of the spec it is on. A structural defect shows its bypass sites and the two
+honest options: route through the chokepoint, or escalate a retirement, whose
+human acknowledges it with the reliance listing in view. A chokepoint
+invariant's detail folds its reliance listing: every recorded reference site
+to the chokepoint or the protected thing, owner component first, each with
+its file, line, symbol, endpoint, classification, syntax form when known and
+test mark; unknown evidence is said as unknown, and only a complete empty
+list says zero. The listing opens when a `#reliance-…` link lands on it or
+the reader opens it, and the state keeps it, and every opened bullet, open
+across a live update's render.
 
 **Practices** tells the story of what the project practices before how each
 practice holds. It opens with a summary in words, then the project's working
@@ -290,9 +310,11 @@ Every card id carries its view as a prefix (`component-`, `invariant-`,
 `run-`, `journal-`, `work-`, the lexicon's `coherence-` and `domain-`, and
 `connections--` for a Connections origin, a structural route or a
 component, which the view opens on). A hash resolves to its view by that
-prefix, or names a view alone (`#runs`). A reliance id (`#reliance-…`)
-opens Invariants on that invariant's reliance listing, open, and the retired
-Reliance view's own `#reliance` opens Invariants. The relief has no cards: a
+prefix, or names a view alone (`#runs`). An invariant id (`#invariant-…`)
+opens Components on its bullet's page with the bullet open, a reliance id
+(`#reliance-…`) the same with its reliance listing open, and the retired
+Invariants and Reliance views' own `#invariants` and `#reliance` open
+Components. The relief has no cards: a
 link into the retired security-spine section or any of the retired map's
 `structure-` selections (the masthead's verdict among them) opens the
 Structure view. `resolveHash` in

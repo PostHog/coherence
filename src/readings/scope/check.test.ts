@@ -52,9 +52,17 @@ function card(rendered: string, id: string): string {
   return rendered.slice(start, rendered.indexOf("</article>", start));
 }
 
-/** Every card id a view renders, in order. */
+/** Every card id a view renders, in order: a view's entries, and the bullets on a Components page. */
 function cardIds(rendered: string): string[] {
-  return [...rendered.matchAll(/<article class="entry[^"]*" id="([^"]+)"/g)].map((m) => m[1]!);
+  return [...rendered.matchAll(/<article class="(?:entry|bullet)[^"]*" id="([^"]+)"/g)].map((m) => m[1]!);
+}
+
+/** Every bullet with its detail open, as the Components view shows each on its component's page, in one text. */
+function everyBullet(state: ShellState): string {
+  const open = state.spec.components.flatMap((c) => c.invariants.map((i) => invariantId(i.component, i.name)));
+  return state.spec.components
+    .map((c) => renderView({ ...state, components: { ...state.components, selected: c.folder, filter: "", query: "", open } }, "components").text)
+    .join("\n");
 }
 
 function firstLexicon(state: ShellState): Lexicon {
@@ -209,19 +217,19 @@ function stringsIn(value: unknown): string[] {
   return [];
 }
 
-test("the render has one view strip with the nine views in order", async () => {
+test("the render has one view strip with the eight views in order", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
   const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ["home", "structure", "connections", "lexicon", "components", "invariants", "practices", "runs", "journal"]);
-  for (const label of ["Home", "Structure", "Connections", "Lexicon", "Components", "Invariants", "Practices", "Runs", "Journal"]) {
+  assert.deepEqual(tabs, ["home", "structure", "connections", "lexicon", "components", "practices", "runs", "journal"]);
+  for (const label of ["Home", "Structure", "Connections", "Lexicon", "Components", "Practices", "Runs", "Journal"]) {
     assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
   }
 });
 
 test("Home is the first view: the strip leads with Home, then Structure, Connections and Lexicon, and a page whose address names no view opens on it", () => {
   const state = fresh();
-  assert.deepEqual(state.views.map((v) => v.id), ["home", "structure", "connections", "lexicon", "components", "invariants", "practices", "runs", "journal"], "Home, then Structure, Connections and Lexicon, then the rest in their order");
+  assert.deepEqual(state.views.map((v) => v.id), ["home", "structure", "connections", "lexicon", "components", "practices", "runs", "journal"], "Home, then Structure, Connections and Lexicon, then the rest in their order");
   assert.equal(state.activeView, state.views[0]!.id, "the state opens on the first view");
   assert.equal(state.activeView, "home");
   const rendered = renderShell(state).text;
@@ -442,40 +450,43 @@ test("every view renders from state: every component, invariant, run, and journa
   const state = fresh();
   const n = fixture.names;
 
+  // Components: a rail of every component in folder order beside one component's page, the entry component's until the reader picks one.
   const components = renderView(state, "components").text;
-  for (const folder of n.components) assert.ok(components.includes(`id="${componentId(folder)}"`), `component ${folder} has a card`);
-  assert.equal([...components.matchAll(/data-slot="mass"/g)].length, n.components.length, "every component reserves its mass slot");
-  assert.ok(components.includes("mass: not measured"));
+  for (const folder of n.components) assert.ok(components.includes(`href="#${componentId(folder)}"`), `component ${folder} is on the rail`);
   assert.ok(components.includes('data-depth="2"'), "nesting follows the folders");
-  assert.ok(!components.includes("data-selected-invariants"), "no component is selected until the reader selects one");
+  assert.match(components, /<article class="spec-page" data-component="\."/, "the entry component's page opens first");
+  for (const folder of n.components.filter((f) => f !== ".")) assert.ok(components.includes(`<dt><a href="#${componentId(folder)}">`), `the entry page says what ${folder} is for`);
   state.components.selected = "src/store";
-  const selected = renderView(state, "components").text;
-  const storeCard = card(selected, componentId("src/store"));
-  assert.ok(storeCard.includes("data-selected-invariants"), "the selected component shows its invariants");
-  for (const { component, name } of n.invariants.filter((i) => i.component === "src/store")) {
-    assert.ok(storeCard.includes(`href="#${invariantId(component, name)}"`), `${name} is listed with a link`);
-  }
-  assert.ok(storeCard.includes('data-count="invariants">1 invariant<') && storeCard.includes('data-count="requirements">1 requirement<'), "counts per state");
+  const store = renderView(state, "components").text;
+  for (const { component, name } of n.invariants.filter((i) => i.component === "src/store")) assert.ok(store.includes(`id="${invariantId(component, name)}"`), `${name} is on its component's page`);
+  assert.ok(store.includes('data-standing="verified">1 invariant<') && store.includes('data-standing="requirement">1 requirement<'), "counts per state, each with the dot its bullets wear");
+  assert.ok(!store.includes('data-field="enforcements"'), "each bullet is its sentence until the reader opens it");
+  state.components.open = [invariantId("src/store", "read shape")];
+  const opened = renderView(state, "components").text;
+  assert.ok(card(opened, invariantId("src/store", "read shape")).includes('data-field="enforcements"'), "an opened bullet shows its detail");
+  assert.ok(!card(opened, invariantId("src/store", "open one")).includes('data-field="enforcements"'), "and only the one opened");
+  state.components.open = [];
 
-  const invariants = renderView(state, "invariants").text;
+  const invariants = everyBullet(state);
   for (const { component, name, state: lifecycle } of n.invariants) {
     const c = card(invariants, invariantId(component, name));
     assert.ok(c.includes(`data-state="${lifecycle}"`), `${name} is a ${lifecycle}`);
   }
-  assert.ok(invariants.includes("enforced by the language itself"), "the ladder's top rung names its enforcer");
   assert.ok(invariants.includes('data-refutation="witnessed"') && invariants.includes('data-refutation="automatic"') && invariants.includes('data-refutation="missing"'), "all three refutation states render");
   assert.ok(invariants.includes("outside</span> → <span class=\"level\" title=\"The store&#39;s own code.\">inside"), "a crossing names its trust levels with their meanings");
   assert.ok(card(invariants, invariantId("src/store", "read shape")).includes("kept from an earlier run"), "a verdict the latest run skipped is marked as kept");
   assert.ok(card(invariants, invariantId("src/store", "open one")).includes("lacks</span> enforcement, refutation, kinds"), "what a requirement lacks is said");
-  state.invariants.state = "structural defect";
-  assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId("src/store", "single writer")], "the state filter narrows to the defect");
-  state.invariants.state = "";
-  state.invariants.component = ".";
-  assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId(".", "entry rule")], "the component filter narrows to the root");
-  state.invariants.component = "";
-  state.invariants.query = "row shape";
-  assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId("src/store", "read shape")], "the search narrows by sentence");
-  state.invariants.query = "";
+  // A filter or a search lists the matching bullets of every component in place of one page.
+  state.components.filter = "failing";
+  assert.deepEqual(cardIds(renderView(state, "components").text), [invariantId("src/store", "single writer")], "the failing filter narrows to the defect, across components");
+  state.components.filter = "requirement";
+  const requirements = n.invariants.filter((i) => i.state === "requirement").map((i) => invariantId(i.component, i.name));
+  assert.deepEqual(cardIds(renderView(state, "components").text).sort(), requirements.sort(), "the requirements filter lists every requirement");
+  state.components.filter = "";
+  state.components.query = "row shape";
+  assert.deepEqual(cardIds(renderView(state, "components").text), [invariantId("src/store", "read shape")], "the search narrows by sentence, across components");
+  state.components.query = "";
+  state.components.selected = "src/store";
 
   const reliance = relianceOn(state);
   assert.ok(reliance.includes('data-reliance="unknown"') && reliance.includes("reliance unknown: run carries no sites"), "a legacy run is explicitly incomplete on the chokepoint invariant's reliance listing");
@@ -518,10 +529,49 @@ test("every view renders from state: every component, invariant, run, and journa
   assert.ok(renderView(absent, "journal").text.includes("No work orders: nothing here"), "absent work orders are a rendered fact");
 });
 
+test("Components reads each component as its spec: one page at a time beside a rail, each bullet folded to its sentence and where it stands, its whole detail when opened, and a filter or search across every component", () => {
+  const state = fresh();
+  const n = fixture.names;
+  const root = renderView(state, "components").text;
+  const page = (text: string): string => text.slice(text.indexOf('<article class="spec-page"'));
+  assert.match(root, /<nav class="spec-rail"/, "a rail of the components");
+  for (const folder of n.components) assert.ok(root.includes(`href="#${componentId(folder)}"`), `${folder} is on the rail`);
+  assert.match(root, /<article class="spec-page" data-component="\."/, "the entry component's page until the reader picks one");
+  const levels = state.spec.trustLevels;
+  assert.ok(levels.length > 0 && levels.every((l) => page(root).includes(`<dt>${l.name}</dt>`)), "the entry page names every trust level");
+  const entry = state.spec.components.find((c) => c.folder === ".")!;
+  assert.deepEqual(cardIds(root), entry.invariants.map((i) => invariantId(i.component, i.name)), "the entry page holds the entry component's bullets and no other's");
+
+  state.components.selected = "src/store";
+  const store = state.spec.components.find((c) => c.folder === "src/store")!;
+  const folded = page(renderView(state, "components").text);
+  assert.ok(folded.includes(store.intent), "the page leads with the component's intent");
+  for (const i of store.invariants) assert.ok(folded.includes(`id="${invariantId(i.component, i.name)}"`) && folded.includes(i.sentence), `${i.name} reads as its sentence`);
+  for (const c of state.spec.components.filter((c) => c.folder !== "src/store")) for (const i of c.invariants) assert.ok(!folded.includes(`id="${invariantId(i.component, i.name)}"`), `${i.name} is on its own component's page, not this one`);
+  assert.equal((folded.match(/class="bullet-meta"/g) ?? []).length, store.invariants.length, "each bullet carries one line of where it stands");
+  assert.ok(folded.includes('data-standing="broken">structural defect'), "the line says a broken bullet is broken");
+  for (const field of ["because", "enforcements", "refutation", "checklist", "reliance", "defect"]) assert.ok(!folded.includes(`data-field="${field}"`), `${field} waits until the bullet is opened`);
+
+  state.components.open = [invariantId("src/store", "single writer")];
+  const writer = card(renderView(state, "components").text, invariantId("src/store", "single writer"));
+  for (const field of ["because", "crossing", "enforcements", "defect", "refutation", "checklist", "reliance"]) assert.ok(writer.includes(`data-field="${field}"`), `the opened bullet carries its ${field}`);
+
+  state.components.selected = ".";
+  state.components.open = [];
+  state.components.filter = "failing";
+  const failing = renderView(state, "components").text;
+  assert.deepEqual(cardIds(failing), [invariantId("src/store", "single writer")], "a filter lists the matching bullets of every component, whichever page was open");
+  assert.ok(failing.includes(`<h3 class="page-section"><a href="#${componentId("src/store")}">`), "grouped under their component, linked to its page");
+  assert.ok(!failing.includes('<article class="spec-page"'), "in place of the page");
+  state.components.filter = "";
+  state.components.query = store.invariants[0]!.sentence.split(" ").slice(0, 3).join(" ");
+  assert.ok(cardIds(renderView(state, "components").text).includes(invariantId("src/store", store.invariants[0]!.name)), "a search reaches a bullet on another component's page");
+});
+
 test("a structural defect renders its bypass sites and both honest options", () => {
   const state = fresh();
   const n = fixture.names;
-  const c = card(renderView(state, "invariants").text, invariantId("src/store", "single writer"));
+  const c = card(everyBullet(state), invariantId("src/store", "single writer"));
   assert.ok(c.includes('data-field="defect"'));
   assert.ok(c.includes('data-grade="broken"') && c.includes("enforced by nobody"), "the broken rung and its enforcer");
   const bypasses = c.slice(c.indexOf('data-field="bypasses"'));
@@ -531,13 +581,13 @@ test("a structural defect renders its bypass sites and both honest options", () 
   assert.ok(c.includes(`id="${relianceId("src/store", "single writer")}"`), "and the listing it links is on the card");
   for (const { component, name, state: lifecycle } of n.invariants) {
     if (lifecycle === "structural defect") continue;
-    assert.ok(!card(renderView(state, "invariants").text, invariantId(component, name)).includes('data-field="defect"'), `${name} shows no defect section`);
+    assert.ok(!card(everyBullet(state), invariantId(component, name)).includes('data-field="defect"'), `${name} shows no defect section`);
   }
 });
 
-/** The single writer's reliance listing, on its card in the Invariants view. */
+/** The single writer's reliance listing, in its bullet's detail on the Components view. */
 function relianceOn(state: ShellState): string {
-  const c = card(renderView(state, "invariants").text, invariantId("src/store", "single writer"));
+  const c = card(everyBullet(state), invariantId("src/store", "single writer"));
   const at = c.indexOf(`id="${relianceId("src/store", "single writer")}"`);
   assert.ok(at >= 0, "the chokepoint invariant's card carries its reliance listing");
   return c.slice(c.lastIndexOf("<details", at), c.indexOf("</details>", at));
@@ -582,10 +632,10 @@ test("a reliance listing is folded on its card until a link lands on it or the r
   const state = fresh();
   const id = relianceId("src/store", "single writer");
   assert.match(relianceOn(state), new RegExp(`<details class="record reliance" id="${id}" data-field="reliance" >`), "folded by default");
-  state.invariants.reliance = id;
+  state.components.reliance = id;
   assert.match(relianceOn(state), new RegExp(`<details class="record reliance" id="${id}" data-field="reliance" open>`), "open when the state names it");
   assert.match(relianceOn(state), new RegExp(`<summary data-reliance-toggle="${id}">`), "its summary opens and folds it through the state");
-  assert.equal((renderView(state, "invariants").text.match(/data-field="reliance" open>/g) ?? []).length, 1, "only the one named is open");
+  assert.equal((everyBullet(state).match(/data-field="reliance" open>/g) ?? []).length, 1, "only the one named is open");
 });
 
 test("legacy site absence stays unknown while a complete empty site list confirms zero", () => {
@@ -748,17 +798,19 @@ test("deep links resolve: every card id on every view resolves to that view", ()
   }
   assert.equal(resolveHash(state, "#nothing-here"), undefined);
   assert.equal(resolveHash(state, ""), undefined);
-  const invariants = renderView(state, "invariants").text;
+  const invariants = everyBullet(state);
   const links = [...invariants.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
   for (const link of links) assert.ok(resolveHash(state, `#${link}`) !== undefined, `link #${link} resolves`);
-  // A reliance id lands on the listing on its invariant's card, the retired Reliance view on Invariants, and the retired map's selections on Structure.
+  // A bullet's id and its reliance id land on Components, on the bullet's own page; the retired Invariants and Reliance views open Components; the retired map's selections open Structure.
   const reliance = links.filter((link) => link.startsWith("reliance-"));
-  assert.ok(reliance.length > 0, "the Invariants view links a reliance listing");
+  assert.ok(reliance.length > 0, "a bullet's detail links a reliance listing");
   for (const link of reliance) {
-    assert.deepEqual(resolveHash(state, `#${link}`), { view: "invariants", id: link }, `#${link} opens Invariants on its listing`);
-    assert.ok(invariants.includes(`id="${link}"`), `the listing #${link} is on the Invariants view`);
+    assert.deepEqual(resolveHash(state, `#${link}`), { view: "components", id: link }, `#${link} opens Components on its listing`);
+    assert.ok(invariants.includes(`id="${link}"`), `the listing #${link} is in its bullet's detail`);
   }
-  assert.deepEqual(resolveHash(state, "#reliance"), { view: "invariants", id: undefined }, "the retired Reliance view opens Invariants");
+  for (const { component, name } of fixture.names.invariants) assert.deepEqual(resolveHash(state, `#${invariantId(component, name)}`), { view: "components", id: invariantId(component, name) }, `${name}'s link opens Components`);
+  assert.deepEqual(resolveHash(state, "#reliance"), { view: "components", id: undefined }, "the retired Reliance view opens Components");
+  assert.deepEqual(resolveHash(state, "#invariants"), { view: "components", id: undefined }, "the retired Invariants view opens Components");
   assert.deepEqual(resolveHash(state, `#${structureId("src/store", "single writer")}`), { view: "structure", id: undefined }, "a retired map selection opens Structure");
 });
 
@@ -773,10 +825,10 @@ test("another project's tree builds as a second root: its lexicon is the domain 
     assert.ok(domain?.kind === "present" && domain.title === "Widgetry lexicon", "the other project's lexicon.json is located from its root");
     assert.deepEqual(state.spec.components.map((c) => c.folder).sort(), [...other.names.components].sort(), "its specs, not Coherence's, are the tree");
     assert.equal(state.runs.records.length, other.names.runAts.length, "its runs are loaded");
-    const invariants = renderView(state, "invariants").text;
+    const invariants = everyBullet(state);
     const defects = state.spec.components.flatMap((c) => c.invariants.filter((i) => i.state === "structural defect"));
     assert.ok(defects.length > 0, "the fixture's run records hold a structural defect");
-    assert.equal([...invariants.matchAll(/<article class="entry invariant" id="[^"]+" data-state="structural defect"/g)].length, defects.length, "every structural defect the model derives is a defect card");
+    assert.equal([...invariants.matchAll(/<article class="bullet" id="[^"]+" data-standing="broken" data-state="structural defect"/g)].length, defects.length, "every structural defect the model derives is a broken bullet");
     for (const defect of defects) {
       const c = card(invariants, invariantId(defect.component, defect.name));
       assert.ok(c.includes('data-option="route"') && c.includes('data-option="retire"'), `${defect.name} shows both options`);
@@ -842,7 +894,7 @@ test("the first load carries at most the site window's reference sites however m
   assert.ok(weights(whole).length > 0, "the run sites draw interfaces");
   assert.deepEqual(weights(windowed), weights(whole), "the map's reference weights are unchanged");
   assert.deepEqual(flowOf(windowed).nodes.map((n) => n.defects), flowOf(whole).nodes.map((n) => n.defects), "every bypass site is unchanged");
-  const governs = (state: ShellState) => /data-field="from"[\s\S]*?<\/p>/.exec(renderView(state, "invariants").text)?.[0];
+  const governs = (state: ShellState) => /data-field="from"[\s\S]*?<\/p>/.exec(everyBullet(state))?.[0];
   assert.match(governs(whole) ?? "", /\d+ references from inside it exempt/);
   assert.equal(governs(windowed), governs(whole), "the exempt references are counted the same");
   // The reliance listing on the chokepoint invariant's card says how many sites there are, how many it lists, and where the rest are.
