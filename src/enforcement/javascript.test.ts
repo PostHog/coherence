@@ -19,6 +19,7 @@ import { after, before, test } from "node:test";
 import { TypeScriptAdapter, locateServer } from "../../plugins/typescript/typescript.ts";
 import { checkChokepoint, classifySite } from "./check.ts";
 import { readEnforcementConfig } from "./config.ts";
+import { budget } from "./test-budgets.ts";
 
 const JSCONFIG = `{ "compilerOptions": { "allowJs": true, "checkJs": false, "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "noEmit": true }, "include": ["src/**/*.mjs"] }`;
 
@@ -147,7 +148,8 @@ test("with tsgo turned off the same check grades the same through tsserver, and 
   assert.equal(grades[0]!.replace(/^tsgo/, "tsserver"), grades[1], grades.join("\n"));
 });
 
-test("the default engine grades as tsserver does where TypeScript 7 answers otherwise: a removed baseUrl in a tsconfig, a jsconfig or a referenced config, an augmentation in another file, and a re-export after another statement, a comment or a BOM, and lists a declaration on an import's line", { timeout: 120_000 }, async () => {
+test("the default engine grades as tsserver does where TypeScript 7 answers otherwise: a removed baseUrl in a tsconfig, a jsconfig or a referenced config, an augmentation in another file, and a re-export after another statement, a comment or a BOM, and lists a declaration on an import's line", { timeout: 120_000 }, async (t) => {
+  budget(t, 15, "d-7914046d");
   const nodeNext = `{ "compilerOptions": { "strict": true, "module": "NodeNext", "moduleResolution": "NodeNext", "noEmit": true }, "include": ["src"] }`;
   const projects = [
     {
