@@ -57,3 +57,24 @@ test("a snapshot without --out lands in the project's .coherence folder, resolve
     rmSync(elsewhere, { recursive: true, force: true });
   }
 });
+
+test("scope reads a bundled plugin's lexicon even though the plugin's file states no version", async () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-scope-plugin-lexicon-"));
+  try {
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "demo", language: "typescript", plugins: { convex: "bundled" } }), "utf8");
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "Demo.spec.md"), "# Demo\n\nA demo project.\n", "utf8");
+    const out = join(root, "scope.html");
+    const errors: string[] = [];
+    const code = await scopeCommand(["--snapshot", "--out", out, "--no-interfaces"], { cwd: root, out: () => {}, err: (line) => errors.push(line) });
+    assert.equal(code, 0, `the snapshot is written: ${errors.join("\n")}`);
+    const html = readFileSync(out, "utf8");
+    const match = /<script type="application\/json" id="scope-state">([\s\S]*?)<\/script>/.exec(html);
+    assert.ok(match?.[1] !== undefined, "the page embeds its state");
+    const state = JSON.parse(match[1]) as ShellState;
+    const layer = state.lexicon.layers.find((l) => l.id === "plugin convex");
+    assert.equal(layer?.kind, "present", "the Convex plugin's lexicon is a layer of the page");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
