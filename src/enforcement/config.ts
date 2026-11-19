@@ -72,6 +72,8 @@ export interface TestSetup {
   cwd: string | undefined;
   test: string[] | string | undefined;
   testMatch: RegExp | undefined;
+  /** What a skipped test prints, for a runner that exits 0 when its test skipped: an exit 0 that matches it and not testMatch reads not run. */
+  testSkip?: RegExp | undefined;
   testJson: string[] | string | undefined;
   testFilterForm: "regex" | "pytest";
   testFolders: string[];
@@ -97,6 +99,7 @@ export interface EnforcementConfig {
   /** Undefined when no test command is configured. */
   test: string[] | string | undefined;
   testMatch: RegExp | undefined;
+  testSkip?: RegExp | undefined;
   /** One invocation reporting every test the bullets name, or undefined to run them one at a time. */
   testJson: string[] | string | undefined;
   /** How a name filter is written for the runner: an escaped regex (jest, vitest, node:test) or a pytest -k expression. */
@@ -149,14 +152,17 @@ function testSetupOf(raw: Record<string, unknown>, path: string, where: string):
   // Only the declared setup keys are read, so a key read here is one the registry inherits as a group.
   const record = raw as { readonly [K in SetupKey]?: unknown };
   const setup: TestSetup = { language: undefined, files: undefined, cwd: undefined, test: commandValue(record["test"]), testMatch: undefined, testJson: commandValue(record["testJson"]), testFilterForm: record["testFilterForm"] === "pytest" ? "pytest" : "regex", testFolders: [...DEFAULT_TEST_FOLDERS] };
-  const testMatch = record["testMatch"];
-  if (typeof testMatch === "string" && testMatch !== "") {
+  const pattern = (key: "testMatch" | "testSkip", value: unknown): RegExp | undefined => {
+    if (typeof value !== "string" || value === "") return undefined;
     try {
-      setup.testMatch = new RegExp(testMatch);
+      return new RegExp(value);
     } catch (error) {
-      throw new Error(`${path}: ${where}testMatch is not a regular expression (${(error as Error).message})`);
+      throw new Error(`${path}: ${where}${key} is not a regular expression (${(error as Error).message})`);
     }
-  }
+  };
+  setup.testMatch = pattern("testMatch", record["testMatch"]);
+  const testSkip = pattern("testSkip", record["testSkip"]);
+  if (testSkip !== undefined) setup.testSkip = testSkip;
   const folders = new Set(setup.testFolders);
   if (typeof record["testDir"] === "string") folders.add(record["testDir"]);
   if (Array.isArray(record["testDirs"])) for (const dir of record["testDirs"]) if (typeof dir === "string") folders.add(dir);
@@ -252,6 +258,7 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   config.test = first.test;
   config.testJson = first.testJson;
   config.testMatch = first.testMatch;
+  config.testSkip = first.testSkip;
   config.testFilterForm = first.testFilterForm;
   config.testFolders = [...new Set(config.tests.flatMap((t) => t.testFolders))];
   // Every runner is handed each peer's checkout, so a test reads the other repository where the config says it lives.

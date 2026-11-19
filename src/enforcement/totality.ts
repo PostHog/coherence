@@ -3,8 +3,10 @@
  * the configured test command. The `via` value, in the adapter's test-filter form, is appended
  * to an argv array or substituted for {filter} in a string template. The
  * verdict is pass when the command exits 0 and, when `testMatch` is
- * configured, its output matches; fail otherwise; not run when no command
- * is configured or it cannot be started. Not configured is reported, never
+ * configured, its output matches; not run when it exits 0 with output that
+ * matches `testSkip` and not `testMatch` (the test skipped, so nothing was
+ * checked); fail otherwise; not run when no command is configured or it
+ * cannot be started. Not configured is reported, never
  * assumed passing.
  *
  * A runner whose setup is costly (a workers pool, a database) should not
@@ -22,7 +24,7 @@ import { join, resolve } from "node:path";
 import type { TestSetup } from "./config.ts";
 
 /** What running a test needs from a setup: its commands, and the folder it runs from (relative to the root; the root when absent). The whole config is one, for its first setup. */
-export type RunnerSetup = Pick<TestSetup, "test" | "testJson" | "testMatch" | "testFilterForm" | "env"> & { cwd?: string | undefined };
+export type RunnerSetup = Pick<TestSetup, "test" | "testJson" | "testMatch" | "testSkip" | "testFilterForm" | "env"> & { cwd?: string | undefined };
 
 /** The folder a setup's runner starts in. */
 export function runnerCwd(root: string, setup: RunnerSetup): string {
@@ -95,7 +97,9 @@ export async function runTotalityOracle(root: string, config: RunnerSetup, filte
     child.on("close", (code) => {
       clearTimeout(timer);
       const matched = config.testMatch === undefined ? true : config.testMatch.test(output);
+      const skipped = code === 0 && !matched ? skipOf(output, config.testSkip) : undefined;
       if (code === 0 && matched) finish({ verdict: "pass", reason: `${shown} exited 0${config.testMatch === undefined ? "" : ` and its output matched ${config.testMatch}`}`, command: shown, tail: "" });
+      else if (skipped !== undefined) finish({ verdict: "not run", reason: `${shown} exited 0 and its output matched ${config.testSkip} and not ${config.testMatch}: the test skipped, so nothing was checked (${skipped})`, command: shown, tail: tailOf(output) });
       else if (code === 0) finish({ verdict: "fail", reason: `${shown} exited 0 but its output did not match ${config.testMatch}; no test ran under that name`, command: shown, tail: tailOf(output) });
       else finish({ verdict: "fail", reason: `${shown} exited ${code}`, command: shown, tail: tailOf(output) });
     });
@@ -112,6 +116,21 @@ export function shellSaid(shell: boolean, output: string): string {
   if (!shell || process.platform === "win32") return "";
   const first = output.split("\n").find((l) => l.trim() !== "");
   return `; the command ran under /bin/sh, not your login shell${first === undefined ? ", and printed nothing" : `, and the first line it printed was: ${first.trim().slice(0, 200)}`}`;
+}
+
+/**
+ * The skip a runner printed, said in its own words: the line matching
+ * testSkip and the line just before it, where a runner such as go test puts
+ * the test's message (`x_test.go:12: set PG_DSN`). Undefined when the output
+ * shows no skip, or no testSkip is configured.
+ */
+export function skipOf(output: string, testSkip: RegExp | undefined): string | undefined {
+  if (testSkip === undefined) return undefined;
+  const lines = output.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  const at = lines.findIndex((l) => testSkip.test(l));
+  if (at === -1) return undefined;
+  const before = at > 0 && !/^(=== |--- |ok\b|PASS\b|FAIL\b)/.test(lines[at - 1]!) ? `${lines[at - 1]!.slice(0, 200)}; ` : "";
+  return `${before}${lines[at]!.slice(0, 200)}`;
 }
 
 function tailOf(output: string, lines = 12): string {

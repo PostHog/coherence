@@ -82,6 +82,12 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   crossing: instrument -> record
   refuted: made a missing test command report pass -> "the totality oracle pass: configured command with a filter and a match; not configured is reported, never passing" went red in enforcement.test.ts; restored, green (2026-09-17)
   kinds: none
+- a skipped test reads not run: A totality oracle whose test command exits 0 with output that matches the config's testSkip and not its testMatch reads not run, with the runner's own skip line and the line before it as the reason, never a pass and never a fail naming no test; without testSkip that output stays a fail, a matched pass stays a pass, and a failing exit stays a fail.
+  over: a go test -v transcript of a test that skipped with its message, the same transcript with no testSkip configured, a pass printed beside a skip, and a skip printed by a command that exits 1
+  via: a skipped test reads not run with the runner's own words for why, never a fail naming no test, and only where the config says what a skip prints
+  because: in hogtower's full run of 2026-11-12, 43 test-backed bullets read "fail: no test ran under that name" while Postgres refused connections and hogtower's Go tests skipped, not failed, for want of it; each passed alone, so the fail named a cause that was not there and hid the real one, the skip's own message (c-f31c7b67)
+  crossing: instrument -> record
+  kinds: none
 - one invocation for every test: When the config names a testJson command, every test the bullets name runs in one invocation, the results map back by name, and the record says which mode ran.
   protects: runTotalityBatch
   chokepoint: performRun
