@@ -41,51 +41,33 @@ import "./lifecycle/work-meter.ts";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { LEXICON_WORK_USAGE, lexiconWorkCommand } from "./lifecycle/lexicon-cli.ts";
-import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
-import { ENFORCEMENT_USAGE, refuteCommand, runCommand, serveCommand } from "./enforcement/cli.ts";
-import { warmInstrument } from "./enforcement/run.ts";
-import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
-import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/check.ts";
+import type { Io } from "./journal/cli.ts";
 import { deliveredText, renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
-import { lastNamed } from "./lifecycle/lexicon-recency.ts";
-import { loadJournal } from "./journal/store.ts";
-import { clashText } from "./plugins/lexicon.ts";
-import { cliName, CONTEXT_BUDGET, VOCABULARY_TOKENS, ECONOMY_SNAPSHOT, isHookEvent, HOOK_EVENTS, MIRROR_REFRESH, readStdinJson, refreshVocabulary, REFRESH_VOCABULARY_FLAG, runHook, STRUCTURE_REFRESH, VOCABULARY_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
-import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
-import { runHookServe } from "./lifecycle/hook-serve.ts";
-import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
-import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
-import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
-import { scopeApp } from "./readings/scope/live.ts";
-import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
-import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
-import { nestedFolder, repositoryTop } from "./adapters/project-files.ts";
+import type { SettingsRoot } from "./lifecycle/install.ts";
+import type { ModStep } from "./lifecycle/mod-install.ts";
 import { keepAttributes, keepIgnore, STATE_DIR } from "./lifecycle/state-files.ts";
-import { installMod, modInstalled, ownModLinked, uninstallMod, MOD_ID, MOD_REPOSITORY, OWN_MOD_LINK, type ModStep } from "./lifecycle/mod-install.ts";
 import { registryOf } from "./adapters/project-config.ts";
-import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
-import { checkPlugin, checkText } from "./plugins/check.ts";
-import { ejectPlugin, ejectText } from "./plugins/eject.ts";
-import { TELEMETRY_USAGE, telemetryCommand } from "./lifecycle/telemetry-cli.ts";
-import { CI_USAGE, ciInstallCommand, ciSuggestion } from "./lifecycle/ci.ts";
-import { ciReportCommand } from "./lifecycle/ci-report.ts";
-import { startTelemetry } from "./lifecycle/telemetry.ts";
-import { reachNote, refreshLatest, startUpdateCheck, versionText } from "./lifecycle/version.ts";
 import { startParsers } from "./plugins/syntax-trees.ts";
-import { warmProjectParses } from "./economy/warm-parses.ts";
-import { shapeCensus, shapesText } from "./plugins/shapes.ts";
-import { calibrate, calibrationText } from "./plugins/calibrate.ts";
-import { compareReference, compareText } from "./plugins/check.ts";
-import { readEnforcementConfig } from "./enforcement/config.ts";
+import { reachNote, refreshLatest, startUpdateCheck, versionText } from "./lifecycle/version.ts";
 
-type CommandResult = number | Promise<number>;
-type RootCommand = (argv: string[], io: Io) => CommandResult;
-
-const commands: Record<string, RootCommand> = { ...journalVerbs, spec: specCommand, scaffold: scaffoldCommand };
-
-const USAGE = `usage:
+// Each verb loads its own modules when it runs: a hook pays for the hook alone, never for every command the binary knows.
+async function usage(): Promise<string> {
+  const [{ LEXICON_WORK_USAGE }, { SPEC_USAGE }, { SCAFFOLD_USAGE }, { ENFORCEMENT_USAGE }, { ECONOMY_USAGE }, { QUERY_USAGE }, { SCOPE_USAGE }, { HOOK_EVENTS }, { HOSTS }, { CI_USAGE }, { TELEMETRY_USAGE }, { JOURNAL_USAGE }] = await Promise.all([
+    import("./lifecycle/lexicon-cli.ts"),
+    import("./spec/cli.ts"),
+    import("./scaffold/cli.ts"),
+    import("./enforcement/cli.ts"),
+    import("./economy/cli.ts"),
+    import("./readings/query/cli.ts"),
+    import("./readings/scope/cli.ts"),
+    import("./lifecycle/hook-events.ts"),
+    import("./lifecycle/hosts.ts"),
+    import("./lifecycle/ci.ts"),
+    import("./lifecycle/telemetry-cli.ts"),
+    import("./journal/cli.ts"),
+  ]);
+  return `usage:
 ${LEXICON_WORK_USAGE}
   coherence lexicon [--json]
   coherence lexicon --check [--json] [paths...]
@@ -114,6 +96,7 @@ ${TELEMETRY_USAGE}
   coherence help      (or --help, -h) this usage
 ${JOURNAL_USAGE}
 `;
+}
 
 /**
  * Where one call of the command line reads and writes: its output streams,
@@ -145,14 +128,21 @@ export interface CommandOutput {
  */
 export class CommandExit extends Error {
   readonly code: number;
-  constructor(code: number, message: string) {
+  readonly withUsage: boolean;
+  constructor(code: number, message: string, withUsage = false) {
     super(message);
     this.code = code;
+    this.withUsage = withUsage;
   }
 }
 
 function fail(message: string, code = 64): never {
   throw new CommandExit(code, message);
+}
+
+/** A usage error; main appends the usage, which loads every verb's, so only an error pays for it. */
+function failWithUsage(message = ""): never {
+  throw new CommandExit(64, message, true);
 }
 
 /** What a call that ended at once prints on stderr, and its exit code: a CommandExit's own, 70 (EX_SOFTWARE) for anything else thrown. */
@@ -202,14 +192,17 @@ function parse(args: string[], valued: Set<string>): Parsed {
 async function defaultCommand(root: string, sub = "", local = false): Promise<string> {
   const personal = local ? ' && [ ! -f "$dir/.claude/settings.local.json" ]' : "";
   const dir = `$(dir="\${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$dir" != "/" ] && [ ! -f "$dir/.claude/settings.json" ]${personal} && [ ! -f "$dir/.codex/hooks.json" ]; do dir=$(dirname "$dir"); done; printf "%s" "$dir")`;
-  return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : locatedPrefix(sub, local);
+  if (await isCoherenceItself(root)) return `node "${dir}/src/cli.ts"`;
+  const { locatedPrefix } = await import("./lifecycle/install.ts");
+  return locatedPrefix(sub, local);
 }
 
 /** The cli running this command, as the located command would name it once resolved: an installed package, a checkout, or Coherence's own source. */
 const THIS_CLI = realpathSync(fileURLToPath(import.meta.url));
 
 /** After an adopter's install: say which Coherence the hooks will find, named as the session start names it, or how to make them find it. */
-function locateNote(call: CommandCall, root: string, sub = ""): string {
+async function locateNote(call: CommandCall, root: string, sub = ""): Promise<string> {
+  const { locate } = await import("./lifecycle/install.ts");
   const found = locate(root, call.env, sub);
   const reached = reachNote(root, found === undefined ? undefined : realpathSync(found), THIS_CLI);
   if (reached !== undefined) return reached;
@@ -225,6 +218,7 @@ async function lexiconCommand(call: CommandCall, args: string[], root: string): 
     out: (line) => call.stdout.write(line + "\n"),
     err: (line) => call.stderr.write(line + "\n"),
   };
+  const { lexiconWorkCommand } = await import("./lifecycle/lexicon-cli.ts");
   if (args[0] === "--help") return lexiconWorkCommand(["help"], io);
   if (args[0] && !args[0].startsWith("--")) return lexiconWorkCommand(args, io);
   const { flags, positionals } = parse(args, new Set());
@@ -234,9 +228,11 @@ async function lexiconCommand(call: CommandCall, args: string[], root: string): 
     return 1;
   }
   const { coherence, project, clashes = [] } = await loadProjectLexicons(root);
+  const { clashText } = await import("./plugins/lexicon.ts");
   // A plugin concept another layer already names stays out of the stack until the project settles it: said here, as spec --check says it.
   for (const clash of clashes) call.stderr.write(`lexicon stack: ${clashText(clash)}\n`);
   if (flags.has("check")) {
+    const { formatReport, hasFindings, runCheck } = await import("./lifecycle/check.ts");
     const report = await runCheck({ root, paths: positionals, coherence, project });
     call.stdout.write(flags.has("json") ? JSON.stringify(report, null, 2) + "\n" : formatReport(report));
     return hasFindings(report) ? 1 : 0;
@@ -246,6 +242,7 @@ async function lexiconCommand(call: CommandCall, args: string[], root: string): 
     return 0;
   }
   // In the order the start injection keeps, so what is printed first is what the host's budget trims last.
+  const [{ lastNamed }, { loadJournal }, { CONTEXT_BUDGET, VOCABULARY_TOKENS }] = await Promise.all([import("./lifecycle/lexicon-recency.ts"), import("./journal/store.ts"), import("./lifecycle/hook.ts")]);
   const named = lastNamed(loadJournal(root).records, [...coherence.concepts, ...(project?.concepts ?? [])]);
   const own = await isCoherenceItself(root);
   const compact = renderCompact(coherence, project, own, () => true, named);
@@ -272,14 +269,15 @@ function writeStdout(call: CommandCall, text: string): Promise<void> {
 const OUTPUT_LOST_EXIT = 74;
 
 async function hookCommand(call: CommandCall, args: string[], root: string): Promise<number> {
+  const { HOOK_EVENTS, isHookEvent, readStdinJson, refreshVocabulary, REFRESH_VOCABULARY_FLAG, runHook } = await import("./lifecycle/hook.ts");
   const event = args[0];
   if (event === REFRESH_VOCABULARY_FLAG) {
     await refreshVocabulary(root);
     return 0;
   }
-  if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
+  if (event === undefined || !isHookEvent(event)) failWithUsage(`hook: expected one of ${HOOK_EVENTS.join(", ")}`);
   const input = await readStdinJson(call.stdin);
-  const result = await runHook(event, input, root, { ...HOOK_STARTS, startedAt: call.startedAt });
+  const result = await runHook(event, input, root, { ...(await hookStarts()), startedAt: call.startedAt });
   if (result.stderr !== "") call.stderr.write(result.stderr);
   if (result.stdout !== "") {
     try {
@@ -303,8 +301,9 @@ async function hookCommand(call: CommandCall, args: string[], root: string): Pro
  */
 async function hookServeCommand(args: string[], root: string): Promise<number> {
   const unknown = args.filter((arg) => arg !== "--socket");
-  if (unknown.length > 0) fail(`hook-serve: unexpected ${unknown.join(" ")}\n${USAGE}`);
-  return runHookServe(root, { socket: args.includes("--socket"), hook: HOOK_STARTS });
+  if (unknown.length > 0) failWithUsage(`hook-serve: unexpected ${unknown.join(" ")}`);
+  const { runHookServe } = await import("./lifecycle/hook-serve.ts");
+  return runHookServe(root, { socket: args.includes("--socket"), hook: await hookStarts() });
 }
 
 /** The verbs that serve the process's own streams until it ends: never run in-process, where the call's streams are buffers. */
@@ -316,7 +315,13 @@ export const PROCESS_VERBS: ReadonlySet<string> = new Set(["hook-serve", "serve"
  * to the per-event hook and to the warm hook process, so both paths start the
  * same work and keep the same records.
  */
-const HOOK_STARTS = { refresh: STRUCTURE_REFRESH, vocabularyRefresh: VOCABULARY_REFRESH, warm: WARM_UP, telemetry: startTelemetry, updateCheck: startUpdateCheck, mirrors: MIRROR_REFRESH, snapshot: ECONOMY_SNAPSHOT } as const;
+async function hookStarts() {
+  const { ECONOMY_SNAPSHOT, MIRROR_REFRESH, STRUCTURE_REFRESH, VOCABULARY_REFRESH, WARM_UP } = await import("./lifecycle/hook.ts");
+  const telemetry = (root: string, event: string, input: Record<string, unknown>): void => {
+    void import("./lifecycle/telemetry.ts").then(({ startTelemetry }) => startTelemetry(root, event, input), () => false);
+  };
+  return { refresh: STRUCTURE_REFRESH, vocabularyRefresh: VOCABULARY_REFRESH, warm: WARM_UP, telemetry, updateCheck: startUpdateCheck, mirrors: MIRROR_REFRESH, snapshot: ECONOMY_SNAPSHOT } as const;
+}
 
 const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
   install: new Set(["host", "command", "local", "mod", "shared"]),
@@ -330,7 +335,8 @@ async function pluginCommand(call: CommandCall, args: string[], root: string): P
   const { flags, positionals } = parse(args, new Set(["to", "files"]));
   const [verb, given, ...more] = positionals;
   if (verb === "compare") {
-    if (given !== undefined || flags.size > 0) fail(`plugin compare: no arguments; it reads every language plugin's check project\n${USAGE}`);
+    if (given !== undefined || flags.size > 0) failWithUsage(`plugin compare: no arguments; it reads every language plugin's check project`);
+    const [{ compareReference, compareText }, { readEnforcementConfig }] = await Promise.all([import("./plugins/check.ts"), import("./enforcement/config.ts")]);
     const readings = await compareReference(readEnforcementConfig(root).plugins);
     call.stdout.write(`${compareText(readings)}\n`);
     return readings.some((r) => !("held" in r) || r.missed.length > 0) ? 1 : 0;
@@ -338,24 +344,29 @@ async function pluginCommand(call: CommandCall, args: string[], root: string): P
   if (verb === "calibrate") {
     const files = flags.get("files");
     const limit = files === undefined ? 200 : Number(files);
-    if (given !== undefined || files === true || !Number.isInteger(limit) || limit < 1 || [...flags.keys()].some((f) => f !== "files")) fail(`plugin calibrate: [--files <n>]; it reads the project it runs in\n${USAGE}`);
+    if (given !== undefined || files === true || !Number.isInteger(limit) || limit < 1 || [...flags.keys()].some((f) => f !== "files")) failWithUsage(`plugin calibrate: [--files <n>]; it reads the project it runs in`);
+    const { calibrate, calibrationText } = await import("./plugins/calibrate.ts");
     call.stdout.write(`${calibrationText(await calibrate(root, limit))}\n`);
     return 0;
   }
   if (verb === "shapes") {
-    if (given !== undefined || flags.size > 0) fail(`plugin shapes: no arguments; it reads the project it runs in\n${USAGE}`);
+    if (given !== undefined || flags.size > 0) failWithUsage(`plugin shapes: no arguments; it reads the project it runs in`);
+    const { shapeCensus, shapesText } = await import("./plugins/shapes.ts");
     call.stdout.write(`${shapesText(await shapeCensus(root))}\n`);
     return 0;
   }
-  if (given === undefined || more.length > 0 || (verb !== "eject" && verb !== "check")) fail(`plugin: eject <name> [--to <dir>], check <plugin>, or shapes\n${USAGE}`);
-  if (verb === "check" && flags.size > 0) fail(`plugin check: no flags\n${USAGE}`);
+  if (given === undefined || more.length > 0 || (verb !== "eject" && verb !== "check")) failWithUsage(`plugin: eject <name> [--to <dir>], check <plugin>, or shapes`);
+  if (verb === "check" && flags.size > 0) failWithUsage(`plugin check: no flags`);
   const to = flags.get("to");
-  if (to === true) fail(`plugin eject: --to names a folder\n${USAGE}`);
+  if (to === true) failWithUsage(`plugin eject: --to names a folder`);
   try {
+    const { cliName } = await import("./lifecycle/hook.ts");
     if (verb === "eject") {
+      const { ejectPlugin, ejectText } = await import("./plugins/eject.ts");
       call.stdout.write(`${ejectText(ejectPlugin(root, given, to), given, await cliName(root))}\n`);
       return 0;
     }
+    const { checkPlugin, checkText } = await import("./plugins/check.ts");
     const checked = await checkPlugin(root, given);
     call.stdout.write(`${checkText(checked)}\n`);
     return checked.duties.every((o) => o.verdict === "pass") ? 0 : 1;
@@ -368,7 +379,8 @@ async function pluginCommand(call: CommandCall, args: string[], root: string): P
 
 /** adopt <folder>: one folder, relative to where the command runs; never the project root the other commands resolve to. */
 async function adoptCommand(call: CommandCall, args: string[]): Promise<number> {
-  if (args.length !== 1 || args[0]!.startsWith("--")) fail(`adopt: one folder\n${USAGE}`);
+  if (args.length !== 1 || args[0]!.startsWith("--")) failWithUsage(`adopt: one folder`);
+  const [{ adopt, AdoptError, adoptText }, { cliName }] = await Promise.all([import("./lifecycle/adopt.ts"), import("./lifecycle/hook.ts")]);
   try {
     const adopted = adopt(call.cwd, args[0]!);
     call.stdout.write(adoptText(adopted, await cliName(resolve(dirname(adopted.path), adopted.folder))));
@@ -381,13 +393,18 @@ async function adoptCommand(call: CommandCall, args: string[]): Promise<number> 
 }
 
 async function hooksCommand(call: CommandCall, args: string[], root: string): Promise<number> {
+  const [{ check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, locatedPrefix, settingsFile, settingsRoots, status, uninstall }, { modInstalled, ownModLinked, uninstallMod, MOD_ID, OWN_MOD_LINK }, { nestedFolder, repositoryTop }] = await Promise.all([
+    import("./lifecycle/install.ts"),
+    import("./lifecycle/mod-install.ts"),
+    import("./adapters/project-files.ts"),
+  ]);
   const { flags, positionals } = parse(args, new Set(["host", "command"]));
   // The check is the noun's --check, as lexicon --check and spec --check are; the other actions are verbs.
   const verb = flags.has("check") && positionals.length === 0 ? "check" : positionals[0];
   const allowed = verb === undefined ? undefined : HOOKS_FLAGS[verb];
-  if (allowed === undefined || positionals.length > (verb === "check" ? 0 : 1)) fail(USAGE);
+  if (allowed === undefined || positionals.length > (verb === "check" ? 0 : 1)) failWithUsage();
   const unknown = [...flags.keys()].filter((flag) => !allowed.has(flag));
-  if (unknown.length > 0) fail(`hooks ${verb}: unknown flag${unknown.length === 1 ? "" : "s"} ${unknown.map((f) => `--${f}`).join(", ")}\n${USAGE}`);
+  if (unknown.length > 0) failWithUsage(`hooks ${verb}: unknown flag${unknown.length === 1 ? "" : "s"} ${unknown.map((f) => `--${f}`).join(", ")}`);
   const local = flags.get("local") === true;
   // A project nested below its repository's top keeps its hooks at the top too, where a host launched at the repository root reads them.
   // Personal settings are one file at the repository top, which the host reads launched there or in any folder below.
@@ -400,15 +417,16 @@ async function hooksCommand(call: CommandCall, args: string[], root: string): Pr
       ...(await Promise.all(personal.map((place) => Promise.all(HOSTS.filter((host) => settingsFile(host, true) !== undefined).map((host) => status(place.dir, host, true)))))).flat(),
     ];
     const modLines = [...shared.filter((place) => modInstalled(place.dir, "project")).map(() => `claude: ${MOD_ID} enabled in the committed settings\n`), ...personal.filter((place) => modInstalled(place.dir)).map(() => `claude: ${MOD_ID} enabled in the personal settings\n`)].join("");
+    const { deliveries, formatDeliveries } = await import("./lifecycle/delivery.ts");
     call.stdout.write(formatStatus(statuses) + modLines + "\n" + formatDeliveries(await deliveries(root), statuses));
     return 0;
   }
   const host = flags.get("host");
   const label = verb === "check" ? "hooks --check" : `hooks ${verb}`;
-  if (typeof host !== "string" || !isHost(host)) fail(`${label}: --host must be one of ${HOSTS.join(", ")}\n${USAGE}`);
+  if (typeof host !== "string" || !isHost(host)) failWithUsage(`${label}: --host must be one of ${HOSTS.join(", ")}`);
   if (local && settingsFile(host, true) === undefined) fail(`${label} --local: ${host} keeps no personal settings file Coherence knows of; install without --local`);
   const given = flags.get("command");
-  if (given === true) fail(`${label}: --command needs a value\n${USAGE}`);
+  if (given === true) failWithUsage(`${label}: --command needs a value`);
   if (verb === "uninstall") {
     // The mod first: while it is installed, the files .coherence keeps for git stay, since a host still runs Coherence.
     if (host === "claude") {
@@ -454,17 +472,18 @@ async function hooksCommand(call: CommandCall, args: string[], root: string): Pr
     }
     return drifted ? 1 : 0;
   }
-  if (flags.get("shared") === true && flags.get("mod") !== true) fail(`hooks install --shared: --shared applies to --mod alone\n${USAGE}`);
-  if (flags.get("mod") === true && (await isCoherenceItself(root))) fail(`hooks install --mod: Coherence's own repository runs each tree's own mod from ${OWN_MOD_LINK}; an installed copy would take its name and run instead\n${USAGE}`);
+  if (flags.get("shared") === true && flags.get("mod") !== true) failWithUsage(`hooks install --shared: --shared applies to --mod alone`);
+  if (flags.get("mod") === true && (await isCoherenceItself(root))) failWithUsage(`hooks install --mod: Coherence's own repository runs each tree's own mod from ${OWN_MOD_LINK}; an installed copy would take its name and run instead`);
   if (flags.get("mod") === true) return flags.get("shared") === true ? sharedModInstallCommand(call, root, host, shared, given !== undefined || local) : modInstallCommand(call, root, host, personal[0]!, shared, given !== undefined || local);
   for (const place of places) {
     const command = await commandAt(place.sub);
     const registry = registryOf(root);
     const result = await install({ root: place.dir, host, command, ignoreRoots: registry === undefined ? [root] : registry.leaves, local });
     call.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
-    if (command === locatedPrefix(place.sub, local)) call.stdout.write(locateNote(call, place.dir, place.sub));
+    if (command === locatedPrefix(place.sub, local)) call.stdout.write(await locateNote(call, place.dir, place.sub));
   }
   // The pull request side: offered once, only while no workflow runs Coherence.
+  const { ciSuggestion } = await import("./lifecycle/ci.ts");
   call.stdout.write(await ciSuggestion(root));
   return 0;
 }
@@ -481,8 +500,9 @@ function modSteps(steps: readonly ModStep[]): string {
  * committed hooks are the team's: kept, and named while they hold the mod back.
  */
 async function modInstallCommand(call: CommandCall, root: string, host: string, personal: SettingsRoot, shared: readonly SettingsRoot[], flagged: boolean): Promise<number> {
-  if (host !== "claude") fail(`hooks install --mod: the mod is Claude Code's; ${host} keeps its settings hooks\n${USAGE}`);
-  if (flagged) fail(`hooks install --mod: the mod is always personal and finds Coherence itself; --local and --command do not apply\n${USAGE}`);
+  if (host !== "claude") failWithUsage(`hooks install --mod: the mod is Claude Code's; ${host} keeps its settings hooks`);
+  if (flagged) failWithUsage(`hooks install --mod: the mod is always personal and finds Coherence itself; --local and --command do not apply`);
+  const [{ formatUninstall, settingsFile, status, uninstall }, { installMod, MOD_REPOSITORY }] = await Promise.all([import("./lifecycle/install.ts"), import("./lifecycle/mod-install.ts")]);
   const steps = installMod(personal.dir);
   call.stdout.write(modSteps(steps));
   if (!steps.every((s) => s.ok) || steps.length < 2) {
@@ -512,8 +532,9 @@ async function modInstallCommand(call: CommandCall, root: string, host: string, 
  * hold the mod back for its owner, so each is named.
  */
 async function sharedModInstallCommand(call: CommandCall, root: string, host: string, shared: readonly SettingsRoot[], flagged: boolean): Promise<number> {
-  if (host !== "claude") fail(`hooks install --mod --shared: the mod is Claude Code's; ${host} keeps its settings hooks\n${USAGE}`);
-  if (flagged) fail(`hooks install --mod --shared: the mod finds Coherence itself; --local and --command do not apply\n${USAGE}`);
+  if (host !== "claude") failWithUsage(`hooks install --mod --shared: the mod is Claude Code's; ${host} keeps its settings hooks`);
+  if (flagged) failWithUsage(`hooks install --mod --shared: the mod finds Coherence itself; --local and --command do not apply`);
+  const [{ formatUninstall, settingsFile, status, uninstall }, { installMod, MOD_REPOSITORY }] = await Promise.all([import("./lifecycle/install.ts"), import("./lifecycle/mod-install.ts")]);
   for (const place of shared) {
     const steps = installMod(place.dir, undefined, "project");
     call.stdout.write(modSteps(steps));
@@ -538,7 +559,7 @@ async function sharedModInstallCommand(call: CommandCall, root: string, host: st
 /** version: what runs and what is published; `--refresh` (which a session start runs detached) asks the registry first. */
 async function versionCommand(call: CommandCall, args: string[], root: string): Promise<number> {
   const unknown = args.filter((arg) => arg !== "--refresh");
-  if (unknown.length > 0) fail(`version: unexpected ${unknown.join(" ")}\n${USAGE}`);
+  if (unknown.length > 0) failWithUsage(`version: unexpected ${unknown.join(" ")}`);
   if (args.includes("--refresh")) await refreshLatest();
   call.stdout.write(versionText(root, await isCoherenceItself(root)));
   return 0;
@@ -547,6 +568,7 @@ async function versionCommand(call: CommandCall, args: string[], root: string): 
 /** The journal's check before a write: a rejected name that binds here, named with what it was rejected for. */
 async function journalVet(root: string): Promise<(record: object) => string[]> {
   const { coherence, project } = await loadProjectLexicons(root);
+  const { recordVetter } = await import("./lifecycle/check.ts");
   const vet = await recordVetter(root, coherence, project);
   return (record) => vet(record).map((f) => `"${f.text}" is rejected for ${f.concept}: ${f.because}`);
 }
@@ -561,6 +583,9 @@ export async function main(argv: string[], call: CommandCall): Promise<number> {
   await startParsers();
   try {
     return await dispatch(argv, call, root);
+  } catch (error) {
+    if (!(error instanceof CommandExit) || !error.withUsage) throw error;
+    throw new CommandExit(error.code, error.message === "" ? await usage() : `${error.message}\n${await usage()}`);
   } finally {
     if (fresh && existsSync(join(root, STATE_DIR))) {
       try {
@@ -575,31 +600,26 @@ export async function main(argv: string[], call: CommandCall): Promise<number> {
 
 async function dispatch(argv: string[], call: CommandCall, root: string): Promise<number> {
   const [verb, ...rest] = argv;
-  const command = verb === undefined ? undefined : commands[verb];
-  if (command !== undefined) {
-    const io: Io = {
-      cwd: root,
-      out: (line) => call.stdout.write(`${line}\n`),
-      err: (line) => call.stderr.write(`${line}\n`),
-      ...(verb !== undefined && verb in journalVerbs ? { vet: await journalVet(root) } : {}),
-    };
-    return command(rest, io);
-  }
   const io: Io = {
     cwd: root,
     out: (line) => call.stdout.write(`${line}\n`),
     err: (line) => call.stderr.write(`${line}\n`),
   };
   switch (verb) {
+    case "spec":
+      return (await import("./spec/cli.ts")).specCommand(rest, io);
+    case "scaffold":
+      return (await import("./scaffold/cli.ts")).scaffoldCommand(rest, io);
     case "lexicon":
       return lexiconCommand(call, rest, root);
     case "run":
-      return runCommand(rest, io);
+      return (await import("./enforcement/cli.ts")).runCommand(rest, io);
     case "refute":
-      return refuteCommand(rest, io);
+      return (await import("./enforcement/cli.ts")).refuteCommand(rest, io);
     case "warm": {
       // Internal: the hook starts this detached so the instrument is loaded before the stop that needs it,
       // and so every file the project reads through a parser is parsed once and kept before a whole-project reading asks.
+      const [{ warmInstrument }, { warmProjectParses }] = await Promise.all([import("./enforcement/run.ts"), import("./economy/warm-parses.ts")]);
       const languageAt = rest.indexOf("--language");
       const instrument = warmInstrument(root, languageAt === -1 ? undefined : rest[languageAt + 1]);
       try {
@@ -612,21 +632,21 @@ async function dispatch(argv: string[], call: CommandCall, root: string): Promis
     }
     case "serve":
       // The warm server answers the live Scope reading over HTTP besides the instrument over its socket.
-      return serveCommand(rest, io, { http: scopeApp() });
+      return (await import("./enforcement/cli.ts")).serveCommand(rest, io, { http: (await import("./readings/scope/live.ts")).scopeApp() });
     case "scope":
-      return scopeCommand(rest, io);
+      return (await import("./readings/scope/cli.ts")).scopeCommand(rest, io);
     case "economy":
-      return economyCommand(rest, io);
+      return (await import("./economy/cli.ts")).economyCommand(rest, io);
     case "calibrate":
-      return calibrateCommand(rest, io);
+      return (await import("./economy/cli.ts")).calibrateCommand(rest, io);
     case "adopt":
       return adoptCommand(call, rest);
     case "plugin":
       return pluginCommand(call, rest, root);
     case "mass":
-      return massCommand(rest, io);
+      return (await import("./economy/cli.ts")).massCommand(rest, io);
     case "query":
-      return queryCommand(rest, io);
+      return (await import("./readings/query/cli.ts")).queryCommand(rest, io);
     case "hook":
       return hookCommand(call, rest, root);
     case "hook-serve":
@@ -634,11 +654,11 @@ async function dispatch(argv: string[], call: CommandCall, root: string): Promis
     case "hooks":
       return hooksCommand(call, rest, root);
     case "telemetry":
-      return telemetryCommand(rest, io);
+      return (await import("./lifecycle/telemetry-cli.ts")).telemetryCommand(rest, io);
     case "ci":
-      if (rest[0] === "install") return ciInstallCommand(rest.slice(1), io);
-      if (rest[0] === "report") return ciReportCommand(rest.slice(1), io);
-      fail(`ci: install or report\n${CI_USAGE}`);
+      if (rest[0] === "install") return (await import("./lifecycle/ci.ts")).ciInstallCommand(rest.slice(1), io);
+      if (rest[0] === "report") return (await import("./lifecycle/ci-report.ts")).ciReportCommand(rest.slice(1), io);
+      fail(`ci: install or report\n${(await import("./lifecycle/ci.ts")).CI_USAGE}`);
     case "version":
     case "--version":
     case "-v":
@@ -646,11 +666,19 @@ async function dispatch(argv: string[], call: CommandCall, root: string): Promis
     case "help":
     case "--help":
     case "-h":
-      call.stdout.write(USAGE);
+      call.stdout.write(await usage());
       return 0;
     default:
-      fail(verb === undefined ? USAGE : `unknown verb "${verb}"\n${USAGE}`);
+      return journalCommand(verb, rest, io, root);
   }
+}
+
+async function journalCommand(verb: string | undefined, rest: string[], io: Io, root: string): Promise<number> {
+  if (verb === undefined) failWithUsage();
+  const { journalVerbs } = await import("./journal/cli.ts");
+  const command = journalVerbs[verb];
+  if (command === undefined) failWithUsage(`unknown verb "${verb}"`);
+  return command(rest, { ...io, vet: await journalVet(root) });
 }
 
 /**

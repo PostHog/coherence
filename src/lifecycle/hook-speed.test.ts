@@ -81,12 +81,12 @@ test("a stop starts the snapshot detached, with a fingerprint that moves only wi
     const quick = [process.execPath, "-e", ""];
     writeFileSync(snapshotSlot(root, "s1"), JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint }));
     await snapshotSession(root, "s1", ((_root, take, given) => take(undefined, undefined, given?.onNoServer?.(undefined))) as typeof withWarmAdapter);
-    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), false, "a stop on the same patch with no server loaded starts no snapshot process");
-    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), false, "nor at any stop after it");
+    assert.equal(await snapshotInBackground(root, "s1", fingerprint, quick), false, "a stop on the same patch with no server loaded starts no snapshot process");
+    assert.equal(await snapshotInBackground(root, "s1", fingerprint, quick), false, "nor at any stop after it");
     mkdirSync(dirname(serverPaths(root).pointer), { recursive: true });
     writeFileSync(serverPaths(root).pointer, JSON.stringify({ pid: process.pid }));
-    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), true, "a snapshot that found no server loaded is taken again on the same patch once a server is recorded");
-    assert.equal(snapshotInBackground(root, "s1", fingerprint, quick), false, "and once only");
+    assert.equal(await snapshotInBackground(root, "s1", fingerprint, quick), true, "a snapshot that found no server loaded is taken again on the same patch once a server is recorded");
+    assert.equal(await snapshotInBackground(root, "s1", fingerprint, quick), false, "and once only");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
