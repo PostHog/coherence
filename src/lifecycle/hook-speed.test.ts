@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { patchFingerprint, recordWriteTrace, sessionPatch, snapshotInBackground, snapshotSession, snapshotSlot, traceFile, type Snapshot } from "../economy/trace.ts";
-import { WARM_UP, economyStopText, editContext, runHook } from "./hook.ts";
+import { WARM_UP, economyStopText, editContext, refreshVocabulary, runHook } from "./hook.ts";
 import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
@@ -348,7 +348,7 @@ test("a tool call's hooks spawn git a fixed number of times, whatever the number
   assert.equal(counts[1], counts[0], `PreToolUse and PostToolUse over 6 components and practices spawn git as often as over 1: ${counts.join(" vs ")}`);
 });
 
-test("the vocabulary coverage reading runs at a tool hook only after a write, and at a prompt only when the tree moved", async () => {
+test("the vocabulary coverage reading runs at a tool hook only after a write, and at a prompt only when the tree moved past the kept reading", async () => {
   const root = repo({ "coherence.config.json": JSON.stringify({ name: "p" }), "src/a/A.spec.md": "# A\n\nA component.\n", "src/a/a.ts": "export const a = 1;\n" });
   try {
     const session = "cov";
@@ -367,12 +367,44 @@ test("the vocabulary coverage reading runs at a tool hook only after a write, an
     await hook("PostToolUse", { tool_name: "Write", tool_input: { file_path: join(root, "src/a/a.ts"), content: "export const a = 2;\n" } });
     assert.equal(readings, 1, "a write reads it");
     await hook("UserPromptSubmit", { prompt: "one" });
-    assert.equal(readings, 2, "the first prompt reads it: no tree key yet");
+    assert.equal(readings, 1, "the first prompt reads nothing: the write kept a reading of this very tree");
     await hook("UserPromptSubmit", { prompt: "two" });
-    assert.equal(readings, 2, "a prompt over a tree that has not moved reads nothing");
+    assert.equal(readings, 1, "a prompt over a tree that has not moved reads nothing");
     writeFileSync(join(root, "src/a/b.ts"), "export const b = 1;\n");
     await hook("UserPromptSubmit", { prompt: "three" });
-    assert.equal(readings, 3, "a file someone added between prompts moves the tree");
+    assert.equal(readings, 2, "a file someone added between prompts moves the tree");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a start reads the vocabulary only when none is kept; over a moved tree it names the kept one's age and the session's baseline waits for the background reading", async () => {
+  const root = repo({ "coherence.config.json": JSON.stringify({ name: "p" }), "src/a/A.spec.md": "# A\n\nA component.\n", "src/a/a.ts": "export const a = 1;\n" });
+  const refreshes: string[] = [];
+  const options = { adapter: undefined, door: async (_r: unknown, fn: (...args: unknown[]) => unknown) => fn(undefined, undefined, "no instrument in this test"), vocabularyRefresh: (_root: string, tree: string) => refreshes.push(tree) } as Parameters<typeof runHook>[3];
+  const baselineOf = (session: string): string => join(root, ".coherence", "lexicon", "sessions", `${session}.json`);
+  const hook = async (event: "SessionStart" | "UserPromptSubmit", session: string): Promise<{ readings: number; stdout: string }> => {
+    const answered = await runHook(event, { cwd: root, session_id: session, ...(event === "SessionStart" ? { source: "startup" } : { prompt: "go" }) }, root, options);
+    answered.commit?.();
+    return { readings: lastHookWork()?.counts["coverage reading"] ?? 0, stdout: answered.stdout };
+  };
+  try {
+    assert.equal((await hook("SessionStart", "first")).readings, 1, "with no kept reading the start reads in full");
+    assert.ok(existsSync(baselineOf("first")));
+    assert.equal((await hook("UserPromptSubmit", "first")).readings, 0, "the first prompt after a start over an unchanged tree reads nothing");
+    assert.equal((await hook("SessionStart", "second")).readings, 0, "a start over the tree the kept reading matches reads nothing");
+    writeFileSync(join(root, "src/a/b.ts"), "export const b = 1;\n");
+    const stale = await hook("SessionStart", "third");
+    assert.equal(stale.readings, 0, "a start over a moved tree reads nothing in the hook");
+    assert.match(stale.stdout, /Vocabulary: as read \d+ min ago, before this tree's latest changes/);
+    assert.equal(refreshes.length, 1, "it starts one background reading");
+    assert.ok(!existsSync(baselineOf("third")), "a stale reading is no baseline: it would count changes made before the session as the session's");
+    await hook("UserPromptSubmit", "third");
+    assert.ok(!existsSync(baselineOf("third")), "a prompt before the background reading finished still keeps none");
+    await refreshVocabulary(root);
+    writeFileSync(join(root, "src/a/c.ts"), "export const c = 1;\n");
+    assert.equal((await hook("UserPromptSubmit", "third")).readings, 0);
+    assert.ok(existsSync(baselineOf("third")), "the first prompt after the background reading takes it as the baseline, though the session's own edits moved the tree since");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -51,7 +51,7 @@ import { deliveredText, renderCompact, renderCompactWithin, tokenEstimate } from
 import { lastNamed } from "./lifecycle/lexicon-recency.ts";
 import { loadJournal } from "./journal/store.ts";
 import { clashText } from "./plugins/lexicon.ts";
-import { cliName, CONTEXT_BUDGET, VOCABULARY_TOKENS, ECONOMY_SNAPSHOT, isHookEvent, HOOK_EVENTS, MIRROR_REFRESH, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
+import { cliName, CONTEXT_BUDGET, VOCABULARY_TOKENS, ECONOMY_SNAPSHOT, isHookEvent, HOOK_EVENTS, MIRROR_REFRESH, readStdinJson, refreshVocabulary, REFRESH_VOCABULARY_FLAG, runHook, STRUCTURE_REFRESH, VOCABULARY_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { runHookServe } from "./lifecycle/hook-serve.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
@@ -273,6 +273,10 @@ const OUTPUT_LOST_EXIT = 74;
 
 async function hookCommand(call: CommandCall, args: string[], root: string): Promise<number> {
   const event = args[0];
+  if (event === REFRESH_VOCABULARY_FLAG) {
+    await refreshVocabulary(root);
+    return 0;
+  }
   if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
   const input = await readStdinJson(call.stdin);
   const result = await runHook(event, input, root, { ...HOOK_STARTS, startedAt: call.startedAt });
@@ -312,7 +316,7 @@ export const PROCESS_VERBS: ReadonlySet<string> = new Set(["hook-serve", "serve"
  * to the per-event hook and to the warm hook process, so both paths start the
  * same work and keep the same records.
  */
-const HOOK_STARTS = { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry: startTelemetry, updateCheck: startUpdateCheck, mirrors: MIRROR_REFRESH, snapshot: ECONOMY_SNAPSHOT } as const;
+const HOOK_STARTS = { refresh: STRUCTURE_REFRESH, vocabularyRefresh: VOCABULARY_REFRESH, warm: WARM_UP, telemetry: startTelemetry, updateCheck: startUpdateCheck, mirrors: MIRROR_REFRESH, snapshot: ECONOMY_SNAPSHOT } as const;
 
 const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
   install: new Set(["host", "command", "local", "mod", "shared"]),

@@ -7,22 +7,47 @@
  * per-event figure includes Node's start for the CLI and the socket round trip
  * for the warm process.
  *
- *   node bench/hook-serve/run.ts <project root> <rounds> <fixture|posthog> <out.json>
+ *   node bench/hook-serve/run.ts <project root> <rounds> <fixture|posthog|starts> <out.json>
+ *
+ * `starts` times the per-event arm alone and prints medians and the kept reading's size; COHERENCE_BENCH_CLI names a built dist/cli.js to time.
  *
  * Sessions are named spike-<arm>-<round>; the caller removes what they record.
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { rmSync, statSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
-const CLI = resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "cli.ts");
+const CLI = process.env["COHERENCE_BENCH_CLI"] ?? resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "cli.ts");
+const CHANGED_FILE = "coherence-bench-change.md";
 const NODE = [process.execPath, "--disable-warning=ExperimentalWarning", CLI];
 
-type Step = { label: string; event: string; input: Record<string, unknown> };
+type Step = { label: string; event: string; input: Record<string, unknown>; before?: () => void };
+
+function startSteps(root: string, session: string): Step[] {
+  const base = { cwd: root, session_id: session };
+  const prompt = (label: string): Step => ({ label, event: "UserPromptSubmit", input: { ...base, hook_event_name: "UserPromptSubmit", prompt: "harden auth" } });
+  const stop = (label: string, before?: () => void): Step => ({ label, event: "Stop", input: { ...base, hook_event_name: "Stop", stop_hook_active: false }, ...(before ? { before } : {}) });
+  const bash = { ...base, tool_name: "Bash", tool_input: { command: "git status" }, tool_use_id: `b-${session}` };
+  return [
+    { label: "session start", event: "SessionStart", input: { ...base, hook_event_name: "SessionStart", source: "startup" } },
+    prompt("first prompt"),
+    prompt("second prompt"),
+    { label: "bash (pre)", event: "PreToolUse", input: { ...bash, hook_event_name: "PreToolUse" } },
+    stop("stop, tree unchanged"),
+    stop("stop, after a change", () => writeFileSync(join(root, CHANGED_FILE), `The bench session ${session} wrote this line.\n`)),
+    prompt("prompt, after a change"),
+    { label: "subagent start", event: "SubagentStart", input: { ...base, hook_event_name: "SubagentStart", agent_id: `a-${session}`, agent_type: "general-purpose" } },
+  ];
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)]!;
+}
 
 function steps(root: string, kind: string, session: string): Step[] {
   const base = { cwd: root, session_id: session };
@@ -50,6 +75,7 @@ function env(root: string): NodeJS.ProcessEnv {
 }
 
 async function viaCli(root: string, step: Step): Promise<{ wall: number; exit: number | null; bytes: number }> {
+  step.before?.();
   const began = performance.now();
   const ran = spawnSync(NODE[0]!, [...NODE.slice(1), "hook", step.event], { cwd: root, input: JSON.stringify(step.input), encoding: "utf8", env: env(root) });
   return { wall: performance.now() - began, exit: ran.status, bytes: ran.stdout.length };
@@ -76,6 +102,7 @@ async function warmSession(root: string, list: Step[]): Promise<{ start: number;
   const rows = [];
   let id = 0;
   for (const step of list) {
+    step.before?.();
     const t = performance.now();
     const answer = JSON.parse(await post(socket, JSON.stringify({ id: ++id, op: "hook", event: step.event, input: step.input }))) as { exit: number; ms: number; stdout: string };
     rows.push({ label: step.label, wall: performance.now() - t, served: answer.ms, exit: answer.exit, bytes: answer.stdout.length });
@@ -94,10 +121,10 @@ async function main(): Promise<void> {
   const battery = spawnSync("pmset", ["-g", "batt"], { encoding: "utf8" }).stdout;
   const results: unknown[] = [];
   for (let round = 1; round <= rounds; round++) {
-    const order = round % 2 === 1 ? ["cli", "warm"] : ["warm", "cli"];
+    const order = kind === "starts" ? ["cli"] : round % 2 === 1 ? ["cli", "warm"] : ["warm", "cli"];
     for (const arm of order) {
       const session = `spike-${arm}-${kind}-${round}-${Date.now()}`;
-      const list = steps(root, kind, session);
+      const list = kind === "starts" ? startSteps(root, session) : steps(root, kind, session);
       if (arm === "cli") {
         const rows = [];
         for (const step of list) rows.push({ label: step.label, ...(await viaCli(root, step)) });
@@ -110,6 +137,23 @@ async function main(): Promise<void> {
   }
   const after = spawnSync("pmset", ["-g", "batt"], { encoding: "utf8" }).stdout;
   writeFileSync(out!, JSON.stringify({ root, kind, rounds, power, battery, after, results }, null, 2));
+  if (kind === "starts") reportStarts(root, results as { arm: string; rows: { label: string; wall: number }[] }[]);
+}
+
+function reportStarts(root: string, results: { arm: string; rows: { label: string; wall: number }[] }[]): void {
+  rmSync(join(root, CHANGED_FILE), { force: true });
+  const wallsByLabel = new Map<string, number[]>();
+  for (const result of results.filter((r) => r.arm === "cli")) for (const row of result.rows) wallsByLabel.set(row.label, [...(wallsByLabel.get(row.label) ?? []), row.wall]);
+  for (const [label, walls] of wallsByLabel) process.stdout.write(`${label.padEnd(24)} ${(median(walls) / 1000).toFixed(2)} s\n`);
+  const readingPath = join(root, ".coherence", "cache", "vocabulary", "reading.json");
+  const readingBytes = (() => {
+    try {
+      return statSync(readingPath).size;
+    } catch {
+      return undefined;
+    }
+  })();
+  process.stdout.write(`reading.json             ${readingBytes === undefined ? "absent" : `${(readingBytes / 1e6).toFixed(1)} MB`}\n`);
 }
 
 await main();
