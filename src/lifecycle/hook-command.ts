@@ -8,9 +8,16 @@
 
 import { PACKAGE_NAME, SIBLING } from "./project.ts";
 
-/** Whether a command is Coherence's hook for `event`: this tool's binary or its own src/cli.ts, followed by hook <event>, as install's ownership test reads it. */
+/** Whether a command is Coherence's hook for `event`: this tool's binary or its own src/cli.ts, followed by hook <event>, or the 0.x launcher coherence-hook <event>, as install's ownership test reads it. */
 export function isOwnHook(command: unknown, event: string): boolean {
-  return typeof command === "string" && new RegExp(`(?:^|[\\s"'/$])(?:coherence|src/cli\\.ts)"?\\s+hook\\s+${event}\\s*$`).test(command);
+  if (typeof command !== "string") return false;
+  // The 0.x launcher (`<host dir>/coherence-hook <Event>`, from @danilocampos/coherence) is an earlier form of these hooks.
+  return new RegExp(`(?:^|[\\s"'/$])(?:(?:coherence|src/cli\\.ts)"?\\s+hook|coherence-hook"?)\\s+${event}\\s*$`).test(command);
+}
+
+/** Whether a command is the 0.x launcher form, `<host dir>/coherence-hook <Event>`, for any event. */
+export function isLauncherHook(command: string): boolean {
+  return /(?:^|[\s"'/$])coherence-hook"?\s+[A-Za-z]+\s*$/.test(command);
 }
 
 /**

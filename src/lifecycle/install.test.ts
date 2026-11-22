@@ -12,6 +12,7 @@ import { PACKAGE_NAME } from "./project.ts";
 import { CLAUDE_WRITER_MATCHER } from "./host-tools.ts";
 import { modInstalled, ownModLinked } from "./mod-install.ts";
 import { cli as inProcess } from "./cli-fixture.ts";
+import { isLauncherHook } from "./hook-command.ts";
 import { driftOf, EARLIER_SEARCH, earlierHookLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
@@ -628,6 +629,49 @@ test("hooks an earlier Coherence wrote, which look beside the project first, are
     const checked = formatCheck({ host: "claude", path, present: true, drift: driftOf(settings, { command: LOCATED_PREFIX, host: "claude" }) });
     assert.ok(checked.endsWith(`  these hooks were ${EARLIER_SEARCH}; reinstall them\nconverge with: hooks install --host claude\n`), checked);
     await install({ root: project, host: "claude", command: LOCATED_PREFIX });
+    assert.deepEqual(earlierHookLines(project), [], "a reinstall clears it");
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("the 0.x launcher hooks (coherence-hook <Event>) are Coherence's own: the check names them and install replaces them", async () => {
+  const project = await mkdtemp(join(tmpdir(), "coherence-launcher-"));
+  try {
+    const path = join(project, ".claude", "settings.json");
+    await mkdir(dirname(path), { recursive: true });
+    const hooks: Record<string, unknown> = {};
+    for (const event of ["SessionStart", "SubagentStart", "SubagentStop", "Stop", "PostToolUse"]) {
+      hooks[event] = [{ hooks: [{ type: "command", command: `"$CLAUDE_PROJECT_DIR/.claude/coherence-hook" ${event}` }] }];
+    }
+    await writeFile(path, JSON.stringify({ hooks }, null, 2) + "\n");
+    const before = driftOf({ hooks } as Record<string, unknown>, { command: LOCATED_PREFIX, host: "claude" });
+    assert.ok(before.some((d) => d.event === "Stop" && d.kind === "stale"), "the launcher form is drift, not a stranger's hook");
+    await install({ root: project, host: "claude", command: LOCATED_PREFIX });
+    const after = JSON.parse(await readFile(path, "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
+    const commands = Object.values(after.hooks).flatMap((entries) => entries.flatMap((e) => e.hooks.map((h) => h.command)));
+    assert.deepEqual(commands.filter((c) => c.includes("/.claude/coherence-hook")), [], "install replaced every launcher entry");
+    assert.deepEqual(driftOf(after, { command: LOCATED_PREFIX, host: "claude" }), []);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("the session start names the 0.x launcher hooks of Claude Code and Codex with the reinstall, and a reinstall clears it", async () => {
+  const project = await mkdtemp(join(tmpdir(), "coherence-launcher-start-"));
+  try {
+    const codexCommand = 'codex_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd -P); "$codex_root/.codex/coherence-hook" Stop';
+    assert.equal(isLauncherHook(codexCommand), true);
+    assert.equal(isLauncherHook("other-coherence-hook Stop"), false);
+    for (const [file, command] of [[join(".claude", "settings.json"), '"$CLAUDE_PROJECT_DIR/.claude/coherence-hook" Stop'], [join(".codex", "hooks.json"), codexCommand]] as const) {
+      await mkdir(dirname(join(project, file)), { recursive: true });
+      await writeFile(join(project, file), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command }] }] } }, null, 2) + "\n");
+    }
+    const lines = earlierHookLines(project);
+    assert.ok(lines.some((l) => l.startsWith("Coherence hooks in .claude/settings.json: ") && l.endsWith("Reinstall them: npx --no -- coherence hooks install --host claude")), lines.join("\n"));
+    assert.ok(lines.some((l) => l.includes(".codex/") && l.endsWith("--host codex")), lines.join("\n"));
+    await install({ root: project, host: "claude", command: LOCATED_PREFIX });
+    await install({ root: project, host: "codex", command: LOCATED_PREFIX });
     assert.deepEqual(earlierHookLines(project), [], "a reinstall clears it");
   } finally {
     await rm(project, { recursive: true, force: true });

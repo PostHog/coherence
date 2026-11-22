@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "./work-meter.ts";
 import { LOCKFILES, type PackageManager } from "./lockfiles.ts";
 import { installedPackage, projectFrom } from "../adapters/installed.ts";
-import { isOwnHook, searchesCheckoutFirst } from "./hook-command.ts";
+import { isLauncherHook, isOwnHook, searchesCheckoutFirst } from "./hook-command.ts";
 import { WRITERS, writersUnmatched } from "./host-tools.ts";
 import { HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, SIBLING, type Host } from "./project.ts";
 import { coherenceVersion, readJson, telemetryDir, truthy, writeJson, type Env } from "./telemetry.ts";
@@ -199,8 +199,8 @@ export { searchesCheckoutFirst };
 
 export const EARLIER_SEARCH = `written by an earlier Coherence, they look for a checkout beside the project (../${SIBLING}) before the installed package, so a stale clone there answers instead of the installed release`;
 
-/** The hosts whose settings at `dir` hold a hook of ours in that earlier form, with the file and whether it is the personal one. */
-export function earlierSearchHooks(dir: string): { host: Host; file: string; local: boolean }[] {
+/** The hosts whose settings at `dir` hold a hook of ours for which `test` holds of a command, with the file and whether it is the personal one. */
+function hostsWithHook(dir: string, test: (command: string) => boolean): { host: Host; file: string; local: boolean }[] {
   const out: { host: Host; file: string; local: boolean }[] = [];
   for (const host of HOSTS) {
     for (const local of [false, true]) {
@@ -217,10 +217,23 @@ export function earlierSearchHooks(dir: string): { host: Host; file: string; loc
         .flatMap((entries) => (Array.isArray(entries) ? entries : []))
         .flatMap((entry) => (isRecord(entry) && Array.isArray(entry["hooks"]) ? entry["hooks"] : []))
         .map((h) => (isRecord(h) ? h["command"] : undefined));
-      if (commands.some((c) => typeof c === "string" && searchesCheckoutFirst(c))) out.push({ host, file, local });
+      if (commands.some((c) => typeof c === "string" && test(c))) out.push({ host, file, local });
     }
   }
   return out;
+}
+
+/** The hosts whose settings at `dir` hold a hook of ours in that earlier form, with the file and whether it is the personal one. */
+export function earlierSearchHooks(dir: string): { host: Host; file: string; local: boolean }[] {
+  return hostsWithHook(dir, searchesCheckoutFirst);
+}
+
+/** The plain reason a 0.x launcher hook must be reinstalled. No apostrophes and no path: it is shown as written. */
+export const EARLIER_LAUNCHER = "written by Coherence 0.x, they run a coherence-hook launcher that this release no longer installs and that fails on every event";
+
+/** The hosts whose settings at `dir` still hold the 0.x launcher (`coherence-hook <Event>`) as a hook. */
+export function earlierLauncherHooks(dir: string): { host: Host; file: string; local: boolean }[] {
+  return hostsWithHook(dir, (c) => isLauncherHook(c));
 }
 
 /**
@@ -264,6 +277,7 @@ export function earlierHookLines(dir: string): string[] {
   const reinstall = (host: Host, local: boolean): string => `Reinstall them: npx --no -- coherence hooks install --host ${host}${local ? " --local" : ""}`;
   return [
     ...earlierSearchHooks(dir).map(({ host, file, local }) => `Coherence hooks in ${file}: ${EARLIER_SEARCH}. ${reinstall(host, local)}`),
+    ...earlierLauncherHooks(dir).map(({ host, file, local }) => `Coherence hooks in ${file}: ${EARLIER_LAUNCHER}. ${reinstall(host, local)}`),
     ...narrowMatcherHooks(dir).map(({ file, local, missing }) => `Coherence hooks in ${file}: ${earlierMatcher(missing)}. ${reinstall("claude", local)}`),
   ];
 }
