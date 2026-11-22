@@ -139,7 +139,7 @@ Go is an opt-in bundled plugin, `"plugins": { "go": "bundled" }`, graded
 through gopls ([plugins.md](plugins.md#go)); a language Coherence
 lacks is a plugin you can write, held by `coherence plugin check` to what every
 language plugin owes.
-It works inside Claude Code and Codex. Where the project already runs a
+It works inside Claude Code, Codex and Antigravity. Where the project already runs a
 checker that refuses a boundary crossing, Coherence grades by it: Pyright's
 private-usage rule, an import-linter rule, or a `tach.toml` interface
 (where tach's own check refuses a planted outside import, and the chokepoint is

@@ -103,7 +103,7 @@ and the detector went red.
 
 ## Violations surface at the edit, not in review
 
-Coherence runs inside your agent host (Claude Code or Codex) through its
+Coherence runs inside your agent host (Claude Code, Codex or Antigravity) through its
 hooks. The moment an agent writes a file that may touch a chokepoint, the
 check runs again through a warm language server and reports any bypass in
 the same turn, by file and line, with the two honest options: route through
