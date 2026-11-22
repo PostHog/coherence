@@ -27,7 +27,7 @@ For the full setup, adopting one folder of a monorepo, and platform requirements
 
 | | |
 |---|---|
-| **Supported agents** | <!-- generated: agents -->Claude Code, Codex<!-- /generated --> |
+| **Supported agents** | <!-- generated: agents -->Claude Code, Codex, Antigravity<!-- /generated --> |
 | **Supported languages** | <!-- generated: languages -->TypeScript and JavaScript, Python, Rust, Go (opt-in)<!-- /generated -->; more via [language plugins](docs/plugins.md) |
 
 ## How it helps

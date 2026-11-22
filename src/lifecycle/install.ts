@@ -53,13 +53,15 @@ import { mkdir, readFile, rmdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
+import { ANTIGRAVITY_EVENTS } from "./hook-events.ts";
+import { modelStep, userStep } from "./antigravity.ts";
 import { DURABLE_FOLDERS, HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, SIBLING, isHost, type Host } from "./project.ts";
 import { nestedFolder, repositoryTop } from "../adapters/project-files.ts";
 import { registryOf } from "../adapters/project-config.ts";
 import { EARLIER_SEARCH, earlierMatcher, searchesCheckoutFirst } from "./version.ts";
 import { modInstalled } from "./mod-install.ts";
 import { isOwnHook } from "./hook-command.ts";
-import { CLAUDE_WRITER_MATCHER, writersUnmatched } from "./host-tools.ts";
+import { ANTIGRAVITY_TRACED_MATCHER, ANTIGRAVITY_WRITER_MATCHER, CLAUDE_WRITER_MATCHER, writersUnmatched } from "./host-tools.ts";
 import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, IGNORE_FILE, IGNORE_TEXT, STATE_DIR, keepAttributes, keepIgnore, removeStateFiles, type AttributesAction, type IgnoreAction } from "./state-files.ts";
 export { DURABLE_FOLDERS, HOME_VAR, SIBLING };
 export { EARLIER_SEARCH, earlierHookLines, searchesCheckoutFirst } from "./version.ts";
@@ -95,8 +97,19 @@ const START_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "SubagentStar
  * "coherence", is never ours and is never touched.
  */
 function isMine(command: unknown): command is string {
-  return typeof command === "string" && HOOK_EVENTS.some((event) => isOwnHook(command, event));
+  return typeof command === "string" && [...HOOK_EVENTS, ...ANTIGRAVITY_EVENTS].some((event) => isOwnHook(command, event));
 }
+
+/** The events install wires for a host: Antigravity names its own. */
+export function eventsOf(host: Host): readonly string[] {
+  return host === "antigravity" ? ANTIGRAVITY_EVENTS : HOOK_EVENTS;
+}
+
+/** The hook name Coherence's handlers sit under in Antigravity's .agents/hooks.json, which keys every tool's hooks by a name. */
+export const ANTIGRAVITY_HOOK_NAME = "coherence";
+
+/** Antigravity's events whose handlers are listed flat, with no matcher group around them. */
+const ANTIGRAVITY_FLAT_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "PreInvocation", "PostInvocation", "Stop"]);
 
 interface HookCommand {
   type: "command";
@@ -128,6 +141,14 @@ const ROOT_WALK =
 const LOCAL_ROOT_WALK =
   'root="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$root" != / ] && [ ! -f "$root/.claude/settings.json" ] && [ ! -f "$root/.claude/settings.local.json" ] && [ ! -f "$root/.codex/hooks.json" ]; do root=$(dirname "$root"); done';
 
+/** Antigravity runs a hook in the folder holding its hooks.json, so the walk starts there and stops at the first folder holding .agents/hooks.json; another tool's .agents never stops a Claude Code or Codex walk, whose prefix stays the one earlier releases wrote. */
+const ANTIGRAVITY_ROOT_WALK = 'root="$PWD"; while [ "$root" != / ] && [ ! -f "$root/.agents/hooks.json" ]; do root=$(dirname "$root"); done';
+
+function rootWalk(local: boolean, host: Host): string {
+  if (host === "antigravity") return ANTIGRAVITY_ROOT_WALK;
+  return local ? LOCAL_ROOT_WALK : ROOT_WALK;
+}
+
 /**
  * Shell that sets `$coherence` to the cli to run, or to nothing: the
  * checkout $COHERENCE_HOME names, else the installed package's own cli, else
@@ -140,11 +161,11 @@ const LOCAL_ROOT_WALK =
  * folder from the top) look in that project's own node_modules first, where
  * the project installed Coherence.
  */
-export function locateShell(sub = "", local = false): string {
+export function locateShell(sub = "", local = false, host: Host = "claude"): string {
   const quoted = sub.replace(/["$`\\]/g, "\\$&");
   const own = sub === "" ? "" : `"$root/${quoted}/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/${quoted}/node_modules/.bin/coherence" `;
   return [
-    local ? LOCAL_ROOT_WALK : ROOT_WALK,
+    rootWalk(local, host),
     "coherence=",
     `for c in "\${${HOME_VAR}:+\$${HOME_VAR}/src/cli.ts}" ${own}"$root/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done`,
   ].join("; ");
@@ -166,6 +187,21 @@ export const MISSING_CONTEXT = `Coherence is configured for this project (its ho
 /** The one line the user is shown at session start when Coherence is there but node is not. */
 export const NO_NODE = "Coherence was found but node is not on the PATH its hooks run with, so they do nothing this session. Install Node 22.18 or newer.";
 
+/** The line Antigravity shows when the cli found refuses the session start, most likely a release older than the one that wrote hook-antigravity; agy runs a failing hook in silence. No apostrophes: it sits in single quotes. */
+export const CLI_REFUSED = `Coherence was found but could not answer this session start, so its hooks do nothing this session: the installed release is likely older than the one that wrote these hooks. Update it (npm install -D ${PACKAGE_NAME}@latest, or the same with the package manager this project uses).`;
+
+/** Run the cli; under Antigravity, a session start it fails to answer says so, since agy shows the user nothing of a failing hook. */
+function runCli(host: Host): string {
+  if (host !== "antigravity") return 'exec node "$coherence" "$@"';
+  return `if [ "$2" = SessionStart ]; then node "$coherence" "$@" || printf '%s\\n' '${JSON.stringify(startReply(host, CLI_REFUSED, CLI_REFUSED))}'; exit 0; fi; exec node "$coherence" "$@"`;
+}
+
+/** What the session start prints when Coherence cannot run, in the host's own reply shape: Antigravity injects a step, with the user's line as its markdown. */
+function startReply(host: Host, userLine: string, agentContext?: string): object {
+  if (host === "antigravity") return { injectSteps: [...(agentContext === undefined ? [] : [modelStep(agentContext)]), userStep(userLine)] };
+  return agentContext === undefined ? { systemMessage: userLine } : { systemMessage: userLine, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: agentContext } };
+}
+
 /** Shell that prints `output` as JSON when the event, the function's second argument, is SessionStart, and nothing otherwise, then exits 0. */
 function atSessionStart(output: object): string {
   return `if [ "$2" = SessionStart ]; then printf '%s\\n' '${JSON.stringify(output)}'; fi; exit 0`;
@@ -179,8 +215,8 @@ function atSessionStart(output: object): string {
  * exits 0 in silence but the session start, which tells the user in one line
  * and, when Coherence is missing, tells the agent how to supply it.
  */
-export function locatedPrefix(sub = "", local = false): string {
-  return `${locateShell(sub, local)}; coherence() { if [ -z "$coherence" ]; then ${atSessionStart({ systemMessage: NOT_INSTALLED, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: MISSING_CONTEXT } })}; fi; if ! command -v node >/dev/null 2>&1; then ${atSessionStart({ systemMessage: NO_NODE })}; fi; exec node "$coherence" "$@"; }; coherence`;
+export function locatedPrefix(sub = "", local = false, host: Host = "claude"): string {
+  return `${locateShell(sub, local, host)}; coherence() { if [ -z "$coherence" ]; then ${atSessionStart(startReply(host, NOT_INSTALLED, MISSING_CONTEXT))}; fi; if ! command -v node >/dev/null 2>&1; then ${atSessionStart(startReply(host, NO_NODE))}; fi; ${runCli(host)}; }; coherence`;
 }
 
 export const LOCATED_PREFIX = locatedPrefix();
@@ -192,8 +228,8 @@ export function locate(root: string, env: NodeJS.ProcessEnv = process.env, sub =
   return found === "" ? undefined : found;
 }
 
-export function hookCommand(prefix: string, event: HookEvent): string {
-  return `${prefix} hook ${event}`;
+export function hookCommand(prefix: string, event: string, host: Host = "claude"): string {
+  return host === "antigravity" ? `${prefix} hook-antigravity ${event}` : `${prefix} hook ${event}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -247,7 +283,13 @@ async function writeSettings(path: string, file: SettingsFile, value: Record<str
   return true;
 }
 
-function hooksOf(settings: Record<string, unknown>): HooksByEvent {
+/**
+ * A host's hooks as entries by event. Antigravity keeps them under a hook
+ * name, a flat event listing handlers alone: each handler reads as an entry
+ * of its own, so one merge, strip and drift serve every host.
+ */
+function hooksOf(settings: Record<string, unknown>, host: Host = "claude"): HooksByEvent {
+  if (host === "antigravity") return antigravityHooksOf(settings);
   const hooks = settings["hooks"];
   if (hooks === undefined) return {};
   if (!isRecord(hooks)) throw new Error("settings.hooks must be an object");
@@ -259,22 +301,57 @@ function hooksOf(settings: Record<string, unknown>): HooksByEvent {
   return out;
 }
 
+function antigravityHooksOf(settings: Record<string, unknown>): HooksByEvent {
+  const named = settings[ANTIGRAVITY_HOOK_NAME];
+  if (named === undefined) return {};
+  if (!isRecord(named)) throw new Error(`${ANTIGRAVITY_HOOK_NAME} must be an object`);
+  const out: HooksByEvent = {};
+  for (const [event, entries] of Object.entries(named)) {
+    if (!Array.isArray(entries)) continue;
+    out[event] = ANTIGRAVITY_FLAT_EVENTS.has(event) ? entries.map((handler) => ({ hooks: [handler as HookCommand] })) : (entries as HookEntry[]);
+  }
+  return out;
+}
+
+/** The settings with `hooks` in the host's own shape; an emptied hooks object, or an Antigravity hook name with nothing left in it, goes. */
+function withHooks(settings: Record<string, unknown>, hooks: HooksByEvent, host: Host): Record<string, unknown> {
+  const key = host === "antigravity" ? ANTIGRAVITY_HOOK_NAME : "hooks";
+  const value = host === "antigravity" ? antigravityShaped(settings[ANTIGRAVITY_HOOK_NAME], hooks) : hooks;
+  if (Object.keys(value).length > 0) return { ...settings, [key]: value };
+  const rest = { ...settings };
+  delete rest[key];
+  return rest;
+}
+
+/** Our hooks under Antigravity's hook name: flat events list their handlers alone, a field that is not an event is kept, and enabled: false, which would turn every handler off, is not. */
+function isDisabling(field: string, value: unknown): boolean {
+  return field === "enabled" && value === false;
+}
+
+function antigravityShaped(named: unknown, hooks: HooksByEvent): Record<string, unknown> {
+  const fields = isRecord(named) ? Object.fromEntries(Object.entries(named).filter(([field, value]) => !Array.isArray(value) && !isDisabling(field, value))) : {};
+  const events = Object.fromEntries(Object.entries(hooks).map(([event, entries]) => [event, ANTIGRAVITY_FLAT_EVENTS.has(event) ? entries.flatMap((entry) => entry.hooks) : entries]));
+  return { ...fields, ...events };
+}
+
 /** The tools whose use can fire a practice, a command or a file written: every Claude Code tool that writes, as host-tools.ts declares them. */
 export const PRACTICE_TOOLS = CLAUDE_WRITER_MATCHER;
 
 /** The one entry install writes for an event: the merge writes it and the check compares against it. */
-export function installedEntry(options: Pick<InstallOptions, "command" | "host">, event: HookEvent): HookEntry {
-  const handler: HookCommand = { type: "command", command: hookCommand(options.command, event), timeout: TIMEOUT_SECONDS };
+export function installedEntry(options: Pick<InstallOptions, "command" | "host">, event: string): HookEntry {
+  const handler: HookCommand = { type: "command", command: hookCommand(options.command, event, options.host), timeout: TIMEOUT_SECONDS };
   if (options.host === "codex" && START_EVENTS.has(event)) handler["additionalContextLimit"] = CODEX_CONTEXT_LIMIT;
   // Practices fire on a command or a written file; Claude Code runs the hook for those tools only.
   if (options.host === "claude" && event === "PreToolUse") return { matcher: PRACTICE_TOOLS, hooks: [handler] };
+  if (options.host === "antigravity" && event === "PreToolUse") return { matcher: ANTIGRAVITY_WRITER_MATCHER, hooks: [handler] };
+  if (options.host === "antigravity" && event === "PostToolUse") return { matcher: ANTIGRAVITY_TRACED_MATCHER, hooks: [handler] };
   return { hooks: [handler] };
 }
 
 /** The merged settings: pure, so the merge can be tested without a disk. */
 export function mergeHooks(settings: Record<string, unknown>, options: Pick<InstallOptions, "command" | "host">): Record<string, unknown> {
-  const hooks = hooksOf(settings);
-  for (const event of HOOK_EVENTS) {
+  const hooks = hooksOf(settings, options.host);
+  for (const event of eventsOf(options.host)) {
     const mine = installedEntry(options, event);
     const existing = hooks[event] ?? [];
     // Our own command leaves every entry it is in; an entry that still holds another tool's hook stays, as it was, without ours.
@@ -285,14 +362,14 @@ export function mergeHooks(settings: Record<string, unknown>, options: Pick<Inst
     });
     hooks[event] = [...kept, mine];
   }
-  return { ...settings, hooks };
+  return withHooks(settings, hooks, options.host);
 }
 
 export { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, IGNORE_FILE, IGNORE_TEXT, type AttributesAction, type IgnoreAction };
 
 export interface InstallResult {
   path: string;
-  events: HookEvent[];
+  events: string[];
   /** False when the file already held exactly what install writes. */
   changed: boolean;
   /** .coherence/.gitignore, and what install did with it. */
@@ -320,7 +397,7 @@ export async function install(options: InstallOptions & { ignoreRoot?: string; i
       attributes = { path: resolve(dir, ATTRIBUTES_FILE), action: attributed };
     }
   }
-  return { path, events: [...HOOK_EVENTS], changed, ignore, attributes };
+  return { path, events: [...eventsOf(options.host)], changed, ignore, attributes };
 }
 
 /** One folder whose host settings carry a project's hooks, with the project's folder from there ("" for the project itself). */
@@ -357,10 +434,10 @@ export interface OwnedCommand {
  * that was empty before stays, and so does every hook that is not ours, in
  * its place and with its matcher. Ownership is the command, wherever it sits.
  */
-export function stripHooks(settings: Record<string, unknown>): { settings: Record<string, unknown>; removed: OwnedCommand[] } {
+export function stripHooks(settings: Record<string, unknown>, host: Host = "claude"): { settings: Record<string, unknown>; removed: OwnedCommand[] } {
   const removed: OwnedCommand[] = [];
-  if (settings["hooks"] === undefined) return { settings, removed };
-  const hooks = hooksOf(settings);
+  if (settings[host === "antigravity" ? ANTIGRAVITY_HOOK_NAME : "hooks"] === undefined) return { settings, removed };
+  const hooks = hooksOf(settings, host);
   const next: HooksByEvent = {};
   for (const [event, entries] of Object.entries(hooks)) {
     let emptiedByUs = false;
@@ -375,10 +452,7 @@ export function stripHooks(settings: Record<string, unknown>): { settings: Recor
     next[event] = kept;
   }
   if (removed.length === 0) return { settings, removed };
-  const rest = { ...settings };
-  if (Object.keys(next).length === 0) delete rest["hooks"];
-  else rest["hooks"] = next;
-  return { settings: rest, removed };
+  return { settings: withHooks(settings, next, host), removed };
 }
 
 export interface UninstallResult {
@@ -396,11 +470,20 @@ async function anyHostInstalled(root: string): Promise<boolean> {
   for (const host of HOSTS) {
     for (const name of [SETTINGS_FILE[host], LOCAL_SETTINGS_FILE[host]]) {
       if (name === undefined) continue;
-      const file = await readSettingsFile(resolve(root, name));
-      if (Object.values(hooksOf(file.value)).some((entries) => entries.some(isCoherenceEntry))) return true;
+      if (await holdsOurHooks(resolve(root, name), host)) return true;
     }
   }
   return false;
+}
+
+/** Whether a host's settings file holds a command of ours; one that does not read is taken to, since .agents/hooks.json is shared with other tools and theirs may not parse, and keeping the ignore file is the safe side. */
+async function holdsOurHooks(path: string, host: Host): Promise<boolean> {
+  try {
+    const file = await readSettingsFile(path);
+    return Object.values(hooksOf(file.value, host)).some((entries) => entries.some(isCoherenceEntry));
+  } catch {
+    return true;
+  }
 }
 
 /** Remove .coherence/.gitignore and .coherence/.gitattributes, each only when it is exactly what Coherence wrote, once no host keeps our hooks; the folder goes too when that left it empty. */
@@ -418,7 +501,7 @@ export async function uninstall(root: string, host: Host, local = false): Promis
   if (name === undefined) return { path, removed: [], changed: false, removedIgnore: false };
   const file = await readSettingsFile(path);
   if (!file.exists) return { path, removed: [], changed: false, removedIgnore: await removeIgnore(root) };
-  const { settings, removed } = stripHooks(file.value);
+  const { settings, removed } = stripHooks(file.value, host);
   const changed = removed.length > 0 && (await writeSettings(path, file, settings));
   return { path, removed, changed, removedIgnore: await removeIgnore(root) };
 }
@@ -472,10 +555,14 @@ function differences(found: HookEntry, expected: HookEntry): string[] {
  * under an event install never wires).
  */
 export function driftOf(settings: Record<string, unknown>, options: Pick<InstallOptions, "command" | "host">): Drift[] {
-  const hooks = hooksOf(settings);
+  const hooks = hooksOf(settings, options.host);
   const drift: Drift[] = [];
-  const wired: ReadonlySet<string> = new Set(HOOK_EVENTS);
-  for (const event of HOOK_EVENTS) {
+  const named = settings[ANTIGRAVITY_HOOK_NAME];
+  if (options.host === "antigravity" && isRecord(named) && isDisabling("enabled", named["enabled"])) {
+    drift.push({ event: ANTIGRAVITY_HOOK_NAME, kind: "stale", expected: "enabled", found: "enabled: false", differences: ["enabled: false turns off every handler under this hook name"] });
+  }
+  const wired: ReadonlySet<string> = new Set(eventsOf(options.host));
+  for (const event of eventsOf(options.host)) {
     const expected = installedEntry(options, event);
     const want = expected.hooks[0]!.command;
     const ours = (hooks[event] ?? []).filter(isCoherenceEntry);
@@ -490,7 +577,7 @@ export function driftOf(settings: Record<string, unknown>, options: Pick<Install
       if (index !== primary) drift.push({ event, kind: "extra", found, reason: "a second entry of ours for this event" });
       else if (exact === -1) {
         // A matcher that leaves out a tool that writes is the drift that keeps a practice from arriving: named, so the check says why.
-        const unmatched = expected.matcher === undefined ? [] : writersUnmatched(entry.matcher);
+        const unmatched = options.host !== "claude" || expected.matcher === undefined ? [] : writersUnmatched(entry.matcher);
         drift.push({ event, kind: "stale", expected: want, found, differences: differences(entry, expected), ...(unmatched.length > 0 ? { unmatched } : {}) });
       }
     });
@@ -515,7 +602,7 @@ export async function check(root: string, host: Host, command: string, local = f
 
 export function formatCheck(result: CheckResult): string {
   if (result.drift.length === 0) {
-    return `${result.host}: ${result.path}: all ${HOOK_EVENTS.length} events match what install would write\n`;
+    return `${result.host}: ${result.path}: all ${eventsOf(result.host).length} events match what install would write\n`;
   }
   const events = new Set(result.drift.map((d) => d.event)).size;
   const lines = [`${result.host}: ${result.path}${result.present ? "" : " (absent)"}: ${events} event${events === 1 ? "" : "s"} drifted from what install would write`];
@@ -538,7 +625,7 @@ export interface HostStatus {
   /** Events for which a Coherence entry exists, with its command. */
   installed: { event: string; command: string }[];
   /** Events Coherence would wire that carry no Coherence entry. */
-  missing: HookEvent[];
+  missing: string[];
   /** Entries by other tools, counted per event. */
   others: Record<string, number>;
 }
@@ -554,7 +641,7 @@ export async function status(root: string, host: Host, local = false): Promise<H
     settings = {};
     present = false;
   }
-  const hooks = hooksOf(settings);
+  const hooks = hooksOf(settings, host);
   const installed: { event: string; command: string }[] = [];
   const others: Record<string, number> = {};
   for (const [event, entries] of Object.entries(hooks)) {
@@ -567,7 +654,7 @@ export async function status(root: string, host: Host, local = false): Promise<H
       }
     }
   }
-  const missing = HOOK_EVENTS.filter((e) => !installed.some((i) => i.event === e));
+  const missing = eventsOf(host).filter((e) => !installed.some((i) => i.event === e));
   return { host, path, present, installed, missing, others };
 }
 
