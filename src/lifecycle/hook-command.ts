@@ -8,9 +8,9 @@
 
 import { PACKAGE_NAME, SIBLING } from "./project.ts";
 
-/** Whether a command is Coherence's hook for `event`: this tool's binary or its own src/cli.ts, followed by hook <event>, as install's ownership test reads it. */
+/** Whether a command is Coherence's hook for `event`: this tool's binary or its own src/cli.ts, followed by hook <event> (hook-antigravity <event> for Antigravity), as install's ownership test reads it. */
 export function isOwnHook(command: unknown, event: string): boolean {
-  return typeof command === "string" && new RegExp(`(?:^|[\\s"'/$])(?:coherence|src/cli\\.ts)"?\\s+hook\\s+${event}\\s*$`).test(command);
+  return typeof command === "string" && new RegExp(`(?:^|[\\s"'/$])(?:coherence|src/cli\\.ts)"?\\s+hook(?:-antigravity)?\\s+${event}\\s*$`).test(command);
 }
 
 /**

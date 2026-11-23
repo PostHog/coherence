@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { journalVerbs, type Io } from "../journal/cli.ts";
 import { runHook, type HookResult } from "./hook.ts";
+import { runAntigravityHook } from "./antigravity.ts";
 import { HOOK_TIMES_DIR, hookLatencyOrientText, hookLatencyStopText, recordHookTime } from "./hook-latency.ts";
 import { firings, practiceContext, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 
@@ -133,4 +134,20 @@ test("a tool hook over the latency budget says so in its own answer, regulate an
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("Antigravity sends a refused stop back to work only when the agent stopped on its own, never when the host ended the turn", async () => {
+  const quiet = { refresh: () => {}, door: async <T>(_root: string, fn: (a: undefined, s: undefined, r: string) => Promise<T>) => fn(undefined, undefined, "no instrument in this test") };
+  const owed = async (session: string, terminationReason: string): Promise<string> => {
+    const root = repo();
+    try {
+      const pre = await runAntigravityHook("PreToolUse", { cwd: root, conversationId: session, toolCall: { name: "run_command", args: { CommandLine: "turn-knob" } } }, root, quiet);
+      pre.commit?.();
+      return (await runAntigravityHook("Stop", { cwd: root, conversationId: session, executionNum: 0, terminationReason }, root, quiet)).stdout;
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+  assert.match(await owed("a1", "NO_TOOL_CALL"), /"decision":"continue".*oil the knob/);
+  for (const reason of ["USER_CANCELED", "ERROR", "MAX_INVOCATIONS", "MAX_FORCED_INVOCATIONS", "MAX_TOKEN_BUDGET_EXCEEDED", "TERMINAL_STEP_TYPE"]) assert.equal(await owed(`a-${reason}`, reason), "", `${reason} ends the turn`);
 });

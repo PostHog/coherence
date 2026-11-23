@@ -4,7 +4,7 @@
  * and the installer read these same names rather than a copy.
  */
 
-export const HOSTS = ["claude", "codex"] as const;
+export const HOSTS = ["claude", "codex", "antigravity"] as const;
 export type Host = (typeof HOSTS)[number];
 
 export function isHost(name: string): name is Host {
@@ -15,18 +15,21 @@ export function isHost(name: string): name is Host {
 export const HOST_TITLE: Readonly<Record<Host, string>> = {
   claude: "Claude Code",
   codex: "Codex",
+  antigravity: "Antigravity",
 };
 
 /** The folder each host keeps its settings in, relative to the project root. */
 export const HOST_FOLDER: Readonly<Record<Host, string>> = {
   claude: ".claude",
   codex: ".codex",
+  antigravity: ".agents",
 };
 
 /** The settings file each host reads, relative to the project root. */
 export const SETTINGS_FILE: Readonly<Record<Host, string>> = {
   claude: `${HOST_FOLDER.claude}/settings.json`,
   codex: `${HOST_FOLDER.codex}/hooks.json`,
+  antigravity: `${HOST_FOLDER.antigravity}/hooks.json`,
 };
 
 /**
