@@ -53,6 +53,7 @@ import {
   rejectedNames,
   type Concept,
   type Lexicon,
+  type RejectedName,
 } from "./lexicon.ts";
 import { isCoherenceItself, loadProjectLexicons, vocabularyFacts, within } from "./project.ts";
 import { BASELINE_CHOSE } from "./lexicon-baseline.ts";
@@ -527,6 +528,117 @@ function specFolders(root: string): string[] {
   return componentFolders(projectFilesEnding(root, ".spec.md").filter((rel) => exclusionOf(rel, bounds) === undefined));
 }
 
+/** What the reduce knows about the whole reading when it builds one term: the full and the incremental reading share it. */
+export interface TermFacts {
+  known: Map<string, KnownMeaning>;
+  rejected: Map<string, RejectedName>;
+  rawEntries: Map<string, Record<string, unknown>>;
+  coherenceSenses: Map<string, Set<string>>;
+  projectSenses: Map<string, Set<string>>;
+  own: boolean;
+  candidates: Map<string, { prose: number; components: number }>;
+  rejectedLines: Map<string, Map<number, string[]>>;
+  decisions: Map<string, { disposition: string; because: string }>;
+}
+
+// A name refused for this very concept, written on or beside a line that uses the concept: the writer may be mixing the two.
+function near(list: VocabularyUse[], concept: string, facts: TermFacts): string | undefined {
+  for (const u of list) {
+    const byLine = facts.rejectedLines.get(u.file);
+    if (!byLine) continue;
+    for (let d = -1; d <= 1; d++) {
+      const name = byLine.get(u.line + d)?.find((r) => facts.rejected.get(r)?.concept === concept);
+      if (name) return `beside "${name}", a name rejected for ${concept}, at ${u.file}:${u.line + d}`;
+    }
+  }
+  return undefined;
+}
+
+export function buildTerm(term: string, locations: VocabularyUse[], facts: TermFacts): VocabularyTerm {
+  locations.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
+  const candidate = facts.candidates.get(term);
+  const item = candidate ? undefined : knownMeaning(term, facts.known);
+  const refused = candidate ? undefined : facts.rejected.get(term);
+  const original = item?.concept
+    ? facts.rawEntries.get(item.layer + ":" + item.concept.name)
+    : undefined;
+  const alternatives = item?.propertyOwners?.map((owner) => ({
+    concept: owner.concept.name,
+    layer: owner.layer,
+    definition: owner.concept.definition,
+    properties: (facts.rawEntries.get(owner.layer + ":" + owner.concept.name)?.["properties"] as Record<string, unknown> | undefined) ?? owner.concept.properties,
+    confusables: owner.concept.notToBeConfusedWith,
+  }));
+  const fingerprint = digest({
+    term,
+    concept: original ?? item?.concept ?? null,
+    layer: item?.layer ?? null,
+    propertyOwners: alternatives ?? null,
+    rejected: refused ?? null,
+  });
+  // In an adopter only the project's own senses can differ: Coherence's sense of a word the project also uses is the tool's, and inside the project the project's sense wins.
+  const senses = facts.own ? alternatives : alternatives?.filter((a) => a.layer === "project");
+  const recorded = (facts.own ? facts.coherenceSenses : facts.projectSenses).get(term) ?? new Set<string>();
+  const multiple = (): string | undefined => {
+    if (senses && senses.length > 1) return `more than one recorded sense: ${senses.map((a) => `${a.concept} (${a.layer})`).join(", ")}`;
+    return recorded.size > 1 ? `more than one recorded sense: ${[...recorded].join(", ")}` : undefined;
+  };
+  // Why a context's sense is at risk, if it is.
+  const atRisk = (here: VocabularyUse[]): string | undefined => {
+    if (candidate || refused || !item || (!item.concept && !alternatives?.length)) return undefined;
+    return multiple() ?? (item.concept ? near(here, item.concept.name, facts) : undefined);
+  };
+  const locationsByComponent = new Map<string, VocabularyUse[]>();
+  for (const location of locations) {
+    const inComponent = locationsByComponent.get(location.component);
+    if (inComponent === undefined) locationsByComponent.set(location.component, [location]);
+    if (inComponent !== undefined) inComponent.push(location);
+  }
+  const contexts = [...locationsByComponent.keys()]
+    .sort()
+    .map((component) => {
+      const here = locationsByComponent.get(component)!;
+      const risk = atRisk(here);
+      // Content, not line numbers, identifies a context; moving a line does not erase a human's answer.
+      const evidence = digest({
+        fingerprint,
+        component,
+        uses: [...new Set(here.map((u) => u.fingerprint + ":" + u.text))].sort(),
+      });
+      const ruling = facts.decisions.get(evidence);
+      return {
+        component,
+        fingerprint: evidence,
+        disposition: ruling?.disposition ?? "unreviewed",
+        because: ruling?.because ?? null,
+        ...(risk ? { risk } : {}),
+      };
+    });
+  return {
+    term,
+    state: candidate ? "unresolved" : refused ? "rejected" : (item?.state ?? "unresolved"),
+    concept: item?.concept?.name ?? refused?.concept ?? null,
+    layer: item?.layer ?? null,
+    definition: item?.concept?.definition ?? null,
+    properties:
+      (original?.["properties"] as Record<string, unknown> | undefined) ??
+      item?.concept?.properties ??
+      {},
+    confusables: item?.concept?.notToBeConfusedWith ?? [],
+    ...(alternatives && alternatives.length > 1 ? { meaningAlternatives: alternatives } : {}),
+    ...(candidate ? { recurrence: { prose: candidate.prose, components: candidate.components } } : {}),
+    fingerprint,
+    count: locations.length,
+    uses: locations,
+    contexts,
+  };
+}
+
+/** The reading's fingerprint, over its population and each term's digest in term order, so a reading that rebuilds a few terms recombines it without the rest of the uses. */
+export function coverageFingerprint(population: Coverage["population"], termDigests: readonly string[]): string {
+  return digestAll([population.extraction, ...population.limits, ...population.files, ...population.excluded, ...population.unreadable, ...termDigests]);
+}
+
 export async function lexiconCoverage(
   root: string,
   layers?: { coherence: Lexicon; project: Lexicon | undefined },
@@ -897,99 +1009,8 @@ export async function lexiconReading(
   }
   for (const [term, found] of candidates) for (const u of found.uses) add(term, u);
   const decisions = scope.rulings === false ? new Map<string, { disposition: string; because: string }>() : rulings(root);
-  // A name refused for this very concept, written on or beside a line that uses the concept: the writer may be mixing the two.
-  const near = (list: VocabularyUse[], concept: string): string | undefined => {
-    for (const u of list) {
-      const byLine = rejectedLines.get(u.file);
-      if (!byLine) continue;
-      for (let d = -1; d <= 1; d++) {
-        const name = byLine.get(u.line + d)?.find((r) => rejected.get(r)?.concept === concept);
-        if (name) return `beside "${name}", a name rejected for ${concept}, at ${u.file}:${u.line + d}`;
-      }
-    }
-    return undefined;
-  };
-  const terms: VocabularyTerm[] = [...uses]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([term, locations]) => {
-      locations.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
-      const candidate = candidates.get(term);
-      const item = candidate ? undefined : knownMeaning(term, known);
-      const refused = candidate ? undefined : rejected.get(term);
-      const original = item?.concept
-        ? rawEntries.get(item.layer + ":" + item.concept.name)
-        : undefined;
-      const alternatives = item?.propertyOwners?.map((owner) => ({
-        concept: owner.concept.name,
-        layer: owner.layer,
-        definition: owner.concept.definition,
-        properties: (rawEntries.get(owner.layer + ":" + owner.concept.name)?.["properties"] as Record<string, unknown> | undefined) ?? owner.concept.properties,
-        confusables: owner.concept.notToBeConfusedWith,
-      }));
-      const fingerprint = digest({
-        term,
-        concept: original ?? item?.concept ?? null,
-        layer: item?.layer ?? null,
-        propertyOwners: alternatives ?? null,
-        rejected: refused ?? null,
-      });
-      // In an adopter only the project's own senses can differ: Coherence's sense of a word the project also uses is the tool's, and inside the project the project's sense wins.
-      const senses = own ? alternatives : alternatives?.filter((a) => a.layer === "project");
-      const recorded = (own ? coherenceSenses : projectSenses).get(term) ?? new Set<string>();
-      const multiple = (): string | undefined => {
-        if (senses && senses.length > 1) return `more than one recorded sense: ${senses.map((a) => `${a.concept} (${a.layer})`).join(", ")}`;
-        return recorded.size > 1 ? `more than one recorded sense: ${[...recorded].join(", ")}` : undefined;
-      };
-      // Why a context's sense is at risk, if it is.
-      const atRisk = (here: VocabularyUse[]): string | undefined => {
-        if (candidate || refused || !item || (!item.concept && !alternatives?.length)) return undefined;
-        return multiple() ?? (item.concept ? near(here, item.concept.name) : undefined);
-      };
-      const locationsByComponent = new Map<string, VocabularyUse[]>();
-      for (const location of locations) {
-        const inComponent = locationsByComponent.get(location.component);
-        if (inComponent === undefined) locationsByComponent.set(location.component, [location]);
-        if (inComponent !== undefined) inComponent.push(location);
-      }
-      const contexts = [...locationsByComponent.keys()]
-        .sort()
-        .map((component) => {
-          const here = locationsByComponent.get(component)!;
-          const risk = atRisk(here);
-          // Content, not line numbers, identifies a context; moving a line does not erase a human's answer.
-          const evidence = digest({
-            fingerprint,
-            component,
-            uses: [...new Set(here.map((u) => u.fingerprint + ":" + u.text))].sort(),
-          });
-          const ruling = decisions.get(evidence);
-          return {
-            component,
-            fingerprint: evidence,
-            disposition: ruling?.disposition ?? "unreviewed",
-            because: ruling?.because ?? null,
-            ...(risk ? { risk } : {}),
-          };
-        });
-      return {
-        term,
-        state: candidate ? "unresolved" : refused ? "rejected" : (item?.state ?? "unresolved"),
-        concept: item?.concept?.name ?? refused?.concept ?? null,
-        layer: item?.layer ?? null,
-        definition: item?.concept?.definition ?? null,
-        properties:
-          (original?.["properties"] as Record<string, unknown> | undefined) ??
-          item?.concept?.properties ??
-          {},
-        confusables: item?.concept?.notToBeConfusedWith ?? [],
-        ...(alternatives && alternatives.length > 1 ? { meaningAlternatives: alternatives } : {}),
-        ...(candidate ? { recurrence: { prose: candidate.prose, components: candidate.components } } : {}),
-        fingerprint,
-        count: locations.length,
-        uses: locations,
-        contexts,
-      };
-    });
+  const termFacts: TermFacts = { known, rejected, rawEntries, coherenceSenses, projectSenses, own, candidates, rejectedLines, decisions };
+  const terms: VocabularyTerm[] = [...uses].sort(([a], [b]) => a.localeCompare(b)).map(([term, locations]) => buildTerm(term, locations, termFacts));
   const population: Coverage["population"] = {
     files: read
       .map((f) => ({ file: f.rel, kind: f.kind, lines: f.lines.length }))
@@ -1014,7 +1035,7 @@ export async function lexiconReading(
   const coverage: Coverage = {
     version: 1,
     projectLexicon: project?.path ?? (own ? coherence.path : null),
-    fingerprint: digestAll([population.extraction, ...population.limits, ...population.files, ...population.excluded, ...population.unreadable, ...terms]),
+    fingerprint: coverageFingerprint(population, terms.map(digest)),
     population,
     terms,
     totals: {
