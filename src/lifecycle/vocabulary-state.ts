@@ -34,13 +34,12 @@ import { cacheDir, storeVersion, withLock, writeKept } from "./kept-parse.ts";
 import { digest, lexiconReading, singularForms, type Contribution, type Coverage, type VocabularyUse } from "./lexicon-coverage.ts";
 import type { Lexicon } from "./lexicon.ts";
 import { LEXICON_PAGE_LIMITS } from "../readings/scope/lexicon-projection.ts";
+import { bucketOf, openScanCache } from "./scan-cache.ts";
 import { vocabularyFacts } from "./project.ts";
 import { journalFileKeys } from "../journal/store.ts";
 import { isStoreFile, storeDir } from "../journal/stores.ts";
 
 const SHAPE = "vocabulary-1";
-/** Buckets per kind: an edit reads at most this many term buckets, whatever the project's size. */
-export const BUCKETS = 64;
 
 interface PoolTotal {
   named: number;
@@ -64,10 +63,6 @@ type FileBucket = Record<string, Contribution>;
 
 function stateDir(root: string): string {
   return join(cacheDir(root), "vocabulary");
-}
-
-function bucketOf(name: string): string {
-  return String(createHash("sha1").update(name).digest().readUInt32BE(0) % BUCKETS).padStart(2, "0");
 }
 
 function readJson<T>(path: string): T | undefined {
@@ -551,7 +546,9 @@ export async function keptReading(root: string, layers: { coherence: Lexicon; pr
   const readFromMs = Date.now();
   const tree = treeKeys(root);
   const records = recordKeys(root);
-  const { coverage: fullCoverage, contributions } = await lexiconReading(root, layers, undefined, { contributions: true });
+  const scans = openScanCache(root, await stateVersion(root, layers));
+  const { coverage: fullCoverage, contributions } = await lexiconReading(root, layers, undefined, { contributions: true, scans });
+  scans.save();
   const coverage = boundedCoverage(fullCoverage);
   try {
     await keepVocabulary(root, layers, contributions, tree, coverage, records, readFromMs);

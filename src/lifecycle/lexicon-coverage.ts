@@ -44,6 +44,7 @@ import { countWork } from "./work-meter.ts";
 import {
   corpusFiles,
   readCorpus,
+  type CorpusFile,
   type UnreadablePath,
 } from "./check.ts";
 import {
@@ -335,6 +336,10 @@ interface Word {
  * other punctuation breaks the run, and so does sentence punctuation. A
  * declared name recurs in prose only where prose writes it as words.
  */
+function isSecretFile(rel: string): boolean {
+  return /(^|\/)\.env(?:$|\.)/.test(rel);
+}
+
 function wordRuns(text: string): Word[][] {
   const runs: Word[][] = [];
   let run: Word[] = [];
@@ -482,6 +487,25 @@ export interface CoverageScope {
   rulings?: boolean | undefined;
   /** Also hand back each file's contribution, the kept vocabulary state's unit (vocabulary-state.ts). */
   contributions?: boolean | undefined;
+  /** Each file's scan kept from an earlier reading, replayed in place of scanning it again (scan-cache.ts). */
+  scans?: ScanCache | undefined;
+}
+
+/** What scanning one line found, in the order the scan found it; replaying the events in order rebuilds the reading exactly. */
+export type ScanEvent =
+  | [line: number, kind: "add", phrase: string]
+  | [line: number, kind: "rejected", names: string[]]
+  | [line: number, kind: "nominate", term: string, spelling: string, proper: boolean, declared: boolean]
+  | [line: number, kind: "prose", runs: string[][]];
+
+export interface FileScan {
+  comparisons: number;
+  events: ScanEvent[];
+}
+
+export interface ScanCache {
+  scanOf(rel: string, key: string): FileScan | undefined;
+  keep(rel: string, key: string, scan: FileScan): void;
 }
 
 /**
@@ -637,20 +661,13 @@ export async function lexiconReading(
   };
   // Components come from every spec in the corpus; only the files the reading was narrowed to were read for uses.
   const read = corpus.files;
-  // Each test of a line against one phrase, counted here and handed to the work meter once: the scan's per-line cost.
-  let comparisons = 0;
-  for (const f of read) {
-    const fileFingerprint = digest(
-      f.lines.filter(
-        (line) => !(f.kind === "record" && isLexiconDecision(line)),
-      ),
-    );
+  // Nothing here reads the pool or the uses: a file's events depend only on its lines and the lexicon, which the cache's version holds.
+  const scanFile = (f: CorpusFile, scan: MemberScan | undefined): FileScan => {
+    const events: ScanEvent[] = [];
+    let comparisons = 0;
     let fenced = false;
     let exported = false;
-    const language = languageOfFile(f.rel);
-    const scan = language === undefined ? undefined : memberScanOf(language);
-    const component = componentFor(f.rel);
-    const secret = /(^|\/)\.env(?:$|\.)/.test(f.rel);
+    const secret = isSecretFile(f.rel);
     for (let n = 0; n < f.lines.length; n++) {
       const source = f.lines[n]!;
       // Review/maintenance decisions are outcomes, not fresh source-language observations of themselves.
@@ -658,18 +675,6 @@ export async function lexiconReading(
       const observed = secret ? source.replace(/=.*/, "") : source;
       const normalized =
         " " + clean(observed).replace(/[^a-z0-9 ]/g, " ") + " ";
-      // Most code lines match nothing: their use, its trimmed text and a record's digest, is built only once one is.
-      let lineUse: VocabularyUse | undefined;
-      const useOfLine = (): VocabularyUse => (lineUse ??= {
-        file: f.rel,
-        line: n + 1,
-        component,
-        text: (secret ? source.replace(/=.*/, "=<redacted>") : source)
-          .trim()
-          .slice(0, 360),
-        kind: f.kind,
-        fingerprint: f.kind === "record" ? digest(source) : fileFingerprint,
-      });
       // Every test of this line against a phrase goes through here, so the work meter counts the scan's real per-line cost.
       const writes = (phrase: string, plural = false): boolean => {
         comparisons += 1;
@@ -686,7 +691,7 @@ export async function lexiconReading(
       for (const i of candidates) {
         const phrase = phrases[i]!;
         if (writes(phrase)) {
-          add(phrase, useOfLine());
+          events.push([n, "add", phrase]);
           spans.push(phrase);
         }
       }
@@ -696,22 +701,15 @@ export async function lexiconReading(
         // A rejected word inside a longer known name on the same line is that name, not the refusal.
         const masked = maskPhrases(normalized, spans.filter((p) => !rejected.has(p)));
         const standing = refused.filter((p) => masked.includes(" " + p + " "));
-        if (standing.length) {
-          const byLine = rejectedLines.get(f.rel) ?? new Map<number, string[]>();
-          byLine.set(n + 1, standing);
-          rejectedLines.set(f.rel, byLine);
-        }
+        if (standing.length) events.push([n, "rejected", standing]);
       }
       if (f.kind === "code") {
         const name = declaredName(observed);
-        if (name !== undefined && !name.startsWith("_")) {
-          nominate({ term: clean(name), spelling: name, proper: false }, useOfLine(), true);
-        }
+        if (name !== undefined && !name.startsWith("_")) events.push([n, "nominate", clean(name), name, false, true]);
         const member = memberName(observed, exported, scan);
-        if (member !== undefined) nominate({ term: clean(member), spelling: member, proper: false }, useOfLine(), true);
+        if (member !== undefined) events.push([n, "nominate", clean(member), member, false, true]);
         // A body opened by an exported type (or a top-level Python class) holds declared fields until it closes at the margin.
-        if (scan?.opens.test(observed)) exported = true;
-        else if (scan?.closes.test(observed)) exported = false;
+        exported = scan?.opens.test(observed) ? true : scan?.closes.test(observed) ? false : exported;
         continue;
       }
       if (f.kind === "data") continue;
@@ -729,17 +727,68 @@ export async function lexiconReading(
           .filter((p) => p.includes(" ") && writes(p, true))
           .flatMap((p) => p.split(" ").flatMap((w) => [w, w + "s", w + "es"])),
       );
-      const runs: Word[][] = [];
+      const runs: string[][] = [];
       for (const text of texts) {
         const heading = f.kind === "prose" && /^#{1,6}\s/.test(text);
         for (const nomination of proseNominations(text, heading))
-          if (!(heading && inside.has(nomination.term))) nominate(nomination, useOfLine());
-        runs.push(...wordRuns(text));
+          if (!(heading && inside.has(nomination.term))) events.push([n, "nominate", nomination.term, nomination.spelling, nomination.proper, false]);
+        for (const run of wordRuns(text)) runs.push(run.map((word) => (inside.has(word.lower) ? "" : word.original)));
       }
-      for (const run of runs)
-        for (let i = 0; i < run.length; i++)
-          if (inside.has(run[i]!.lower)) run[i] = { lower: "", original: "" };
-      proseLines.push({ use: useOfLine(), runs });
+      events.push([n, "prose", runs]);
+    }
+    return { comparisons, events };
+  };
+  // A kept scan is replayed only under every input the scan reads beyond its file: the phrases, the rejected names, and its language's member scan.
+  const scanInputs = scope.scans === undefined ? "" : hash("sha1", JSON.stringify([phrases, [...rejected.keys()]]));
+  let comparisons = 0;
+  for (const f of read) {
+    const language = languageOfFile(f.rel);
+    const scan = language === undefined ? undefined : memberScanOf(language);
+    const scanText = scan === undefined ? "" : [scan.opens, scan.closes, scan.field].map((pattern) => `${pattern.source}/${pattern.flags}`).join("\0");
+    const key = scope.scans === undefined ? "" : hash("sha1", `${scanInputs}\0${language ?? ""}\0${scanText}\0${f.kind}\0${f.rel}\0${f.lines.join("\n")}`);
+    const kept = scope.scans?.scanOf(f.rel, key);
+    const scanned = kept ?? scanFile(f, scan);
+    if (kept === undefined) scope.scans?.keep(f.rel, key, scanned);
+    comparisons += scanned.comparisons;
+    const component = componentFor(f.rel);
+    const secret = isSecretFile(f.rel);
+    let fileFingerprint: string | undefined;
+    const fingerprintOf = (): string => (fileFingerprint ??= digest(f.lines.filter((line) => !(f.kind === "record" && isLexiconDecision(line)))));
+    let lineUse: VocabularyUse | undefined;
+    const useOfLine = (n: number): VocabularyUse => {
+      if (lineUse?.line === n + 1) return lineUse;
+      const source = f.lines[n]!;
+      lineUse = {
+        file: f.rel,
+        line: n + 1,
+        component,
+        text: (secret ? source.replace(/=.*/, "=<redacted>") : source)
+          .trim()
+          .slice(0, 360),
+        kind: f.kind,
+        fingerprint: f.kind === "record" ? digest(source) : fingerprintOf(),
+      };
+      return lineUse;
+    };
+    for (const event of scanned.events) {
+      const n = event[0];
+      switch (event[1]) {
+        case "add":
+          add(event[2], useOfLine(n));
+          break;
+        case "rejected": {
+          const byLine = rejectedLines.get(f.rel) ?? new Map<number, string[]>();
+          byLine.set(n + 1, event[2]);
+          rejectedLines.set(f.rel, byLine);
+          break;
+        }
+        case "nominate":
+          nominate({ term: event[2], spelling: event[3], proper: event[4] }, useOfLine(n), event[5]);
+          break;
+        case "prose":
+          proseLines.push({ use: useOfLine(n), runs: event[2].map((run) => run.map((original) => ({ lower: original.toLowerCase(), original }))) });
+          break;
+      }
     }
   }
   countWork("phrase comparison", comparisons);
