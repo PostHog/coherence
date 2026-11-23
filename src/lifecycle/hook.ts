@@ -1372,8 +1372,9 @@ export const WARM_UP = (root: string, language?: string): boolean => {
   }
 };
 
-/** The vocabulary refresh the command line starts: one per tree, superseding a refresh of an older tree. */
+/** The vocabulary refresh the command line starts: one per tree, superseding a refresh of an older tree. COHERENCE_NO_WARM_UP=1 starts nothing here either. */
 export const VOCABULARY_REFRESH = (root: string, treeFingerprint: string): void => {
+  if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
   releaseDeadVocabularyRefresh(root);
   refreshInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "hook", REFRESH_VOCABULARY_FLAG], treeFingerprint, Date.now, { path: vocabularyRefreshSlotPath(root), command: /(?:^|\s)hook\s+--refresh-vocabulary\s*$/ });
 };
