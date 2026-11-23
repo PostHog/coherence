@@ -28,17 +28,20 @@ export type Naming = "file_path" | "notebook_path" | "path" | "patch" | "command
  * The tools that write files, per host, each with how it names them. Claude
  * Code's are those of 2.1.296 (MultiEdit is kept for the releases that still
  * have it); Codex's are its patch tool and its shell tools, under the names
- * its tool calls and its hooks give them.
+ * its tool calls and its hooks give them; Antigravity's are those of agy
+ * 1.5.14, whose Path and CommandLine arguments hook-antigravity renames.
  */
 export const WRITERS: Readonly<Record<Host, Readonly<Record<string, Naming>>>> = {
   claude: { Bash: "command", Edit: "file_path", Write: "file_path", MultiEdit: "file_path", NotebookEdit: "notebook_path", PowerShell: "command", Monitor: "command" },
   codex: { apply_patch: "patch", shell: "command", local_shell: "command", shell_command: "command", exec_command: "command", Bash: "command" },
+  antigravity: { write_file: "path", edit_file: "path", create_file: "path", run_command: "command" },
 };
 
 /** The tools whose reading of a file the read trace records, per host, each with the field naming the file. */
 export const READERS: Readonly<Record<Host, Readonly<Record<string, Exclude<Naming, "patch" | "command">>>>> = {
   claude: { Read: "file_path", NotebookRead: "notebook_path" },
   codex: { read_file: "path" },
+  antigravity: { read_file: "path" },
 };
 
 /** A tool's own name: Codex may namespace one (functions.apply_patch). */
@@ -70,6 +73,12 @@ export function namesWrittenFiles(tool: unknown): boolean {
 
 /** The PreToolUse matcher install writes for Claude Code: every tool of its that writes, since a practice fires on a command or a written file. */
 export const CLAUDE_WRITER_MATCHER = Object.keys(WRITERS.claude).join("|");
+
+/** The PreToolUse matcher install writes for Antigravity, which reads a matcher as a regular expression: its tools that write. */
+export const ANTIGRAVITY_WRITER_MATCHER = `^(?:${Object.keys(WRITERS.antigravity).join("|")})$`;
+
+/** The PostToolUse matcher install writes for Antigravity: its tools that write and those that read, which the read trace records. */
+export const ANTIGRAVITY_TRACED_MATCHER = `^(?:${[...Object.keys(WRITERS.antigravity), ...Object.keys(READERS.antigravity)].join("|")})$`;
 
 /**
  * Whether a Claude Code hook matcher runs the hook for `tool`: no matcher,

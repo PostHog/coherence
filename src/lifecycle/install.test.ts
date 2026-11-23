@@ -9,10 +9,11 @@ import { fileURLToPath } from "node:url";
 import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
 import { budget } from "../enforcement/test-budgets.ts";
 import { PACKAGE_NAME } from "./project.ts";
-import { CLAUDE_WRITER_MATCHER } from "./host-tools.ts";
+import { ANTIGRAVITY_WRITER_MATCHER, CLAUDE_WRITER_MATCHER } from "./host-tools.ts";
+import { ANTIGRAVITY_EVENTS } from "./hook-events.ts";
 import { modInstalled, ownModLinked } from "./mod-install.ts";
 import { cli as inProcess } from "./cli-fixture.ts";
-import { driftOf, EARLIER_SEARCH, earlierHookLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
+import { driftOf, EARLIER_SEARCH, earlierHookLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, locatedPrefix, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -115,6 +116,39 @@ test("install --host codex writes .codex/hooks.json in the same shape", async ()
     additionalContextLimit: 4000,
   });
   assert.deepEqual(written.hooks["Stop"]![0]!.hooks[0], { type: "command", command: "npx coherence hook Stop", timeout: 60 });
+});
+
+test("install --host antigravity writes its own hook name in .agents/hooks.json, which check, status and uninstall read back beside another tool's", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "coherence-agy-"));
+  try {
+    const theirs = { "lint-checker": { PostToolUse: [{ matcher: "run_command", hooks: [{ type: "command", command: "./lint.sh" }] }] } };
+    await mkdir(join(dir, ".agents"));
+    await writeFile(join(dir, ".agents", "hooks.json"), JSON.stringify(theirs, null, 2) + "\n");
+    const result = await install({ root: dir, host: "antigravity", command: "npx coherence" });
+    assert.equal(result.path, join(dir, ".agents", "hooks.json"));
+    const written = JSON.parse(await readFile(result.path, "utf8")) as Record<string, Record<string, unknown[]>>;
+    assert.deepEqual(written["lint-checker"], theirs["lint-checker"], "another tool's hook name is untouched");
+    assert.deepEqual(Object.keys(written["coherence"]!), [...ANTIGRAVITY_EVENTS]);
+    assert.deepEqual(written["coherence"]!["SessionStart"], [{ type: "command", command: "npx coherence hook-antigravity SessionStart", timeout: 60 }], "a flat event lists its handler alone");
+    assert.deepEqual(written["coherence"]!["PreToolUse"], [{ matcher: ANTIGRAVITY_WRITER_MATCHER, hooks: [{ type: "command", command: "npx coherence hook-antigravity PreToolUse", timeout: 60 }] }]);
+    assert.match("read_file", new RegExp((written["coherence"]!["PostToolUse"]![0] as { matcher: string }).matcher), "a read reaches PostToolUse, which records the read trace");
+    assert.equal((await install({ root: dir, host: "antigravity", command: "npx coherence" })).changed, false, "a second install changes nothing");
+    assert.deepEqual(driftOf(written, { command: "npx coherence", host: "antigravity" }), []);
+    assert.deepEqual((await status(dir, "antigravity")).missing, []);
+    const located = await install({ root: dir, host: "antigravity", command: locatedPrefix("", false, "antigravity") });
+    const older = join(dir, "older");
+    await mkdir(join(older, "src"), { recursive: true });
+    await writeFile(join(older, "src", "cli.ts"), "process.stderr.write('unknown verb'); process.exit(1);\n");
+    const sessionStart = (JSON.parse(await readFile(located.path, "utf8")) as Record<string, Record<string, { command: string }[]>>)["coherence"]!["SessionStart"]![0]!.command;
+    const refused = spawnSync("sh", ["-c", sessionStart], { cwd: join(dir, ".agents"), input: "{}", encoding: "utf8", env: { ...process.env, COHERENCE_HOME: older } });
+    assert.equal(refused.status, 0);
+    assert.match(refused.stdout, /"user_markdown":"Coherence was found but could not answer this session start/, "agy runs a failing hook in silence, so a cli too old for the verb says so");
+    const removed = await uninstall(dir, "antigravity");
+    assert.equal(removed.removed.length, ANTIGRAVITY_EVENTS.length);
+    assert.deepEqual(JSON.parse(await readFile(result.path, "utf8")), theirs, "uninstall gives back the file as it was");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("status reports what is installed per host and what other hooks were kept", async () => {

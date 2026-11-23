@@ -19,6 +19,7 @@
  *   coherence query <question> ...     the agent query: what Scope shows a human, as plain text
  *   coherence scope [--no-open]        open the live Scope reading from the warm server; --snapshot [--out <file>] writes one file
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
+ *   coherence hook-antigravity <event> answer one Antigravity CLI event in its own shape (antigravity.ts)
  *   coherence hook-serve [--socket]    the warm hook process: answer events as JSON lines on stdin, and over a Unix socket (hook-serve.ts)
  *   coherence hooks install --host <host>           merge one entry per event into the agent host's settings
  *   coherence hooks uninstall --host <host>         remove exactly those entries; every other hook stays
@@ -43,6 +44,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Io } from "./journal/cli.ts";
 import { deliveredText, renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
+import type { HookResult } from "./lifecycle/hook.ts";
+import type { Host } from "./lifecycle/hosts.ts";
 import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
 import type { SettingsRoot } from "./lifecycle/install.ts";
 import type { ModStep } from "./lifecycle/mod-install.ts";
@@ -53,7 +56,7 @@ import { reachNote, refreshLatest, startUpdateCheck, versionText } from "./lifec
 
 // Each verb loads its own modules when it runs: a hook pays for the hook alone, never for every command the binary knows.
 async function usage(): Promise<string> {
-  const [{ LEXICON_WORK_USAGE }, { SPEC_USAGE }, { SCAFFOLD_USAGE }, { ENFORCEMENT_USAGE }, { ECONOMY_USAGE }, { QUERY_USAGE }, { SCOPE_USAGE }, { HOOK_EVENTS }, { HOSTS }, { CI_USAGE }, { TELEMETRY_USAGE }, { JOURNAL_USAGE }] = await Promise.all([
+  const [{ LEXICON_WORK_USAGE }, { SPEC_USAGE }, { SCAFFOLD_USAGE }, { ENFORCEMENT_USAGE }, { ECONOMY_USAGE }, { QUERY_USAGE }, { SCOPE_USAGE }, { HOOK_EVENTS, ANTIGRAVITY_EVENTS }, { HOSTS }, { CI_USAGE }, { TELEMETRY_USAGE }, { JOURNAL_USAGE }] = await Promise.all([
     import("./lifecycle/lexicon-cli.ts"),
     import("./spec/cli.ts"),
     import("./scaffold/cli.ts"),
@@ -84,6 +87,7 @@ ${SCOPE_USAGE}
   coherence plugin check <plugin>   hold a plugin, bundled by name or a folder, to what every language plugin owes (file rule, declarations, references, a chokepoint graded) over its check.json's project; pass or fail per duty, exit 1 unless all pass
   coherence adopt <folder>   list the folder in the registry (projects in coherence.config.json at the repository top), creating it when absent
   coherence hook <${HOOK_EVENTS.join("|")}>
+  coherence hook-antigravity <${ANTIGRAVITY_EVENTS.join("|")}>
   coherence hook-serve [--socket]   the warm hook process: {"op":"hook","event":...,"input":...} per line on stdin; --socket also over HTTP on a Unix socket
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]   --local: the host's personal settings (.claude/settings.local.json), never committed
   coherence hooks install --host claude --mod [--shared]   Claude Code only: Coherence's mod answers every event through one warm process per session, in place of your personal settings hooks; --shared: for the whole team, in the committed settings, in place of the committed hooks
@@ -189,12 +193,14 @@ function parse(args: string[], valued: Set<string>): Parsed {
  * project and fails softly when it is not there (LOCATED_PREFIX), never
  * through npx, which would fetch a stranger's package of the same name.
  */
-async function defaultCommand(root: string, sub = "", local = false): Promise<string> {
+async function defaultCommand(root: string, sub = "", local = false, host: Host = "claude"): Promise<string> {
   const personal = local ? ' && [ ! -f "$dir/.claude/settings.local.json" ]' : "";
-  const dir = `$(dir="\${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$dir" != "/" ] && [ ! -f "$dir/.claude/settings.json" ]${personal} && [ ! -f "$dir/.codex/hooks.json" ]; do dir=$(dirname "$dir"); done; printf "%s" "$dir")`;
+  const start = host === "antigravity" ? "$PWD" : "\${CLAUDE_PROJECT_DIR:-$PWD}";
+  const stops = host === "antigravity" ? ' [ ! -f "$dir/.agents/hooks.json" ]' : ` [ ! -f "$dir/.claude/settings.json" ]${personal} && [ ! -f "$dir/.codex/hooks.json" ]`;
+  const dir = `$(dir="${start}"; while [ "$dir" != "/" ] &&${stops}; do dir=$(dirname "$dir"); done; printf "%s" "$dir")`;
   if (await isCoherenceItself(root)) return `node "${dir}/src/cli.ts"`;
   const { locatedPrefix } = await import("./lifecycle/install.ts");
-  return locatedPrefix(sub, local);
+  return locatedPrefix(sub, local, host);
 }
 
 /** The cli running this command, as the located command would name it once resolved: an installed package, a checkout, or Coherence's own source. */
@@ -277,7 +283,19 @@ async function hookCommand(call: CommandCall, args: string[], root: string): Pro
   }
   if (event === undefined || !isHookEvent(event)) failWithUsage(`hook: expected one of ${HOOK_EVENTS.join(", ")}`);
   const input = await readStdinJson(call.stdin);
-  const result = await runHook(event, input, root, { ...(await hookStarts()), startedAt: call.startedAt });
+  return deliverHook(call, event, await runHook(event, input, root, { ...(await hookStarts()), startedAt: call.startedAt }));
+}
+
+async function antigravityHookCommand(call: CommandCall, args: string[], root: string): Promise<number> {
+  const [{ readStdinJson }, { runAntigravityHook }, { ANTIGRAVITY_EVENTS, isAntigravityEvent }] = await Promise.all([import("./lifecycle/hook.ts"), import("./lifecycle/antigravity.ts"), import("./lifecycle/hook-events.ts")]);
+  const event = args[0];
+  if (event === undefined || !isAntigravityEvent(event)) failWithUsage(`hook-antigravity: expected one of ${ANTIGRAVITY_EVENTS.join(", ")}`);
+  const payload = await readStdinJson(call.stdin);
+  return deliverHook(call, event, await runAntigravityHook(event, payload, root, { ...(await hookStarts()), startedAt: call.startedAt }));
+}
+
+/** Print a hook's answer and commit what it covered only once the host has it. */
+async function deliverHook(call: CommandCall, event: string, result: HookResult): Promise<number> {
   if (result.stderr !== "") call.stderr.write(result.stderr);
   if (result.stdout !== "") {
     try {
@@ -443,7 +461,7 @@ async function hooksCommand(call: CommandCall, args: string[], root: string): Pr
     }
     return 0;
   }
-  const commandAt = async (sub: string): Promise<string> => given ?? (await defaultCommand(root, sub, local));
+  const commandAt = async (sub: string): Promise<string> => given ?? (await defaultCommand(root, sub, local, host));
   if (verb === "check") {
     let drifted = false;
     for (const place of places) {
@@ -480,7 +498,7 @@ async function hooksCommand(call: CommandCall, args: string[], root: string): Pr
     const registry = registryOf(root);
     const result = await install({ root: place.dir, host, command, ignoreRoots: registry === undefined ? [root] : registry.leaves, local });
     call.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
-    if (command === locatedPrefix(place.sub, local)) call.stdout.write(await locateNote(call, place.dir, place.sub));
+    if (command === locatedPrefix(place.sub, local, host)) call.stdout.write(await locateNote(call, place.dir, place.sub));
   }
   // The pull request side: offered once, only while no workflow runs Coherence.
   const { ciSuggestion } = await import("./lifecycle/ci.ts");
@@ -649,6 +667,8 @@ async function dispatch(argv: string[], call: CommandCall, root: string): Promis
       return (await import("./readings/query/cli.ts")).queryCommand(rest, io);
     case "hook":
       return hookCommand(call, rest, root);
+    case "hook-antigravity":
+      return antigravityHookCommand(call, rest, root);
     case "hook-serve":
       return hookServeCommand(rest, root);
     case "hooks":

@@ -340,6 +340,30 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: graceful-drain dismissed: nothing is shut down by an install
   checklist: readiness-evidence dismissed: status reports what is written in the settings file and claims nothing about a running process
   checklist: declared-target-coverage declared as install keeps other hooks
+- antigravity keeps its own hook name: Installing the hook for Antigravity writes .agents/hooks.json with Coherence's handlers under the hook name coherence, a flat handler list for SessionStart, PreInvocation and Stop and a group matching its writing tools for PreToolUse and PostToolUse, each running hook-antigravity <Event>, and an enabled: false under it, which would turn every handler off, is dropped by install and named by check; another hook name is never touched, a second install changes nothing, and check, status and uninstall read the same shape back. Because agy runs a failing hook in silence, a session start the found cli refuses (a release older than the one that wrote these hooks) shows the user an update line.
+  protects: mergeHooks
+  chokepoint: install
+  over: a .agents/hooks.json holding another tool's hook name, install twice, the check, the status, a session start run by a cli that refuses the verb, and the uninstall
+  via: install --host antigravity writes its own hook name in .agents/hooks.json, which check, status and uninstall read back beside another tool's
+  because: Antigravity keys its hooks file by hook name and reads a flat event's handlers with no matcher group (agy 1.5.14, its bundled hooks.md); writing the Claude Code shape there would install hooks it never runs while check reported them clean
+  crossing: project-source -> harness
+  refuted: wrote flat events as matcher groups (withHooks in src/lifecycle/install.ts) -> "install --host antigravity writes its own hook name in .agents/hooks.json, which check, status and uninstall read back beside another tool's" went red in install.test.ts on "a flat event lists its handler alone"; restored, green (2026-11-22)
+  kinds: deploy
+  checklist: graceful-drain dismissed: nothing is shut down by an install
+  checklist: readiness-evidence dismissed: status reports what is written in the hooks file and claims nothing about a running process
+  checklist: declared-target-coverage dismissed: the bullet covers one host's file, with no fan-out over targets
+- antigravity hears what a tool event said: hook-antigravity answers each Antigravity CLI event through runHook in Antigravity's own shape: the context a PreToolUse or PostToolUse produces waits in .coherence/antigravity/<session>.pending and the next PreInvocation injects it once, then clears it after the host has it; a PreInvocation at a turn's first model call is UserPromptSubmit; a Stop refusal becomes continue only when the agent stopped on its own (NO_TOOL_CALL), never when the host ended the turn (a cancel, an error, a cap, a terminal step), and a Stop with executionNum above 0 is a forced continuation, never refused again; the verb always exits 0.
+  protects: runAntigravityHook
+  chokepoint: antigravityHookCommand
+  over: a PostToolUse speaking a hook voice file, the PreInvocation after it and the one after that, a Stop past a forced continuation, and a run_command's CommandLine
+  via: an Antigravity tool event's context waits for the next model call, which injects it once, and a forced continuation's stop is never refused again
+  because: agy 1.5.14 drops what a PostToolUse injects, and a PreToolUse answer that carries context must say allow, which skips agy's own permission prompt; and agy keeps continuationActive false through every forced continuation, so a stop guard read from it would refuse forever
+  crossing: harness -> project-source
+  refuted: never cleared the pending file after delivery (runAntigravityHook in src/lifecycle/antigravity.ts) -> "an Antigravity tool event's context waits for the next model call, which injects it once, and a forced continuation's stop is never refused again" went red in hook.test.ts on "delivered once, then gone"; restored, green (2026-11-22)
+  kinds: deploy
+  checklist: graceful-drain dismissed: a hook process holds nothing open past its answer
+  checklist: readiness-evidence dismissed: the verb claims nothing about a running process
+  checklist: declared-target-coverage dismissed: the verb answers one host, with no fan-out over targets
 - uninstall keeps other hooks: Uninstalling the hook removes every command of Coherence's from the agent host's settings and nothing else: another tool's hook stays in its entry with its matcher, an entry, event list, or hooks object goes only when this removal emptied it, the file keeps its layout, and a second uninstall changes nothing.
   over: both agent hosts, settings in every layout (two spaces with a final newline, a tab without one, no hooks object), and every hook command another tool could have written beside ours or in the same entry
   via: uninstall removes only Coherence's commands and returns the settings to what they were before install
