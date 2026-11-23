@@ -1019,7 +1019,7 @@ export async function lexiconReading(
   const contributionOf = (file: string, component: string): Contribution => {
     const found = contributions.get(file);
     if (found !== undefined) return found;
-    const made: Contribution = { component, pool: {}, words: {}, uses: [] };
+    const made: Contribution = { component, pool: Object.create(null), words: Object.create(null), uses: [] };
     contributions.set(file, made);
     return made;
   };

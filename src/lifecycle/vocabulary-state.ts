@@ -83,7 +83,7 @@ async function stateVersion(root: string, layers: { coherence: Lexicon; project:
 }
 
 function bump(record: Record<string, number>, key: string, by: number): void {
-  const next = (record[key] ?? 0) + by;
+  const next = (ownEntry(record, key) ?? 0) + by;
   if (next === 0) delete record[key];
   else record[key] = next;
 }
@@ -101,7 +101,7 @@ function apply(buckets: Map<string, TermBucket>, c: Contribution, sign: 1 | -1, 
   for (const [term, stats] of Object.entries(c.pool)) {
     if (only !== undefined && !only.has(term)) continue;
     const b = bucket(term);
-    const total = (b.pool[term] ??= { named: 0, sites: {}, code: {}, declared: 0, declaredIn: {} });
+    const total = ownEntry(b.pool, term) ?? (b.pool[term] = { named: 0, sites: {}, code: {}, declared: 0, declaredIn: {} });
     total.named += sign * stats.named;
     bump(total.sites, c.component, sign * stats.sites);
     bump(total.code, c.component, sign * stats.code);
@@ -114,7 +114,7 @@ function apply(buckets: Map<string, TermBucket>, c: Contribution, sign: 1 | -1, 
   for (const [term, n] of Object.entries(c.words)) {
     if (only !== undefined && !only.has(term)) continue;
     const b = bucket(term);
-    const total = (b.words[term] ??= { words: 0, byComponent: {} });
+    const total = ownEntry(b.words, term) ?? (b.words[term] = { words: 0, byComponent: {} });
     total.words += sign * n;
     bump(total.byComponent, c.component, sign * n);
     if (total.words === 0) delete b.words[term];
@@ -152,7 +152,7 @@ export async function keepVocabulary(root: string, layers: { coherence: Lexicon;
     files.set(id, b);
     apply(terms, c, 1);
   }
-  const present = (t: string): boolean => terms.get(bucketOf(t))?.pool[t] !== undefined;
+  const present = (t: string): boolean => ownEntry(terms.get(bucketOf(t))?.pool ?? {}, t) !== undefined;
   const declared = new Set<string>();
   for (const b of terms.values()) for (const [term, total] of Object.entries(b.pool)) if (total.declared > 0) declared.add(canonicalOf(term, present));
   withLock(join(cacheDir(root), "vocabulary.lock"), () => {
@@ -392,7 +392,7 @@ export async function keptCoverage(root: string, layers: { coherence: Lexicon; p
 /**
  * The reading the tree now holds: the kept one while its tree and records
  * keys match, else one taken from the kept index for the files that changed,
- * else a full reading. Each reading past the kept one logs its tier.
+ * else a full reading. Each reading past the kept one logs its extent.
  */
 export async function currentReading(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }): Promise<Coverage> {
   // Taken before the tree is keyed: a write during the reading moves the key, so the reading never claims a write it may have missed.
@@ -408,27 +408,27 @@ export async function currentReading(root: string, layers: { coherence: Lexicon;
     const reason = error instanceof FullReading || error instanceof BucketUnusable ? error.message : `the incremental reading failed: ${error instanceof Error ? error.message : String(error)}`;
     return fullReading(root, layers, reason, readFromMs);
   }
-  logTier(root, { tier: done.tier, changed: done.changed, rebuilt: done.rebuilt, ms: Date.now() - readFromMs });
+  logExtent(root, { extent: done.extent, changed: done.changed, rebuilt: done.rebuilt, ms: Date.now() - readFromMs });
   if (process.env["COHERENCE_VOCABULARY_VERIFY"] === undefined) return done.coverage;
   return verifiedAgainstFull(root, layers, done.coverage, done.changed);
 }
 
 async function fullReading(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, reason: string, readFromMs: number): Promise<Coverage> {
   const coverage = await keptReading(root, layers);
-  logTier(root, { tier: "full", reason, ms: Date.now() - readFromMs });
+  logExtent(root, { extent: "full", reason, ms: Date.now() - readFromMs });
   return coverage;
 }
 
 /** Whether the group counted under `canonical` is a candidate by these totals: the reading's rule, by name or by word. */
 function candidacy(canonical: string, terms: Map<string, TermBucket>): { candidate: boolean; prose: number; components: number } {
-  const total = (t: string): PoolTotal | undefined => terms.get(bucketOf(t))?.pool[t];
+  const total = (t: string): PoolTotal | undefined => ownEntry(terms.get(bucketOf(t))?.pool ?? {}, t);
   const members = [canonical, ...pluralsOf(canonical)].map(total).filter((t): t is PoolTotal => t !== undefined);
   if (members.length === 0) return { candidate: false, prose: 0, components: 0 };
   const named = members.reduce((n, m) => n + m.named, 0);
   const sites = new Set(members.flatMap((m) => Object.keys(m.sites)));
   const code = new Set(members.flatMap((m) => Object.keys(m.code)));
   const declared = members.some((m) => m.declared > 0);
-  const words = terms.get(bucketOf(canonical))?.words[canonical];
+  const words = ownEntry(terms.get(bucketOf(canonical))?.words ?? {}, canonical);
   const wordComponents = new Set([...Object.keys(words?.byComponent ?? {}), ...code]);
   const byName = named >= 3 || (named >= 2 && sites.size >= 2);
   const byWord = declared && (words?.words ?? 0) >= 10 && wordComponents.size >= 4;
@@ -490,7 +490,7 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
     if (was !== undefined) apply(after, was, -1);
     apply(after, c, 1);
   }
-  const has = (terms: Map<string, TermBucket>) => (t: string): boolean => terms.get(bucketOf(t))?.pool[t] !== undefined;
+  const has = (terms: Map<string, TermBucket>) => (t: string): boolean => ownEntry(terms.get(bucketOf(t))?.pool ?? {}, t) !== undefined;
   const changes: EditChange[] = [];
   const named = new Set<string>();
   for (const term of moved) {
@@ -500,7 +500,7 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
     const now = candidacy(canonical, after);
     if (!now.candidate || then.candidate) continue;
     named.add(canonical);
-    const file = [...fresh.keys()].find((f) => fresh.get(f)!.pool[term] !== undefined || fresh.get(f)!.words[term] !== undefined) ?? [...fresh.keys()][0]!;
+    const file = [...fresh.keys()].find((f) => ownEntry(fresh.get(f)!.pool, term) !== undefined || ownEntry(fresh.get(f)!.words, term) !== undefined) ?? [...fresh.keys()][0]!;
     changes.push({ term: canonical, component: file, evidence: "", state: "unresolved", reason: `recurs without a definition (${now.prose} prose lines, ${now.components} components)` });
   }
   // A known name newly written where its sense is at risk, as the reading of the written files judges it; a Coherence name declared only in code the edit did not write is named by the next full reading.
@@ -565,7 +565,7 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
     const present = has(buckets);
     let changed = false;
     for (const t of touched) {
-      const total = buckets.get(bucketOf(t))?.pool[t];
+      const total = ownEntry(buckets.get(bucketOf(t))?.pool ?? {}, t);
       const canonical = canonicalOf(t, present);
       const is = total !== undefined && total.declared > 0;
       if (is && !declared.has(canonical)) {
@@ -646,7 +646,7 @@ function writeIndex(stateRoot: string, index: ReadingIndex, declared: ReadonlySe
   writeKept(join(indexDir(stateRoot), "side.json"), side, false, true);
 }
 
-/** Why a reading could not be taken from the index: the hook takes a full reading instead, and the tier log says why. */
+/** Why a reading could not be taken from the index: the hook takes a full reading instead, and the extent log says why. */
 class FullReading extends Error {}
 
 interface SavedReading {
@@ -826,7 +826,7 @@ function isDeclaredIn(name: string, index: ReadingIndexStore): boolean {
 
 interface IncrementalReading {
   coverage: Coverage;
-  tier: "files" | "declared names";
+  extent: "files" | "declared names";
   changed: number;
   rebuilt: number;
 }
@@ -890,9 +890,9 @@ async function incrementalReading(root: string, layers: { coherence: Lexicon; pr
     declared.delete(name);
   }
   const flipped = [...new Set([...declared, ...declaredThen])].filter((name) => declared.has(name) !== declaredThen.has(name));
-  let tier: IncrementalReading["tier"] = "files";
+  let extent: IncrementalReading["extent"] = "files";
   if (flipped.length > 0) {
-    tier = "declared names";
+    extent = "declared names";
     const forms = wordForms(flipped);
     const corpusNow = new Set([...[...listedThen.keys()].filter((file) => !changed.includes(file)), ...readRels]);
     const again = [...new Set([...filesWriting(root, forms).filter((file) => corpusNow.has(file)), ...readRels])].sort();
@@ -959,7 +959,7 @@ async function incrementalReading(root: string, layers: { coherence: Lexicon; pr
     totals: coverageTotals(terms),
   };
   keepIncremental(root, meta, { index, side, contributions, declared, tree, records, coverage, readFromMs });
-  return { coverage, tier, changed: changed.length, rebuilt: rebuild.size };
+  return { coverage, extent, changed: changed.length, rebuilt: rebuild.size };
 }
 
 /** The kept state taking an incremental reading in, under the lock, only while no other reading or edit moved it since this one began. */
@@ -1011,13 +1011,13 @@ function isFileOnDisk(root: string, rel: string): boolean {
   }
 }
 
-/** Where each reading's tier and reason are kept, for measuring how often each fires; the oldest half is dropped past its size. */
-const TIER_LOG_LIMIT_BYTES = 256 * 1024;
+/** Where each reading's extent and reason are kept, for measuring how often each fires; the oldest half is dropped past its size. */
+const EXTENT_LOG_LIMIT_BYTES = 256 * 1024;
 
-function logTier(root: string, entry: { tier: string; reason?: string; changed?: number; rebuilt?: number; ms: number }): void {
-  const path = join(cacheDir(root), "vocabulary-tiers.jsonl");
+function logExtent(root: string, entry: { extent: string; reason?: string; changed?: number; rebuilt?: number; ms: number }): void {
+  const path = join(cacheDir(root), "vocabulary-extents.jsonl");
   try {
-    if (existsSync(path) && statSync(path).size > TIER_LOG_LIMIT_BYTES) {
+    if (existsSync(path) && statSync(path).size > EXTENT_LOG_LIMIT_BYTES) {
       const lines = readFileSync(path, "utf8").split("\n").filter(Boolean);
       writeFileSync(path, lines.slice(Math.floor(lines.length / 2)).join("\n") + "\n");
     }

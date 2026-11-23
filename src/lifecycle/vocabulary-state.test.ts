@@ -9,9 +9,9 @@ import { loadProjectLexicons } from "./project.ts";
 import { currentReading, editVocabulary, keptReading } from "./vocabulary-state.ts";
 
 const COMPONENTS = ["books", "sales", "stock", "staff"];
-const NAMES = ["Widget Ledger", "Widget Ledgers", "Tally Basis", "Tally Bases", "Settlement Window", "`Settlement Window`", "Stock Count"];
-const WORDS = ["widget ledger", "widget ledgers", "tally basis", "settlement window", "settlement windows", "stock count", "stock counts"];
-const DECLARATIONS = ["export function widgetLedger(): number {\n  return 1;\n}", "export class TallyBasis {}", "export interface SettlementWindow {\n  opensAt: number;\n}", "export const stockCount = 2;"];
+const NAMES = ["Widget Crate", "Widget Crates", "Tally Basis", "Tally Bases", "Settlement Window", "`Settlement Window`", "Stock Count"];
+const WORDS = ["widget crate", "widget crates", "tally basis", "settlement window", "settlement windows", "stock count", "stock counts"];
+const DECLARATIONS = ["export function widgetCrate(): number {\n  return 1;\n}", "export class TallyBasis {}", "export interface SettlementWindow {\n  opensAt: number;\n}", "export const stockCount = 2;"];
 const KNOWN = ["The exposure is set here.", "A hazard sits beside the exposure.", "Each exposure counts.", "work orders wait."];
 
 function git(root: string, ...args: string[]): void {
@@ -38,7 +38,7 @@ function tallyProject(): string {
     writeFileSync(join(root, component, `${component}.spec.md`), `# ${component}\n\n## invariants\n`);
   }
   mkdirSync(join(root, "pkg"));
-  writeFileSync(join(root, "pkg", "notes.md"), "The Widget Ledger ships in a package.\nA Widget Ledger, and the `Widget Ledger` again.\n");
+  writeFileSync(join(root, "pkg", "notes.md"), "The Widget Crate ships in a package.\nA Widget Crate, and the `Widget Crate` again.\n");
   for (const component of COMPONENTS) writeFileSync(join(root, component, "words.md"), WORDS.map((words) => `Each ${words} is counted here, and another ${words} there.`).join("\n") + "\n");
   git(root, "init", "-q");
   git(root, "add", "-A");
@@ -59,7 +59,7 @@ test("a reading taken from the kept index equals a full reading after every rand
     const prose = (): string => Array.from({ length: 1 + Math.floor(random() * 5) }, () => (random() < 0.5 ? `The ${pick(NAMES)} meets the ${pick(NAMES)}.` : random() < 0.5 ? `Every ${pick(WORDS)} keeps a ${pick(WORDS)} and a ${pick(WORDS)}.` : pick(KNOWN))).join("\n");
     const layers = await loadProjectLexicons(root);
     await keptReading(root, layers);
-    const tiers = new Set<string>();
+    const extents = new Set<string>();
     for (let step = 0; step < 20; step++) {
       const roll = random();
       const component = pick(COMPONENTS);
@@ -108,9 +108,9 @@ test("a reading taken from the kept index equals a full reading after every rand
       assert.equal(incremental.fingerprint, full.fingerprint, `step ${step}: the fingerprint covers every term's full uses`);
       assert.equal(withoutUses(incremental), withoutUses(full), `step ${step}`);
     }
-    const log = readFileSync(join(root, ".coherence", "cache", "vocabulary-tiers.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line) as { tier: string; reason?: string });
-    for (const entry of log) tiers.add(entry.tier);
-    assert.ok(tiers.has("files") && tiers.has("declared names"), `the sequence reached both incremental tiers: ${JSON.stringify(log.filter((entry) => entry.tier === "full"))}`);
+    const log = readFileSync(join(root, ".coherence", "cache", "vocabulary-extents.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line) as { extent: string; reason?: string });
+    for (const entry of log) extents.add(entry.extent);
+    assert.ok(extents.has("files") && extents.has("declared names"), `the sequence reached both incremental extents: ${JSON.stringify(log.filter((entry) => entry.extent === "full"))}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -120,11 +120,11 @@ test("a file renamed, staged and then committed, is read from its new path alone
   const root = tallyProject();
   try {
     const layers = await loadProjectLexicons(root);
-    writeFileSync(join(root, "books", "ledger.md"), "The Widget Ledger opens.\nA Widget Ledger closes.\n");
+    writeFileSync(join(root, "books", "crate.md"), "The Widget Crate opens.\nA Widget Crate closes.\n");
     git(root, "add", "-A");
-    git(root, "commit", "-qm", "ledger");
+    git(root, "commit", "-qm", "crate");
     await keptReading(root, layers);
-    git(root, "mv", join("books", "ledger.md"), join("sales", "ledger.md"));
+    git(root, "mv", join("books", "crate.md"), join("sales", "crate.md"));
     for (const label of ["staged", "committed"]) {
       if (label === "committed") git(root, "commit", "-qm", "move");
       const incremental = await currentReading(root, layers);
@@ -148,13 +148,29 @@ test("a kept reading whose HEAD is no commit name never reaches git as an option
     const kept = JSON.parse(readFileSync(readingPath, "utf8")) as { tree: Record<string, string> };
     kept.tree["\u0000HEAD"] = `--output=${victim}`;
     writeFileSync(readingPath, JSON.stringify(kept));
-    writeFileSync(join(root, "books", "notes.md"), "The Widget Ledger moves.\n");
+    writeFileSync(join(root, "books", "notes.md"), "The Widget Crate moves.\n");
     await currentReading(root, layers);
     assert.equal(readFileSync(victim, "utf8"), "kept\n");
-    const last = readFileSync(join(root, ".coherence", "cache", "vocabulary-tiers.jsonl"), "utf8").trim().split("\n").at(-1)!;
-    assert.match(last, /"tier":"full"/);
+    const last = readFileSync(join(root, ".coherence", "cache", "vocabulary-extents.jsonl"), "utf8").trim().split("\n").at(-1)!;
+    assert.match(last, /"extent":"full"/);
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(victim, { force: true });
+  }
+});
+
+test("a term spelled like a built-in object key, such as constructor, is counted by the edit hook as any other term is", async () => {
+  const root = tallyProject();
+  try {
+    const layers = await loadProjectLexicons(root);
+    await keptReading(root, layers);
+    const written = ["books", "sales"].map((component) => join(component, "make.md"));
+    for (const file of written) writeFileSync(join(root, file), "The Constructor runs.\nThe Constructor again.\nEach Constructor counts.\n");
+    const edited = await editVocabulary(root, layers, written, new Set());
+    assert.ok("changes" in edited, JSON.stringify(edited));
+    assert.deepEqual(edited.changes.map((change) => change.term), ["constructor"]);
+    assert.equal((Object as unknown as Record<string, unknown>)["named"], undefined);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

@@ -127,13 +127,13 @@ function compareSteps(root: string, session: string): Step[] {
   return [
     { label: "session start", event: "SessionStart", input: { ...base, hook_event_name: "SessionStart", source: "startup" } },
     prompt("prompt, tree unchanged"),
-    prompt("prompt, after an edit", () => appendFileSync(join(root, edited), "\n- The Widget Ledger keeps a line here for the bench.\n")),
+    prompt("prompt, after an edit", () => appendFileSync(join(root, edited), "\n- The Widget Crate keeps a line here for the bench.\n")),
     prompt("prompt, after an added file", () => {
       mkdirSync(join(root, dirname(added)), { recursive: true });
-      writeFileSync(join(root, added), "# Widget Ledger\n\nThe Widget Ledger records each Widget Ledger entry.\n\nA second line names the Widget Ledger again, and the `Widget Ledger` too.\n");
+      writeFileSync(join(root, added), "# Widget Crate\n\nThe Widget Crate records each Widget Crate entry.\n\nA second line names the Widget Crate again, and the `Widget Crate` too.\n");
     }),
     prompt("prompt, after a deleted file", () => rmSync(join(root, deleted))),
-    { label: "stop, after a change", event: "Stop", input: { ...base, hook_event_name: "Stop", stop_hook_active: false }, before: () => appendFileSync(join(root, added), "More Widget Ledger prose.\n") },
+    { label: "stop, after a change", event: "Stop", input: { ...base, hook_event_name: "Stop", stop_hook_active: false }, before: () => appendFileSync(join(root, added), "More Widget Crate prose.\n") },
   ];
 }
 
@@ -196,6 +196,40 @@ function keptOutputs(clone: string): Map<string, string> {
   return kept;
 }
 
+/** The pid a refresh mark names, or undefined when the refresh already removed its mark or never finished writing one. */
+function markedPid(mark: string): number | undefined {
+  try {
+    const { pid } = JSON.parse(readFileSync(mark, "utf8")) as { pid?: unknown };
+    return typeof pid === "number" ? pid : undefined;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT" || error instanceof SyntaxError) return undefined;
+    throw error;
+  }
+}
+
+/** Whether `pid` still runs inside `clone`: a mark outlives its refresh, and a reused pid never has the clone as its folder. */
+function runsInside(pid: number, clone: string): boolean {
+  try {
+    return realpathSync(`/proc/${pid}/cwd`).startsWith(realpathSync(clone));
+  } catch {
+    return false;
+  }
+}
+
+/** The detached refreshes a hook started in `clone`, each with its process group, stopped so none writes into the clone once it is removed. */
+function stopBackgroundRefreshes(clone: string): void {
+  const marks = readdirSync(join(clone, ".coherence"), { recursive: true, encoding: "utf8" }).filter((path) => /refresh[^/]*\.json$/.test(path));
+  for (const mark of marks) {
+    const pid = markedPid(join(clone, ".coherence", mark));
+    if (pid === undefined || !runsInside(pid, clone)) continue;
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+    }
+  }
+}
+
 async function compareBuilds(root: string, rounds: number, out: string): Promise<void> {
   const previous = process.env["COHERENCE_BENCH_BASELINE_CLI"];
   const next = process.env["COHERENCE_BENCH_CLI"];
@@ -226,7 +260,11 @@ async function compareBuilds(root: string, rounds: number, out: string): Promise
           }
           if (round === 1) for (const [name, text] of keptOutputs(clone)) outputsByBuild[build].set(name, masked(text, clone, builds[build]));
         } finally {
-          rmSync(clone, { recursive: true, force: true });
+          try {
+            if (existsSync(join(clone, ".coherence"))) stopBackgroundRefreshes(clone);
+          } finally {
+            rmSync(clone, { recursive: true, force: true });
+          }
         }
         process.stderr.write(`round ${round} ${build} done\n`);
       }

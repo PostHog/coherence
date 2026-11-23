@@ -130,7 +130,7 @@ export function sizedProject(scale: number): SizedProject {
     mkdirSync(dirname(join(top, path)), { recursive: true });
     writeFileSync(join(top, path), text);
   }
-  const git = (...args: string[]) => spawnSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: top, encoding: "utf8" });
+  const git = (...args: string[]) => spawnSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args], { cwd: top, encoding: "utf8" });
   git("init", "-q");
   git("add", "-A");
   git("commit", "-q", "-m", "seed");
