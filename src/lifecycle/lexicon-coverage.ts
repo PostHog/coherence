@@ -36,7 +36,7 @@ import type { Language } from "../adapters/index.ts";
 import { languageOfFile } from "../adapters/language-files.ts";
 import { memberScanOf } from "../plugins/languages.ts";
 import { readFile } from "node:fs/promises";
-import { createHash, type Hash } from "node:crypto";
+import { createHash, hash, type Hash } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { loadJournal } from "../journal/store.ts";
 import { recordWords } from "../journal/record.ts";
@@ -137,8 +137,7 @@ export interface Coverage {
     unreviewedContexts: number;
   };
 }
-export const digest = (value: unknown): string =>
-  createHash("sha256").update(JSON.stringify(value)).digest("hex");
+export const digest = (value: unknown): string => hash("sha256", JSON.stringify(value));
 /** A digest over many parts without building one string of them all: a large corpus must not exceed a string's length. */
 function digestAll(parts: Iterable<unknown>): string {
   const hash: Hash = createHash("sha256");
@@ -650,24 +649,27 @@ export async function lexiconReading(
     let exported = false;
     const language = languageOfFile(f.rel);
     const scan = language === undefined ? undefined : memberScanOf(language);
+    const component = componentFor(f.rel);
+    const secret = /(^|\/)\.env(?:$|\.)/.test(f.rel);
     for (let n = 0; n < f.lines.length; n++) {
       const source = f.lines[n]!;
       // Review/maintenance decisions are outcomes, not fresh source-language observations of themselves.
       if (f.kind === "record" && isLexiconDecision(source)) continue;
-      const secret = /(^|\/)\.env(?:$|\.)/.test(f.rel);
       const observed = secret ? source.replace(/=.*/, "") : source;
       const normalized =
         " " + clean(observed).replace(/[^a-z0-9 ]/g, " ") + " ";
-      const use: VocabularyUse = {
+      // Most code lines match nothing: their use, its trimmed text and a record's digest, is built only once one is.
+      let lineUse: VocabularyUse | undefined;
+      const useOfLine = (): VocabularyUse => (lineUse ??= {
         file: f.rel,
         line: n + 1,
-        component: componentFor(f.rel),
+        component,
         text: (secret ? source.replace(/=.*/, "=<redacted>") : source)
           .trim()
           .slice(0, 360),
         kind: f.kind,
         fingerprint: f.kind === "record" ? digest(source) : fileFingerprint,
-      };
+      });
       // Every test of this line against a phrase goes through here, so the work meter counts the scan's real per-line cost.
       const writes = (phrase: string, plural = false): boolean => {
         comparisons += 1;
@@ -684,7 +686,7 @@ export async function lexiconReading(
       for (const i of candidates) {
         const phrase = phrases[i]!;
         if (writes(phrase)) {
-          add(phrase, use);
+          add(phrase, useOfLine());
           spans.push(phrase);
         }
       }
@@ -703,10 +705,10 @@ export async function lexiconReading(
       if (f.kind === "code") {
         const name = declaredName(observed);
         if (name !== undefined && !name.startsWith("_")) {
-          nominate({ term: clean(name), spelling: name, proper: false }, use, true);
+          nominate({ term: clean(name), spelling: name, proper: false }, useOfLine(), true);
         }
         const member = memberName(observed, exported, scan);
-        if (member !== undefined) nominate({ term: clean(member), spelling: member, proper: false }, use, true);
+        if (member !== undefined) nominate({ term: clean(member), spelling: member, proper: false }, useOfLine(), true);
         // A body opened by an exported type (or a top-level Python class) holds declared fields until it closes at the margin.
         if (scan?.opens.test(observed)) exported = true;
         else if (scan?.closes.test(observed)) exported = false;
@@ -731,13 +733,13 @@ export async function lexiconReading(
       for (const text of texts) {
         const heading = f.kind === "prose" && /^#{1,6}\s/.test(text);
         for (const nomination of proseNominations(text, heading))
-          if (!(heading && inside.has(nomination.term))) nominate(nomination, use);
+          if (!(heading && inside.has(nomination.term))) nominate(nomination, useOfLine());
         runs.push(...wordRuns(text));
       }
       for (const run of runs)
         for (let i = 0; i < run.length; i++)
           if (inside.has(run[i]!.lower)) run[i] = { lower: "", original: "" };
-      proseLines.push({ use, runs });
+      proseLines.push({ use: useOfLine(), runs });
     }
   }
   countWork("phrase comparison", comparisons);
@@ -797,17 +799,28 @@ export async function lexiconReading(
       pool.delete(term);
     }
   // A declared name recurs wherever prose writes it as words, plural included; a well-known capitalized spelling is not a use.
+  // Only a window whose last word, or its singular, ends some declared name can find one: the rest are skipped before any key is built.
+  const declaredLastWords = new Set([...[...pool].filter(([, entry]) => entry.declared).map(([term]) => term), ...(scope.declared ?? [])].map((term) => term.split(" ").at(-1)!));
+  const singularsByWord = new Map<string, string[]>();
+  const singularsOf = (word: string): string[] => {
+    const known = singularsByWord.get(word);
+    if (known !== undefined) return known;
+    const made = singular(word);
+    singularsByWord.set(word, made);
+    return made;
+  };
   for (const line of proseLines) {
     const seen = new Set<string>();
     for (const run of line.runs)
       for (let i = 0; i < run.length; i++)
         for (let size = 1; size <= 3 && i + size <= run.length; size++) {
+          const last = run[i + size - 1]!.lower;
+          if (last === "") break;
+          if (!declaredLastWords.has(last) && !singularsOf(last).some((form) => declaredLastWords.has(form))) continue;
           const words = run.slice(i, i + size);
-          if (words.some((w) => w.lower === "")) break;
-          const last = words.at(-1)!.lower;
           const head = words.slice(0, -1).map((w) => w.lower);
           // A reading of a few files also counts the names code declares elsewhere: the kept reading holds where.
-          const key = [last, ...singular(last)].map((w) => [...head, w].join(" ")).find((k) => pool.get(k)?.declared || scope.declared?.has(k));
+          const key = [last, ...singularsOf(last)].map((w) => [...head, w].join(" ")).find((k) => pool.get(k)?.declared || scope.declared?.has(k));
           if (key === undefined || seen.has(key)) continue;
           if (isWellKnown(famous, key, words.map((w) => w.original).join(" "))) continue;
           seen.add(key);
@@ -883,10 +896,16 @@ export async function lexiconReading(
         if (candidate || refused || !item || (!item.concept && !alternatives?.length)) return undefined;
         return multiple() ?? (item.concept ? near(here, item.concept.name) : undefined);
       };
-      const contexts = [...new Set(locations.map((u) => u.component))]
+      const locationsByComponent = new Map<string, VocabularyUse[]>();
+      for (const location of locations) {
+        const inComponent = locationsByComponent.get(location.component);
+        if (inComponent === undefined) locationsByComponent.set(location.component, [location]);
+        if (inComponent !== undefined) inComponent.push(location);
+      }
+      const contexts = [...locationsByComponent.keys()]
         .sort()
         .map((component) => {
-          const here = locations.filter((u) => u.component === component);
+          const here = locationsByComponent.get(component)!;
           const risk = atRisk(here);
           // Content, not line numbers, identifies a context; moving a line does not erase a human's answer.
           const evidence = digest({
