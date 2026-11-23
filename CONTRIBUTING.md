@@ -21,10 +21,10 @@ node src/cli.ts run --status              # the latest verdict per enforcement, 
 node src/cli.ts run --each                # after the batched pass, each totality oracle's test in its own invocation, a second run; exit 1 if one fails alone
 node src/cli.ts serve [--language <l>]    # the warm language server for this project and language (spawned on demand otherwise)
 node src/cli.ts hook <event>              # answer one harness event (event JSON on stdin)
-node src/cli.ts hooks install --host claude|codex [--command "<prefix>"]
+node src/cli.ts hooks install --host claude|codex|antigravity [--command "<prefix>"]
 node src/cli.ts hooks install --host claude --mod [--shared]   # the mod in place of the settings hooks: yours, or the team's in the committed settings
-node src/cli.ts hooks uninstall --host claude|codex   # removes only Coherence's commands; other hooks and settings stay byte for byte
-node src/cli.ts hooks --check --host claude|codex     # exit 1 naming each event missing, stale, or extra against what install would write
+node src/cli.ts hooks uninstall --host claude|codex|antigravity   # removes only Coherence's commands; other hooks and settings stay byte for byte
+node src/cli.ts hooks --check --host claude|codex|antigravity     # exit 1 naming each event missing, stale, or extra against what install would write
 node src/cli.ts hooks status                          # the wiring per agent host, and what each event delivers for this project
 node src/cli.ts ci install --host github --mode fail|comment [--write]   # the workflow that runs Coherence on every pull request; never over a file already there
 node src/cli.ts ci report --session <id> [--base <commit>]   # the pull request report as Markdown, from that session's run; --base marks findings in files changed since that commit (on GitHub Actions, the pull request's base branch by default)
@@ -45,7 +45,8 @@ tree's `src/cli.ts`, and an interactive session reloads the mod when a file
 of it is saved. A copy of the mod installed for this repository or for you
 (`hooks install --mod`, `/plugin install`) would take its name first and run
 instead; the mod says so when it starts, and `hooks --check --host claude`
-names one installed for this repository. Codex keeps its settings hooks in `.codex/hooks.json`.
+names one installed for this repository. Codex keeps its settings hooks in `.codex/hooks.json`, and Antigravity
+its handlers under the hook name `coherence` in `.agents/hooks.json`.
 `node src/cli.ts hooks status` reports their installation and what each event
 carries here (orient at the starts, the peer feed at prompt and tool boundaries,
 a practice before a tool use that fires it, regulate at the stops), and `hooks --check` is the CI form. Stop reports the check
@@ -57,7 +58,7 @@ To try a change to Coherence in another project before it is published, keep
 the project's hooks as they are and point them at your checkout:
 
 ```sh
-export COHERENCE_HOME=~/Dev/coherence   # in the shell that starts claude or codex
+export COHERENCE_HOME=~/Dev/coherence   # in the shell that starts claude, codex or agy
 ```
 
 The hooks the project commits run the checkout `$COHERENCE_HOME` names

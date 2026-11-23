@@ -93,7 +93,7 @@ Everything Coherence does as of branch `promo` (2026-09-24), grouped by what the
 - **Vocabulary at the edit** _(unnamed)_ — at PostToolUse, names only a new undefined term or at-risk meaning the edit just introduced. `src/lifecycle/hook.ts`
 - **Read trace** — records the files a session read at each tool use, and snapshots them at Stop against the change and the economy prediction. `src/economy/trace.ts`
 1- **Regulate** — at Stop and SubagentStop, reports what the session owes (rejected names in changed files, spec problems, structural defects, an open work order, new undefined terms); a subagent's stop is refused only for what the tool can prove. `src/lifecycle/hook.ts`
-1- **Hook install** — merges Coherence's hooks into Claude Code or Codex settings, leaving other hooks untouched; uninstall removes only its own. `coherence hooks install` / `uninstall`
+1- **Hook install** — merges Coherence's hooks into Claude Code, Codex or Antigravity settings, leaving other hooks untouched; uninstall removes only its own. `coherence hooks install` / `uninstall`
 - **Hook check** — exits non-zero when installed hooks drift from what install would write (for CI). `coherence hooks --check`
 - **Hook status** — shows the wiring per agent host and what each event will actually deliver in this project. `coherence hooks status`
 - **Project confinement** _(unnamed)_ — the hook answers only for the project it was installed in; events from elsewhere are refused untouched. `src/lifecycle/hook.ts`
@@ -152,7 +152,7 @@ Everything Coherence does as of branch `promo` (2026-09-24), grouped by what the
 1- **Language adapter** — the seam that lets chokepoint checks and reference lookup work across languages via each language's server. `src/adapters/`
 1- **TypeScript support** — via the TypeScript language server; reaches the visibility-choked grade. `src/adapters/typescript.ts`
 1- **Python support** — via Pyright and pytest; reaches closure-choked and checker-chokefd grades. `src/adapters/python.ts`
-- **Agent host support** — Claude Code and Codex.
+- **Agent host support** — Claude Code, Codex and Antigravity.
 - **Platform** — Apple Silicon Macs only.
 - **Project files only** _(unnamed)_ — only files git tracks (or untracked, not ignored) count as evidence; vendored checkouts are ignored. `src/adapters/project-filesure,s.ts`
 

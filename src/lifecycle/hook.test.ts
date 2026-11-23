@@ -13,6 +13,7 @@ import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
 import { BOUNDARY_RULE, CONTEXT_BUDGET, VOCABULARY_TOKENS, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, ADOPTER_INSTRUCTION, runHook, startReading, sessionBlock, type WarmDoor } from "./hook.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
+import { hookInputOf, runAntigravityHook } from "./antigravity.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { TRACES_DIR, recordReadTrace, recordWriteTrace } from "../economy/trace.ts";
 import { COHERENCE_LEXICON, installedRoot, PACKAGE_NAME } from "./project.ts";
@@ -1062,5 +1063,28 @@ test("a hook voice file whose real path leaves the project root is named as not 
   } finally {
     await rm(dir, { recursive: true, force: true });
     await rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("an Antigravity tool event's context waits for the next model call, which injects it once, and a forced continuation's stop is never refused again", async () => {
+  const dir = await freshRoot();
+  const session = { conversationId: "agy-1", cwd: dir };
+  try {
+    await mkdir(join(dir, ".coherence", "hooks"), { recursive: true });
+    await writeFile(join(dir, ".coherence", "hooks", "PostToolUse.append.md"), "After each tool: {{session}}.");
+    const toolCall = { id: "t1", name: "write_file", args: { Path: join(dir, "a.ts"), Content: "x" } };
+    const tool = await runAntigravityHook("PostToolUse", { ...session, toolCall }, dir);
+    assert.deepEqual([tool.stdout, tool.exit], ["", 0], "agy drops a PostToolUse injection, so nothing is printed there");
+    tool.commit?.();
+
+    const call = await runAntigravityHook("PreInvocation", { ...session, invocationNum: 1 }, dir);
+    assert.deepEqual(JSON.parse(call.stdout), { injectSteps: [{ systemMessage: { systemMessage: "After each tool: agy-1." } }] });
+    call.commit?.();
+    assert.equal((await runAntigravityHook("PreInvocation", { ...session, invocationNum: 2 }, dir)).stdout, "", "delivered once, then gone");
+
+    assert.equal(hookInputOf("Stop", { ...session, executionNum: 1 }).stop_hook_active, true);
+    assert.deepEqual(hookInputOf("PreToolUse", { ...session, toolCall: { name: "run_command", args: { CommandLine: "ls" } } })["tool_input"], { command: "ls" });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
