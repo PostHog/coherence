@@ -59,6 +59,7 @@ import { isCoherenceItself, loadProjectLexicons, vocabularyFacts, within } from 
 import { BASELINE_CHOSE } from "./lexicon-baseline.ts";
 import { FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
 import { singularForms } from "./inflection.ts";
+import { LEXICON_PAGE_LIMITS } from "../readings/scope/lexicon-projection.ts";
 import { clean, proseNominations, type Nomination } from "./nomination.ts";
 
 export { proseNominations };
@@ -490,7 +491,41 @@ export interface CoverageScope {
   contributions?: boolean | undefined;
   /** Each file's scan kept from an earlier reading, replayed in place of scanning it again (scan-cache.ts). */
   scans?: ScanCache | undefined;
+  /** Also hand back each file's part of each term, the unit the incremental reading rebuilds terms from (vocabulary-state.ts). */
+  records?: boolean | undefined;
+  /** The component folders, as the whole reading found them: a reading of a few files then places each file as the whole reading would. */
+  components?: readonly string[] | undefined;
+  /** The names prose words resolve to, in place of the declared names this reading's own pool holds: an incremental reading's whole-project set. */
+  wordKeys?: ReadonlySet<string> | undefined;
 }
+
+/** One file's part of one term: the lines that use it, nominate it, and write it as words, with each line's text and fingerprint. */
+export interface FileTerm {
+  kind: VocabularyUse["kind"];
+  component: string;
+  adds?: number[];
+  sites?: [line: number, declared: boolean][];
+  words?: number[];
+  lines: Record<number, string>;
+  /** The fingerprint of every line but a record's, which carries its own in `prints`. */
+  fingerprint: string;
+  prints?: Record<number, string>;
+}
+
+/** The reading's totals, from its terms alone. */
+export function coverageTotals(terms: readonly VocabularyTerm[]): Coverage["totals"] {
+  return {
+    terms: terms.length,
+    uses: terms.reduce((n, t) => n + t.count, 0),
+    known: terms.filter((t) => !["unresolved", "rejected"].includes(t.state)).length,
+    rejected: terms.filter((t) => t.state === "rejected").length,
+    unresolved: terms.filter((t) => t.state === "unresolved").length,
+    unreviewedContexts: terms.reduce((n, t) => n + t.contexts.filter(awaitsReview).length, 0),
+  };
+}
+
+/** A file's parts of every term it holds, by term. */
+export type FileTerms = Record<string, FileTerm>;
 
 /** What scanning one line found, in the order the scan found it; replaying the events in order rebuilds the reading exactly. */
 export type ScanEvent =
@@ -526,6 +561,28 @@ export interface Contribution {
 function specFolders(root: string): string[] {
   const bounds = walkBounds(root);
   return componentFolders(projectFilesEnding(root, ".spec.md").filter((rel) => exclusionOf(rel, bounds) === undefined));
+}
+
+export interface Candidate {
+  uses: VocabularyUse[];
+  prose: number;
+  components: number;
+}
+
+/** Whether a pool entry, plurals merged, stands as a candidate, and with which uses: the full and the incremental reading share it. */
+export function candidacyOf(entry: { declared: boolean; sites: readonly VocabularyUse[]; siteKeys: ReadonlySet<string>; words: readonly VocabularyUse[] }): Candidate | undefined {
+  // Written as a name (backticked, Title Case, a heading): the unknown-noun check's sense of a use.
+  const named = entry.sites.filter((u) => u.kind === "prose" || u.kind === "record");
+  const namedSpread = new Set(entry.sites.map((u) => u.component)).size;
+  // Declared in code and written as words in prose: the vocabulary the code and the documents share.
+  const wordSpread = new Set([...entry.words, ...entry.sites.filter((u) => u.kind === "code")].map((u) => u.component)).size;
+  const byName = named.length >= 3 || (named.length >= 2 && namedSpread >= 2);
+  const byWord = entry.declared && entry.words.length >= 10 && wordSpread >= 4;
+  if (!byName && !byWord) return undefined;
+  const all = [...entry.sites];
+  for (const u of entry.words) if (!entry.siteKeys.has(`${u.file}\n${u.line}`)) all.push(u);
+  const prose = all.filter((u) => u.kind === "prose" || u.kind === "record").length;
+  return { uses: all, prose, components: new Set(all.map((u) => u.component)).size };
 }
 
 /** What the reduce knows about the whole reading when it builds one term: the full and the incremental reading share it. */
@@ -634,7 +691,23 @@ export function buildTerm(term: string, locations: VocabularyUse[], facts: TermF
   };
 }
 
-/** The reading's fingerprint, over its population and each term's digest in term order, so a reading that rebuilds a few terms recombines it without the rest of the uses. */
+// The uses a bounded reading's readers show: termEvidence's first per component and first usesPerTerm, and attention's first prose or record use.
+function keptUses(uses: readonly VocabularyUse[]): VocabularyUse[] {
+  const seenComponents = new Set<string>();
+  const firstWritten = uses.find((use) => use.kind === "prose" || use.kind === "record");
+  return uses.filter((use, index) => {
+    const isFirstOfComponent = !seenComponents.has(use.component);
+    seenComponents.add(use.component);
+    return isFirstOfComponent || index < LEXICON_PAGE_LIMITS.usesPerTerm || use === firstWritten;
+  });
+}
+
+/** A term as a kept reading holds it: every count and context, and only the uses its readers show. */
+export function boundedTerm(term: VocabularyTerm): VocabularyTerm {
+  return { ...term, uses: keptUses(term.uses) };
+}
+
+/** The reading's fingerprint, over its population and each bounded term's digest in term order: every context's evidence digest covers its uses, so a reading that rebuilds a few terms recombines it without the rest of the uses. */
 export function coverageFingerprint(population: Coverage["population"], termDigests: readonly string[]): string {
   return digestAll([population.extraction, ...population.limits, ...population.files, ...population.excluded, ...population.unreadable, ...termDigests]);
 }
@@ -654,7 +727,7 @@ export async function lexiconReading(
   layers?: { coherence: Lexicon; project: Lexicon | undefined },
   paths?: readonly string[],
   scope: CoverageScope = {},
-): Promise<{ coverage: Coverage; contributions: Map<string, Contribution> }> {
+): Promise<{ coverage: Coverage; contributions: Map<string, Contribution>; records: Map<string, FileTerms>; facts: TermFacts; termDigests: string[]; components: readonly string[] }> {
   countWork("coverage reading");
   const { coherence, project } = layers ?? (await loadProjectLexicons(root));
   // Coherence's own lexicon is the project's only in Coherence's own checkout; an adopter without lexicon.json has none yet.
@@ -722,7 +795,7 @@ export async function lexiconReading(
     const first = phrase.split(" ")[0]!;
     byFirstWord.set(first, [...(byFirstWord.get(first) ?? []), n]);
   });
-  const components = scope.files !== undefined ? specFolders(root) : componentFolders(corpus.listed);
+  const components = scope.components ?? (scope.files !== undefined ? specFolders(root) : componentFolders(corpus.listed));
   const uses = new Map<string, VocabularyUse[]>();
   const componentFor = (file: string): string => componentOf(file, components);
   // Each term's uses by file and line, so adding one is a lookup, never a scan of the uses so far.
@@ -739,6 +812,21 @@ export async function lexiconReading(
     useKeys.set(term, keys);
     uses.set(term, list);
   };
+  const records = new Map<string, FileTerms>();
+  const partOf = (term: string, use: VocabularyUse): FileTerm => {
+    // Terms are words such as "constructor": a record with no prototype never mistakes one for an inherited member.
+    const byTerm: FileTerms = records.get(use.file) ?? Object.create(null);
+    records.set(use.file, byTerm);
+    const part = (byTerm[term] ??= { kind: use.kind, component: use.component, lines: {}, fingerprint: use.kind === "record" ? "" : use.fingerprint });
+    part.lines[use.line] = use.text;
+    if (use.kind === "record") (part.prints ??= {})[use.line] = use.fingerprint;
+    return part;
+  };
+  const recordAdd = (term: string, use: VocabularyUse): void => {
+    if (scope.records !== true || !term) return;
+    const adds = (partOf(term, use).adds ??= []);
+    if (!adds.includes(use.line)) adds.push(use.line);
+  };
   /** Rejected names on each line, keyed by file then line: sense is at risk beside them. */
   const rejectedLines = new Map<string, Map<number, string[]>>();
   const pool = new Map<string, Pool>();
@@ -750,7 +838,10 @@ export async function lexiconReading(
     if (!ELIGIBLE.test(term) || term.length > 40) return;
     if (knownMeaning(term, known) || rejected.has(term)) {
       // An inflection of a known name is observed under its own spelling; an exact name already has its uses.
-      if (site && !known.has(term) && !rejected.has(term)) add(term, site);
+      if (site && !known.has(term) && !rejected.has(term)) {
+        add(term, site);
+        recordAdd(term, site);
+      }
       return;
     }
     if (confusables.has(term) || unremarked.has(term) || isWellKnown(famous, term, n.spelling)) return;
@@ -769,6 +860,12 @@ export async function lexiconReading(
       entry.sites.push(site);
     }
     if (declared && site) declaredBy.set(term, (declaredBy.get(term) ?? new Set<string>()).add(site.file));
+    if (scope.records === true && site) {
+      const sites = (partOf(term, site).sites ??= []);
+      const found = sites.find(([line]) => line === site.line);
+      if (found !== undefined) found[1] ||= declared;
+      if (found === undefined) sites.push([site.line, declared]);
+    }
     pool.set(term, entry);
   };
   // Components come from every spec in the corpus; only the files the reading was narrowed to were read for uses.
@@ -887,6 +984,7 @@ export async function lexiconReading(
       switch (event[1]) {
         case "add":
           add(event[2], useOfLine(n));
+          recordAdd(event[2], useOfLine(n));
           break;
         case "rejected": {
           const byLine = rejectedLines.get(f.rel) ?? new Map<number, string[]>();
@@ -961,7 +1059,9 @@ export async function lexiconReading(
     }
   // A declared name recurs wherever prose writes it as words, plural included; a well-known capitalized spelling is not a use.
   // Only a window whose last word, or its singular, ends some declared name can find one: the rest are skipped before any key is built.
-  const declaredLastWords = new Set([...[...pool].filter(([, entry]) => entry.declared).map(([term]) => term), ...(scope.declared ?? [])].map((term) => term.split(" ").at(-1)!));
+  const isWordKey = scope.wordKeys !== undefined ? (key: string): boolean => scope.wordKeys!.has(key) : (key: string): boolean => pool.get(key)?.declared === true || scope.declared?.has(key) === true;
+  const wordKeySource = scope.wordKeys !== undefined ? [...scope.wordKeys] : [...[...pool].filter(([, entry]) => entry.declared).map(([term]) => term), ...(scope.declared ?? [])];
+  const declaredLastWords = new Set(wordKeySource.map((term) => term.split(" ").at(-1)!));
   const singularsByWord = new Map<string, string[]>();
   const singularsOf = (word: string): string[] => {
     const known = singularsByWord.get(word);
@@ -981,10 +1081,14 @@ export async function lexiconReading(
           const words = run.slice(i, i + size);
           const head = words.slice(0, -1).map((w) => w.lower);
           // A reading of a few files also counts the names code declares elsewhere: the kept reading holds where.
-          const key = [last, ...singularsOf(last)].map((w) => [...head, w].join(" ")).find((k) => pool.get(k)?.declared || scope.declared?.has(k));
+          const key = [last, ...singularsOf(last)].map((w) => [...head, w].join(" ")).find(isWordKey);
           if (key === undefined || seen.has(key)) continue;
           if (isWellKnown(famous, key, words.map((w) => w.original).join(" "))) continue;
           seen.add(key);
+          if (scope.records === true) {
+            const words = (partOf(key, line.use).words ??= []);
+            words.push(line.use.line);
+          }
           if (scope.contributions === true) {
             const c = contributionOf(line.use.file, line.use.component);
             c.words[key] = (c.words[key] ?? 0) + 1;
@@ -992,20 +1096,10 @@ export async function lexiconReading(
           pool.get(key)?.words.push(line.use);
         }
   }
-  const candidates = new Map<string, { uses: VocabularyUse[]; prose: number; components: number }>();
+  const candidates = new Map<string, Candidate>();
   for (const [term, entry] of pool) {
-    // Written as a name (backticked, Title Case, a heading): the unknown-noun check's sense of a use.
-    const named = entry.sites.filter((u) => u.kind === "prose" || u.kind === "record");
-    const namedSpread = new Set(entry.sites.map((u) => u.component)).size;
-    // Declared in code and written as words in prose: the vocabulary the code and the documents share.
-    const wordSpread = new Set([...entry.words, ...entry.sites.filter((u) => u.kind === "code")].map((u) => u.component)).size;
-    const byName = named.length >= 3 || (named.length >= 2 && namedSpread >= 2);
-    const byWord = entry.declared && entry.words.length >= 10 && wordSpread >= 4;
-    if (!byName && !byWord) continue;
-    const all = [...entry.sites];
-    for (const u of entry.words) if (!entry.siteKeys.has(`${u.file}\n${u.line}`)) all.push(u);
-    const prose = all.filter((u) => u.kind === "prose" || u.kind === "record").length;
-    candidates.set(term, { uses: all, prose, components: new Set(all.map((u) => u.component)).size });
+    const candidate = candidacyOf(entry);
+    if (candidate !== undefined) candidates.set(term, candidate);
   }
   for (const [term, found] of candidates) for (const u of found.uses) add(term, u);
   const decisions = scope.rulings === false ? new Map<string, { disposition: string; because: string }>() : rulings(root);
@@ -1032,23 +1126,16 @@ export async function lexiconReading(
       "Totals are population facts about this reading, not a to-do count.",
     ],
   };
+  const termDigests = terms.map((term) => digest(boundedTerm(term)));
   const coverage: Coverage = {
     version: 1,
     projectLexicon: project?.path ?? (own ? coherence.path : null),
-    fingerprint: coverageFingerprint(population, terms.map(digest)),
+    fingerprint: coverageFingerprint(population, termDigests),
     population,
     terms,
-    totals: {
-      terms: terms.length,
-      uses: terms.reduce((n, t) => n + t.count, 0),
-      known: terms.filter((t) => !["unresolved", "rejected"].includes(t.state))
-        .length,
-      rejected: terms.filter((t) => t.state === "rejected").length,
-      unresolved: terms.filter((t) => t.state === "unresolved").length,
-      unreviewedContexts: terms.reduce((n, t) => n + t.contexts.filter(awaitsReview).length, 0),
-    },
+    totals: coverageTotals(terms),
   };
-  return { coverage, contributions };
+  return { coverage, contributions, records, facts: termFacts, termDigests, components };
 }
 
 /* -------------------------------------------------------------- attention */

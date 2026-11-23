@@ -143,6 +143,7 @@ const MASKS: [RegExp, string][] = [
   [/\d{4}-\d\d-\d\d \d\d:\d\d UTC/g, "<time>"],
   [/\b1\d{12}(\.\d+)?\b/g, "<file time>"],
   [/vocabulary-\d+@[0-9a-f]+:[0-9a-f]+/g, "<state version>"],
+  [/^\d+:\d+:(\d+):<file time>:<file time>$/g, "<device>:<inode>:$1:<file time>:<file time>"],
 ];
 
 function maskedText(text: string): string {

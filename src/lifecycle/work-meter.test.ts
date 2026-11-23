@@ -860,7 +860,7 @@ const HEAD_MOVES: [string, (project: SizedProject) => void, (project: SizedProje
   ],
 ];
 
-test("a checkout, a pull or a branch switch onto a clean tree moves the tree: the next edit and the next prompt read in full", async () => {
+test("a checkout, a pull or a branch switch onto a clean tree moves the tree: the next edit reads in full and the next prompt reads again from what changed", async () => {
   for (const [name, before, move] of HEAD_MOVES) {
     for (const next of ["edit", "prompt"] as const) {
       const project = sizedProject(1);
@@ -878,6 +878,8 @@ test("a checkout, a pull or a branch switch onto a clean tree moves the tree: th
         } else {
           const m = await workOf(project, "UserPromptSubmit", { prompt: "second" });
           assert.equal(m.work.counts["coverage reading"], 1, `${name}: the next prompt takes the reading`);
+          const tier = readFileSync(join(project.root, ".coherence", "cache", "vocabulary-tiers.jsonl"), "utf8").trim().split("\n").at(-1)!;
+          assert.match(tier, /"tier":"files"/, `${name}: the next prompt reads the files HEAD's move changed, from the kept index`);
         }
       } finally {
         rmSync(project.top, { recursive: true, force: true });

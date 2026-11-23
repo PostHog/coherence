@@ -9,7 +9,11 @@ import type { FileScan, ScanCache } from "./lexicon-coverage.ts";
 export const BUCKETS = 64;
 
 export function bucketOf(name: string): string {
-  return String(createHash("sha1").update(name).digest().readUInt32BE(0) % BUCKETS).padStart(2, "0");
+  return bucketAmong(name, BUCKETS);
+}
+
+export function bucketAmong(name: string, buckets: number): string {
+  return String(createHash("sha1").update(name).digest().readUInt32BE(0) % buckets).padStart(String(buckets - 1).length, "0");
 }
 
 interface KeptScan extends FileScan {
