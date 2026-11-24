@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { lexiconReading, type Coverage } from "./lexicon-coverage.ts";
+import { lexiconReading, type Coverage, boundedTerm } from "./lexicon-coverage.ts";
 import { loadProjectLexicons } from "./project.ts";
 import { currentReading, editVocabulary, keptReading } from "./vocabulary-state.ts";
 
@@ -107,6 +107,7 @@ test("a reading taken from the kept index equals a full reading after every rand
       const full = (await lexiconReading(root, layers)).coverage;
       assert.equal(incremental.fingerprint, full.fingerprint, `step ${step}: the fingerprint covers every term's full uses`);
       assert.equal(withoutUses(incremental), withoutUses(full), `step ${step}`);
+      assert.deepEqual(incremental.terms.map((term) => term.uses), full.terms.map((term) => boundedTerm(term).uses), `step ${step}: the uses a reader is shown`);
     }
     const log = readFileSync(join(root, ".coherence", "cache", "vocabulary-extents.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line) as { extent: string; reason?: string });
     for (const entry of log) extents.add(entry.extent);
