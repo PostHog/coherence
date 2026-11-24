@@ -7,6 +7,7 @@
 
 import { posix } from "node:path";
 import { languageOfFile } from "../../src/plugins/api.ts";
+import { INDEX_EXTENSIONS, JAVASCRIPT_EXTENSION, MODULE_EXTENSIONS } from "./module-extensions.ts";
 import { escape, handlerName, lineOf, NEXT_ROUTE_METHODS, REMIX_ROUTE_EXPORTS, spanOf, throughOf, type EntranceCandidate, type EntranceSyntax } from "../../src/plugins/api.ts";
 
 /** The text from its first code: leading whitespace and comments skipped by a walk, never a backtracking pattern. */
@@ -138,8 +139,8 @@ function importedFiles(files: readonly string[], read: (file: string) => string 
     if (text === undefined) continue;
     for (const m of text.matchAll(TS_IMPORT)) {
       const joined = posix.normalize(posix.join(posix.dirname(file), m[1]!));
-      const stem = joined.replace(/\.(js|mjs|cjs|jsx)$/, "");
-      for (const c of [joined, ...[".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs"].map((e) => stem + e), ...[".ts", ".tsx", ".js"].map((e) => posix.join(joined, "index" + e))]) {
+      const stem = joined.replace(JAVASCRIPT_EXTENSION, "");
+      for (const c of [joined, ...MODULE_EXTENSIONS.map((e) => stem + e), ...INDEX_EXTENSIONS.map((e) => posix.join(joined, "index" + e))]) {
         if (all.has(c) && c !== file) out.add(c);
       }
     }
