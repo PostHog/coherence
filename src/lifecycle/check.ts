@@ -43,7 +43,7 @@
  * the walk. Every path given is confined to the project root.
  */
 
-import { existsSync } from "node:fs";
+import { accessSync, constants as fsConstants, existsSync, lstatSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { readProjectTextAsync } from "./work-meter.ts";
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
@@ -222,6 +222,57 @@ function kindOf(root: string, path: string): FileKind | undefined {
 }
 
 const OUTSIDE_BOUNDS = "outside the config's bounds: under a folder its ignore list names";
+const UNSUPPORTED_KIND = "unsupported file kind or dependency lockfile";
+const SYMLINK_NOT_FOLLOWED = "symbolic link not followed";
+export const NESTED_CHECKOUT = "a nested checkout: another repository or worktree, not the project's files";
+const OWN_BUT_LEFT_OUT = "lexicon, reference vocabulary, generated state, or excluded folder";
+const NOT_OWN = "not one of the project's files: ignored, or inside a nested checkout";
+
+/**
+ * The walk's own rules asked of one path, under a config, lexicons and
+ * markers the caller has already ruled unchanged, and git's listing of the
+ * project's files as it now stands. `descends`: the walk lists this folder's
+ * entries. `reaches`: it descends through every folder above the path.
+ * `leftOutAgain`: it would list the path again with this reason. Binary
+ * content is read from the text, so it is never answered here.
+ */
+export function walkRules(root: string, own: ReadonlySet<string>): { descends: (folder: string) => boolean; reaches: (rel: string) => boolean; leftOutAgain: (rel: string, reason: string) => boolean } {
+  const ignore = new Set(configIgnore(root));
+  const rules = walkBounds(root, [], { readHidden: true });
+  const descends = (folder: string): boolean => {
+    try {
+      if (!lstatSync(resolve(root, folder)).isDirectory()) return false;
+      accessSync(resolve(root, folder), fsConstants.R_OK | fsConstants.X_OK);
+    } catch {
+      return false;
+    }
+    return !machineWritten(folder) && exclusionOf(folder + "/", rules) === undefined && !outsideBounds(folder + "/", ignore) && !existsSync(resolve(root, folder, ".git"));
+  };
+  const reaches = (rel: string): boolean => {
+    const parts = rel.split("/");
+    return parts.slice(0, -1).every((_, index) => descends(parts.slice(0, index + 1).join("/")));
+  };
+  const leftOutAgain = (rel: string, reason: string): boolean => {
+    if (!reaches(rel)) return false;
+    let info;
+    try {
+      info = lstatSync(resolve(root, rel));
+    } catch {
+      return false;
+    }
+    if (info.isSymbolicLink()) return reason === SYMLINK_NOT_FOLLOWED;
+    if (info.isDirectory()) {
+      const rule = exclusionOf(rel + "/", rules);
+      if (rule !== undefined) return reason === rule;
+      if (outsideBounds(rel + "/", ignore)) return reason === OUTSIDE_BOUNDS;
+      return existsSync(resolve(root, rel, ".git")) && reason === NESTED_CHECKOUT;
+    }
+    if (!info.isFile() || machineWritten(rel)) return false;
+    if (kindOf(root, resolve(root, rel)) === undefined) return reason === UNSUPPORTED_KIND;
+    return reason === (outsideBounds(rel, ignore) ? OUTSIDE_BOUNDS : own.has(rel) ? OWN_BUT_LEFT_OUT : NOT_OWN);
+  };
+  return { descends, reaches, leftOutAgain };
+}
 
 interface Walk {
   root: string;
@@ -261,12 +312,12 @@ async function walk(dir: string, walker: Walk): Promise<void> {
       const rule = exclusionOf(relPath(walker.root, path) + "/", walker.rules);
       if (rule !== undefined) { walker.excluded.push({ file: relPath(walker.root, path), reason: rule }); continue; }
       if (outsideBounds(relPath(walker.root, path) + "/", walker.ignore)) { walker.excluded.push({ file: relPath(walker.root, path), reason: OUTSIDE_BOUNDS }); continue; }
-      if (existsSync(resolve(path, ".git"))) { walker.excluded.push({ file: relPath(walker.root, path), reason: "a nested checkout: another repository or worktree, not the project's files" }); continue; }
+      if (existsSync(resolve(path, ".git"))) { walker.excluded.push({ file: relPath(walker.root, path), reason: NESTED_CHECKOUT }); continue; }
       await walk(path, walker);
     } else if (entry.isFile() && kindOf(walker.root, path) !== undefined) {
       walker.found.push(path);
     } else {
-      walker.excluded.push({ file: relPath(walker.root, path), reason: entry.isSymbolicLink() ? "symbolic link not followed" : "unsupported file kind or dependency lockfile" });
+      walker.excluded.push({ file: relPath(walker.root, path), reason: entry.isSymbolicLink() ? SYMLINK_NOT_FOLLOWED : UNSUPPORTED_KIND });
     }
   }
 }
@@ -321,7 +372,7 @@ export async function collectFiles(options: CheckOptions): Promise<{ files: stri
   for (const path of walker.found) {
     if (kept.has(path)) continue;
     const rel = relPath(root, path);
-    walker.excluded.push({ file: rel, reason: outsideBounds(rel, walker.ignore) ? OUTSIDE_BOUNDS : own.has(rel) ? "lexicon, reference vocabulary, generated state, or excluded folder" : "not one of the project's files: ignored, or inside a nested checkout" });
+    walker.excluded.push({ file: rel, reason: outsideBounds(rel, walker.ignore) ? OUTSIDE_BOUNDS : own.has(rel) ? OWN_BUT_LEFT_OUT : NOT_OWN });
   }
   return { files, unreadable: walker.unreadable, excluded: walker.excluded };
 }

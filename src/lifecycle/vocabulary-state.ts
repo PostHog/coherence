@@ -32,7 +32,7 @@ import { spawnSync } from "./work-meter.ts";
 import { basename, join } from "node:path";
 import { cacheDir, storeVersion, withLock, writeKept } from "./kept-parse.ts";
 import { boundedTerm, buildTerm, candidacyOf, coverageFingerprint, coverageTotals, digest, lexiconReading, singularForms, type Candidate, type Contribution, type Coverage, type FileTerm, type FileTerms, type TermFacts, type VocabularyTerm, type VocabularyUse } from "./lexicon-coverage.ts";
-import { corpusFiles } from "./check.ts";
+import { corpusFiles, NESTED_CHECKOUT, walkRules } from "./check.ts";
 import { projectFiles } from "../adapters/project-files.ts";
 import type { Lexicon } from "./lexicon.ts";
 import { bucketAmong, bucketOf, openScanCache } from "./scan-cache.ts";
@@ -853,25 +853,46 @@ async function incrementalReading(root: string, layers: { coherence: Lexicon; pr
   if (tree === undefined || records === undefined) throw new FullReading("git could not list the tree's changes");
   // An edit keeps its file's contribution and meta.tree without the reading, so a file it wrote that is since put back matches the reading's tree yet not the buckets.
   const changed = [...new Set([...changedPaths(root, saved.tree, tree, saved.records, records), ...movedBeyond(meta.tree, tree, [HEAD_KEY]).filter((file) => !file.startsWith("\0"))])].sort();
-  const reshaping = changed.find((file) => reshapingFiles().has(basename(file)));
-  if (reshaping !== undefined) throw new FullReading(`${reshaping} changed, which can change what the reading reads`);
+  const reshaping = reshapingFiles();
+  const reshaped = changed.find((file) => reshaping.has(basename(file)));
+  if (reshaped !== undefined) throw new FullReading(`${reshaped} changed, which can change what the reading reads`);
   const population = saved.coverage.population;
   const listedThen = new Map(population.files.map((entry) => [entry.file, entry]));
-  const setAside = [...population.excluded, ...population.unreadable].map((entry) => entry.file);
+  const excludedThen = new Map(population.excluded.map((entry) => [entry.file, entry.reason]));
+  const unreadableThen = new Set(population.unreadable.map((entry) => entry.file));
   const onDisk = new Set(changed.filter((file) => isFileOnDisk(root, file)));
+  const own = new Set(projectFiles(root));
+  const walk = walkRules(root, own);
+  // A folder can start or stop being walked into (a git init, a removed .git, its mode) with no file git lists as changed.
+  const foldersWalked = new Set([...population.files, ...population.excluded, ...population.unreadable].flatMap((entry) => ancestorsOf(entry.file)));
+  const unwalked = [...foldersWalked].find((folder) => !walk.descends(folder));
+  if (unwalked !== undefined) throw new FullReading(`${unwalked} is no longer walked into`);
+  const nowReadable = population.unreadable.find((entry) => walk.descends(entry.file));
+  if (nowReadable !== undefined) throw new FullReading(`${nowReadable.file} can be read now`);
+  const nestedGone = population.excluded.find((entry) => entry.reason === NESTED_CHECKOUT && !walk.leftOutAgain(entry.file, entry.reason));
+  if (nestedGone !== undefined) throw new FullReading(`${nestedGone.file} is no longer a nested checkout`);
+  // The walk would list these again exactly as the last reading did, so they are neither read nor a reason to read in full.
+  const asListed = new Set<string>();
   for (const file of changed) {
-    if (setAside.some((aside) => file === aside || file.startsWith(aside + "/"))) throw new FullReading(`${file} was left out of the last reading`);
+    const folders = ancestorsOf(file);
+    if (unreadableThen.has(file) || folders.some((folder) => unreadableThen.has(folder))) throw new FullReading(`${file} was left out of the last reading`);
+    const leftOutAt = [file, ...folders].find((path) => excludedThen.has(path));
+    if (leftOutAt !== undefined) {
+      if (!walk.leftOutAgain(leftOutAt, excludedThen.get(leftOutAt)!)) throw new FullReading(`${file} was left out of the last reading`);
+      asListed.add(file);
+      continue;
+    }
     if (file.endsWith(".spec.md") && listedThen.has(file) !== onDisk.has(file)) throw new FullReading(`a spec was added or removed (${file})`);
   }
-  const own = new Set(projectFiles(root));
-  const read = await corpusFiles({ root, coherence: layers.coherence, project: layers.project }, [...onDisk].filter((file) => own.has(file)));
+  const toRead = [...onDisk].filter((file) => !asListed.has(file));
+  const read = await corpusFiles({ root, coherence: layers.coherence, project: layers.project }, toRead.filter((file) => own.has(file)));
   const readRels = new Set(read.map((file) => file.rel));
-  const leftOut = [...onDisk].find((file) => !readRels.has(file));
+  const leftOut = toRead.find((file) => !readRels.has(file) || !walk.reaches(file));
   if (leftOut !== undefined) throw new FullReading(`${leftOut} would be left out of the reading`);
   const declaredThen = new Set(side.declared);
   const scans = openScanCache(root, version);
   const scope = { records: true, contributions: true, scans, components: side.components } as const;
-  const first = await lexiconReading(root, layers, undefined, { ...scope, files: [...readRels], wordKeys: declaredThen });
+  const first = await lexiconReading(root, layers, undefined, { ...scope, files: [...readRels], corpus: read, wordKeys: declaredThen });
   const index = openIndex(root, side);
   const touched = new Set<string>();
   const contributions = new Map<string, Contribution | undefined>();
@@ -898,9 +919,13 @@ async function incrementalReading(root: string, layers: { coherence: Lexicon; pr
   if (flipped.length > 0) {
     extent = "declared names";
     const forms = wordForms(flipped);
-    const corpusNow = new Set([...[...listedThen.keys()].filter((file) => !changed.includes(file)), ...readRels]);
+    const changedFiles = new Set(changed);
+    const corpusNow = new Set([...[...listedThen.keys()].filter((file) => !changedFiles.has(file)), ...readRels]);
     const again = [...new Set([...filesWriting(root, forms).filter((file) => corpusNow.has(file)), ...readRels])].sort();
-    const second = await lexiconReading(root, layers, undefined, { ...scope, files: again, wordKeys: declared });
+    const alreadyRead = new Map(read.map((file) => [file.rel, file]));
+    const readNow = new Map((await corpusFiles({ root, coherence: layers.coherence, project: layers.project }, again.filter((file) => !alreadyRead.has(file)))).map((file) => [file.rel, file]));
+    const corpusAgain = again.flatMap((file) => { const found = alreadyRead.get(file) ?? readNow.get(file); return found === undefined ? [] : [found]; });
+    const second = await lexiconReading(root, layers, undefined, { ...scope, files: again, corpus: corpusAgain, wordKeys: declared });
     for (const file of again) {
       contributions.set(file, second.contributions.get(file));
       const parts = second.records.get(file) ?? {};
@@ -1013,6 +1038,12 @@ function isFileOnDisk(root: string, rel: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** The folders above a project-relative path, outermost first. */
+function ancestorsOf(rel: string): string[] {
+  const parts = rel.split("/");
+  return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join("/"));
 }
 
 /** Where each reading's extent and reason are kept, for measuring how often each fires; the oldest half is dropped past its size. */

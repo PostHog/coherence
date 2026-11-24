@@ -781,7 +781,7 @@ test("a write no hook saw is caught at the next edit, which reads again and name
     writeFileSync(file, readFileSync(file, "utf8") + "A `rebate` is clawed back.\n");
     const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
     assert.match(m.said, /Lexicon: read again at this edit: the tree moved since its vocabulary was kept, beyond what this edit wrote \(docs\/note-1\.md\)/, "the unseen write is said");
-    assert.deepEqual([...new Set(m.work.reads.filter((r) => r.startsWith("corpus ")))].sort(), ["corpus <top>/proj/docs/note-0.md", "corpus <top>/proj/docs/note-1.md"], "only the files that changed are read");
+    assert.deepEqual(m.work.reads.filter((r) => r.startsWith("corpus ")).sort(), ["corpus <top>/proj/docs/note-0.md", "corpus <top>/proj/docs/note-1.md"], "only the files that changed are read, each once");
     assert.ok(pendingCandidates(project.root, SESSION).terms.includes("rebate"), "and the term it made recur with this edit is held for the stop, as main finds it");
     assert.doesNotMatch(m.said, /recur without a definition/, "held, not said at the edit");
   } finally {

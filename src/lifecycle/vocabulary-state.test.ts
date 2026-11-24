@@ -116,6 +116,60 @@ test("a reading taken from the kept index equals a full reading after every rand
   }
 });
 
+test("a changed file the walk would leave out again as before keeps the reading incremental; one whose reason moved reads in full; each equals a full reading", async () => {
+  const root = tallyProject();
+  try {
+    mkdirSync(join(root, "docs", "reference"), { recursive: true });
+    writeFileSync(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+    writeFileSync(join(root, "styles.css"), "body { color: red; }\n");
+    writeFileSync(join(root, "docs", "reference", "glossary.md"), "The Widget Crate, as another project names it.\n");
+    writeFileSync(join(root, ".gitignore"), "secret.md\n");
+    writeFileSync(join(root, "secret.md"), "The Widget Crate is kept from git.\n");
+    writeFileSync(join(root, "notes"), "a file with no kind\n");
+    mkdirSync(join(root, "inner"));
+    writeFileSync(join(root, "inner", "inner.md"), "The Widget Crate, in another repository.\n");
+    for (const folder of ["vendored", "imported", "quiet", "pruned", "lockbox"]) mkdirSync(join(root, folder));
+    writeFileSync(join(root, "lockbox", "Cargo.lock"), "# a lockfile alone\n");
+    writeFileSync(join(root, "quiet", "quiet.md"), "The Widget Crate, read and never edited.\n");
+    writeFileSync(join(root, "pruned", "kept.md"), "The Widget Crate stays.\n");
+    writeFileSync(join(root, "pruned", "gone.md"), "The Widget Crate goes.\n");
+    writeFileSync(join(root, "vendored", "yarn.lock"), "# yarn lockfile v1\n");
+    writeFileSync(join(root, "imported", "notes.md"), "The Widget Crate, read as the project's own.\n");
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "left out");
+    git(join(root, "inner"), "init", "-q");
+    const layers = await loadProjectLexicons(root);
+    await keptReading(root, layers);
+    const lastExtent = (): string => readFileSync(join(root, ".coherence", "cache", "vocabulary-extents.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line) as { extent: string }).at(-1)!.extent;
+    const changes: [string, () => void, string][] = [
+      ["a lockfile rewritten", () => writeFileSync(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\nimporters: {}\n"), "files"],
+      ["a stylesheet edited", () => writeFileSync(join(root, "styles.css"), "body { color: blue; }\n"), "files"],
+      ["reference vocabulary edited", () => writeFileSync(join(root, "docs", "reference", "glossary.md"), "The Widget Crate, and a Widget Crate again.\n"), "files"],
+      ["a new lockfile", () => writeFileSync(join(root, "yarn.lock"), "# yarn lockfile v1\n"), "full"],
+      ["a lockfile deleted", () => rmSync(join(root, "pnpm-lock.yaml")), "full"],
+      ["an ignored file added by force", () => git(root, "add", "-f", "secret.md"), "full"],
+      ["a kindless file turned into a folder", () => { rmSync(join(root, "notes")); mkdirSync(join(root, "notes")); writeFileSync(join(root, "notes", "more.md"), "The Widget Crate, now in a folder.\n"); }, "full"],
+      ["a folder of left-out files that becomes a nested checkout while another file changes", () => { git(join(root, "lockbox"), "init", "-q"); writeFileSync(join(root, "styles.css"), "body { color: navy; }\n"); }, "full"],
+      ["a folder of left-out files that becomes a nested checkout", () => { git(join(root, "vendored"), "init", "-q"); writeFileSync(join(root, "vendored", "yarn.lock"), "# yarn lockfile v1\n# rewritten\n"); }, "full"],
+      ["a folder of read files that becomes a nested checkout", () => { git(join(root, "imported"), "init", "-q"); writeFileSync(join(root, "imported", "notes.md"), "The Widget Crate, now another repository's.\n"); }, "full"],
+      ["a folder of read files that becomes a nested checkout while another file changes", () => { git(join(root, "quiet"), "init", "-q"); writeFileSync(join(root, "styles.css"), "body { color: green; }\n"); }, "full"],
+      ["a folder that becomes a nested checkout as one of its files is deleted", () => { git(join(root, "pruned"), "init", "-q"); rmSync(join(root, "pruned", "gone.md")); }, "full"],
+      ["a nested checkout that stops being one", () => { rmSync(join(root, "inner", ".git"), { recursive: true, force: true }); writeFileSync(join(root, "inner", "inner.md"), "The Widget Crate, now the project's own.\n"); }, "full"],
+    ];
+    for (const [name, change, extent] of changes) {
+      change();
+      const incremental = await currentReading(root, layers);
+      const read = lastExtent();
+      const full = (await lexiconReading(root, layers)).coverage;
+      assert.equal(incremental.fingerprint, full.fingerprint, `${name}: the fingerprint`);
+      assert.equal(withoutUses(incremental), withoutUses(full), name);
+      assert.equal(read, extent, `${name}: read ${extent === "files" ? "from the changed files" : "in full"}`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a file renamed, staged and then committed, is read from its new path alone, as a full reading reads it", async () => {
   const root = tallyProject();
   try {

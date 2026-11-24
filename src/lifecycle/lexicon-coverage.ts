@@ -59,7 +59,6 @@ import { isCoherenceItself, loadProjectLexicons, vocabularyFacts, within } from 
 import { BASELINE_CHOSE } from "./lexicon-baseline.ts";
 import { FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
 import { singularForms } from "./inflection.ts";
-import { LEXICON_PAGE_LIMITS } from "../readings/scope/lexicon-projection.ts";
 import { clean, proseNominations, type Nomination } from "./nomination.ts";
 
 export { proseNominations };
@@ -483,6 +482,8 @@ export interface CoverageScope {
    * holding a spec, found by listing only the folders above it.
    */
   files?: readonly string[] | undefined;
+  /** These files already read, standing for `files`, so a caller that read them does not read them again. */
+  corpus?: readonly CorpusFile[] | undefined;
   /** Terms code declares elsewhere in the project, so this reading counts their recurrence as words in its own files. */
   declared?: ReadonlySet<string> | undefined;
   /** False skips the journal's review rulings: an edit's reading names only what it introduced, whose evidence no ruling has seen. */
@@ -691,6 +692,9 @@ export function buildTerm(term: string, locations: VocabularyUse[], facts: TermF
   };
 }
 
+/** How many of a term's uses, in order, a bounded reading keeps; the kept digests and fingerprint depend on it, and the Lexicon page shows as many. */
+export const KEPT_USES_PER_TERM = 8;
+
 // The uses a bounded reading's readers show: termEvidence's first per component and first usesPerTerm, and attention's first prose or record use.
 function keptUses(uses: readonly VocabularyUse[]): VocabularyUse[] {
   const seenComponents = new Set<string>();
@@ -698,7 +702,7 @@ function keptUses(uses: readonly VocabularyUse[]): VocabularyUse[] {
   return uses.filter((use, index) => {
     const isFirstOfComponent = !seenComponents.has(use.component);
     seenComponents.add(use.component);
-    return isFirstOfComponent || index < LEXICON_PAGE_LIMITS.usesPerTerm || use === firstWritten;
+    return isFirstOfComponent || index < KEPT_USES_PER_TERM || use === firstWritten;
   });
 }
 
@@ -747,7 +751,7 @@ export async function lexiconReading(
   const select = paths !== undefined ? (rel: string) => underPaths(rel, paths) : undefined;
   const corpus =
     scope.files !== undefined
-      ? { files: await corpusFiles({ root, coherence, project }, scope.files), listed: [] as string[], unreadable: [] as UnreadablePath[], excluded: [] as UnreadablePath[] }
+      ? { files: scope.corpus !== undefined ? [...scope.corpus] : await corpusFiles({ root, coherence, project }, scope.files), listed: [] as string[], unreadable: [] as UnreadablePath[], excluded: [] as UnreadablePath[] }
       : await readCorpus({ root, coherence, project }, select);
   const known = new Map<string, KnownMeaning>();
   const coherenceSenses = new Map<string, Set<string>>();
