@@ -607,14 +607,6 @@ export function findPractice(practices: readonly ModelPractice[], given: string)
   throw new JournalError(`enact: no practice "${given}"; ${known}`);
 }
 
-/** The command that enacts a practice, one --step line per step, for a session to fill in. */
-export function enactTemplate(practice: ModelPractice, cli: string, session: string, agent: string, trigger?: string): string {
-  return [
-    `${cli} enact "${practice.id}"${trigger === undefined ? "" : ` --trigger "${trigger}"`} --session ${session} --agent ${agent}`,
-    ...practice.steps.map((step) => `  --step ${step.n}=done${step.leaves === undefined ? "" : `:"<the evidence: ${step.leaves}>"`}`),
-  ].join(" \\\n") + "\n  (a step not done as written: --step <n>=deviated:<why> or --step <n>=skipped:<why>)";
-}
-
 /** One --step value: <n>=done[:<evidence>], <n>=deviated:<because>, or <n>=skipped:<because>. */
 function stepOutcome(pair: string): { n: string; outcome: StepOutcome } {
   const match = /^(\d+)=(done|deviated|skipped)(?::([\s\S]*))?$/.exec(pair);

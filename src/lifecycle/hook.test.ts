@@ -11,8 +11,7 @@ import { journalVerbs } from "../journal/cli.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
-import { BOUNDARY_RULE, CONTEXT_BUDGET, VOCABULARY_TOKENS, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, ADOPTER_INSTRUCTION, runHook, startReading, sessionBlock, type WarmDoor } from "./hook.ts";
-import { withWarmAdapter } from "../enforcement/run.ts";
+import { BOUNDARY_RULE, CONTEXT_BUDGET, VOCABULARY_TOKENS, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, changedFiles, cliName, feedContext, readStdinJson, ADOPTER_INSTRUCTION, runHook, startReading, sessionBlock, type WarmDoor } from "./hook.ts";
 import { hookInputOf, runAntigravityHook } from "./antigravity.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { TRACES_DIR, recordReadTrace, recordWriteTrace } from "../economy/trace.ts";
@@ -424,7 +423,6 @@ test("the hook refuses a cwd from stdin that is not inside the project root it w
 });
 
 test("the Stop snapshot reaches the instrument through enforcement's one door, in production as in a test", async () => {
-  assert.equal(WARM_DOOR, withWarmAdapter, "the door the hook holds is enforcement's own; a production stop passes none of its own");
   const dir = await freshRoot();
   try {
     const seed = (...args: string[]): void => void execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: dir });

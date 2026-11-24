@@ -23,15 +23,14 @@ import { execFileSync } from "../lifecycle/work-meter.ts";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
-import { withWarmAdapter } from "../enforcement/run.ts";
-import { refreshFoundNoServer, refreshInBackground } from "../readings/scope/gaps.ts";
-import { serverRecorded } from "../enforcement/server.ts";
+import type { withWarmAdapter } from "../enforcement/run.ts";
+import { refreshFoundNoServer, refreshInBackground } from "../readings/scope/background-refresh.ts";
 import { escapeRegExp } from "../enforcement/totality.ts";
 import { configIgnore, fileIdentity, keepProjectFiles, projectListing, underIgnored } from "../adapters/project-files.ts";
 import type { HookInput } from "../lifecycle/hook.ts";
 import { readerNaming } from "../lifecycle/host-tools.ts";
 import type { SpecModel } from "../spec/model.ts";
-import { predictClosure, type Instrument } from "./closure.ts";
+import type { Instrument } from "./closure.ts";
 import { toRelative } from "./source.ts";
 
 export const TRACES_DIR = join(".coherence", "traces");
@@ -285,6 +284,7 @@ export async function snapshotTrace(root: string, session: string, options: Snap
   let instrument: Instrument = { language: "unknown", server: "none", reason: options.instrumentReason ?? "no adapter" };
   if (changed.length > 0) {
     try {
+      const { predictClosure } = await import("./closure.ts");
       const closure = await predictClosure(root, changed, { adapter: options.adapter, server: options.server, instrumentReason: options.instrumentReason, model: options.model });
       predicted = closure.entries.map((e) => e.file);
       tokens = closure.tokens;
@@ -313,9 +313,10 @@ export function patchFingerprint(root: string, patch: readonly string[], filesRe
  * server loaded marks its slot so: a later stop on the same patch starts none
  * while no server is recorded, and takes it again once one is.
  */
-export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel, changed: readonly string[] = sessionPatch(root, session)): Promise<Snapshot | undefined> {
+export async function snapshotSession(root: string, session: string, door?: typeof withWarmAdapter, model?: SpecModel, changed: readonly string[] = sessionPatch(root, session)): Promise<Snapshot | undefined> {
   let foundNoServer = false;
-  const snapshot = await door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }), {
+  const openDoor = door ?? (await import("../enforcement/run.ts")).withWarmAdapter;
+  const snapshot = await openDoor(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }), {
     onNoServer: () => {
       foundNoServer = true;
       return SNAPSHOT_WITHOUT_SERVER;
@@ -337,7 +338,8 @@ export function snapshotSlot(root: string, session: string): string {
  * loaded, and only once a server is recorded for the project. Returns
  * whether one started.
  */
-export function snapshotInBackground(root: string, session: string, fingerprint: string, command: readonly string[]): boolean {
+export async function snapshotInBackground(root: string, session: string, fingerprint: string, command: readonly string[]): Promise<boolean> {
+  const { serverRecorded } = await import("../enforcement/server.ts");
   const ownCommand = new RegExp(`(?:^|\\s)economy\\s+--snapshot\\s+${escapeRegExp(session)}\\s*$`);
   return refreshInBackground(root, command, fingerprint, Date.now, { path: snapshotSlot(root, session), command: ownCommand, retry: () => serverRecorded(root) });
 }
