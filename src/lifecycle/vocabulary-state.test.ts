@@ -122,7 +122,7 @@ test("a changed file the walk would leave out again as before keeps the reading 
     mkdirSync(join(root, "docs", "reference"), { recursive: true });
     writeFileSync(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
     writeFileSync(join(root, "styles.css"), "body { color: red; }\n");
-    writeFileSync(join(root, "docs", "reference", "glossary.md"), "The Widget Crate, as another project names it.\n");
+    writeFileSync(join(root, "docs", "reference", "vendor-terms.md"), "The Widget Crate, as another project names it.\n");
     writeFileSync(join(root, ".gitignore"), "secret.md\n");
     writeFileSync(join(root, "secret.md"), "The Widget Crate is kept from git.\n");
     writeFileSync(join(root, "notes"), "a file with no kind\n");
@@ -144,7 +144,7 @@ test("a changed file the walk would leave out again as before keeps the reading 
     const changes: [string, () => void, string][] = [
       ["a lockfile rewritten", () => writeFileSync(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\nimporters: {}\n"), "files"],
       ["a stylesheet edited", () => writeFileSync(join(root, "styles.css"), "body { color: blue; }\n"), "files"],
-      ["reference vocabulary edited", () => writeFileSync(join(root, "docs", "reference", "glossary.md"), "The Widget Crate, and a Widget Crate again.\n"), "files"],
+      ["reference vocabulary edited", () => writeFileSync(join(root, "docs", "reference", "vendor-terms.md"), "The Widget Crate, and a Widget Crate again.\n"), "files"],
       ["a new lockfile", () => writeFileSync(join(root, "yarn.lock"), "# yarn lockfile v1\n"), "full"],
       ["a lockfile deleted", () => rmSync(join(root, "pnpm-lock.yaml")), "full"],
       ["an ignored file added by force", () => git(root, "add", "-f", "secret.md"), "full"],

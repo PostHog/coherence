@@ -134,7 +134,7 @@ const DATA_EXTENSIONS = new Set([
 ]);
 
 /** Machine-written or foreign-vocabulary files no adopter can repair by renaming: a dependency lockfile is the author's, not the project's. Every lockfile ci and the update line recognize (lockfiles.ts) is among them. */
-const EXCLUDED_NAMES = new Set([...LOCKFILES.map(([file]) => file), "npm-shrinkwrap.json", "Cargo.lock", "poetry.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"]);
+export const EXCLUDED_NAMES = new Set([...LOCKFILES.map(([file]) => file), "npm-shrinkwrap.json", "Cargo.lock", "poetry.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"]);
 
 /** The record folders under .coherence the check reads, the stores whose records are the writer's words; every other folder there is machine-written output (runs, traces, feed cursors). */
 const RECORD_FOLDERS = PROSE_STORE_FOLDERS;

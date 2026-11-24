@@ -23,6 +23,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import { EXCLUDED_NAMES } from "../../src/lifecycle/check.ts";
 
 const CLI = process.env["COHERENCE_BENCH_CLI"] ?? resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "cli.ts");
 const CHANGED_FILE = "coherence-bench-change.md";
@@ -124,7 +125,7 @@ function compareSteps(root: string, session: string): Step[] {
   const edited = tracked.find((path) => basename(path).toLowerCase() === "readme.md") ?? tracked[0]!;
   const deleted = tracked.filter((path) => path !== edited).at(-1)!;
   const added = "coherence-bench-added/notes.md";
-  const lockfile = spawnSync("git", ["ls-files", "yarn.lock", "pnpm-lock.yaml", "package-lock.json", "uv.lock", "poetry.lock", "Cargo.lock"], { cwd: root, encoding: "utf8" }).stdout.split("\n").find(Boolean);
+  const lockfile = spawnSync("git", ["ls-files", ...EXCLUDED_NAMES], { cwd: root, encoding: "utf8" }).stdout.split("\n").find(Boolean);
   // The edit's own write lands first, then the hook hears of it, as a host's PostToolUse does.
   const edit = (label: string, before: () => void): Step => ({ label, event: "PostToolUse", input: { ...base, hook_event_name: "PostToolUse", tool_name: "Edit", tool_input: { file_path: join(root, edited) } }, before: () => { before(); appendFileSync(join(root, edited), "- One more Widget Crate line.\n"); } });
   // Fixed dates give both builds' clones the same commit for the same tree; --allow-empty moves HEAD even when nothing is left to add.
