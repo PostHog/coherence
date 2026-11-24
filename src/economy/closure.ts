@@ -43,6 +43,7 @@ import { DECLARED_NOT_READ } from "../readings/scope/languages-read.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { describeChanged, type WorkingChange } from "./change.ts";
 import { componentOf, declarationsOf, importsOf, isTest, sourceFiles, toRelative } from "./source.ts";
+import { NAMED_SYMBOL } from "../spec/named.ts";
 
 export interface ClosureEntry {
   file: string;
@@ -145,7 +146,7 @@ function chokepointForms(invariant: ModelInvariant): { protects: string; chokepo
 /** Whether a spec value (a symbol, a symbol in a file, or a module path) could be defined in one of the given files: a given file spells the symbol, or is the module. */
 export function spelledInGiven(value: string, given: readonly string[], texts: ReadonlyMap<string, string>): boolean {
   const trimmed = value.trim();
-  const named = /^([A-Za-z_$][\w$]*)(?:\s+in\s+\S+)?$/.exec(trimmed)?.[1];
+  const named = NAMED_SYMBOL.exec(trimmed)?.[1];
   if (named === undefined) return given.some((file) => file === trimmed || file.endsWith(`/${trimmed}`) || trimmed.endsWith(`/${file}`) || file.startsWith(trimmed.replace(/\/+$/, "") + "/"));
   const spelled = new RegExp(`(^|[^\\w$])${named.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w$]|$)`);
   return given.some((file) => spelled.test(texts.get(file) ?? ""));

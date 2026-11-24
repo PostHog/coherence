@@ -91,6 +91,7 @@ import { parsedOf, serverExtensions, syntaxOf } from "../../plugins/languages.ts
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, InterfaceUnanswered, KeptReport, ReachReference, ScopedReading } from "./model.ts";
+import { NAMED_SYMBOL } from "../../spec/named.ts";
 
 /**
  * What the reading reads of one language's text without its server, each
@@ -190,7 +191,7 @@ export function reachOf(start: string, nodes: ReadonlyMap<string, ReachNode>, ca
 
 /** A spec value as a symbol and an optional file, or a module file; undefined for prose. */
 function namedValue(value: string): { symbol?: string; file?: string } | undefined {
-  const named = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/.exec(value.trim());
+  const named = NAMED_SYMBOL.exec(value.trim());
   if (named !== null) return named[2] === undefined ? { symbol: named[1]! } : { symbol: named[1]!, file: named[2]! };
   if (isModuleHandler(value)) return { file: value.trim() };
   return undefined;

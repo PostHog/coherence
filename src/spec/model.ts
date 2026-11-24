@@ -39,6 +39,7 @@ import { readLexiconSources } from "../adapters/lexicon-sources.ts";
 import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
 import { declaredClasses, declaredFamilies, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
 import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
+import { NAMED_SYMBOL } from "./named.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
 export const CONFIG_FILE = "coherence.config.json";
@@ -672,12 +673,12 @@ function entranceTrustProblems(components: readonly Component[], trustLevels: re
         problems.push({ file: component.specPath, line, message: `entrance ${entrance.name} declares trust ${entrance.trust}, which is no trust level; ${declared}` });
         continue;
       }
-      const handler = entrance.handler === undefined ? undefined : HANDLER.exec(entrance.handler.trim())?.[1];
+      const handler = entrance.handler === undefined ? undefined : NAMED_SYMBOL.exec(entrance.handler.trim())?.[1];
       const holder = entrance.file === undefined ? undefined : componentHolding(components, entrance.file);
       if (handler === undefined || holder === undefined) continue;
       for (const invariant of holder.invariants) {
         if (invariant.crossing === undefined || invariant.crossing.from === entrance.trust) continue;
-        if (!invariant.enforcements.some((e) => e.form === "chokepoint" && HANDLER.exec(e.chokepoint.trim())?.[1] === handler)) continue;
+        if (!invariant.enforcements.some((e) => e.form === "chokepoint" && NAMED_SYMBOL.exec(e.chokepoint.trim())?.[1] === handler)) continue;
         problems.push({
           file: component.specPath,
           line,
@@ -689,15 +690,13 @@ function entranceTrustProblems(components: readonly Component[], trustLevels: re
   return problems;
 }
 
-const HANDLER = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/;
-
 /** The trust an entrance carries in, as the model can tell without a reading: the level it declares, else the entering side of every crossing whose chokepoint is its handler, in the component holding it. */
 function entranceTrust(entrance: ModelEntrance, components: readonly Component[]): string[] {
   if (entrance.trust !== undefined) return [entrance.trust];
-  const handler = entrance.handler === undefined ? undefined : HANDLER.exec(entrance.handler.trim())?.[1];
+  const handler = entrance.handler === undefined ? undefined : NAMED_SYMBOL.exec(entrance.handler.trim())?.[1];
   const holder = entrance.file === undefined ? undefined : componentHolding(components, entrance.file);
   if (handler === undefined || holder === undefined) return [];
-  return [...new Set(holder.invariants.flatMap((invariant) => (invariant.crossing !== undefined && invariant.enforcements.some((e) => e.form === "chokepoint" && HANDLER.exec(e.chokepoint.trim())?.[1] === handler) ? [invariant.crossing.from] : [])))];
+  return [...new Set(holder.invariants.flatMap((invariant) => (invariant.crossing !== undefined && invariant.enforcements.some((e) => e.form === "chokepoint" && NAMED_SYMBOL.exec(e.chokepoint.trim())?.[1] === handler) ? [invariant.crossing.from] : [])))];
 }
 
 /**
@@ -780,7 +779,7 @@ function entranceGuardProblems(root: string, components: readonly Component[]): 
   for (const component of components) {
     for (const entrance of component.entrances) {
       if (entrance.guard === undefined) continue;
-      const guard = HANDLER.exec(entrance.guard.trim());
+      const guard = NAMED_SYMBOL.exec(entrance.guard.trim());
       const line = entrance.guardLine ?? entrance.line;
       if (guard === null) {
         problems.push({ file: component.specPath, line, message: `entrance ${entrance.name}: guard "${entrance.guard}" reads <chokepoint symbol> or <symbol> in <file>` });
@@ -788,7 +787,7 @@ function entranceGuardProblems(root: string, components: readonly Component[]): 
       }
       const name = guard[1]!;
       const named = chokepoints.some(({ component: owner, value }) => {
-        const symbol = HANDLER.exec(value)?.[1];
+        const symbol = NAMED_SYMBOL.exec(value)?.[1];
         if (symbol !== undefined) return symbol === name;
         if (!isDeclaringSource(value)) return false;
         return [owner.folder === "." ? value : `${owner.folder}/${value}`, value].some((path) => {
@@ -844,7 +843,7 @@ function handlerFile(root: string, folder: string, handler: string, ignore: read
     }
     return { reason: `handler module ${file} does not exist (read under ${folder} and under the root)` };
   }
-  const parsed = HANDLER.exec(handler.trim());
+  const parsed = NAMED_SYMBOL.exec(handler.trim());
   if (parsed === null) return { reason: `handler "${handler}" reads <symbol>, <symbol> in <file>, or a module file` };
   const [, name, file] = parsed as unknown as [string, string, string | undefined];
   const candidates =

@@ -43,6 +43,7 @@ import { declarationsOf, importsOf } from "../../economy/source.ts";
 import { componentHolding, type SpecModel } from "../../spec/model.ts";
 import { chokepointTargets } from "./component-interfaces.ts";
 import { ruleIsRemote } from "./entrance-coverage.ts";
+import { NAMED_SYMBOL } from "../../spec/named.ts";
 
 /** How many of the ranked undeclared entrances scaffold entrances proposes bullets for, unless --all or --first says otherwise. */
 export const FIRST_RANKED = 15;
@@ -91,7 +92,7 @@ export function familiesOf(model: Pick<SpecModel, "components">, detected: reado
   const out: (SkippedGroup & { rules: Set<string> })[] = [];
   for (const component of model.components) {
     for (const e of component.entrances) {
-      const handler = /^([A-Za-z_$][\w$]*)(?:\s+in\s+\S+)?$/.exec(e.handler?.trim() ?? "")?.[1];
+      const handler = NAMED_SYMBOL.exec(e.handler?.trim() ?? "")?.[1];
       if (handler === undefined || symbols.has(handler)) continue;
       const members = detected.filter((c) => c.through?.includes(handler) === true);
       if (members.length < 2) continue;
