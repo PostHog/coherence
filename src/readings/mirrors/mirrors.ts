@@ -31,6 +31,9 @@ import { declaredLanguageOf, type DeclaredLanguage } from "../../adapters/declar
 import { languageOfFile } from "../../adapters/language-files.ts";
 import { underIgnored } from "../../adapters/project-files.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
+import { MANIFEST } from "../../plugins/plugin.ts";
+import { parseSpec } from "../../spec/grammar.ts";
+import { restatementsOf, VALUE_MIN, type DeclaredPair, type ImportFact, type ValueSite } from "./restatements.ts";
 import { DERIVED, DOC_FORMS, type Finding, type Form, type Group, type MirrorHistory, type MirrorReading, type SetRef, type Verdict } from "./model.ts";
 
 export type { Finding, Group, MirrorReading, SetRef, Verdict };
@@ -67,6 +70,8 @@ interface NameSet {
 
 /** Test files: their literals are fixtures and expectations, which copy the lists on purpose. */
 const TEST_FILE = /\.(test|e2e)\.[cm]?[tj]s$|fixture/;
+/** The tests themselves, without the fixtures they build from: what can hold a copy equal. */
+const TEST_ONLY = /\.(test|e2e)\.[cm]?[tj]s$/;
 const CODE_FILE = /\.(ts|mts|cts|js|mjs|cjs)$/;
 const DOC_FILE = /\.md$/;
 /** The Markdown read for candidates: the docs folder, every spec, the README. */
@@ -75,7 +80,8 @@ const READ_DOC = /(^docs\/|\.spec\.md$|^README\.md$)/;
 const ALWAYS_IGNORED = ["node_modules", ".coherence"];
 
 interface ModuleFacts {
-  imports: { spec: string; typeOnly: boolean }[];
+  /** `names`: the names the import binds, type-only ones too, for the restatements' held check. */
+  imports: { spec: string; typeOnly: boolean; names: string[] }[];
 }
 
 interface Context {
@@ -84,6 +90,12 @@ interface Context {
   rev: string;
   sets: NameSet[];
   modules: Map<string, ModuleFacts>;
+  /** Literal values of VALUE_MIN or more characters, by value, with every site that writes one. */
+  values: Map<string, ValueSite[]>;
+  /** The strings literal types name: the compiler holds them. */
+  typed: Set<string>;
+  /** Code files the compiler does not check. */
+  untyped: Set<string>;
 }
 
 function git(root: string, args: string[], input?: string): Buffer {
@@ -121,6 +133,12 @@ function ignoredAt(root: string, rev: string): string[] {
   }
   const own = Array.isArray(ignore) ? ignore.filter((v): v is string => typeof v === "string") : [];
   return own.map((f) => f.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "")).filter((f) => f !== "" && f !== ".");
+}
+
+function addValue(ctx: Context, value: string, site: ValueSite): void {
+  const at = ctx.values.get(value);
+  if (at === undefined) ctx.values.set(value, [site]);
+  else at.push(site);
 }
 
 function addSet(ctx: Context, s: Omit<NameSet, "id" | "members"> & { members: readonly string[] }): void {
@@ -304,6 +322,7 @@ function readCode(ctx: Context, file: string, text: string): void {
   const exported: string[] = [];
   const reads = new Map<string, { keys: string[]; line: number }>();
   const isTest = TEST_FILE.test(file);
+  if (scriptKind(ts, file) === ts.ScriptKind.JS || /^(?:\s*\/\/[^\n]*\n)*\s*\/\/\s*@ts-nocheck/.test(text)) ctx.untyped.add(file);
   const add = (s: Omit<NameSet, "id" | "members" | "file"> & { members: readonly string[] }): void => addSet(ctx, { ...s, file });
 
   const visit = (node: TS.Node): void => {
@@ -313,10 +332,14 @@ function readCode(ctx: Context, file: string, text: string): void {
       const named = clause?.namedBindings;
       // `import type …`, or `import { type A, type B }` with no default: erased when the module is stripped.
       const typeOnly = clause !== undefined && (clause.isTypeOnly || (clause.name === undefined && named !== undefined && ts.isNamedImports(named) && named.elements.length > 0 && named.elements.every((e) => e.isTypeOnly)));
-      facts.imports.push({ spec: node.moduleSpecifier.text, typeOnly });
+      // Type-only names too: `import type { FOOT_KEYS }` read as `typeof FOOT_KEYS` holds a copy to the list as an import of its value does.
+      const names = clause === undefined ? [] : [...(clause.name === undefined ? [] : [clause.name.text]), ...(named !== undefined && ts.isNamedImports(named) ? named.elements.map((e) => (e.propertyName ?? e.name).text) : [])];
+      facts.imports.push({ spec: node.moduleSpecifier.text, typeOnly, names });
     }
     if (ts.isExportDeclaration(node) && node.moduleSpecifier !== undefined && ts.isStringLiteral(node.moduleSpecifier)) {
-      facts.imports.push({ spec: node.moduleSpecifier.text, typeOnly: node.isTypeOnly });
+      const clause = node.exportClause;
+      const names = clause === undefined || !ts.isNamedExports(clause) ? [] : clause.elements.map((e) => (e.propertyName ?? e.name).text);
+      facts.imports.push({ spec: node.moduleSpecifier.text, typeOnly: node.isTypeOnly, names });
     }
     if (node.parent !== undefined && ts.isSourceFile(node.parent) && ts.canHaveModifiers(node) && ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
       if (ts.isVariableStatement(node)) for (const d of node.declarationList.declarations) exported.push(d.name.getText());
@@ -325,6 +348,22 @@ function readCode(ctx: Context, file: string, text: string): void {
     if (isTest) {
       ts.forEachChild(node, visit);
       return;
+    }
+
+    // Literal values for the restatements: a string or a regular expression of VALUE_MIN or more characters, written as a value.
+    if (ts.isLiteralTypeNode(node) && ts.isStringLiteral(node.literal)) ctx.typed.add(node.literal.text);
+    else if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isRegularExpressionLiteral(node)) {
+      const value = ts.isRegularExpressionLiteral(node) ? node.text.slice(1, node.text.lastIndexOf("/")) : node.text;
+      const p = node.parent;
+      const specifier = ts.isLiteralTypeNode(p) || ts.isImportDeclaration(p) || ts.isExportDeclaration(p) || ts.isExternalModuleReference(p) || (ts.isCallExpression(p) && p.expression.kind === ts.SyntaxKind.ImportKeyword);
+      if (value.length >= VALUE_MIN && !specifier && !value.includes("\n") && !/^\.\.?\//.test(value)) {
+        const top = outer(ts, node);
+        const decl = top.parent;
+        const bound = decl !== undefined && ts.isVariableDeclaration(decl) && decl.initializer === top && ts.isIdentifier(decl.name) ? decl.name.text : undefined;
+        const stmt = bound === undefined ? undefined : decl!.parent?.parent;
+        const exported = stmt !== undefined && ts.isVariableStatement(stmt) && (ts.getModifiers(stmt)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false);
+        addValue(ctx, value, { file, line: lineOf(node), ...(bound === undefined ? {} : { bound }), exported });
+      }
     }
 
     if (ts.isArrayLiteralExpression(node)) {
@@ -463,6 +502,53 @@ function readDoc(ctx: Context, file: string, text: string): void {
   flushTable();
 }
 
+/* ---------------------------------------------------- manifests: candidates */
+
+/**
+ * A plugin manifest's data: each array of strings is a set, each string of
+ * VALUE_MIN or more characters a value, placed at the line its key or its
+ * text is first written on.
+ */
+function readManifest(ctx: Context, file: string, text: string): void {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return;
+  }
+  const lines = text.split("\n");
+  const lineOf = (needle: string): number => lines.findIndex((l) => l.includes(needle)) + 1;
+  const walk = (v: unknown, path: string): void => {
+    if (typeof v === "string") {
+      if (v.length >= VALUE_MIN) addValue(ctx, v, { file, line: lineOf(JSON.stringify(v)), exported: false });
+    } else if (Array.isArray(v)) {
+      if (v.length >= 2 && v.every((x) => typeof x === "string")) {
+        const key = path.slice(path.lastIndexOf(".") + 1);
+        addSet(ctx, { file, line: lineOf(JSON.stringify(key)) || 1, name: path, form: "array", members: v as string[], origin: `${file}:${path}`, checked: false });
+      }
+      v.forEach((x, i) => walk(x, `${path}[${i}]`));
+    } else if (v !== null && typeof v === "object") {
+      for (const [k, x] of Object.entries(v)) walk(x, path === "" ? k : `${path}.${k}`);
+    }
+  };
+  walk(data, "");
+}
+
+/** The declared mirrors of every spec at the revision whose partner is a literal, each side as `<file>:<NAME>`: a pair a spec declares is held by the edit-time alarm. */
+function declaredMirrors(texts: ReadonlyMap<string, string>, tracked: ReadonlySet<string>): DeclaredPair[] {
+  const out: DeclaredPair[] = [];
+  for (const [file, text] of texts) {
+    if (!file.endsWith(".spec.md")) continue;
+    const folder = dirname(file);
+    const at = (f: string): string => [posix.normalize(posix.join(folder, f)), posix.normalize(f)].find((c) => tracked.has(c)) ?? f;
+    for (const m of parseSpec(text, file).mirrors) {
+      if (m.recipe === undefined || m.recipe.kind === "closure") continue;
+      out.push({ list: `${at(m.file)}:${m.name}`, partner: `${at(m.recipe.file)}:${m.recipe.name}` });
+    }
+  }
+  return out;
+}
+
 /* --------------------------------------------------------- the universes */
 
 interface Universes {
@@ -472,6 +558,14 @@ interface Universes {
   hasClosure: Set<number>;
   /** An import closure's id to the files it starts from, as the list spells them, and the list's file:line when a list named them. */
   closureOf: Map<number, { of: string[]; list?: string }>;
+}
+
+/** The project file a relative import names, or undefined for a package, a built-in or a file not tracked. */
+function resolveIn(tracked: ReadonlySet<string>, from: string, spec: string): string | undefined {
+  if (!spec.startsWith(".")) return undefined;
+  const base = posix.normalize(posix.join(dirname(from), spec));
+  for (const c of [base, base.replace(/\.js$/, ".ts"), `${base}.ts`, `${base}/index.ts`]) if (tracked.has(c)) return c;
+  return undefined;
 }
 
 function universes(ctx: Context, paths: readonly string[]): Universes {
@@ -487,12 +581,7 @@ function universes(ctx: Context, paths: readonly string[]): Universes {
     addSet(ctx, { file: dir, line: 0, name: `files in ${dir}/`, form: "folder", members: own.map((f) => basename(f)), origin: `folder:${dir}`, checked: false });
   }
 
-  const resolveImport = (from: string, spec: string): string | undefined => {
-    if (!spec.startsWith(".")) return undefined;
-    const base = posix.normalize(posix.join(dirname(from), spec));
-    for (const c of [base, base.replace(/\.js$/, ".ts"), `${base}.ts`, `${base}/index.ts`]) if (tracked.has(c)) return c;
-    return undefined;
-  };
+  const resolveImport = (from: string, spec: string): string | undefined => resolveIn(tracked, from, spec);
 
   /** Every file the starts import at run time, transitively, staying inside the folders they are in. */
   const closure = (starts: string[], dirs: ReadonlySet<string>): string[] => {
@@ -948,7 +1037,8 @@ export async function readMirrors(root: string, options: MirrorOptions = {}): Pr
   const ignored = new Set([...ALWAYS_IGNORED, ...ignoredAt(root, commit)]);
   const isIgnored = (p: string): boolean => underIgnored(p, ignored);
   const paths = git(root, ["ls-tree", "-r", "-z", "--name-only", commit]).toString("utf8").split("\0").filter((p) => p !== "" && !isIgnored(p));
-  const wanted = paths.filter((p) => (CODE_FILE.test(p) && !p.endsWith(".d.ts")) || (DOC_FILE.test(p) && READ_DOC.test(p)));
+  const manifests = paths.filter((p) => basename(p) === MANIFEST && !TEST_FILE.test(p));
+  const wanted = [...paths.filter((p) => (CODE_FILE.test(p) && !p.endsWith(".d.ts")) || (DOC_FILE.test(p) && READ_DOC.test(p))), ...manifests];
   // No silent skip: a file in a language the reading does not parse is counted, so a Python project learns its code went unread.
   const unread: Record<string, number> = {};
   // A language the config declares (its language server answers chokepoint checks) is code the reading leaves unread too.
@@ -962,9 +1052,10 @@ export async function readMirrors(root: string, options: MirrorOptions = {}): Pr
   const texts = readAll(root, commit, wanted);
   phase("read");
 
-  const ctx: Context = { ts, root, rev: commit, sets: [], modules: new Map() };
+  const ctx: Context = { ts, root, rev: commit, sets: [], modules: new Map(), values: new Map(), typed: new Set(), untyped: new Set() };
   for (const [file, text] of texts) {
     if (CODE_FILE.test(file)) readCode(ctx, file, text);
+    else if (basename(file) === MANIFEST) readManifest(ctx, file, text);
     else readDoc(ctx, file, text);
   }
   phase("candidates");
@@ -1001,5 +1092,22 @@ export async function readMirrors(root: string, options: MirrorOptions = {}): Pr
       ...(f.history === undefined ? {} : { history: f.history }),
     })),
   }));
-  return { rev, commit, ms: Math.round(performance.now() - t0), phases, sets: ctx.sets.length, read: wanted.filter((p) => CODE_FILE.test(p)).length, unread, groups };
+  const tracked = new Set(paths);
+  const imports = new Map<string, ImportFact[]>();
+  for (const [file, facts] of ctx.modules) if (!TEST_FILE.test(file)) imports.set(file, facts.imports.map((i) => ({ to: resolveIn(tracked, file, i.spec), names: i.names, typeOnly: i.typeOnly })));
+  // Every pair, the loose ones too: two equal switches that each keep a default are no mirror of a list, and are one value written twice.
+  const pairs = (options.all === true ? findings : match(ctx, u, true).findings).map((f) => ({ a: refOf(f.a, u), b: refOf(f.b, u), shared: f.shared, onlyA: f.onlyA, onlyB: f.onlyB, jaccard: f.jaccard }));
+  const { restatements, held } = restatementsOf({
+    pairs,
+    values: ctx.values,
+    typed: ctx.typed,
+    tests: new Map([...texts].filter(([file]) => TEST_ONLY.test(file) && !/fixture/.test(file))),
+    imports,
+    untyped: ctx.untyped,
+    plugins: manifests.map((m) => dirname(m)),
+    manifests: new Set(manifests),
+    declared: declaredMirrors(texts, tracked),
+  });
+  phase("restatements");
+  return { rev, commit, ms: Math.round(performance.now() - t0), phases, sets: ctx.sets.length, read: wanted.filter((p) => CODE_FILE.test(p)).length, unread, groups, restatements, held };
 }

@@ -91,4 +91,43 @@ export interface MirrorReading {
   /** The tracked files in a language the reading does not parse, counted by extension: `{ ".py": 4123 }`. */
   unread: Record<string, number>;
   groups: Group[];
+  /** The restatements nothing holds equal, in rank order: the count later readings must not exceed. */
+  restatements: Restatement[];
+  /** How many restatements a test, an import or a declared mirror holds: found, and not counted. */
+  held: number;
+}
+
+/**
+ * The kinds of restatement, in the order they are ranked: two sets that
+ * differ by one member (live drift), one value bound to a named constant in
+ * two or more files, two equal sets, and one literal written in two or more
+ * files.
+ */
+export type RestatementKind = "drift" | "constant" | "copy" | "literal";
+
+export interface RestatementSite {
+  file: string;
+  /** 0 when the file has no line for it (a manifest value it could not place). */
+  line: number;
+  /** The constant or list the value is bound to there, when it is bound to one. */
+  name?: string;
+}
+
+/**
+ * A restatement: one value, a literal of 16 or more characters or a set of
+ * three or more members, at live sites in two or more files, where no site
+ * imports it from another and no test, type or declared mirror holds the
+ * copies equal.
+ */
+export interface Restatement {
+  kind: RestatementKind;
+  /** The literal, for a value; the members the sets share, for a set. */
+  value: string;
+  members?: string[];
+  /** For drift: the one member only one side holds, and the side that lacks it as file:line. */
+  odd?: { member: string; lacks: string };
+  sites: RestatementSite[];
+  /** Where the value would live once: one module the rest import, a plugin's manifest, or a test that holds the copies equal. */
+  source: string;
+  score: number;
 }

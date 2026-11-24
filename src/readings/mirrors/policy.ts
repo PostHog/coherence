@@ -13,10 +13,10 @@
  *     and every alarm, as a pair the edit-time alarm can watch.
  */
 
-import { DERIVED, type Finding, type Group, type MirrorReading, type SetRef, type Verdict } from "./model.ts";
+import { DERIVED, type Finding, type Group, type MirrorReading, type Restatement, type SetRef, type Verdict } from "./model.ts";
 
 /** The question's usage line, in query's usage and in its own errors. */
-export const MIRRORS_USAGE = "  query mirrors [--all] [--limit <n>] [--rev <rev>] [--no-history] [--json | --proposals]   lists kept by hand that mirror another list, a folder or an import closure (hand lists), read from git objects at a revision; advisory: by default only cross-file groups sharing 3 or more names and scoring 20 or more; --proposals: the pairs proposed for declaration";
+export const MIRRORS_USAGE = "  query mirrors [--all] [--limit <n>] [--rev <rev>] [--no-history] [--json | --proposals | --restatements]   lists kept by hand that mirror another list, a folder or an import closure (hand lists), read from git objects at a revision; advisory: by default only cross-file groups sharing 3 or more names and scoring 20 or more; --proposals: the pairs proposed for declaration; --restatements: each value written in two or more files that nothing holds equal, ranked, with the one source each would come from";
 
 /** The threshold policy's numbers: a group shares at least this many names in one finding, and scores at least this much. */
 export const SURFACE_SHARED = 3;
@@ -163,6 +163,7 @@ export function readingText(reading: MirrorReading, options: { all?: boolean; li
   const lines = [
     `mirror reading at ${reading.commit.slice(0, 7)} (${reading.rev}): ${reading.sets} sets, ${reading.groups.length} groups, ${surfacedCount} worth a look (cross-file, ${SURFACE_SHARED} or more shared names, score ${SURFACE_SCORE} or more), in ${reading.ms} ms${unread === "" ? "" : `; not read: ${unread} (the reading parses ${PARSED_LANGUAGES})`}`,
     "Advisory: hand lists are never a spec problem and never block. --all lists every group.",
+    restatementCountText(reading),
   ];
   const alarms = alarmsOf(reading.groups);
   if (alarms.length > 0) {
@@ -175,5 +176,37 @@ export function readingText(reading: MirrorReading, options: { all?: boolean; li
     if (options.all !== true && g.findings.length > 3) lines.push(`  … and ${g.findings.length - 3} more in this group`);
   }
   if (limited.length < shown.length) lines.push("", `and ${shown.length - limited.length} more groups`);
+  return lines.join("\n");
+}
+
+/* -------------------------------------------------------- restatements */
+
+/** The count line: how many restatements nothing holds, and how many something does. */
+export function restatementCountText(reading: Pick<MirrorReading, "restatements" | "held">): string {
+  const n = reading.restatements.length;
+  return `${n} restatement${n === 1 ? "" : "s"} nothing holds equal (one value written in two or more files; ${reading.held} more held by a test, an import or a declared mirror). --restatements lists them.`;
+}
+
+const quoted = (value: string): string => (value.length > 80 ? `${JSON.stringify(value.slice(0, 79))}…` : JSON.stringify(value));
+
+/** One restatement: what is restated and where, what drifted, and where it would live once. */
+export function restatementLines(r: Restatement, index: number): string[] {
+  const what = r.members === undefined ? `the value ${quoted(r.value)}` : `${r.members.length} members: ${r.members.slice(0, 8).join(", ")}${r.members.length > 8 ? ", …" : ""}`;
+  const lines = [`${index}. ${r.kind}  ${what}`];
+  for (const s of r.sites) lines.push(`     ${s.file}${s.line > 0 ? `:${s.line}` : ""}${s.name === undefined ? "" : ` ${s.name}`}`);
+  if (r.odd !== undefined) lines.push(`     ${r.odd.lacks} lacks ${r.odd.member}`);
+  lines.push(`     source: ${r.source}`);
+  return lines;
+}
+
+/** The answer to query mirrors --restatements: the count, then each restatement in rank order. */
+export function restatementsText(reading: MirrorReading, options: { limit?: number } = {}): string {
+  const shown = options.limit === undefined ? reading.restatements : reading.restatements.slice(0, options.limit);
+  const lines = [
+    `restatements at ${reading.commit.slice(0, 7)} (${reading.rev}): ${restatementCountText(reading).replace(/ --restatements lists them\.$/, "")}`,
+    "Ranked: two sets that differ by one member (drift), then a value bound to a named constant in two or more files (constant), then the rest. Advisory: never a spec problem and never blocking.",
+  ];
+  shown.forEach((r, i) => lines.push("", ...restatementLines(r, i + 1)));
+  if (shown.length < reading.restatements.length) lines.push("", `and ${reading.restatements.length - shown.length} more`);
   return lines.join("\n");
 }

@@ -1,6 +1,6 @@
 # Mirrors
 
-The mirror reading: the lists a project keeps by hand that must mirror something defined elsewhere (the defect family hand-list), found by overlap between literal collections and what code derives (a folder's files, the import closure of a list of files, a module's exports, the keys a file reads), explained by git history, read from git objects at one revision, and advisory: on request through query mirrors, and at a session's start from the last reading kept, never one taken in a hook.
+The mirror reading: the lists a project keeps by hand that must mirror something defined elsewhere (the defect family hand-list), found by overlap between literal collections and what code derives (a folder's files, the import closure of a list of files, a module's exports, the keys a file reads), explained by git history, read from git objects at one revision, and counting the restatements nothing holds equal; advisory: on request through query mirrors, and at a session's start from the last reading kept, never one taken in a hook.
 
 ## invariants
 - reads one revision: The mirror reading reads every file from git objects at one revision, HEAD unless another is asked for, and never the working tree, so an edit not yet committed changes nothing it says and an older revision reads as it was committed.
@@ -42,4 +42,22 @@ The mirror reading: the lists a project keeps by hand that must mirror something
   because: df-2932838a: on PostHog's Python folder the reading ran 5.4 s, read 0 sets and orient said nothing, so the project never learned its code went unread; no silent skips. Orient speaks only when the unread outnumber the parsed, so Coherence's own start, 14 such files beside 294, stays quiet
   crossing: project-source -> reading
   refuted: made readMirrors never count a file in a language it does not parse, so unread stayed empty -> the totality oracle went red; restored, green (2026-10-14)
+  kinds: none
+- restatements are counted: The mirror reading counts as a restatement each value written at live sites in two or more files, a literal of 16 or more characters, or two sets sharing three or more members that differ by at most one; it leaves out test files and fixtures, a value a literal type names, prose of four or more spaces unless a named constant holds it in two or more files, and strings another party defines (URLs, MIME types, language server methods); it ranks two sets that differ by one member first, then a value bound to a named constant in two or more files, then the rest; and query mirrors says the count in its default answer, lists them with --restatements and carries them in its JSON.
+  over: a fixture repository holding a list and a copy that lacks one of its members, a regular expression and a prose message each bound to a constant in two files, a literal written in two files, and, in two files each, a literal type's member, unbound prose, a URL, and a literal repeated only by a test and a fixture
+  via: a value written in two files is a restatement, ranked drift then constant then the rest, and tests, literal types, prose and vocabulary are left out
+  because: d-fc099227: a detector is judged by the complexity it lets a project remove, as a count that only goes down. c-74956e4e found one shape in all six fixes of PR #192 and rs-a454912d found the owner would consolidate all ten of its top ten; each exclusion is a clause a rejected candidate broke (a fixture, a value the compiler holds, prose, a protocol's string), and two-member sets were noise
+  crossing: project-source -> reading
+  kinds: none
+- a held copy is not counted: A restatement whose copy a test holds (a test names a site's file and its list, its constant or its value), whose file imports the other site's list by name, a type-only import included, or whose two lists a spec declares a mirror, is counted as held and never in the count of restatements.
+  over: a fixture repository with a list copied under a type read off the original, a list copied and named by a test, a list a spec declares a mirror of another, a value a test names, and a list and a value nothing holds
+  via: a copy held by a test, by an import of the list's name or by a declared mirror is counted held, not restated
+  because: the count must be able to drop without the copy going away: where a boundary blocks the import (a plugin, a separate package, untyped code) the fix is a held copy, and 296b5670 held FOOT to FOOT_KEYS by a type import, which an unheld count would never credit
+  crossing: project-source -> reading
+  kinds: none
+- a restatement names its one source: Each restatement names the one source its copies would come from: a site every other site can import from as its neighbors do, or through the one module it already reaches that part of the project by; the plugin's manifest when a site is one, or when file extensions are written in a plugin and outside it; and otherwise one source and a test that holds the other copies equal, naming each site that cannot import it and why (not type-checked, importing nothing of the project's, or importing nothing from that part).
+  over: two core sites, a core site and a plugin that reaches the core through its plugin interface, extensions in the core and a plugin, a value a manifest holds, a site in a separate package, files that import only built-ins, and an untyped file
+  via: a restatement names its one source: a module every site can import, a plugin's manifest for a language's fact, or a test where a site cannot import it
+  because: rs-a454912d: a candidate is worth consolidating only with a place to put it, and the six fixes of PR #192 took three: an import where every site could reach it, the TypeScript manifest for its extensions (d50225f7; the core names no language), and a test where the mod, a bench or untyped code could not import (60704e0d, c50f05fd)
+  crossing: project-source -> reading
   kinds: none
