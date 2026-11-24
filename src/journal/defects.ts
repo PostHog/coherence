@@ -31,17 +31,15 @@ import { readPlugins } from "../plugins/registry.ts";
 import { effectiveConfig } from "../adapters/project-config.ts";
 import { missingCommits } from "./commits.ts";
 import { CAUGHT, type Caught, type DefectOrigin } from "./record.ts";
-import type { DefectState } from "./defect-states.ts";
+import { CLASS_NAME, type DefectState } from "./defect-states.ts";
 
 export { defectStates, type DefectState } from "./defect-states.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_LEXICON = resolve(here, "..", "..", "docs", "lexicon.json");
 
-/** A class name: lowercase words joined by hyphens. */
-const CLASS_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 /** The property key that declares a class, or a family (a class too broad for one guard), on the defect concept. */
-const CLASS_KEY = /^(class|family) ([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/;
+const CLASS_KEY = new RegExp(`^(class|family) (${CLASS_NAME.source.slice(1, -1)})$`);
 const COMMIT = /^[0-9a-f]{7,40}$/;
 const PULL = /^PR #(\d+)$/;
 

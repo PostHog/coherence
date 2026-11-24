@@ -6,6 +6,9 @@
 
 import type { Caught, Decision, Defect, DefectOrigin, JournalRecord, Resolution } from "./record.ts";
 
+/** A defect class's name, as the defect verb takes one and the lexicon declares one: lowercase words joined by hyphens (path-identity, silent-skip). */
+export const CLASS_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+
 /** One defect as the journal now has it: its fields folded from every later record, and the resolution that closed it. */
 export interface DefectState {
   id: string;
