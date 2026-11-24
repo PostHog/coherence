@@ -120,6 +120,7 @@ import { namesWrittenFiles, writtenNames } from "./host-tools.ts";
 import { keepMirrorIndex, mirrorAlarm } from "./mirrors.ts";
 import { specAlarm } from "./spec-at-edit.ts";
 import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
+import { cliArgs } from "./own-cli.ts";
 
 const run = promisify(execFile);
 
@@ -1268,7 +1269,7 @@ export function economyStopText(snapshot: Snapshot | undefined, currentFingerpri
 export const WARM_UP = (root: string, language?: string): boolean => {
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return false;
   try {
-    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "warm", ...(language === undefined ? [] : ["--language", language])], { cwd: root, detached: true, stdio: "ignore" });
+    const child = spawn(process.execPath, cliArgs(OWN_CLI, "warm", ...(language === undefined ? [] : ["--language", language])), { cwd: root, detached: true, stdio: "ignore" });
     child.on("error", () => {});
     child.unref();
     return child.pid !== undefined;
@@ -1291,12 +1292,12 @@ export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
  */
 export const ECONOMY_SNAPSHOT = (root: string, session: string, fingerprint: string): void => {
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
-  snapshotInBackground(root, session, fingerprint, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "economy", "--snapshot", session]);
+  snapshotInBackground(root, session, fingerprint, [process.execPath, ...cliArgs(OWN_CLI, "economy", "--snapshot", session)]);
 };
 
 /** The mirror refresh the command line starts: this checkout's query mirrors --refresh, which reads only when the kept reading is of another commit. */
 export const MIRROR_REFRESH = (root: string): void => {
-  refreshMirrorsInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "query", "mirrors", "--refresh"]);
+  refreshMirrorsInBackground(root, [process.execPath, ...cliArgs(OWN_CLI, "query", "mirrors", "--refresh")]);
 };
 
 /** Regulate's gap lines: the gaps this session touched, advisory, or nothing. */

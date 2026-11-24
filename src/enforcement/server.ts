@@ -52,13 +52,14 @@ import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, rea
 import { createServer as createHttpServer, type IncomingHttpHeaders, type IncomingMessage, type Server as HttpServer, type ServerResponse } from "node:http";
 import { createConnection, createServer, type AddressInfo, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
-import { dirname, extname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import type { Definition, Ladder, LanguageAdapter, Occasion, Refutation, ReferenceSite, ResolveHint, Resolved, Visibility } from "../adapters/adapter.ts";
 import { instrumentFor } from "../adapters/index.ts";
 import { readEnforcementConfig } from "./config.ts";
 import { codeFingerprint } from "./code-fingerprint.ts";
+import { CLI_BESIDE, cliArgs } from "../lifecycle/own-cli.ts";
 
 export const RUN_DIR = join(".coherence", "run");
 export const DEFAULT_IDLE_MS = 5 * 60 * 1000;
@@ -84,7 +85,7 @@ const HTTP_REQUEST_MS = 10_000;
 /** HTTP: the most connections at once; a page holds two or three. */
 const HTTP_MAX_CONNECTIONS = 64;
 const CODE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const CLI = join(CODE_DIR, `cli${extname(fileURLToPath(import.meta.url))}`);
+const CLI = CLI_BESIDE;
 
 /* ------------------------------------------------------ code fingerprint */
 
@@ -1032,7 +1033,7 @@ export async function connectAdapter(rootGiven: string, options: ConnectOptions 
     }
     // Only the client that takes the lock spawns; a dead or never-listening owner's lock is reclaimed first.
     if (spawns < SPAWN_ATTEMPTS && (tryLock(paths, process.pid) || (reclaim(paths, false) && tryLock(paths, process.pid)))) {
-      const args = ["--disable-warning=ExperimentalWarning", CLI, "serve", "--root", root, ...(slot === undefined ? [] : ["--language", slot]), ...(options.idleMs === undefined ? [] : ["--idle", String(Math.ceil(options.idleMs / 1000))])];
+      const args = [...cliArgs(CLI, "serve", "--root", root), ...(slot === undefined ? [] : ["--language", slot]), ...(options.idleMs === undefined ? [] : ["--idle", String(Math.ceil(options.idleMs / 1000))])];
       const child = spawn(process.execPath, args, { cwd: root, detached: true, stdio: "ignore" });
       child.unref();
       if (child.pid !== undefined) handLock(paths, child.pid);
