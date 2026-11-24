@@ -275,12 +275,8 @@ function writeStdout(call: CommandCall, text: string): Promise<void> {
 const OUTPUT_LOST_EXIT = 74;
 
 async function hookCommand(call: CommandCall, args: string[], root: string): Promise<number> {
-  const { HOOK_EVENTS, isHookEvent, readStdinJson, refreshVocabulary, REFRESH_VOCABULARY_FLAG, runHook } = await import("./lifecycle/hook.ts");
+  const { HOOK_EVENTS, isHookEvent, readStdinJson, runHook } = await import("./lifecycle/hook.ts");
   const event = args[0];
-  if (event === REFRESH_VOCABULARY_FLAG) {
-    await refreshVocabulary(root);
-    return 0;
-  }
   if (event === undefined || !isHookEvent(event)) failWithUsage(`hook: expected one of ${HOOK_EVENTS.join(", ")}`);
   const input = await readStdinJson(call.stdin);
   return deliverHook(call, event, await runHook(event, input, root, { ...(await hookStarts()), startedAt: call.startedAt }));
@@ -334,11 +330,11 @@ export const PROCESS_VERBS: ReadonlySet<string> = new Set(["hook-serve", "serve"
  * same work and keep the same records.
  */
 async function hookStarts() {
-  const { ECONOMY_SNAPSHOT, MIRROR_REFRESH, STRUCTURE_REFRESH, VOCABULARY_REFRESH, WARM_UP } = await import("./lifecycle/hook.ts");
+  const { ECONOMY_SNAPSHOT, MIRROR_REFRESH, STRUCTURE_REFRESH, WARM_UP } = await import("./lifecycle/hook.ts");
   const telemetry = (root: string, event: string, input: Record<string, unknown>): void => {
     void import("./lifecycle/telemetry.ts").then(({ startTelemetry }) => startTelemetry(root, event, input), () => false);
   };
-  return { refresh: STRUCTURE_REFRESH, vocabularyRefresh: VOCABULARY_REFRESH, warm: WARM_UP, telemetry, updateCheck: startUpdateCheck, mirrors: MIRROR_REFRESH, snapshot: ECONOMY_SNAPSHOT } as const;
+  return { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry, updateCheck: startUpdateCheck, mirrors: MIRROR_REFRESH, snapshot: ECONOMY_SNAPSHOT } as const;
 }
 
 const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {

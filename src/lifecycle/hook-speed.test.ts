@@ -12,7 +12,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { patchFingerprint, recordWriteTrace, sessionPatch, snapshotInBackground, snapshotSession, snapshotSlot, traceFile, type Snapshot } from "../economy/trace.ts";
-import { WARM_UP, economyStopText, editContext, refreshVocabulary, runHook } from "./hook.ts";
+import { WARM_UP, economyStopText, editContext, runHook } from "./hook.ts";
+import { pendingCandidates } from "./lexicon-cli.ts";
 import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
@@ -378,10 +379,9 @@ test("the vocabulary coverage reading runs at a tool hook only after a write, an
   }
 });
 
-test("a start reads the vocabulary only when none is kept; over a moved tree it names the kept one's age and the session's baseline waits for the background reading", async () => {
-  const root = repo({ "coherence.config.json": JSON.stringify({ name: "p" }), "src/a/A.spec.md": "# A\n\nA component.\n", "src/a/a.ts": "export const a = 1;\n" });
-  const refreshes: string[] = [];
-  const options = { adapter: undefined, door: async (_r: unknown, fn: (...args: unknown[]) => unknown) => fn(undefined, undefined, "no instrument in this test"), vocabularyRefresh: (_root: string, tree: string) => refreshes.push(tree) } as Parameters<typeof runHook>[3];
+test("a start reads the vocabulary when none is kept or the tree moved, keeps the session's baseline at once, and its first edit is judged against it", async () => {
+  const root = repo({ "coherence.config.json": JSON.stringify({ name: "p" }), "src/a/A.spec.md": "# A\n\nA component.\n", "src/a/a.ts": "export const a = 1;\n", "docs/note.md": "A note.\n" });
+  const options = { adapter: undefined, door: async (_r: unknown, fn: (...args: unknown[]) => unknown) => fn(undefined, undefined, "no instrument in this test") } as Parameters<typeof runHook>[3];
   const baselineOf = (session: string): string => join(root, ".coherence", "lexicon", "sessions", `${session}.json`);
   const hook = async (event: "SessionStart" | "UserPromptSubmit", session: string): Promise<{ readings: number; stdout: string }> => {
     const answered = await runHook(event, { cwd: root, session_id: session, ...(event === "SessionStart" ? { source: "startup" } : { prompt: "go" }) }, root, options);
@@ -394,17 +394,15 @@ test("a start reads the vocabulary only when none is kept; over a moved tree it 
     assert.equal((await hook("UserPromptSubmit", "first")).readings, 0, "the first prompt after a start over an unchanged tree reads nothing");
     assert.equal((await hook("SessionStart", "second")).readings, 0, "a start over the tree the kept reading matches reads nothing");
     writeFileSync(join(root, "src/a/b.ts"), "export const b = 1;\n");
-    const stale = await hook("SessionStart", "third");
-    assert.equal(stale.readings, 0, "a start over a moved tree reads nothing in the hook");
-    assert.match(stale.stdout, /Vocabulary: as read \d+ min ago, before this tree's latest changes/);
-    assert.equal(refreshes.length, 1, "it starts one background reading");
-    assert.ok(!existsSync(baselineOf("third")), "a stale reading is no baseline: it would count changes made before the session as the session's");
-    await hook("UserPromptSubmit", "third");
-    assert.ok(!existsSync(baselineOf("third")), "a prompt before the background reading finished still keeps none");
-    await refreshVocabulary(root);
-    writeFileSync(join(root, "src/a/c.ts"), "export const c = 1;\n");
-    assert.equal((await hook("UserPromptSubmit", "third")).readings, 0);
-    assert.ok(existsSync(baselineOf("third")), "the first prompt after the background reading takes it as the baseline, though the session's own edits moved the tree since");
+    const moved = await hook("SessionStart", "third");
+    assert.ok(moved.readings > 0, "a start over a moved tree reads the vocabulary as it now stands");
+    assert.doesNotMatch(moved.stdout, /Vocabulary: as read/, "and says nothing of an older reading");
+    assert.ok(existsSync(baselineOf("third")), "the session's baseline is kept at its start");
+    const note = join(root, "docs/note.md");
+    writeFileSync(note, "A note.\nThe `rebate` is new.\nEach `rebate` is paid.\nA `rebate` is clawed back.\n");
+    const edit = await runHook("PostToolUse", { cwd: root, session_id: "third", tool_name: "Edit", tool_input: { file_path: note } }, root, options);
+    edit.commit?.();
+    assert.ok(pendingCandidates(root, "third").terms.includes("rebate"), "an edit right after the start makes its term recur, and the session counts it");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

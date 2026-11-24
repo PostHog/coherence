@@ -97,7 +97,7 @@ import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
 import { deadEndBlock, readDeadEnds } from "../journal/dead-ends.ts";
-import { filesRead, firstWriteAtMs, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotInBackground, snapshotSession, snapshotTrace, type Snapshot } from "../economy/trace.ts";
+import { filesRead, lastSnapshot, patchFingerprint, recordReadTrace, recordWriteTrace, sessionPatch, snapshotInBackground, snapshotSession, snapshotTrace, type Snapshot } from "../economy/trace.ts";
 import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type JournalRecord, type Unable } from "../journal/record.ts";
@@ -111,7 +111,7 @@ import type { Coverage } from "./lexicon-coverage.ts";
 import { cacheDir } from "./kept-parse.ts";
 import { mirrorBlock, refreshMirrorsInBackground } from "../readings/mirrors/recorded.ts";
 import type { GapState } from "../readings/scope/gaps.ts";
-import { refreshInBackground, releaseRefresh, refreshUnderWay, structureRefreshSlot } from "../readings/scope/background-refresh.ts";
+import { refreshInBackground, refreshUnderWay, structureRefreshSlot } from "../readings/scope/background-refresh.ts";
 import type { coverageChanges } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 import { namesWrittenFiles, writtenNames } from "./host-tools.ts";
@@ -215,30 +215,6 @@ function treeKeyPath(root: string, session: string): string {
   return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.tree`);
 }
 
-function awaitingBaselinePath(root: string, session: string): string {
-  return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.awaiting`);
-}
-
-// A reading begun after a stale start holds every change made before the session, so it can be the session's baseline.
-async function adoptAwaitedBaseline(root: string, session: string): Promise<void> {
-  const { baselinePath, saveBaseline } = await import("./lexicon-cli.ts");
-  const { keptCoverage } = await import("./vocabulary-state.ts");
-  let startedAtMs: number;
-  try {
-    startedAtMs = Number(readFileSync(awaitingBaselinePath(root, session), "utf8"));
-  } catch {
-    return;
-  }
-  if (existsSync(baselinePath(root, session))) return;
-  const kept = await keptCoverage(root, await loadProjectLexicons(root));
-  if (kept === undefined || kept.readFromMs < startedAtMs) return;
-  // A reading that ended after the session's first write may already hold that write, which would then never be counted.
-  const firstWriteMs = firstWriteAtMs(root, session);
-  if (firstWriteMs !== undefined && firstWriteMs <= kept.readToMs) return;
-  saveBaseline(root, session, kept.coverage);
-  rmSync(awaitingBaselinePath(root, session), { force: true });
-}
-
 /**
  * What the coverage reading's text depends on, cheaply: the commit HEAD
  * names, and every changed or untracked project file git lists, with its
@@ -265,70 +241,17 @@ async function treeKey(root: string): Promise<string | undefined> {
     .join("\n");
 }
 
-// A stale kept reading is no baseline: changes made after it but before the session would be counted as the session's.
-async function startVocabulary(root: string, options: HookOptions): Promise<{ reading: Coverage; staleNote: string; keepBaseline: (session: string) => void }> {
-  const { baselinePath, saveBaseline } = await import("./lexicon-cli.ts");
-  const { keptCoverage, keptReading } = await import("./vocabulary-state.ts");
-  const startedAtMs = Date.now();
+// The tree is keyed before the reading, so a write during it moves the key and the first prompt reads again.
+async function startVocabulary(root: string): Promise<{ reading: Coverage; keepBaseline: (session: string) => void }> {
+  const { saveBaseline } = await import("./lexicon-cli.ts");
+  const { currentReading } = await import("./vocabulary-state.ts");
   const tree = await treeKey(root);
-  const layers = await loadProjectLexicons(root);
-  const kept = await keptCoverage(root, layers);
-  const keepFreshBaseline = (reading: Coverage) => (session: string): void => {
+  const reading = await currentReading(root, await loadProjectLexicons(root));
+  const keepBaseline = (session: string): void => {
     saveBaseline(root, session, reading);
     if (tree !== undefined) keepTreeKey(root, session, tree);
   };
-  if (kept === undefined) {
-    const reading = await keptReading(root, layers);
-    return { reading, staleNote: "", keepBaseline: keepFreshBaseline(reading) };
-  }
-  if (kept.isFresh || tree === undefined) return { reading: kept.coverage, staleNote: "", keepBaseline: keepFreshBaseline(kept.coverage) };
-  options.vocabularyRefresh?.(root, createHash("sha256").update(`${tree}\n${kept.readFromMs}`).digest("hex"));
-  const staleNote = `Vocabulary: as read ${ageText(startedAtMs - kept.readFromMs)} ago, before this tree's latest changes; a background reading brings it up to date, and this session's vocabulary changes are counted from the first prompt or stop after it.`;
-  const awaitBaseline = (session: string): void => {
-    try {
-      rmSync(baselinePath(root, session), { force: true });
-      rmSync(treeKeyPath(root, session), { force: true });
-      mkdirSync(dirname(awaitingBaselinePath(root, session)), { recursive: true });
-      writeFileSync(awaitingBaselinePath(root, session), String(startedAtMs));
-    } catch {
-      // Without the mark the session keeps no vocabulary baseline: its vocabulary lines stay quiet, nothing is misattributed.
-    }
-  };
-  return { reading: kept.coverage, staleNote, keepBaseline: awaitBaseline };
-}
-
-function ageText(ageMs: number): string {
-  const minutes = Math.max(1, Math.round(ageMs / 60_000));
-  if (minutes < 120) return `${minutes} min`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours} h`;
-  return `${Math.round(hours / 24)} days`;
-}
-
-/** What the command line's vocabulary refresh runs: one full reading that keeps the vocabulary state for the tree as it then stands. */
-export async function refreshVocabulary(root: string): Promise<void> {
-  const { keptReading } = await import("./vocabulary-state.ts");
-  try {
-    await keptReading(root, await loadProjectLexicons(root));
-  } finally {
-    releaseRefresh(process.pid, vocabularyRefreshSlotPath(root));
-  }
-}
-
-function vocabularyRefreshSlotPath(root: string): string {
-  return join(cacheDir(root), "vocabulary-refresh.json");
-}
-
-// refreshInBackground never retries a fingerprint its mark names, so a refresh killed before releasing its slot gives the slot up here.
-function releaseDeadVocabularyRefresh(root: string): void {
-  try {
-    const mark = JSON.parse(readFileSync(vocabularyRefreshSlotPath(root), "utf8")) as { pid?: unknown };
-    if (typeof mark.pid !== "number") return;
-    process.kill(mark.pid, 0);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ESRCH") return;
-    rmSync(vocabularyRefreshSlotPath(root), { force: true });
-  }
+  return { reading, keepBaseline };
 }
 
 function lastTreeKey(root: string, session: string): string | undefined {
@@ -1235,8 +1158,6 @@ export interface HookOptions {
    * test), nothing is started.
    */
   refresh?: ((root: string, fingerprint: string) => void | Promise<unknown>) | undefined;
-  /** Re-keep the vocabulary reading in the background for a start that found it stale; VOCABULARY_REFRESH from the command line, nothing in a test. */
-  vocabularyRefresh?: ((root: string, treeFingerprint: string) => void) | undefined;
   /** The door to the warm instrument; enforcement's own by default. */
   door?: WarmDoor | undefined;
   /** How long a session start may wait for a nearly done refresh; START_WAIT_MS by default. */
@@ -1372,13 +1293,6 @@ export const WARM_UP = (root: string, language?: string): boolean => {
   }
 };
 
-/** The vocabulary refresh the command line starts: one per tree, superseding a refresh of an older tree. COHERENCE_NO_WARM_UP=1 starts nothing here either. */
-export const VOCABULARY_REFRESH = (root: string, treeFingerprint: string): void => {
-  if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
-  releaseDeadVocabularyRefresh(root);
-  refreshInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "hook", REFRESH_VOCABULARY_FLAG], treeFingerprint, Date.now, { path: vocabularyRefreshSlotPath(root), command: /(?:^|\s)hook\s+--refresh-vocabulary\s*$/ });
-};
-export const REFRESH_VOCABULARY_FLAG = "--refresh-vocabulary";
 
 /** The refresh the command line starts: this checkout's query structure, warm-only so a refresh never starts a language server, which records the reading it takes. */
 // Settles once the refresh's mark is written, so the start that awaits it can say one is under way.
@@ -1648,12 +1562,12 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     const session = sessionOf(input);
     if (session === undefined || oriented(place.root, session)) return result;
     const root = place.root;
-    const vocabulary = await startVocabulary(root, options);
+    const vocabulary = await startVocabulary(root);
     const reading = vocabulary.reading;
     const gaps = await gapReading(root);
     const start = await startReading(root, input, reading, gaps);
     const { saveSessionGaps } = await import("../readings/scope/gaps.ts");
-    const text = [start.text, vocabulary.staleNote].filter(Boolean).join("\n");
+    const text = start.text;
     const answered = (result.stdout.trim() === "" ? {} : JSON.parse(result.stdout)) as { hookSpecificOutput?: { additionalContext?: string } };
     const before = answered.hookSpecificOutput?.additionalContext;
     const context = before === undefined || before === "" ? text : `${text}\n${before}`;
@@ -1683,7 +1597,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     switch (event) {
       case "SessionStart":
       case "SubagentStart": {
-        const vocabulary = await startVocabulary(root, options);
+        const vocabulary = await startVocabulary(root);
         const reading = vocabulary.reading;
         // Only a session start waits, and only for a refresh of this tree that is nearly done; a subagent starts at once.
         let gaps = await gapReading(root, event === "SessionStart" ? { waitMs: options.startWaitMs ?? START_WAIT_MS } : {});
@@ -1695,7 +1609,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         }
         const start = await startReading(root, input, reading, gaps);
         const { saveSessionGaps } = await import("../readings/scope/gaps.ts");
-        const context = await voiced(root, input, [start.text, vocabulary.staleNote].filter(Boolean).join("\n"), voice);
+        const context = await voiced(root, input, start.text, voice);
         await keepMirrorsFromModel(root);
         const session = sessionOf(input);
         if (session !== undefined) openFeed(root, session);
@@ -1807,7 +1721,6 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
             pending = pending.filter((term) => owed.has(term));
           }
         }
-        if (!baseline && session !== undefined && event === "UserPromptSubmit") await adoptAwaitedBaseline(root, session);
         const vocabulary=changes.length || pending.length ? await vocabularyAtEdit(root, changes, pending, event === "PostToolUse") : "";
         // What the last stop said reached only the user; the prompt that follows it is where the agent reads it.
         const fromStop = event === "UserPromptSubmit" && session ? carried(root, session) : undefined;
@@ -1848,7 +1761,6 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const spec = specStopText(root, changed.files, walls);
         const lexicon = await lexiconStopText(report, walls);
         const workText = workStopText(root, input);
-        if (session) await adoptAwaitedBaseline(root, session);
         const { baselinePath, deliverCandidates, priorBaseline } = await import("./lexicon-cli.ts");
         const { currentReading } = await import("./vocabulary-state.ts");
         const reading=session && existsSync(baselinePath(root,session)) ? await currentReading(root, await loadProjectLexicons(root)) : undefined;

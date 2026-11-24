@@ -129,19 +129,6 @@ export function recordWriteTrace(root: string, session: string, files: readonly 
   append(root, { kind: "write", at, session, files: [...files] });
 }
 
-/** When the session's trace first records a write, in epoch ms; undefined when it records none. */
-export function firstWriteAtMs(root: string, session: string): number | undefined {
-  if (!SESSION_TOKEN.test(session)) return undefined;
-  const file = traceFile(root, session);
-  if (!existsSync(file)) return undefined;
-  for (const line of readFileSync(file, "utf8").split("\n")) {
-    if (line.trim() === "") continue;
-    const parsed = parseLine(line);
-    if (typeof parsed !== "string" && parsed.kind === "write") return Date.parse(parsed.at);
-  }
-  return undefined;
-}
-
 /** The distinct files a session's trace says it wrote, sorted. */
 export function filesWritten(root: string, session: string): string[] {
   const file = traceFile(root, session);
