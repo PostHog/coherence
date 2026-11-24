@@ -14,6 +14,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileStemOf } from "../journal/session-token.ts";
 
 export const REGULATE_DIR = join(".coherence", "regulate");
 
@@ -25,7 +26,7 @@ interface Memory {
 }
 
 function file(root: string, session: string): string {
-  return join(root, REGULATE_DIR, `${session.replace(/[^\w.-]/g, "_")}.json`);
+  return join(root, REGULATE_DIR, `${fileStemOf(session)}.json`);
 }
 
 function read(root: string, session: string): Memory {

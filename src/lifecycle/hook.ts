@@ -121,6 +121,7 @@ import { keepMirrorIndex, mirrorAlarm } from "./mirrors.ts";
 import { specAlarm } from "./spec-at-edit.ts";
 import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
 import { cliArgs } from "./own-cli.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 const run = promisify(execFile);
 
@@ -217,7 +218,7 @@ const GIT_LISTING_LIMIT = 64 * 1024 * 1024;
  */
 /** Where a session keeps the tree key of its last prompt-time coverage reading. */
 function treeKeyPath(root: string, session: string): string {
-  return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.tree`);
+  return join(root, ".coherence", "lexicon", "sessions", `${fileStemOf(session)}.tree`);
 }
 
 /**
@@ -737,7 +738,7 @@ function editServerWaitMs(root: string, startedAt: number | undefined): number {
 
 /** Where a session keeps the files whose edit check waited for a language server to load, one file per path so concurrent hooks never rewrite each other's. */
 function deferredCheckFolder(root: string, session: string): string {
-  return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.deferred`);
+  return join(root, ".coherence", "lexicon", "sessions", `${fileStemOf(session)}.deferred`);
 }
 
 function deferredEntry(root: string, session: string, file: string): string {
@@ -763,7 +764,7 @@ function deferredFiles(root: string, session: string): string[] {
 
 /** Where a session lists the projects it put an edit check off in: a stop routes by its folder, an edit by its file, so the stop reads this list to drain them all. */
 function deferringFolder(session: string): string {
-  return join(userCacheDir(), "deferred", session.replace(/[^\w.-]/g, "_"));
+  return join(userCacheDir(), "deferred", fileStemOf(session));
 }
 
 function deferringEntry(root: string, session: string): string {
@@ -1392,7 +1393,7 @@ async function voiced(root: string, input: HookInput, canonical: string, voice: 
 
 /** Where a session's orient in a nested project is marked delivered: transient, as the feed cursors and practice firings are. */
 function orientedPath(root: string, session: string): string {
-  return join(root, ".coherence", "orient", session.replace(/[^\w.-]/g, "_"));
+  return join(root, ".coherence", "orient", fileStemOf(session));
 }
 
 /** Whether this session has had orient in this project. */

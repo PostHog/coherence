@@ -15,6 +15,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { TOOL_HOOKS } from "./hook-events.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 /** Not .coherence/hooks, which holds the project's own hook voice and is committed; these are regenerated. */
 export const HOOK_TIMES_DIR = join(".coherence", "hook-times");
@@ -48,7 +49,7 @@ export function coherenceVersion(): string | null {
 }
 
 function sessionFile(root: string, session: string): string {
-  return join(root, HOOK_TIMES_DIR, `${session.replace(/[^\w.-]/g, "_")}.jsonl`);
+  return join(root, HOOK_TIMES_DIR, `${fileStemOf(session)}.jsonl`);
 }
 
 /** The latency budget in seconds: the config's, or the default. */

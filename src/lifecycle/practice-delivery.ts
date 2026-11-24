@@ -24,6 +24,7 @@ import type { Enactment } from "../journal/record.ts";
 import { enactTemplate } from "../journal/verbs.ts";
 import { holdsProject, projectRoot, within } from "./project.ts";
 import { shellCommandOf, simpleCommands, type SimpleCommand } from "./shell-writes.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 export const PRACTICES_DIR = join(".coherence", "practices");
 
@@ -39,7 +40,7 @@ export interface Firing {
 }
 
 function firingsFile(root: string, session: string): string {
-  return join(root, PRACTICES_DIR, `${session.replace(/[^\w.-]/g, "_")}.jsonl`);
+  return join(root, PRACTICES_DIR, `${fileStemOf(session)}.jsonl`);
 }
 
 /** The firings this session has had, oldest first; a torn line is skipped. */

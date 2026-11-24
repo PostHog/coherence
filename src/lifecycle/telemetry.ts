@@ -34,6 +34,7 @@ import { TELEMETRY_TARGET, TELEMETRY_TIMEOUT_MS, type TelemetryTarget } from "./
 import { HOOK_EVENTS } from "./hook-events.ts";
 import { HOSTS as AGENT_HOSTS } from "./hosts.ts";
 import { CLI_BESIDE, cliArgs } from "./own-cli.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
@@ -461,7 +462,7 @@ function reported(env: Env): string[] {
 }
 
 const sessionKey = (root: string, file: string): string => createHash("sha256").update(`${root}\0${file}`).digest("hex").slice(0, 24);
-const sessionFileName = (session: string): string => `${session.replace(/[^\w.-]/g, "_")}.jsonl`;
+const sessionFileName = (session: string): string => `${fileStemOf(session)}.jsonl`;
 
 /** The hook-time files of sessions in this project that are over, touched since the opt-in, and never summarized. */
 export function pendingSessions(root: string, current: string | undefined, env: Env = process.env, now: () => number = Date.now): string[] {

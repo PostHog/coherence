@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { runHook, type HookInput, type HookOptions, type HookResult } from "./hook.ts";
 import type { AntigravityEvent, HookEvent } from "./hook-events.ts";
 import { installedRoot } from "./project.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 type Payload = Record<string, unknown>;
 
@@ -53,7 +54,7 @@ export function hookInputOf(event: AntigravityEvent, payload: Payload): HookInpu
 }
 
 function pendingPath(holder: string, session: string): string {
-  return join(holder, ".coherence", "antigravity", `${session.replace(/[^\w.-]/g, "_")}.pending`);
+  return join(holder, ".coherence", "antigravity", `${fileStemOf(session)}.pending`);
 }
 
 function appendPending(holder: string, session: string, context: string): void {
