@@ -29,6 +29,7 @@ import { generate, LEAVES } from "./generate.ts";
 import { TOOL_HOOKS } from "../../src/lifecycle/hook-events.ts";
 import { DEFAULT_LATENCY_BUDGET } from "../../src/lifecycle/hook-latency.ts";
 import { startParsers } from "../../src/plugins/syntax-trees.ts";
+import { cliArgs } from "../../src/lifecycle/own-cli.ts";
 
 // A reading through a language's parser needs its runtime started first, as the CLI starts it.
 await startParsers();
@@ -152,7 +153,7 @@ try {
   for (const step of steps) {
     step.act?.();
     const started = performance.now();
-    const result = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, "hook", step.event], { cwd: root, env, input: JSON.stringify(step.input), encoding: "utf8", timeout: 120_000 });
+    const result = spawnSync(process.execPath, cliArgs(CLI, "hook", step.event), { cwd: root, env, input: JSON.stringify(step.input), encoding: "utf8", timeout: 120_000 });
     const ms = Math.round(performance.now() - started);
     const budgetMs = budgets[step.label];
     if (budgetMs === undefined) throw new Error(`budgets.json names no budget for "${step.label}"`);
