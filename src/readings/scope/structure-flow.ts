@@ -75,6 +75,7 @@ import { creditedByCrossingAlone, crossingChecksTrust, namesEntrance } from "../
 import { slug } from "./html.ts";
 import { languagesReadLine, type LanguagesRead } from "./languages-read.ts";
 import type { EntranceGuard, InterfacePartial, InterfaceReading, InterfaceUnanswered, InterfaceSymbol, ReachReference, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
+import { NAMED_SYMBOL } from "../../spec/named.ts";
 
 type ReadInterfaces = Extract<InterfaceReading, { kind: "read" }>;
 type InterfaceBounds = NonNullable<ReadInterfaces["bounds"]>;
@@ -497,11 +498,9 @@ export interface FlowModel {
 
 /* ------------------------------------------------------ interface symbols */
 
-const FLOW_NAME = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/;
-
 /** A spec value as a symbol and optional file, or a module path; undefined for prose. */
 function flowNamed(value: string): { symbol?: string; file?: string } | undefined {
-  const named = FLOW_NAME.exec(value.trim());
+  const named = NAMED_SYMBOL.exec(value.trim());
   if (named !== null) return named[2] === undefined ? { symbol: named[1]! } : { symbol: named[1]!, file: named[2]! };
   if (/^[A-Za-z0-9_./@-]+\.[A-Za-z]+$/.test(value.trim())) return { file: value.trim() };
   return undefined;

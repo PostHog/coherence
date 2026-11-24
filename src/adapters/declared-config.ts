@@ -9,6 +9,7 @@
 
 import { isLanguage } from "./index.ts";
 import { languageOfFile } from "./language-files.ts";
+import { CONFIG_NAME, CONFIG_NAME_FORM } from "../enforcement/config-name.ts";
 
 /** One language the config declares. */
 export interface DeclaredLanguage {
@@ -32,7 +33,6 @@ export const REFUTE_PLACEHOLDERS: Readonly<Record<string, string>> = {
   "{path}": "the protected thing's file, relative to the project root",
 };
 
-const NAME = /^[a-z][a-z0-9-]*$/;
 const EXTENSION = /^\.[A-Za-z0-9][A-Za-z0-9.+-]*$/;
 
 /**
@@ -47,7 +47,7 @@ export function readDeclaredLanguages(raw: unknown, path: string): DeclaredLangu
   for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
     const where = `${path}: languages.${name}`;
     if (isLanguage(name)) throw new Error(`${where} is a built-in language; a declared language takes another name`);
-    if (!NAME.test(name)) throw new Error(`${where}: a declared language's name is lowercase letters, digits and hyphens, starting with a letter`);
+    if (!CONFIG_NAME.test(name)) throw new Error(`${where}: a declared language's name is ${CONFIG_NAME_FORM}`);
     if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${where} is an object with extensions and server`);
     const entry = value as Record<string, unknown>;
     const extensions = entry["extensions"];

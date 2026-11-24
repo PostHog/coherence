@@ -27,6 +27,7 @@ import { modelFileKind } from "../spec/model.ts";
 import { parsePractices } from "../spec/practice.ts";
 import { loadSeed } from "../spec/seed.ts";
 import { readProjectText } from "./work-meter.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 /** Where what an edit said of each written spec is kept, per session; transient state, ignored with the rest of .coherence. */
 export const SPEC_SAID_DIR = join(".coherence", "spec-said");
@@ -39,7 +40,7 @@ export interface EditProblem {
 }
 
 function saidPath(root: string, session: string): string {
-  return join(root, SPEC_SAID_DIR, `${session.replace(/[^\w.-]/g, "_")}.json`);
+  return join(root, SPEC_SAID_DIR, `${fileStemOf(session)}.json`);
 }
 
 function readSaid(root: string, session: string | undefined): Record<string, string> {

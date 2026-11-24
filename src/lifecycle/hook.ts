@@ -116,6 +116,8 @@ import type { coverageChanges } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 import { namesWrittenFiles, writtenNames } from "./host-tools.ts";
 import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
+import { cliArgs } from "./own-cli.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 const run = promisify(execFile);
 
@@ -212,7 +214,7 @@ const GIT_LISTING_LIMIT = 64 * 1024 * 1024;
  */
 /** Where a session keeps the tree key of its last prompt-time coverage reading. */
 function treeKeyPath(root: string, session: string): string {
-  return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.tree`);
+  return join(root, ".coherence", "lexicon", "sessions", `${fileStemOf(session)}.tree`);
 }
 
 /**
@@ -749,7 +751,7 @@ function editServerWaitMs(root: string, startedAt: number | undefined): number {
 
 /** Where a session keeps the files whose edit check waited for a language server to load, one file per path so concurrent hooks never rewrite each other's. */
 function deferredCheckFolder(root: string, session: string): string {
-  return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.deferred`);
+  return join(root, ".coherence", "lexicon", "sessions", `${fileStemOf(session)}.deferred`);
 }
 
 function deferredEntry(root: string, session: string, file: string): string {
@@ -775,7 +777,7 @@ function deferredFiles(root: string, session: string): string[] {
 
 /** Where a session lists the projects it put an edit check off in: a stop routes by its folder, an edit by its file, so the stop reads this list to drain them all. */
 function deferringFolder(session: string): string {
-  return join(userCacheDir(), "deferred", session.replace(/[^\w.-]/g, "_"));
+  return join(userCacheDir(), "deferred", fileStemOf(session));
 }
 
 function deferringEntry(root: string, session: string): string {
@@ -1283,7 +1285,7 @@ export function economyStopText(snapshot: Snapshot | undefined, currentFingerpri
 export const WARM_UP = (root: string, language?: string): boolean => {
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return false;
   try {
-    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "warm", ...(language === undefined ? [] : ["--language", language])], { cwd: root, detached: true, stdio: "ignore" });
+    const child = spawn(process.execPath, cliArgs(OWN_CLI, "warm", ...(language === undefined ? [] : ["--language", language])), { cwd: root, detached: true, stdio: "ignore" });
     child.on("error", () => {});
     child.unref();
     return child.pid !== undefined;
@@ -1310,12 +1312,12 @@ export const STRUCTURE_REFRESH = (root: string, fingerprint: string): Promise<un
  */
 export const ECONOMY_SNAPSHOT = (root: string, session: string, fingerprint: string): void => {
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
-  void snapshotInBackground(root, session, fingerprint, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "economy", "--snapshot", session]).catch(() => false);
+  void snapshotInBackground(root, session, fingerprint, [process.execPath, ...cliArgs(OWN_CLI, "economy", "--snapshot", session)]).catch(() => false);
 };
 
 /** The mirror refresh the command line starts: this checkout's query mirrors --refresh, which reads only when the kept reading is of another commit. */
 export const MIRROR_REFRESH = (root: string): void => {
-  refreshMirrorsInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "query", "mirrors", "--refresh"]);
+  refreshMirrorsInBackground(root, [process.execPath, ...cliArgs(OWN_CLI, "query", "mirrors", "--refresh")]);
 };
 
 /** Regulate's gap lines: the gaps this session touched, advisory, or nothing. */
@@ -1413,7 +1415,7 @@ async function voiced(root: string, input: HookInput, canonical: string, voice: 
 
 /** Where a session's orient in a nested project is marked delivered: transient, as the feed cursors and practice firings are. */
 function orientedPath(root: string, session: string): string {
-  return join(root, ".coherence", "orient", session.replace(/[^\w.-]/g, "_"));
+  return join(root, ".coherence", "orient", fileStemOf(session));
 }
 
 /** Whether this session has had orient in this project. */

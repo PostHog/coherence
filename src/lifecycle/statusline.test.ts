@@ -104,3 +104,9 @@ test("the status line links the live Scope page while its warm server answers, n
   writeFileSync(join(top, ".coherence/run/server.json"), JSON.stringify({ pid: process.pid, token }));
   assert.equal(readStatus({ session_id: SESSION, cwd: top })!.scope, undefined, "a server that serves no HTTP yet has no page");
 });
+
+test("the status line names a session's files as the hooks do", async () => {
+  const { fileStemOf } = await import("../journal/session-token.ts");
+  const { statusFileStem } = await import("./statusline.ts");
+  for (const session of ["11c93d87-0407-4ce7-9a27-189f3a835bb6", "agent:a1/b", "..", ".", "", ".hidden", "x".repeat(200)]) assert.equal(statusFileStem(session), fileStemOf(session), JSON.stringify(session));
+});

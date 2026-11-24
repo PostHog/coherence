@@ -53,13 +53,12 @@ import {
 import { locateServer as locateInstalled, type ServerLocation } from "../../src/plugins/api.ts";
 import { locateTsgo, locateTsserver, tsgoRefusal, type TsgoChoice } from "./tsserver.ts";
 import manifest from "./plugin.json" with { type: "json" };
+import { INDEX_EXTENSIONS, JAVASCRIPT_EXTENSIONS, MODULE_EXTENSION, MODULE_EXTENSIONS, TYPESCRIPT_EXTENSIONS } from "./module-extensions.ts";
 import { JsonRpcClient } from "../../src/plugins/api.ts";
 import { fileIdentity, hintedFiles, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
 
 const SERVER_BIN = "typescript-language-server";
-const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
-const JAVASCRIPT_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs"]);
-const SOURCE_EXTENSIONS = new Set([...TYPESCRIPT_EXTENSIONS, ...JAVASCRIPT_EXTENSIONS]);
+const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set(MODULE_EXTENSIONS);
 
 /**
  * The sources the project is written in: when any TypeScript source is in the
@@ -229,11 +228,11 @@ export function specifierCandidates(from: string, specifier: string): string[] {
   const dir = dirname(from);
   const base = join(dir, specifier).split(sep).join("/");
   if (base.startsWith("..")) return [];
-  const stripped = base.replace(/\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$/, "");
+  const stripped = base.replace(MODULE_EXTENSION, "");
   const candidates = [
     base,
-    ...[".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"].map((extension) => `${stripped}${extension}`),
-    ...[".ts", ".tsx", ".js", ".jsx"].flatMap((extension) => [`${stripped}/index${extension}`, `${base}/index${extension}`]),
+    ...MODULE_EXTENSIONS.map((extension) => `${stripped}${extension}`),
+    ...INDEX_EXTENSIONS.flatMap((extension) => [`${stripped}/index${extension}`, `${base}/index${extension}`]),
   ];
   return [...new Set(candidates.filter((candidate) => SOURCE_EXTENSIONS.has(extensionOf(candidate))))];
 }

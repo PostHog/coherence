@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { ReliefData, ReliefFileLanded } from "./data.ts";
 import { MARGIN, nesting, placeComponents, type ReliefLayout } from "./layout.ts";
+import { FOOT } from "./measures.ts";
 import type { Touch } from "../../relief/relief.ts";
 
 export type { Touch };
@@ -135,15 +136,6 @@ const pct = (x) => (Number.isFinite(x) ? (x * 100).toFixed(x < 0.1 ? 1 : 0) + "%
 const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const css = (v) => getComputedStyle(root).getPropertyValue(v).trim();
 
-const FOOT = [
-  { key: "lines", label: "Lines", unit: "lines", how: "the lines mass counts in the component's files (node src/cli.ts mass --json); mass leaves out test files" },
-  { key: "unreached", label: "Unreached", unit: "unreached lines", how: "lines in files no enforcement reaches, per mass. Totality oracles name no files, so this is mostly where no chokepoint reaches" },
-  { key: "invariants", label: "Invariants", unit: "bullets", how: "bullets in the component's spec" },
-  { key: "refutations", label: "Refutations", unit: "refutations", how: "refuted: entries under the component's bullets" },
-  { key: "crossings", label: "Crossings", unit: "crossing bullets", how: "bullets that carry a crossing" },
-  { key: "leaned", label: "Leaned on", unit: "call sites in", how: "call sites in other components that use this component's symbols, values and types alike, from Scope's component interfaces: the load it carries" },
-  { key: "defects", label: "Defects", unit: "open defects", how: "open defect records in the journal (a resolution closes one, a retraction withdraws it) naming a file in the component's folder; one naming no file counts nowhere" },
-];
 const HEIGHT = [
   { key: "landings", label: "Landings", unit: "landings", how: `first-parent commits on ${TRUNK} touching the component` },
   { key: "volume", label: "Lines changed", unit: "lines changed", how: "lines added plus deleted in those landings" },

@@ -96,7 +96,7 @@ import {
   type Visibility,
 } from "../../src/plugins/api.ts";
 import { locateServer as locateInstalled, type ServerLocation } from "../../src/plugins/api.ts";
-import { JsonRpcClient } from "../../src/plugins/api.ts";
+import { COHERENCE_ENFORCER, JsonRpcClient } from "../../src/plugins/api.ts";
 import manifest from "./plugin.json" with { type: "json" };
 import { hintedFiles, horizonFolders, keepHorizonFiles, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, nestedFolder, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
 import { TACH_CONFIG, dottedFor, excluded, findTachConfig, locateTach, moduleLocations, moduleOf, reaches, readTachConfig, runTach, tachGovernance, tachOverCopy, witnessTach, type TachConfig, type TachModule, type TachRun, type TachWitness } from "./tach.ts";
@@ -123,7 +123,6 @@ function isVirtualEnvironment(dir: string): boolean {
   return existsSync(join(dir, VENV_MARKER));
 }
 
-const COHERENCE_ENFORCER = "Coherence's check at the edit and in CI";
 
 /** The ladder, as this plugin's manifest declares it for the core to read without loading this module. */
 export const PYTHON_LADDER: Ladder = manifest.ladder as Ladder;

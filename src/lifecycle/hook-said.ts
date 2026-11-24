@@ -15,6 +15,7 @@
 
 import { mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
+import { fileStemOf } from "../journal/session-token.ts";
 
 export const HOOK_SAID_DIR = join(".coherence", "hook-said");
 /** How many of an event's last words are kept. */
@@ -60,7 +61,7 @@ export function toolOf(root: string, input: Record<string, unknown>): { tool?: s
 }
 
 function eventFile(root: string, event: string): string {
-  return join(root, HOOK_SAID_DIR, `${event.replace(/[^\w.-]/g, "_")}.json`);
+  return join(root, HOOK_SAID_DIR, `${fileStemOf(event)}.json`);
 }
 
 /** One event's kept words, newest first; none when nothing was kept or the file cannot be read. */

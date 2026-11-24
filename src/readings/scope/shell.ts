@@ -1,9 +1,9 @@
 /**
  * The Scope shell: masthead, the view strip, and the active view's body.
  * A pure function from `ShellState` to markup. A view is added by listing
- * it in `state.views` and adding its tools and results to the two switches
- * below; the page re-renders the results region alone when a query or
- * filter changes, and the whole shell when the view changes.
+ * it in VIEWS and giving it its parts in VIEW_PARTS below; the page
+ * re-renders the results region alone when a query or filter changes, and
+ * the whole shell when the view changes.
  */
 
 import { renderHomeResults } from "./home-view.ts";
@@ -13,7 +13,7 @@ import { renderLexiconView } from "./lexicon-view.ts";
 import { html, type Markup } from "./html.ts";
 import { renderJournalResults, renderJournalTools } from "./journal-view.ts";
 import { renderPracticesResults, renderPracticesTools } from "./practices-view.ts";
-import type { ShellState } from "./model.ts";
+import type { ComponentsFilter, JournalKind, ShellState } from "./model.ts";
 import { renderRunsResults, renderRunsTools } from "./runs-view.ts";
 import { renderConnectionsResults, renderStructureResults } from "./structure-view.ts";
 import { CONNECTIONS_ID, CONNECTIONS_LABEL } from "./derive.ts";
@@ -91,50 +91,82 @@ export function renderLexiconResults(state: ShellState): Markup {
   return renderLexiconView(state.lexicon);
 }
 
-/** The active view's results region alone: what a query or filter change re-renders. */
-export function renderViewResults(state: ShellState): Markup {
-  switch (state.activeView) {
-    case "lexicon":
-      return renderLexiconResults(state);
-    case "components":
-      return renderComponentsResults(state);
-    case "home":
-      return renderHomeResults(state);
-    case "structure":
-      return renderStructureResults(state);
-    case CONNECTIONS_ID:
-      return renderConnectionsResults(state);
-    case "practices":
-      return renderPracticesResults(state);
-    case "runs":
-      return renderRunsResults(state);
-    case "journal":
-      return renderJournalResults(state);
-    default:
-      return html`<p class="absence">No view named “${state.activeView}” exists in this reading.</p>`;
-  }
+/** A view's id, as VIEWS lists it. */
+export type ViewId = (typeof VIEWS)[number]["id"];
+
+/** What a view draws and what a reader sets on it: its results region, the tools above it, its search's query, its filters. */
+interface ViewParts {
+  results: (state: ShellState) => Markup;
+  tools?: (state: ShellState) => Markup;
+  query?: (state: ShellState, value: string) => void;
+  /** A filter by name; a name the view does not have is ignored. */
+  filter?: (state: ShellState, name: string, value: string) => void;
 }
 
-function renderViewTools(state: ShellState): Markup | null {
-  switch (state.activeView) {
-    case "lexicon":
-      return html`<div class="view-tools">
+function renderLexiconTools(state: ShellState): Markup {
+  return html`<div class="view-tools">
         <label class="search">
           <span class="label">Search</span>
           <input type="search" data-search value="${state.lexicon.query}" placeholder="name, other name, definition, or rejected name" autocomplete="off" spellcheck="false">
         </label>
       </div>`;
-    case "components":
-      return renderComponentsTools(state);
-    case "practices":
-      return renderPracticesTools(state);
-    case "runs":
-      return renderRunsTools(state);
-    case "journal":
-      return renderJournalTools(state);
-    default:
-      return null;
-  }
+}
+
+/**
+ * Each view's parts, keyed by its id: the one place a view's name is
+ * switched on, which the compiler holds to VIEWS (a view listed there
+ * without an entry here, or an entry for no view, does not compile).
+ */
+const VIEW_PARTS: Record<ViewId, ViewParts> = {
+  home: { results: renderHomeResults },
+  structure: { results: renderStructureResults },
+  [CONNECTIONS_ID]: { results: renderConnectionsResults },
+  lexicon: { results: renderLexiconResults, tools: renderLexiconTools, query: (state, value) => void (state.lexicon.query = value) },
+  components: {
+    results: renderComponentsResults,
+    tools: renderComponentsTools,
+    query: (state, value) => void (state.components.query = value),
+    filter: (state, name, value) => {
+      if (name === "show") state.components.filter = value as ComponentsFilter;
+    },
+  },
+  practices: { results: renderPracticesResults, tools: renderPracticesTools, query: (state, value) => void (state.practicesView.query = value) },
+  runs: { results: renderRunsResults, tools: renderRunsTools, query: (state, value) => void (state.runsView.query = value) },
+  journal: {
+    results: renderJournalResults,
+    tools: renderJournalTools,
+    query: (state, value) => void (state.journalView.query = value),
+    filter: (state, name, value) => {
+      if (name === "kind") state.journalView.kind = value as JournalKind | "";
+      if (name === "agent") state.journalView.agent = value;
+      if (name === "session") state.journalView.session = value;
+    },
+  },
+};
+
+/** The parts of the view a state names, or undefined when it names none of VIEWS. */
+function partsOf(view: string): ViewParts | undefined {
+  return Object.hasOwn(VIEW_PARTS, view) ? VIEW_PARTS[view as ViewId] : undefined;
+}
+
+/** The active view's results region alone: what a query or filter change re-renders. */
+export function renderViewResults(state: ShellState): Markup {
+  const parts = partsOf(state.activeView);
+  return parts === undefined ? html`<p class="absence">No view named “${state.activeView}” exists in this reading.</p>` : parts.results(state);
+}
+
+function renderViewTools(state: ShellState): Markup | null {
+  return partsOf(state.activeView)?.tools?.(state) ?? null;
+}
+
+/** Set the active view's search query; a view with no search ignores it. */
+export function setViewQuery(state: ShellState, value: string): void {
+  partsOf(state.activeView)?.query?.(state, value);
+}
+
+/** Set a filter of the active view. Unknown names are ignored. */
+export function setViewFilter(state: ShellState, name: string, value: string): void {
+  partsOf(state.activeView)?.filter?.(state, name, value);
 }
 
 function renderViewBody(state: ShellState): Markup {

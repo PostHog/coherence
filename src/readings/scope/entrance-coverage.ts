@@ -24,6 +24,7 @@
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import { derived, type CandidateRule } from "./language-data.ts";
 import type { SpecComponent } from "./model.ts";
+import { NAMED_SYMBOL } from "../../spec/named.ts";
 
 /**
  * The rules, per language, each with its plural and what it detects: the
@@ -77,8 +78,6 @@ export interface EntranceCoverage {
   beyond: number;
 }
 
-const COVERAGE_NAMED = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/;
-
 /** Whether a file the spec model resolved is the candidate's file; the spec model gives project-relative paths. */
 function coverageSameFile(a: string | undefined, b: string): boolean {
   return a !== undefined && (a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`));
@@ -97,7 +96,7 @@ export function coverageOf(components: readonly Pick<SpecComponent, "folder" | "
     for (const e of component.entrances) {
       declared += 1;
       const handler = e.handler?.trim() ?? "";
-      const named = COVERAGE_NAMED.exec(handler);
+      const named = NAMED_SYMBOL.exec(handler);
       const symbol = named?.[1];
       const file = e.file;
       let set = candidates.filter((c) => (c.symbol === "" ? coverageSameFile(file, c.file) : symbol !== undefined && symbol === c.symbol && (c.registered === true || file === undefined || coverageSameFile(file, c.file))));

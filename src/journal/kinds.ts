@@ -36,3 +36,18 @@ export const WORK_KINDS = {
 } as const;
 
 export type WorkKind = keyof typeof WORK_KINDS;
+
+/** The kinds that point at an earlier record, carrying its id in `of`. */
+export const POINTING_KINDS = ["retraction", "resolution", "dismissal", "close", "acknowledgement"] as const satisfies readonly Kind[];
+
+export type PointingKind = (typeof POINTING_KINDS)[number];
+
+/**
+ * The id of the record a record points at, or null for a kind that points at
+ * none. Typed by shape, so the store's records and the Scope page's (two
+ * unions of the same kinds) are read by this one function; each union holds
+ * its kinds that carry `of` to POINTING_KINDS at compile time.
+ */
+export function pointsAt(record: { kind: string; of?: string }): string | null {
+  return (POINTING_KINDS as readonly string[]).includes(record.kind) ? (record.of as string) : null;
+}

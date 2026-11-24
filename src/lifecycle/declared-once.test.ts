@@ -26,7 +26,7 @@ function sources(dir: string, into: string[] = []): string[] {
     if (entry.name === "node_modules" || entry.name === "fonts" || entry.name === "mirrors") continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) sources(path, into);
-    else if (/\.(ts|mjs)$/.test(entry.name) && !/\.(test|e2e)\.ts$/.test(entry.name) && !/fixture/.test(entry.name)) into.push(path);
+    else if (/\.(ts|tsx|mjs)$/.test(entry.name) && !/\.(test|e2e)\.tsx?$/.test(entry.name) && !/fixture/.test(entry.name)) into.push(path);
   }
   return into;
 }
@@ -96,11 +96,15 @@ test("every list the hooks, telemetry, ci, the update line and the lexicon verbs
     [DISPOSITIONS, "src/lifecycle/lexicon-coverage.ts"],
     [BUDGET_FLAG_NAMES, "src/readings/scope/component-interfaces.ts"],
   ];
-  const held = new Set(["src/lifecycle/statusline.ts"]); // imports nothing of Coherence's; its copy of the tool hooks is held equal by its own test
-  for (const file of [...sources(join(REPO, "src")), ...sources(join(REPO, "plugins")), ...sources(join(REPO, ".github")), ...sources(join(REPO, "bench"))]) {
+  // The mod is its own package and imports nothing of src, so its copy of the hook events is held equal here.
+  const MOD_EVENTS = "mods/coherence/hooks/answer.ts";
+  const modEvents = /export const EVENTS = \[([^\]]*)\]/.exec(readFileSync(join(REPO, MOD_EVENTS), "utf8"))?.[1] ?? "";
+  assert.deepEqual([...modEvents.matchAll(/'([^']+)'/g)].map((m) => m[1]), [...HOOK_EVENTS], `${MOD_EVENTS}'s EVENTS are the hook events install wires; add the event there too`);
+  const held = new Set(["src/lifecycle/statusline.ts", MOD_EVENTS]); // import nothing of Coherence's; their copies of the tool hooks are held equal by their own tests
+  for (const file of [...sources(join(REPO, "src")), ...sources(join(REPO, "plugins")), ...sources(join(REPO, ".github")), ...sources(join(REPO, "bench")), ...sources(join(REPO, "mods"))]) {
     const at = relative(REPO, file);
     const code = readFileSync(file, "utf8");
-    for (const [values, home] of declaredIn) if (at !== home) assert.deepEqual(copiesOf(values, code), [], `${at} writes ${values.join("|")} out by hand; import it from ${home}`);
+    for (const [values, home] of declaredIn) if (at !== home && !(held.has(at) && values === HOOK_EVENTS)) assert.deepEqual(copiesOf(values, code), [], `${at} writes ${values.join("|")} out by hand; import it from ${home}`);
     if (at !== "src/lifecycle/hook-events.ts" && !held.has(at)) assert.deepEqual(copiesOf([...TOOL_HOOKS], code), [], `${at} writes the tool hooks out by hand`);
     if (at !== "src/lifecycle/lockfiles.ts") for (const [lockfile] of LOCKFILES) assert.ok(!new RegExp(`["'\`]${escape(lockfile)}["'\`]`).test(code), `${at} names ${lockfile} by hand; read it from lockfiles.ts`);
     if (at !== "src/lifecycle/inflection.ts") assert.doesNotMatch(code, /\(\?:?ss\|sh\|ch\|x\|z\)es\$/, `${at} keeps a plural rule of its own; use inflection.ts`);

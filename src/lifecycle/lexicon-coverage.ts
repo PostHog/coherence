@@ -154,8 +154,18 @@ function digestAll(parts: Iterable<unknown>): string {
  * rejects) keeps its ruling: the journal is append-only and is read as written.
  */
 const REVIEW = /^[a-z]+ review (\{.*\})$/s;
-/** The same for an applied proposal: the verb, "apply", the proposal id. */
-const APPLY = /^[a-z]+ apply [a-z]p-[a-f0-9]{24} /;
+/**
+ * The same for an applied proposal: the verb, "apply", the proposal id, then
+ * the change's JSON. applyChose writes it; this reads it, here and in
+ * lexicon-maintain.ts, where a record written under the vocabulary's older
+ * name still counts as applied.
+ */
+export const APPLY_CHOSE = /^[a-z]+ apply [a-z]p-[a-f0-9]{24} /;
+
+/** An applied proposal's decision text, as APPLY_CHOSE reads it. */
+export function applyChose(id: string, applied: { change: unknown; human: string | null }): string {
+  return `lexicon apply ${id} ${JSON.stringify(applied)}`;
+}
 
 /** Recover only lexicon review decisions with a matching current evidence key. Old answers are history. */
 function rulings(
@@ -251,7 +261,7 @@ function isLexiconDecision(line: string): boolean {
     return (
       record["kind"] === "decision" &&
       typeof record["chose"] === "string" &&
-      (REVIEW.test(record["chose"]) || APPLY.test(record["chose"]) || BASELINE_CHOSE.test(record["chose"]))
+      (REVIEW.test(record["chose"]) || APPLY_CHOSE.test(record["chose"]) || BASELINE_CHOSE.test(record["chose"]))
     );
   } catch {
     return false;

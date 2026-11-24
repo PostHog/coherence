@@ -26,7 +26,7 @@
 import { posix } from "node:path";
 import type * as TS from "typescript";
 import { typescriptCompiler } from "../../src/plugins/api.ts";
-import { enclosingName, namesGenerated, parse } from "./convex-api.ts";
+import { enclosingName, moduleExtensions, namesGenerated, parse } from "./convex-api.ts";
 
 function ts(): typeof TS {
   return typescriptCompiler("the Convex plugin reads a Convex project's code with its parser");
@@ -50,7 +50,6 @@ export interface ReachTarget {
   names: readonly string[];
 }
 
-const EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
 const OBJECTS: ReadonlySet<string> = new Set(["api", "internal"]);
 
 export class ApiReader {
@@ -79,7 +78,7 @@ export class ApiReader {
   private resolve(file: string, specifier: string): string | undefined {
     const bare = specifier.replace(/\.(js|mjs|cjs|jsx)$/, "");
     const stems = bare.startsWith(".") ? [posix.normalize(posix.join(posix.dirname(file), bare))] : [];
-    const tries = (stem: string): string[] => [stem, ...EXTENSIONS.map((e) => stem + e), ...EXTENSIONS.map((e) => `${stem}/index${e}`)];
+    const tries = (stem: string): string[] => [stem, ...moduleExtensions().map((e) => stem + e), ...moduleExtensions().map((e) => `${stem}/index${e}`)];
     for (const stem of stems) for (const candidate of tries(stem)) if (this.known.has(candidate)) return candidate;
     if (bare.startsWith(".")) return undefined;
     // A path alias (@/lib/api, ~/lib/api): the one project file whose path, extension aside, ends with what follows its first segment.

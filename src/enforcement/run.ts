@@ -33,6 +33,7 @@ import { answeringFor } from "../plugins/registry.ts";
 import { proveVia, viaForm } from "../plugins/verify.ts";
 import { readLatency, type LatencyReading } from "./latency.ts";
 import { createObserver, recordObservation, type ObservationOutcome, type TotalityVia } from "../observation/index.ts";
+import { NAMED_SYMBOL } from "../spec/named.ts";
 
 export interface RunOptions {
   session: string;
@@ -139,7 +140,7 @@ export function mayTouch(invariant: Pick<ModelInvariant, "enforcements"> & { lat
   if (text === undefined) return false;
   for (const { protects, chokepoint } of chokepointEnforcements(invariant)) {
     for (const value of [protects, chokepoint]) {
-      const name = /^([A-Za-z_$][A-Za-z0-9_$]*)(\s+in\s+\S+)?$/.exec(value.trim())?.[1];
+      const name = NAMED_SYMBOL.exec(value.trim())?.[1];
       if (name !== undefined && new RegExp(`\\b${name.replace(/\$/g, "\\$")}\\b`).test(text)) return true;
       if (name === undefined && file.endsWith(value.trim())) return true;
     }

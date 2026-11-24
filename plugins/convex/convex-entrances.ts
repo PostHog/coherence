@@ -17,7 +17,7 @@ import { posix } from "node:path";
 import type * as TS from "typescript";
 import type { EntranceCandidate, EntranceSyntax } from "../../src/plugins/api.ts";
 import { typescriptCompiler } from "../../src/plugins/api.ts";
-import { parse } from "./convex-api.ts";
+import { moduleExtension, parse } from "./convex-api.ts";
 
 /** The builders whose functions any client of the deployment can call; the internal* builders' only the deployment's own code can. */
 const PUBLIC_BUILDERS: ReadonlySet<string> = new Set(["query", "mutation", "action", "httpAction"]);
@@ -71,7 +71,7 @@ function importsOf(file: string, source: TS.SourceFile): Imports {
 
 /** The path a client calls a function of `file` by, below the functions folder: `model/player.ts`'s join is model.player.join. */
 function calledAs(file: string, folder: string, name: string): string | undefined {
-  const module = file.replace(/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/, "");
+  const module = file.replace(moduleExtension(), "");
   if (folder !== "." && !module.startsWith(`${folder}/`)) return undefined;
   const below = folder === "." ? module : module.slice(folder.length + 1);
   return below.startsWith("..") ? undefined : `${below.split("/").join(".")}.${name}`;

@@ -21,6 +21,7 @@ export {
   statementStartLine,
   withinFolder,
   type AdapterBounds,
+  COHERENCE_ENFORCER,
   type CheckerBoundary,
   type Definition,
   type Ladder,
@@ -43,6 +44,7 @@ export { escape, handlerName, lineOf, NEXT_ROUTE_METHODS, REMIX_ROUTE_EXPORTS, s
 export { COHERENCE_FROM, installedPackage, locateServer, packageFile, projectFrom, type ServerLocation } from "../adapters/installed.ts";
 export { JsonRpcClient, RpcError } from "../adapters/jsonrpc.ts";
 export { languageOfFile } from "../adapters/language-files.ts";
+export { serverExtensions } from "./languages.ts";
 export { exclusionOf, fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, nestedCheckouts, nestedFolder, neverWalkedName, projectListing, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "../adapters/project-files.ts";
 // TOML's line lookup is exported under its own name: entrance detection has a lineOf of its own.
 export { lineOf as tomlLineOf, parseToml, TomlError, type TomlTable, type TomlValue } from "../adapters/toml.ts";
