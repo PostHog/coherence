@@ -20,8 +20,8 @@
  */
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, extname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, relative, resolve, sep } from "node:path";
+
 import { spawn } from "./work-meter.ts";
 import { LOCKFILES, type PackageManager } from "./lockfiles.ts";
 import { installedPackage, projectFrom } from "../adapters/installed.ts";
@@ -29,6 +29,7 @@ import { isOwnHook, searchesCheckoutFirst } from "./hook-command.ts";
 import { WRITERS, writersUnmatched } from "./host-tools.ts";
 import { HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, SIBLING, type Host } from "./project.ts";
 import { coherenceVersion, readJson, telemetryDir, truthy, writeJson, type Env } from "./telemetry.ts";
+import { CLI_BESIDE, cliArgs } from "./own-cli.ts";
 
 /** The registry document for the newest published release: its `version` field is the answer. */
 export const REGISTRY_LATEST = `https://registry.npmjs.org/${PACKAGE_NAME}/latest`;
@@ -46,7 +47,7 @@ export const LATEST_TIMEOUT_MS = 5000;
  */
 export const OWN_CLI = ((): string => {
   // Compiled, this module is .js and so is the cli beside it.
-  const own = fileURLToPath(new URL(`../cli${extname(fileURLToPath(import.meta.url))}`, import.meta.url));
+  const own = CLI_BESIDE;
   const invoked = process.argv[1];
   try {
     if (invoked !== undefined && realpathSync(invoked) === realpathSync(own)) return resolve(invoked);
@@ -359,7 +360,7 @@ export function startUpdateCheck(root: string, event: string, env: Env = process
     const running = runningCopy(root, OWN_CLI, env).version;
     if (!updateCheckDue(env, now().getTime(), running)) return false;
     writeJson(latestPath(env), { ...readLatest(env), attempted: now().toISOString(), askedAs: running }, env);
-    const child = spawner(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "version", "--refresh"], { cwd: root, detached: true, stdio: "ignore" });
+    const child = spawner(process.execPath, cliArgs(OWN_CLI, "version", "--refresh"), { cwd: root, detached: true, stdio: "ignore" });
     child.on("error", () => {});
     child.unref();
     return true;

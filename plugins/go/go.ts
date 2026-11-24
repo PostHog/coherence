@@ -41,6 +41,7 @@ import {
   walkedProjectFiles,
   withinFolder,
   isTestPath,
+  COHERENCE_ENFORCER,
   type Definition,
   type Ladder,
   type LanguageAdapter,
@@ -61,7 +62,6 @@ import manifest from "./plugin.json" with { type: "json" };
 
 const LADDER: Ladder = manifest.ladder as Ladder;
 const COMPILER = "the compiler (go build)";
-const COHERENCE_ENFORCER = "Coherence's check at the edit and in CI";
 /** Past this many files a forget with no files named stops telling gopls about each one. */
 const WATCH_LIMIT = 5000;
 /** Kinds that name a type rather than a value: class, interface, struct, type parameter. */

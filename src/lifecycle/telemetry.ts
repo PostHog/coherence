@@ -19,7 +19,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "./work-meter.ts";
 import { userConfigDir } from "./user-dir.ts";
@@ -33,6 +33,8 @@ import { HOOK_TIMES_DIR, type HookTime } from "./hook-latency.ts";
 import { TELEMETRY_TARGET, TELEMETRY_TIMEOUT_MS, type TelemetryTarget } from "./telemetry-config.ts";
 import { HOOK_EVENTS } from "./hook-events.ts";
 import { HOSTS as AGENT_HOSTS } from "./hosts.ts";
+import { CLI_BESIDE, cliArgs } from "./own-cli.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
@@ -460,7 +462,7 @@ function reported(env: Env): string[] {
 }
 
 const sessionKey = (root: string, file: string): string => createHash("sha256").update(`${root}\0${file}`).digest("hex").slice(0, 24);
-const sessionFileName = (session: string): string => `${session.replace(/[^\w.-]/g, "_")}.jsonl`;
+const sessionFileName = (session: string): string => `${fileStemOf(session)}.jsonl`;
 
 /** The hook-time files of sessions in this project that are over, touched since the opt-in, and never summarized. */
 export function pendingSessions(root: string, current: string | undefined, env: Env = process.env, now: () => number = Date.now): string[] {
@@ -599,7 +601,7 @@ export async function flushQueue(env: Env = process.env, send: Sender = FETCH_SE
 // ---------------------------------------------------------------- the hook's one call
 
 /** This checkout's cli, which the detached flush runs. */
-const OWN_CLI = fileURLToPath(new URL(`../cli${extname(fileURLToPath(import.meta.url))}`, import.meta.url));
+const OWN_CLI = CLI_BESIDE;
 
 export type Spawner = (command: string, args: string[], options: { cwd: string; detached: true; stdio: "ignore" }) => { on(event: "error", listener: () => void): unknown; unref(): void };
 
@@ -616,7 +618,7 @@ export function startTelemetry(root: string, event: string, input: Record<string
     const session = typeof input["session_id"] === "string" && input["session_id"] !== "" ? input["session_id"] : undefined;
     const collect = event === "SessionStart" && pendingSessions(root, session, env).length > 0;
     if (!collect && !queueHolds(env)) return false;
-    const args = ["--disable-warning=ExperimentalWarning", OWN_CLI, "telemetry", "flush", "--root", root, "--host", hostOf(input, env)];
+    const args = cliArgs(OWN_CLI, "telemetry", "flush", "--root", root, "--host", hostOf(input, env));
     if (collect) args.push("--collect", ...(session === undefined ? [] : ["--current", session]));
     const child = spawner(process.execPath, args, { cwd: root, detached: true, stdio: "ignore" });
     child.on("error", () => {});

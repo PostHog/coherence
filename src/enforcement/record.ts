@@ -34,6 +34,7 @@ import { shardFor } from "../journal/shards.ts";
 import { isStoreFile, storeDir } from "../journal/stores.ts";
 import type { PeerReading } from "./peers.ts";
 import { heldSites, noteRunAppend, noteSitesAppend, runFileIdentity, type HeldSites } from "./run-index.ts";
+import { SESSION_TOKEN, sessionRefusal } from "../journal/session-token.ts";
 
 export const RUNS_DIR = storeDir("runs");
 
@@ -255,7 +256,6 @@ export function machineLoad(): { average: number; cores: number } {
   return { average: Math.round(loadavg()[0]! * 100) / 100, cores: availableParallelism() };
 }
 
-const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 /** A run entry's sites, written once per run file: their content's hash and the run, in the same file, whose line holds them in full. */
 export interface SitesRef {
@@ -333,7 +333,7 @@ function appendLine(root: string, file: string, line: string, updates: ReadonlyM
 
 /** Append one run as one line; the file and folder are created on first write. Sites its enforcement already wrote in full in this file are written as a reference. */
 export function appendRun(root: string, record: RunRecord): string {
-  if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
+  if (!SESSION_TOKEN.test(record.session)) throw new Error(sessionRefusal(record.session));
   mkdirSync(runsDir(root), { recursive: true });
   const shard = shardFor(root, "runs", record.session);
   const written = compactRecord(root, shard.name, record);
@@ -344,7 +344,7 @@ export function appendRun(root: string, record: RunRecord): string {
 
 /** Append one refutation as one line, beside the runs of the same session. */
 export function appendRefutation(root: string, record: RefutationRecord): string {
-  if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
+  if (!SESSION_TOKEN.test(record.session)) throw new Error(sessionRefusal(record.session));
   mkdirSync(runsDir(root), { recursive: true });
   const shard = shardFor(root, "runs", record.session);
   appendLine(root, shard.file, `${JSON.stringify(record)}\n`, new Map());

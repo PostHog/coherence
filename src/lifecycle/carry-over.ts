@@ -17,6 +17,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Conjecture, Decision, JournalRecord } from "../journal/record.ts";
 import { isTerminal, type WorkOrder } from "../journal/work.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 /** How far back a start looks for decisions. */
 export const RECENT_DAYS = 7;
@@ -106,7 +107,7 @@ interface Told {
 }
 
 function toldFile(root: string, session: string): string {
-  return join(root, TOLD_DIR, `${session.replace(/[^\w.-]/g, "_")}.json`);
+  return join(root, TOLD_DIR, `${fileStemOf(session)}.json`);
 }
 
 function readTold(root: string, session: string): Told | undefined {

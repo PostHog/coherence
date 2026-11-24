@@ -13,6 +13,7 @@
  * modules the hooks load would cost more than every reading here together.
  */
 
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -51,7 +52,16 @@ export interface StatusReading {
   scope?: string;
 }
 
-const fileName = (session: string): string => `${session.replace(/[^\w.-]/g, "_")}.jsonl`;
+/**
+ * The file stem the hooks give a session (fileStemOf in src/journal/session-token.ts),
+ * spelled here because this module imports nothing but node's own; held equal by its test.
+ */
+export function statusFileStem(session: string): string {
+  const rewritten = session.replace(/[^\w.-]/g, "_");
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(rewritten) ? rewritten : `h${createHash("sha256").update(session).digest("hex").slice(0, 32)}`;
+}
+
+const fileName = (session: string): string => `${statusFileStem(session)}.jsonl`;
 
 function lines(path: string): unknown[] {
   let text: string;

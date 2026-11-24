@@ -23,8 +23,8 @@
 
 import { CONNECTIONS_ID, CONNECTIONS_PREFIX, componentId, componentOfHash, invariantId, journalId, resolveHash } from "./derive.ts";
 import { componentOrder, invariantOfHash, shownBulletIds } from "./components-view.ts";
-import type { ComponentsFilter, JournalKind, JournalRecord, RecordedSite, RunRecord, ShellState } from "./model.ts";
-import { renderMasthead, renderShell, renderViewResults } from "./shell.ts";
+import type { ComponentsFilter, JournalRecord, RecordedSite, RunRecord, ShellState } from "./model.ts";
+import { renderMasthead, renderShell, renderViewResults, setViewFilter, setViewQuery } from "./shell.ts";
 import { isReplaying, mountRelief, replayRelief, stopReplay, touchRelief, type Touch } from "./relief/mount.ts";
 import { replayFrames } from "./home-replay.ts";
 import { landConnections, mountConnections } from "./connections/mount.ts";
@@ -47,40 +47,6 @@ const HISTORY_PAGE = 200;
 /** What a live page can ask its server for, beyond the stream: pages of history and single records. */
 interface LiveAccess {
   get(path: string): Promise<unknown>;
-}
-
-/** The query field of the active view. */
-function setQuery(state: ShellState, value: string): void {
-  switch (state.activeView) {
-    case "lexicon":
-      state.lexicon.query = value;
-      return;
-    case "components":
-      state.components.query = value;
-      return;
-    case "practices":
-      state.practicesView.query = value;
-      return;
-    case "runs":
-      state.runsView.query = value;
-      return;
-    case "journal":
-      state.journalView.query = value;
-      return;
-    default:
-      return;
-  }
-}
-
-/** A filter of the active view. Unknown names are ignored. */
-function setFilter(state: ShellState, name: string, value: string): void {
-  if (state.activeView === "components") {
-    if (name === "show") state.components.filter = value as ComponentsFilter;
-  } else if (state.activeView === "journal") {
-    if (name === "kind") state.journalView.kind = value as JournalKind | "";
-    if (name === "agent") state.journalView.agent = value;
-    if (name === "session") state.journalView.session = value;
-  }
 }
 
 /**
@@ -208,7 +174,7 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
   root.addEventListener("input", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement) || !target.hasAttribute("data-search")) return;
-    setQuery(state, target.value);
+    setViewQuery(state, target.value);
     renderResults();
   });
 
@@ -217,7 +183,7 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
     if (!(target instanceof HTMLSelectElement)) return;
     const name = target.dataset["filter"];
     if (name === undefined) return;
-    setFilter(state, name, target.value);
+    setViewFilter(state, name, target.value);
     renderResults();
   });
 
@@ -351,7 +317,7 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
       const resolved = resolveHash(state, hash);
       if (resolved === undefined) return;
       if (resolved.view === state.activeView) {
-        setQuery(state, "");
+        setViewQuery(state, "");
         renderResults();
       }
       if (hash === location.hash) {

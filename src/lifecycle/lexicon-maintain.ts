@@ -15,7 +15,7 @@ import { randomUUID } from "node:crypto";
 import { decide } from "../journal/verbs.ts";
 import { loadJournal, sessionFile } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
-import { DISPOSITIONS, digest, isSettled, lexiconCoverage } from "./lexicon-coverage.ts";
+import { APPLY_CHOSE, applyChose, DISPOSITIONS, digest, isSettled, lexiconCoverage } from "./lexicon-coverage.ts";
 import { aliasNames, parseLexicon, rejectedNames } from "./lexicon.ts";
 import { projectName } from "../adapters/project-config.ts";
 import { normalizeTerm, runCheck } from "./check.ts";
@@ -88,13 +88,11 @@ interface Transaction {
   human?: string;
 }
 const STATE = ".coherence/lexicon";
-/**
- * The shape of an applied-proposal decision: the vocabulary verb, "apply",
- * the proposal id. The verb is matched by shape, not by name, so a record
- * written before the concept was renamed (under the name it now rejects)
- * still counts as applied: the journal is append-only and is read as written.
- */
-const APPLIED = /^[a-z]+ apply [a-z]p-[a-f0-9]{24} /;
+
+/** A proposal's id: "lp-" and the first 24 hex characters of its draft's digest, the id an applied decision's text carries (APPLY_CHOSE). */
+export function proposalIdOf(draft: Omit<Proposal, "id">): string {
+  return "lp-" + digest(draft).slice(0, 24);
+}
 
 /** Confine even through existing symlinked parents; a configured lexicon cannot write outside its project. */
 export function confined(root: string, name: string, what = "lexicon path"): string {
@@ -430,7 +428,7 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
     ...(findings ? { findings } : {}),
   };
   const proposal: Proposal = {
-    id: "lp-" + digest(draft).slice(0, 24),
+    id: proposalIdOf(draft),
     ...draft,
   };
   const path = confined(root, `${STATE}/proposals/${proposal.id}.json`);
@@ -444,7 +442,7 @@ function readProposal(root: string, id: string): Proposal {
     readFileSync(confined(root, `${STATE}/proposals/${id}.json`), "utf8"),
   ) as Proposal;
   const { id: stored, ...draft } = p;
-  if (stored !== id || "lp-" + digest(draft).slice(0, 24) !== id)
+  if (stored !== id || proposalIdOf(draft) !== id)
     throw new Error("proposal content was changed; prepare a new preview");
   return p;
 }
@@ -462,7 +460,7 @@ function writingFlags(who: Who): string[] {
 }
 function appliedDecision(root: string, id: string): string | undefined {
   return loadJournal(root).records.find(
-    (r) => r.kind === "decision" && APPLIED.test(r.chose) && r.chose.includes(` apply ${id} `),
+    (r) => r.kind === "decision" && APPLY_CHOSE.test(r.chose) && r.chose.includes(` apply ${id} `),
   )?.id;
 }
 /**
@@ -475,10 +473,10 @@ function rejectingDecisions(root: string, concept: string, name: string): string
   const same = (a: unknown, b: string): boolean =>
     String(a).toLowerCase() === b.toLowerCase();
   return loadJournal(root).records.flatMap((r) => {
-    if (r.kind !== "decision" || !APPLIED.test(r.chose)) return [];
+    if (r.kind !== "decision" || !APPLY_CHOSE.test(r.chose)) return [];
     let change: Change;
     try {
-      change = (JSON.parse(r.chose.replace(APPLIED, "")) as { change: Change }).change;
+      change = (JSON.parse(r.chose.replace(APPLY_CHOSE, "")) as { change: Change }).change;
     } catch {
       return [];
     }
@@ -504,7 +502,7 @@ function finish(root: string, tx: Transaction): string {
     existing ??
     decide(
       [
-        `lexicon apply ${tx.proposal.id} ${JSON.stringify({ change: tx.proposal.change, human: tx.human ?? null })}`,
+        applyChose(tx.proposal.id, { change: tx.proposal.change, human: tx.human ?? null }),
         "--because",
         tx.because,
         ...tx.over.flatMap((s) => ["--over", s]),

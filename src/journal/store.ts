@@ -14,11 +14,12 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSyn
 import { join } from "node:path";
 import { appendWhole, storeLines } from "./append.ts";
 import { JournalError } from "./args.ts";
-import { isKind, type JournalRecord } from "./record.ts";
+import { isKind, parseStamped, type JournalRecord } from "./record.ts";
 import { shardFor } from "./shards.ts";
 import { isStoreFile, storeDir } from "./stores.ts";
-import { SESSION_TOKEN, workBinding } from "./work.ts";
+import { workBinding } from "./work.ts";
 import { digestOf, identityOf, lineKey, WorktreeIndex, type IndexedLine } from "./worktree-index.ts";
+import { SESSION_TOKEN, sessionRefusal } from "./session-token.ts";
 
 export const JOURNAL_DIR = storeDir("journal");
 
@@ -29,7 +30,7 @@ export function journalDir(cwd: string): string {
 export function sessionFile(cwd: string, session: string): string {
   if (!SESSION_TOKEN.test(session)) {
     throw new JournalError(
-      `session "${session}" cannot name a file; use letters, digits, dot, dash, or underscore`,
+      sessionRefusal(session),
     );
   }
   return join(journalDir(cwd), `${session}.jsonl`);
@@ -307,21 +308,7 @@ export function loadJournalAcrossWorktrees(cwd: string): LoadedAcross {
 
 /** A record, or the reason the line is not one. */
 function parseLine(line: string): JournalRecord | string {
-  let value: unknown;
-  try {
-    value = JSON.parse(line);
-  } catch (error) {
-    return `not JSON (${error instanceof Error ? error.message : String(error)})`;
-  }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return "not a record object";
-  const record = value as Record<string, unknown>;
-  for (const field of ["id", "kind", "at", "session", "agent"]) {
-    if (typeof record[field] !== "string" || record[field] === "") return `missing ${field}`;
-  }
-  const kind = record["kind"] as string;
-  if (!isKind(kind)) return `unknown kind "${kind}"`;
-  if (Number.isNaN(Date.parse(record["at"] as string))) return `unreadable time "${String(record["at"])}"`;
-  return value as JournalRecord;
+  return parseStamped<JournalRecord>(line, isKind);
 }
 
 /** What git says about the tree at the moment of a write; null commit when there is no git to ask. */

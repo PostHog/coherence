@@ -18,7 +18,17 @@
 import { existsSync } from "node:fs";
 import { join, posix } from "node:path";
 import type * as TS from "typescript";
-import { typescriptCompiler } from "../../src/plugins/api.ts";
+import { escape, serverExtensions, typescriptCompiler } from "../../src/plugins/api.ts";
+
+/** The extensions a module of the language this plugin extends is written under, as TypeScript's manifest names them. */
+export function moduleExtensions(): readonly string[] {
+  return serverExtensions("typescript");
+}
+
+/** A path ending in one of those extensions. */
+export function moduleExtension(): RegExp {
+  return new RegExp(`(?:${moduleExtensions().map(escape).join("|")})$`);
+}
 
 /** Where Convex generates its API object and its server builders, below the functions folder. */
 const GENERATED_API_FILES = ["_generated/api.d.ts", "_generated/api.ts", "_generated/api.js"];
@@ -60,7 +70,7 @@ export function convexModule(root: string, file: string): ConvexModule | undefin
   if (folder === undefined) return undefined;
   const below = folder === "." ? file : file.slice(folder.length + 1);
   if (below.split("/").includes("_generated")) return undefined;
-  return { folder, path: below.replace(/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/, "").split("/") };
+  return { folder, path: below.replace(moduleExtension(), "").split("/") };
 }
 
 /**

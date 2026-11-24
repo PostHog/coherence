@@ -61,7 +61,7 @@
  * as refused by the checker.
  */
 
-import { isTestPath, rangeContains, withinFolder, type CheckerBoundary, type Definition, type LanguageAdapter, type Occasion, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
+import { COHERENCE_ENFORCER, isTestPath, rangeContains, withinFolder, type CheckerBoundary, type Definition, type LanguageAdapter, type Occasion, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
 import { horizonSites, projectSites, searchedHorizon } from "../adapters/project-files.ts";
 import { moduleFolderOf } from "../plugins/languages.ts";
 import { fromText, type ChokepointFrom } from "../spec/grammar.ts";
@@ -379,5 +379,5 @@ function rungFor(adapter: LanguageAdapter, visibility: Visibility): Rung {
   if (visibility.enforced && !visibility.visible && adapter.ladder.top === "visibility-choked") {
     return { grade: "visibility-choked", enforcer: listed("visibility-choked")?.enforcer ?? "the compiler", fact: `not visible outside its module (${visibility.evidence}) and every reference inside the chokepoint` };
   }
-  return { grade: "reference-choked", enforcer: listed("reference-choked")?.enforcer ?? "Coherence's check at the edit and in CI", fact: `visible outside its module (${visibility.evidence}); every reference in the project is inside the chokepoint` };
+  return { grade: "reference-choked", enforcer: listed("reference-choked")?.enforcer ?? COHERENCE_ENFORCER, fact: `visible outside its module (${visibility.evidence}); every reference in the project is inside the chokepoint` };
 }

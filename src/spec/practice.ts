@@ -26,6 +26,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { CLASS_NAME } from "../journal/defect-states.ts";
 import { KINDS, WORK_KINDS } from "../journal/kinds.ts";
 
 export const PRACTICE_SUFFIX = ".practice.md";
@@ -356,9 +357,6 @@ export function commandWordsMatch(words: string, command: readonly string[]): bo
   }
   return false;
 }
-
-/** A class name, as the defect verb takes one: lowercase words joined by hyphens. */
-const CLASS_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 /** The journal verbs that give a defect its class: recording it, classifying it, closing it; each named after the program, as a defect trigger reads them. */
 const CLASS_VERBS = ["defect", "classify", "resolved"].flatMap((verb) => [`coherence ${verb}`, `cli.* ${verb}`]);

@@ -30,6 +30,7 @@ import type * as TS from "typescript";
 import { declaredLanguageOf, type DeclaredLanguage } from "../../adapters/declared-config.ts";
 import { languageOfFile } from "../../adapters/language-files.ts";
 import { underIgnored } from "../../adapters/project-files.ts";
+import { MODULE_FILE } from "../../enforcement/code-fingerprint.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { MANIFEST } from "../../plugins/plugin.ts";
 import { parseSpec } from "../../spec/grammar.ts";
@@ -70,7 +71,8 @@ interface NameSet {
 
 /** Test files: their literals are fixtures and expectations, which copy the lists on purpose. */
 const TEST_FILE = /\.(test|e2e)\.[cm]?[tj]s$|fixture/;
-const CODE_FILE = /\.(ts|mts|cts|js|mjs|cjs)$/;
+/** The modules the reading parses: JavaScript and TypeScript, JSX aside, the extensions Coherence's own code is written in. */
+const CODE_FILE = MODULE_FILE;
 const DOC_FILE = /\.md$/;
 /** The Markdown read for candidates: the docs folder, every spec, the README. */
 const READ_DOC = /(^docs\/|\.spec\.md$|^README\.md$)/;

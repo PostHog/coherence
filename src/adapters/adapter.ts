@@ -151,6 +151,13 @@ export interface CheckerBoundary {
   scope: string;
 }
 
+/**
+ * Who enforces the reference-choked rung, by name: Coherence's own check, which
+ * every adapter that earns the rung names in the same words, and every bundled
+ * manifest's ladder too (held to this by a test).
+ */
+export const COHERENCE_ENFORCER = "Coherence's check at the edit and in CI";
+
 /** One rung of a ladder: the grade, who enforces it, and the fact that earns it. */
 export interface Rung {
   grade: ChokedGrade;

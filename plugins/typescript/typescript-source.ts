@@ -9,6 +9,7 @@ import { readFileSync, statSync } from "node:fs";
 import { posix, resolve } from "node:path";
 import { isSourceFile, toRelative, type ModuleResolution } from "../../src/plugins/api.ts";
 import { specifierCandidates } from "./typescript.ts";
+import { INDEX_EXTENSIONS, TYPESCRIPT_EXTENSIONS } from "./module-extensions.ts";
 
 /** One compilerOptions.paths entry: the pattern's text before and after its one `*` (none for an exact pattern), and its targets, project-relative. */
 interface PathAlias {
@@ -89,7 +90,7 @@ export const TYPESCRIPT_RESOLVE: ModuleResolution = {
 
 /** The project file a joined path names: the file itself, its TypeScript twin, or its folder's index. */
 function resolveJoined(root: string, joined: string, vanished: ReadonlySet<string>): string | undefined {
-  const candidates = [joined, ...[".ts", ".tsx", ".mts", ".cts"].map((ext) => joined.replace(/\.js$/, "") + ext), ...[".ts", ".tsx"].map((ext) => posix.join(joined, "index" + ext))];
+  const candidates = [joined, ...[...TYPESCRIPT_EXTENSIONS].map((ext) => joined.replace(/\.js$/, "") + ext), ...INDEX_EXTENSIONS.filter((ext) => TYPESCRIPT_EXTENSIONS.has(ext)).map((ext) => posix.join(joined, "index" + ext))];
   for (const candidate of candidates) {
     const rel = toRelative(root, resolve(root, candidate));
     if (rel === undefined) continue;

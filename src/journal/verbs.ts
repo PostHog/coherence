@@ -53,6 +53,7 @@ import {
 import { componentFolders, componentHolding, loadSpecModel, projectFile, projectPractices } from "../spec/model.ts";
 import { filesWritten } from "../economy/trace.ts";
 import { originFields } from "./defects.ts";
+import { ORIGIN_FIELDS, originText, type OriginField, type OriginGiven } from "./defect-states.ts";
 import { amendCommand, floorGaps, type ModelPractice } from "../spec/practices.ts";
 import { appendRecordTo, gitState, loadJournal, loadJournalAcrossWorktrees, type Loaded } from "./store.ts";
 import { describeBinding, loadWork } from "./work.ts";
@@ -305,11 +306,11 @@ export function conjecture(argv: string[], ctx: Context): Written {
   return write(ctx, record);
 }
 
-/** The --class, --introduced and --caught flags a defect, its classification and its close take. */
-const ORIGIN: Record<string, FlagShape> = { class: "one", introduced: "one", caught: "one" };
+/** The --class, --introduced and --caught flags a defect, its classification and its close take: one per origin field. */
+const ORIGIN: Record<OriginField, FlagShape> = Object.fromEntries(ORIGIN_FIELDS.map((field) => [field, "one"])) as Record<OriginField, FlagShape>;
 
-function originGiven(parsed: Parsed): { class?: string | undefined; introduced?: string | undefined; caught?: string | undefined } {
-  return { class: parsed.one.get("class"), introduced: parsed.one.get("introduced"), caught: parsed.one.get("caught") };
+function originGiven(parsed: Parsed): OriginGiven {
+  return Object.fromEntries(ORIGIN_FIELDS.map((field) => [field, parsed.one.get(field)])) as OriginGiven;
 }
 
 /**
@@ -388,9 +389,8 @@ export function classify(argv: string[], ctx: Context): Written {
   const because = required(parsed, "because", "a classification records the evidence it rests on");
   target(answerable(ctx.cwd), of, "defect", "classify");
   const fields = originFields(originGiven(parsed), ctx.cwd);
-  if (Object.keys(fields).length === 0) throw new JournalError("classify: give at least one of --class, --introduced, --caught");
-  const said = [fields.class === undefined ? "" : `class ${fields.class}`, fields.introduced === undefined ? "" : `introduced ${fields.introduced}`, fields.caught === undefined ? "" : `caught ${fields.caught}`].filter((s) => s !== "");
-  const chose = `classify ${of}: ${said.join(", ")}`;
+  if (Object.keys(fields).length === 0) throw new JournalError(`classify: give at least one of ${ORIGIN_FIELDS.map((field) => `--${field}`).join(", ")}`);
+  const chose = `classify ${of}: ${originText(fields)}`;
   const given = parsed.many.get("over") ?? [];
   const over: string[] | "none" = given.length === 1 && given[0]!.trim().toLowerCase() === "none" ? "none" : given;
   const record: Decision = { ...head("decision", who, ctx, chose), classifies: { of, ...fields }, chose, over, because, cites: [of] };
@@ -605,14 +605,6 @@ export function findPractice(practices: readonly ModelPractice[], given: string)
   const known = practices.length === 0 ? "this project declares no practice (a practice file beside a spec)" : `known: ${practices.map((p) => p.id).join("; ")}`;
   if (named.length > 1) throw new JournalError(`enact: "${given}" names ${named.length} practices; give the id: ${named.map((p) => p.id).join("; ")}`);
   throw new JournalError(`enact: no practice "${given}"; ${known}`);
-}
-
-/** The command that enacts a practice, one --step line per step, for a session to fill in. */
-export function enactTemplate(practice: ModelPractice, cli: string, session: string, agent: string, trigger?: string): string {
-  return [
-    `${cli} enact "${practice.id}"${trigger === undefined ? "" : ` --trigger "${trigger}"`} --session ${session} --agent ${agent}`,
-    ...practice.steps.map((step) => `  --step ${step.n}=done${step.leaves === undefined ? "" : `:"<the evidence: ${step.leaves}>"`}`),
-  ].join(" \\\n") + "\n  (a step not done as written: --step <n>=deviated:<why> or --step <n>=skipped:<why>)";
 }
 
 /** One --step value: <n>=done[:<evidence>], <n>=deviated:<because>, or <n>=skipped:<because>. */

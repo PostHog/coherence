@@ -32,6 +32,7 @@ import { syntaxOf } from "../plugins/languages.ts";
 import { escapeRegExp } from "../enforcement/totality.ts";
 import { mirrorRecipeText, type MirrorRecipe } from "../spec/grammar.ts";
 import { declaredMirrors, SPEC_SUFFIX, type ModelMirror } from "../spec/model.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 /** Where the index and each session's said memory live: transient, regenerated state. */
 export const MIRRORS_DIR = join(".coherence", "mirrors");
@@ -480,7 +481,7 @@ function readMirror(root: string, mirror: IndexedMirror, edited: ReadonlySet<str
 }
 
 function saidPath(root: string, session: string): string {
-  return join(root, MIRRORS_DIR, "said", `${session.replace(/[^\w.-]/g, "_")}.json`);
+  return join(root, MIRRORS_DIR, "said", `${fileStemOf(session)}.json`);
 }
 
 function readSaid(root: string, session: string | undefined): Record<string, string> {

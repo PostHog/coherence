@@ -38,7 +38,7 @@ import {
   type Rung,
   type Visibility,
 } from "../../src/plugins/api.ts";
-import { JsonRpcClient } from "../../src/plugins/api.ts";
+import { COHERENCE_ENFORCER, JsonRpcClient } from "../../src/plugins/api.ts";
 import { declaredInstrument, declaredLanguageOf, type DeclaredLanguage } from "../../src/plugins/api.ts";
 import { languageOfFile } from "../../src/plugins/api.ts";
 import { fileIdentity, hintedFiles, keepProjectFiles, walkBounds, walkedProjectFiles } from "../../src/plugins/api.ts";
@@ -117,7 +117,7 @@ export class DeclaredAdapter implements LanguageAdapter {
     this.root = resolve(root);
     this.declared = declared;
     this.language = declared.name;
-    const rung: Rung = { grade: "reference-choked", enforcer: "Coherence's check at the edit and in CI", fact: `${declaredInstrument(declared)} reports every reference, and every one in the project is inside the chokepoint` };
+    const rung: Rung = { grade: "reference-choked", enforcer: COHERENCE_ENFORCER, fact: `${declaredInstrument(declared)} reports every reference, and every one in the project is inside the chokepoint` };
     this.ladder = { top: "reference-choked", because: `nothing declares ${declared.name}'s visibility rules, so no compiler or checker is credited`, rungs: [rung] };
   }
 

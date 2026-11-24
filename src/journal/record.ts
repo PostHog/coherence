@@ -8,9 +8,9 @@
  */
 
 import { createHash } from "node:crypto";
-import { KINDS, WORK_KINDS, type Kind, type WorkKind } from "./kinds.ts";
+import { KINDS, pointsAt, WORK_KINDS, type Kind, type PointingKind, type WorkKind } from "./kinds.ts";
 
-export { KINDS, WORK_KINDS, type Kind, type WorkKind };
+export { KINDS, pointsAt, WORK_KINDS, type Kind, type WorkKind };
 
 export const KIND_NAMES: readonly Kind[] = Object.keys(KINDS) as Kind[];
 
@@ -61,6 +61,32 @@ export interface Stamp<K extends string> {
   commit: string | null;
   /** Whether the working tree had uncommitted changes at the write. */
   dirty: boolean;
+}
+
+/** The head's fields a store's reader requires, each a non-empty string; commit and dirty are the writer's to fill. */
+export const STAMP_FIELDS = ["id", "kind", "at", "session", "agent"] as const satisfies readonly (keyof Stamp<string>)[];
+
+/**
+ * A store's line read as far as the head every record in either store
+ * shares: the record, or the reason the line is not one. Which kinds the
+ * store holds is its own to say; the rest of the record is the kind's.
+ */
+export function parseStamped<R>(line: string, isStoreKind: (kind: string) => boolean): R | string {
+  let value: unknown;
+  try {
+    value = JSON.parse(line);
+  } catch (error) {
+    return `not JSON (${error instanceof Error ? error.message : String(error)})`;
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return "not a record object";
+  const record = value as Record<string, unknown>;
+  for (const field of STAMP_FIELDS) {
+    if (typeof record[field] !== "string" || record[field] === "") return `missing ${field}`;
+  }
+  const kind = record["kind"] as string;
+  if (!isStoreKind(kind)) return `unknown kind "${kind}"`;
+  if (Number.isNaN(Date.parse(record["at"] as string))) return `unreadable time "${String(record["at"])}"`;
+  return value as R;
 }
 
 /**
@@ -386,19 +412,9 @@ export interface WorkCompletion extends Stamp<"completion">, Citing {
 
 export type WorkRecord = WorkOrderRecord | WorkMove | WorkOwner | WorkCompletion;
 
-/** Records that point at an earlier record carry its id in `of`. */
-export function pointsAt(record: JournalRecord): string | null {
-  switch (record.kind) {
-    case "retraction":
-    case "resolution":
-    case "dismissal":
-    case "close":
-    case "acknowledgement":
-      return record.of;
-    default:
-      return null;
-  }
-}
+// The kinds whose record carries an earlier record's id in `of` are exactly those pointsAt (kinds.ts) reads it from.
+type CarryingOf = Extract<JournalRecord, { of: string }>["kind"];
+export const POINTING_COMPLETE: [Exclude<CarryingOf, PointingKind> | Exclude<PointingKind, CarryingOf>] extends [never] ? true : never = true;
 
 /** A record from either store. */
 export type AnyRecord = JournalRecord | WorkRecord;

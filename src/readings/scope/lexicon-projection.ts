@@ -1,12 +1,12 @@
 /** Node-only evidence projection. Definitions stay whole; oversized entries are omitted, not rewritten. */
-import { attention, awaitsReview, type Coverage, type VocabularyTerm } from "../../lifecycle/lexicon-coverage.ts";
+import { attention, awaitsReview, KEPT_USES_PER_TERM, type Coverage, type VocabularyTerm } from "../../lifecycle/lexicon-coverage.ts";
 import type { LexiconCoverage, LexiconEvidenceTerm } from "./model.ts";
 
 export const LEXICON_PAGE_LIMITS = {
   bytes: 256 * 1024,
   terms: 120,
   contextsPerTerm: 6,
-  usesPerTerm: 8,
+  usesPerTerm: KEPT_USES_PER_TERM,
   populationEntries: 30,
   /** Entries of each attention list the page leads with; the rest are one command away. */
   attentionEntries: 12,

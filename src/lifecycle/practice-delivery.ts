@@ -21,9 +21,9 @@ import { KERNEL_PREFIX, isCoherenceTree, kernelPractices, type ModelPractice } f
 import { configIgnore, underIgnored } from "../adapters/project-files.ts";
 import { loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
-import { enactTemplate } from "../journal/verbs.ts";
 import { holdsProject, projectRoot, within } from "./project.ts";
 import { shellCommandOf, simpleCommands, type SimpleCommand } from "./shell-writes.ts";
+import { fileStemOf } from "../journal/session-token.ts";
 
 export const PRACTICES_DIR = join(".coherence", "practices");
 
@@ -39,7 +39,7 @@ export interface Firing {
 }
 
 function firingsFile(root: string, session: string): string {
-  return join(root, PRACTICES_DIR, `${session.replace(/[^\w.-]/g, "_")}.jsonl`);
+  return join(root, PRACTICES_DIR, `${fileStemOf(session)}.jsonl`);
 }
 
 /** The firings this session has had, oldest first; a torn line is skipped. */
@@ -269,4 +269,12 @@ export function deliveryPractices(root: string): ModelPractice[] {
     }
   }
   return isCoherenceTree(root) ? out : [...out, ...kernelPractices()];
+}
+
+/** The command that enacts a practice, one --step line per step, for a session to fill in. */
+function enactTemplate(practice: ModelPractice, cli: string, session: string, agent: string, trigger?: string): string {
+  return [
+    `${cli} enact "${practice.id}"${trigger === undefined ? "" : ` --trigger "${trigger}"`} --session ${session} --agent ${agent}`,
+    ...practice.steps.map((step) => `  --step ${step.n}=done${step.leaves === undefined ? "" : `:"<the evidence: ${step.leaves}>"`}`),
+  ].join(" \\\n") + "\n  (a step not done as written: --step <n>=deviated:<why> or --step <n>=skipped:<why>)";
 }
