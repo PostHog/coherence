@@ -8,9 +8,9 @@
  */
 
 import { createHash } from "node:crypto";
-import { KINDS, WORK_KINDS, type Kind, type WorkKind } from "./kinds.ts";
+import { KINDS, pointsAt, WORK_KINDS, type Kind, type PointingKind, type WorkKind } from "./kinds.ts";
 
-export { KINDS, WORK_KINDS, type Kind, type WorkKind };
+export { KINDS, pointsAt, WORK_KINDS, type Kind, type WorkKind };
 
 export const KIND_NAMES: readonly Kind[] = Object.keys(KINDS) as Kind[];
 
@@ -412,19 +412,9 @@ export interface WorkCompletion extends Stamp<"completion">, Citing {
 
 export type WorkRecord = WorkOrderRecord | WorkMove | WorkOwner | WorkCompletion;
 
-/** Records that point at an earlier record carry its id in `of`. */
-export function pointsAt(record: JournalRecord): string | null {
-  switch (record.kind) {
-    case "retraction":
-    case "resolution":
-    case "dismissal":
-    case "close":
-    case "acknowledgement":
-      return record.of;
-    default:
-      return null;
-  }
-}
+// The kinds whose record carries an earlier record's id in `of` are exactly those pointsAt (kinds.ts) reads it from.
+type CarryingOf = Extract<JournalRecord, { of: string }>["kind"];
+export const POINTING_COMPLETE: [Exclude<CarryingOf, PointingKind> | Exclude<PointingKind, CarryingOf>] extends [never] ? true : never = true;
 
 /** A record from either store. */
 export type AnyRecord = JournalRecord | WorkRecord;

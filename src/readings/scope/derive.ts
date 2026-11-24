@@ -7,6 +7,7 @@
  */
 
 import { defectStates, type DefectState } from "../../journal/defect-states.ts";
+import { pointsAt, type PointingKind } from "../../journal/kinds.ts";
 import type { JournalRecord as StoredRecord } from "../../journal/record.ts";
 import { slug } from "./html.ts";
 import type {
@@ -701,19 +702,9 @@ export const GLYPH: Record<JournalKind, string> = {
 
 export const JOURNAL_KINDS: readonly JournalKind[] = Object.keys(GLYPH) as JournalKind[];
 
-/** Records that point at an earlier record carry its id in `of`. */
-export function pointsAt(record: JournalRecord): string | null {
-  switch (record.kind) {
-    case "retraction":
-    case "resolution":
-    case "dismissal":
-    case "close":
-    case "acknowledgement":
-      return record.of;
-    default:
-      return null;
-  }
-}
+// The page's records that carry an earlier record's id in `of` are of exactly the kinds pointsAt (kinds.ts) reads it from.
+type CarryingOf = Extract<JournalRecord, { of: string }>["kind"];
+export const POINTING_COMPLETE: [Exclude<CarryingOf, PointingKind> | Exclude<PointingKind, CarryingOf>] extends [never] ? true : never = true;
 
 /** The ids a record cites; empty for a record that cites nothing or was written before citations. */
 export function citesOf(record: { cites?: string[] | undefined }): readonly string[] {
