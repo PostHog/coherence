@@ -47,6 +47,7 @@ import type { ShellState, SpecEntrance, SpecInvariant } from "../readings/scope/
 import { CONTROL_WORDS, type FlowEntrance, type FlowModel, type FlowRoute } from "../readings/scope/structure-flow.ts";
 import { appendInvariant, renderInvariant, ScaffoldError } from "./scaffold.ts";
 import { NAMED_SYMBOL } from "../spec/named.ts";
+import { identifierTokens } from "../readings/scope/kept-answers.ts";
 
 /** Names that say static or public content, or a health check: an entrance that plausibly needs no control. */
 const PLAINLY_PUBLIC = /(?:^|[^a-z])(health|healthz|ready|readiness|liveness|ping|robots|well-known|sitemap|favicon|manifest|static|assets?|openapi|llms)(?:[^a-z]|$)/i;
@@ -154,7 +155,7 @@ function chokepointSymbols(root: string, owner: string, chokepoint: string): str
   const path = [owner === "." ? chokepoint : `${owner}/${chokepoint}`, chokepoint].map((p) => join(root, p)).find((p) => existsSync(p));
   if (path === undefined) return [];
   const text = readFileSync(path, "utf8");
-  const tokens = new Set(text.match(/[A-Za-z_$][\w$]*/g) ?? []);
+  const tokens = new Set(identifierTokens(text));
   return [...tokens].filter((t) => declaresAtTop(text, t, path)).sort();
 }
 

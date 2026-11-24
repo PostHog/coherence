@@ -86,6 +86,17 @@ const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..", "..");
 
 const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
+/**
+ * The identifier tokens a text spells, in order, repeats kept: the tokens a
+ * changed file is read for here, the component interface reading's word index
+ * and the scaffold's candidates for a module's declarations. One tokenizer,
+ * so a kept answer is dropped by a change to any token the word index would
+ * find. A function over a private global pattern: match resets its lastIndex,
+ * and no caller holds the pattern to leave one behind.
+ */
+export function identifierTokens(text: string): string[] {
+  return text.match(TOKEN) ?? [];
+}
 /** The module files a changed file star-imports or wildcard re-exports, as the component interface reading reads them (the parsed interfaces reading's wildcardModules). */
 function keptModules(language: Language, file: string, text: string): string[] {
   return parsedOf(language, "interfaces")?.wildcardModules(file, text) ?? [];
@@ -283,7 +294,7 @@ function changesOf(root: string, language: Language, was: Record<string, string>
     } catch {
       continue;
     }
-    for (const token of text.match(TOKEN) ?? []) tokens.add(token);
+    for (const token of identifierTokens(text)) tokens.add(token);
     for (const module of keptModules(language, file, text)) modules.add(module);
   }
   return { files, tokens, modules };

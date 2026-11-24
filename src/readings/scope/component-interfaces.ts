@@ -85,7 +85,7 @@ import { configRecord } from "../../adapters/project-config.ts";
 import { instrumentFor, type Language } from "../../adapters/index.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
-import { KeptAnswers, lastingRefusal } from "./kept-answers.ts";
+import { identifierTokens, KeptAnswers, lastingRefusal } from "./kept-answers.ts";
 import { DECLARED_NOT_READ, languagesRead, notScannedYet, unscannedOf } from "./languages-read.ts";
 import { parsedOf, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
@@ -369,7 +369,6 @@ function componentCodeOf(model: SpecModel, file: string, language: Language, ski
 
 /* ------------------------------------------------------- the word index */
 
-const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
 const ALIAS = /([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)/g;
 
 /**
@@ -423,7 +422,7 @@ export function wordIndex(root: string, code: ReadonlyMap<string, string>, langu
       return;
     }
     const counts = new Map<string, number>();
-    for (const token of text.match(TOKEN) ?? []) counts.set(token, (counts.get(token) ?? 0) + 1);
+    for (const token of identifierTokens(text)) counts.set(token, (counts.get(token) ?? 0) + 1);
     for (const [token, count] of counts) {
       add(owners, token, owner);
       const files = where.get(token) ?? new Map<number, number>();
