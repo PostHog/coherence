@@ -1677,7 +1677,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         let vocabularyNote = "";
         if (baseline && event === "PostToolUse" && written.length > 0) {
           const { coverageChanges, heldCandidates, holdCandidates, priorBaseline, saveBaseline } = lexiconCli;
-          const { editVocabulary, keptReading } = await import("./vocabulary-state.ts");
+          const { currentReading, editVocabulary, keptReading } = await import("./vocabulary-state.ts");
           const layers = await loadProjectLexicons(root);
           const prior = priorBaseline(root, session!);
           // The kept vocabulary is an optimization: anything that keeps it from answering falls back to the full reading, which says why.
@@ -1695,8 +1695,9 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
             if (changes.length === 0) edited.keep();
             else keep = edited.keep;
           } else {
-            if (edited.unavailable !== undefined) vocabularyNote = `Lexicon: read in full at this edit: ${edited.unavailable}.`;
-            const full = await keptReading(root, layers);
+            const treeMoved = "treeMoved" in edited && edited.treeMoved === true;
+            if (edited.unavailable !== undefined) vocabularyNote = `Lexicon: ${treeMoved ? "read again" : "read in full"} at this edit: ${edited.unavailable}.`;
+            const full = treeMoved ? await currentReading(root, layers) : await keptReading(root, layers);
             const found = coverageChanges(full, prior);
             changes = found.filter((c) => c.state !== "unresolved");
             holdCandidates(root, session!, found.filter((c) => c.state === "unresolved").map((c) => c.term));

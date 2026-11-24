@@ -435,6 +435,9 @@ function candidacy(canonical: string, terms: Map<string, TermBucket>): { candida
   return { candidate: byName || byWord, prose: named + (words?.words ?? 0), components: new Set([...sites, ...Object.keys(words?.byComponent ?? {})]).size };
 }
 
+/** Why an edit could not be judged against the kept state; `treeMoved` when only writes no hook saw stand in the way, which the incremental reading answers. */
+export type EditUnavailable = { unavailable: string | undefined; treeMoved?: true };
+
 /**
  * The vocabulary changes an edit to `written` introduced, judged against the
  * kept state, and the kept state taking the edit in; undefined when no kept
@@ -442,7 +445,7 @@ function candidacy(canonical: string, terms: Map<string, TermBucket>): { candida
  * full reading instead. `candidates` names the terms the baseline already
  * holds as candidates, never named again.
  */
-export async function editVocabulary(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, written: readonly string[], candidates: ReadonlySet<string>): Promise<EditVocabulary | { unavailable: string | undefined }> {
+export async function editVocabulary(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, written: readonly string[], candidates: ReadonlySet<string>): Promise<EditVocabulary | EditUnavailable> {
   try {
     return await judgeEdit(root, layers, written, candidates);
   } catch (error) {
@@ -452,7 +455,7 @@ export async function editVocabulary(root: string, layers: { coherence: Lexicon;
   }
 }
 
-async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, written: readonly string[], candidates: ReadonlySet<string>): Promise<EditVocabulary | { unavailable: string | undefined }> {
+async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, written: readonly string[], candidates: ReadonlySet<string>): Promise<EditVocabulary | EditUnavailable> {
   const meta = readMeta(root);
   // None kept yet, or kept by other code or lexicons: the full reading is the ordinary way, and keeps the state again.
   if (meta === undefined || meta.version !== (await stateVersion(root, layers))) return { unavailable: undefined };
@@ -461,7 +464,7 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
   const tree = treeKeys(root);
   if (tree === undefined) return { unavailable: "git could not list the tree's changes, so writes no hook saw cannot be ruled out" };
   const unseen = movedBeyond(meta.tree, tree, written);
-  if (unseen.length > 0) return { unavailable: `the tree moved since its vocabulary was kept, beyond what this edit wrote (${unseen.slice(0, 3).map((f) => (f === HEAD_KEY ? "HEAD names another commit" : f)).join(", ")}${unseen.length > 3 ? `, and ${unseen.length - 3} more` : ""})` };
+  if (unseen.length > 0) return { unavailable: `the tree moved since its vocabulary was kept, beyond what this edit wrote (${unseen.slice(0, 3).map((f) => (f === HEAD_KEY ? "HEAD names another commit" : f)).join(", ")}${unseen.length > 3 ? `, and ${unseen.length - 3} more` : ""})`, treeMoved: true };
   const declaredRaw = readJson<unknown>(join(stateDir(root), "declared.json"));
   if (!Array.isArray(declaredRaw) || !declaredRaw.every((d) => typeof d === "string")) throw new BucketUnusable("its kept declared names are missing or torn");
   const declared = new Set(declaredRaw as string[]);
@@ -848,7 +851,8 @@ async function incrementalReading(root: string, layers: { coherence: Lexicon; pr
   if (!isRecord(saved.tree) || !isRecord(saved.records)) throw new FullReading("its kept reading is missing or torn");
   const side = indexSide(root);
   if (tree === undefined || records === undefined) throw new FullReading("git could not list the tree's changes");
-  const changed = changedPaths(root, saved.tree, tree, saved.records, records);
+  // An edit keeps its file's contribution and meta.tree without the reading, so a file it wrote that is since put back matches the reading's tree yet not the buckets.
+  const changed = [...new Set([...changedPaths(root, saved.tree, tree, saved.records, records), ...movedBeyond(meta.tree, tree, [HEAD_KEY]).filter((file) => !file.startsWith("\0"))])].sort();
   const reshaping = changed.find((file) => reshapingFiles().has(basename(file)));
   if (reshaping !== undefined) throw new FullReading(`${reshaping} changed, which can change what the reading reads`);
   const population = saved.coverage.population;
