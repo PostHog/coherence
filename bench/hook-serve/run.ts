@@ -124,6 +124,17 @@ function compareSteps(root: string, session: string): Step[] {
   const edited = tracked.find((path) => basename(path).toLowerCase() === "readme.md") ?? tracked[0]!;
   const deleted = tracked.filter((path) => path !== edited).at(-1)!;
   const added = "coherence-bench-added/notes.md";
+  const lockfile = spawnSync("git", ["ls-files", "yarn.lock", "pnpm-lock.yaml", "package-lock.json", "uv.lock", "poetry.lock", "Cargo.lock"], { cwd: root, encoding: "utf8" }).stdout.split("\n").find(Boolean);
+  // The edit's own write lands first, then the hook hears of it, as a host's PostToolUse does.
+  const edit = (label: string, before: () => void): Step => ({ label, event: "PostToolUse", input: { ...base, hook_event_name: "PostToolUse", tool_name: "Edit", tool_input: { file_path: join(root, edited) } }, before: () => { before(); appendFileSync(join(root, edited), "- One more Widget Crate line.\n"); } });
+  // Fixed dates give both builds' clones the same commit for the same tree; --allow-empty moves HEAD even when nothing is left to add.
+  const commitAll = (): void => {
+    const dated = { ...process.env, GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z" };
+    for (const args of [["add", "-A"], ["commit", "-q", "--allow-empty", "-m", "bench: move HEAD"]]) {
+      const ran = spawnSync("git", ["-c", "user.email=bench@example.com", "-c", "user.name=bench", "-c", "commit.gpgsign=false", ...args], { cwd: root, encoding: "utf8", env: dated });
+      if (ran.status !== 0) throw new Error(`git ${args[0]} failed in the bench clone: ${ran.stderr}`);
+    }
+  };
   return [
     { label: "session start", event: "SessionStart", input: { ...base, hook_event_name: "SessionStart", source: "startup" } },
     prompt("prompt, tree unchanged"),
@@ -134,6 +145,10 @@ function compareSteps(root: string, session: string): Step[] {
     }),
     prompt("prompt, after a deleted file", () => rmSync(join(root, deleted))),
     { label: "stop, after a change", event: "Stop", input: { ...base, hook_event_name: "Stop", stop_hook_active: false }, before: () => appendFileSync(join(root, added), "More Widget Crate prose.\n") },
+    edit("edit, after a write no hook saw", () => appendFileSync(join(root, added), "A Widget Crate line no hook heard.\n")),
+    ...(lockfile === undefined ? [] : [prompt("prompt, after a lockfile change", () => appendFileSync(join(root, lockfile), "\n"))]),
+    { label: "session start, after HEAD moved", event: "SessionStart", input: { ...base, hook_event_name: "SessionStart", source: "startup" }, before: commitAll },
+    edit("edit, after HEAD moved", commitAll),
   ];
 }
 
@@ -191,6 +206,9 @@ function keptOutputs(clone: string): Map<string, string> {
   const kept = new Map<string, string>();
   const vocabulary = join(clone, ".coherence", "cache", "vocabulary");
   for (const name of ["reading.json", "declared.json"]) if (existsSync(join(vocabulary, name))) kept.set(`vocabulary/${name}`, readFileSync(join(vocabulary, name), "utf8"));
+  // Written only under COHERENCE_VOCABULARY_VERIFY, and only when an incremental reading differed from the full one.
+  const verifyLog = join(clone, ".coherence", "cache", "vocabulary-verify.log");
+  if (existsSync(verifyLog)) kept.set("cache/vocabulary-verify.log", readFileSync(verifyLog, "utf8"));
   const sessions = join(clone, ".coherence", "lexicon", "sessions");
   if (existsSync(sessions)) for (const name of readdirSync(sessions).sort()) kept.set(`lexicon/sessions/${name}`, readFileSync(join(sessions, name), "utf8"));
   return kept;
