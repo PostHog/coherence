@@ -1626,7 +1626,20 @@
     },
     {
       "name": "restatement",
-      "definition": "One value written at live sites in two or more files, a literal of 16 or more characters or a set of three or more members in any form (an array, a Set, a regular-expression alternation, a union, an object's keys, a manifest's data), where no site imports it from another and no test, type or declared mirror holds the copies equal. The mirror reading counts the restatements nothing holds (query mirrors --restatements), each with the one source it would come from; the count is the complexity a project removes by consolidating, so it only goes down (d-fc099227)."
+      "definition": "One value written at live sites in two or more files, a literal of 16 or more characters or a set of three or more members in any form (an array, a Set, a regular-expression alternation, a union, an object's keys, a manifest's data), where no site imports it from another and no test, type or declared mirror holds the copies equal. The mirror reading counts the restatements nothing holds (query mirrors --restatements), each with the one source it would come from; the count is the complexity a project removes by consolidating, so it only goes down (d-fc099227).",
+      "status": "proposed",
+      "aliases": [
+        "unenforced restatement"
+      ],
+      "related": [
+        "reading",
+        "defect",
+        "invariant"
+      ],
+      "provenance": {
+        "defined_by": "agent proposal from conjecture c-74956e4e and its resolution rs-a454912d, 2026-11-24",
+        "because": "the mirror reading counts restatements and query mirrors, the spec and the code name them; hand list names lists alone, not a literal or a constant written in two files"
+      }
     }
   ],
   "metaphors": {

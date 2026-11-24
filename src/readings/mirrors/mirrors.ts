@@ -70,8 +70,6 @@ interface NameSet {
 
 /** Test files: their literals are fixtures and expectations, which copy the lists on purpose. */
 const TEST_FILE = /\.(test|e2e)\.[cm]?[tj]s$|fixture/;
-/** The tests themselves, without the fixtures they build from: what can hold a copy equal. */
-const TEST_ONLY = /\.(test|e2e)\.[cm]?[tj]s$/;
 const CODE_FILE = /\.(ts|mts|cts|js|mjs|cjs)$/;
 const DOC_FILE = /\.md$/;
 /** The Markdown read for candidates: the docs folder, every spec, the README. */
@@ -1101,7 +1099,8 @@ export async function readMirrors(root: string, options: MirrorOptions = {}): Pr
     pairs,
     values: ctx.values,
     typed: ctx.typed,
-    tests: new Map([...texts].filter(([file]) => TEST_ONLY.test(file) && !/fixture/.test(file))),
+    // The tests themselves, without the fixtures they build from: what can hold a copy equal.
+    tests: new Map([...texts].filter(([file]) => TEST_FILE.test(file) && !/fixture/.test(file))),
     imports,
     untyped: ctx.untyped,
     plugins: manifests.map((m) => dirname(m)),
