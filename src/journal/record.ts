@@ -63,6 +63,32 @@ export interface Stamp<K extends string> {
   dirty: boolean;
 }
 
+/** The head's fields a store's reader requires, each a non-empty string; commit and dirty are the writer's to fill. */
+export const STAMP_FIELDS = ["id", "kind", "at", "session", "agent"] as const satisfies readonly (keyof Stamp<string>)[];
+
+/**
+ * A store's line read as far as the head every record in either store
+ * shares: the record, or the reason the line is not one. Which kinds the
+ * store holds is its own to say; the rest of the record is the kind's.
+ */
+export function parseStamped<R>(line: string, isStoreKind: (kind: string) => boolean): R | string {
+  let value: unknown;
+  try {
+    value = JSON.parse(line);
+  } catch (error) {
+    return `not JSON (${error instanceof Error ? error.message : String(error)})`;
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return "not a record object";
+  const record = value as Record<string, unknown>;
+  for (const field of STAMP_FIELDS) {
+    if (typeof record[field] !== "string" || record[field] === "") return `missing ${field}`;
+  }
+  const kind = record["kind"] as string;
+  if (!isStoreKind(kind)) return `unknown kind "${kind}"`;
+  if (Number.isNaN(Date.parse(record["at"] as string))) return `unreadable time "${String(record["at"])}"`;
+  return value as R;
+}
+
 /**
  * A citation: the ids of earlier records, in either store and of any kind,
  * that a record rests on or is about. Checked at the write (an id that names

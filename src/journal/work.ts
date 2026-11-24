@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { appendWhole, storeLines } from "./append.ts";
 import { JournalError } from "./args.ts";
-import { isWorkKind, TERMINAL_STATES, type WorkRecord, type WorkState } from "./record.ts";
+import { isWorkKind, parseStamped, TERMINAL_STATES, type WorkRecord, type WorkState } from "./record.ts";
 import { shardFor } from "./shards.ts";
 import { isStoreFile, storeDir } from "./stores.ts";
 import { SESSION_TOKEN, sessionRefusal } from "./session-token.ts";
@@ -85,21 +85,7 @@ export function loadWork(cwd: string): LoadedWork {
 }
 
 function parseWorkLine(line: string): WorkRecord | string {
-  let value: unknown;
-  try {
-    value = JSON.parse(line);
-  } catch (error) {
-    return `not JSON (${error instanceof Error ? error.message : String(error)})`;
-  }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return "not a record object";
-  const record = value as Record<string, unknown>;
-  for (const field of ["id", "kind", "at", "session", "agent"]) {
-    if (typeof record[field] !== "string" || record[field] === "") return `missing ${field}`;
-  }
-  const kind = record["kind"] as string;
-  if (!isWorkKind(kind)) return `unknown kind "${kind}"`;
-  if (Number.isNaN(Date.parse(record["at"] as string))) return `unreadable time "${String(record["at"])}"`;
-  return value as WorkRecord;
+  return parseStamped<WorkRecord>(line, isWorkKind);
 }
 
 /** One order as a reader sees it: the fold of its records in time order. */
