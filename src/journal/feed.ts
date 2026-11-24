@@ -39,7 +39,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { SESSION_TOKEN } from "./work.ts";
+import { SESSION_TOKEN } from "./session-token.ts";
 import { cursorAfter, formatCursor, parseCursor, recordsAfter, subjectLine, type Cursor } from "./read.ts";
 import type { JournalRecord } from "./record.ts";
 import { journalFileKeys, loadJournal, loadJournalFiles, type Loaded } from "./store.ts";

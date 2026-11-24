@@ -17,8 +17,9 @@ import { JournalError } from "./args.ts";
 import { isKind, type JournalRecord } from "./record.ts";
 import { shardFor } from "./shards.ts";
 import { isStoreFile, storeDir } from "./stores.ts";
-import { SESSION_TOKEN, workBinding } from "./work.ts";
+import { workBinding } from "./work.ts";
 import { digestOf, identityOf, lineKey, WorktreeIndex, type IndexedLine } from "./worktree-index.ts";
+import { SESSION_TOKEN, sessionRefusal } from "./session-token.ts";
 
 export const JOURNAL_DIR = storeDir("journal");
 
@@ -29,7 +30,7 @@ export function journalDir(cwd: string): string {
 export function sessionFile(cwd: string, session: string): string {
   if (!SESSION_TOKEN.test(session)) {
     throw new JournalError(
-      `session "${session}" cannot name a file; use letters, digits, dot, dash, or underscore`,
+      sessionRefusal(session),
     );
   }
   return join(journalDir(cwd), `${session}.jsonl`);

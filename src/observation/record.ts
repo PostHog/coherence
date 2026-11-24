@@ -19,6 +19,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from
 import { join } from "node:path";
 import type { Attribution, TestVerdict } from "./capture.ts";
 import type { LanguagesRead } from "../readings/scope/languages-read.ts";
+import { SESSION_TOKEN, sessionRefusal } from "../journal/session-token.ts";
 
 export const OBSERVATIONS_DIR = join(".coherence", "observations");
 
@@ -112,11 +113,10 @@ export interface ObservationRecord {
   languages?: LanguagesRead;
 }
 
-const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 /** Append one observation as one line; never rewrite one. */
 export function appendObservation(root: string, record: ObservationRecord): string {
-  if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
+  if (!SESSION_TOKEN.test(record.session)) throw new Error(sessionRefusal(record.session));
   const dir = join(root, OBSERVATIONS_DIR);
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${record.session}.jsonl`);

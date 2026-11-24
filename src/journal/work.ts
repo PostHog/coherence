@@ -22,11 +22,12 @@ import { JournalError } from "./args.ts";
 import { isWorkKind, TERMINAL_STATES, type WorkRecord, type WorkState } from "./record.ts";
 import { shardFor } from "./shards.ts";
 import { isStoreFile, storeDir } from "./stores.ts";
+import { SESSION_TOKEN, sessionRefusal } from "./session-token.ts";
 
 export const WORK_DIR = storeDir("work");
 
 /** A session names its file, so it must be a plain file-safe token. */
-export const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+export { SESSION_TOKEN };
 
 export function workDir(cwd: string): string {
   return join(cwd, WORK_DIR);
@@ -34,7 +35,7 @@ export function workDir(cwd: string): string {
 
 export function workFile(cwd: string, session: string): string {
   if (!SESSION_TOKEN.test(session)) {
-    throw new JournalError(`session "${session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
+    throw new JournalError(sessionRefusal(session));
   }
   return join(workDir(cwd), `${session}.jsonl`);
 }

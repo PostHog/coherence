@@ -38,6 +38,7 @@ import {
   type Proposal,
   type Who,
 } from "./lexicon-maintain.ts";
+import { SESSION_TOKEN, sessionRefusal } from "../journal/session-token.ts";
 
 export const LEXICON_WORK_USAGE = `  lexicon coverage [--json] [<path>...]   recurring terms without a definition and senses at risk, ranked; --json: every observed use and population fact
                                           <path>: read only the project's files under these folders or files, relative to the root or absolute inside it
@@ -125,8 +126,7 @@ function cleanWrite(path: string, value: unknown): void {
   renameSync(temp, path);
 }
 export function baselinePath(root: string, session: string): string {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(session))
-    throw new Error("invalid session token");
+  if (!SESSION_TOKEN.test(session)) throw new Error(sessionRefusal(session));
   return confined(root, `.coherence/lexicon/sessions/${session}.json`);
 }
 /** The baseline key that remembers a candidate: never a term's own key, which always holds a component after the newline. */

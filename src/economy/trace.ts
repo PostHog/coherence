@@ -33,11 +33,11 @@ import { readerNaming } from "../lifecycle/host-tools.ts";
 import type { SpecModel } from "../spec/model.ts";
 import { predictClosure, type Instrument } from "./closure.ts";
 import { toRelative } from "./source.ts";
+import { SESSION_TOKEN, sessionRefusal } from "../journal/session-token.ts";
 
 export const TRACES_DIR = join(".coherence", "traces");
 
 
-const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 export interface ReadLine {
   kind: "read";
@@ -78,7 +78,7 @@ export function tracesDir(root: string): string {
 }
 
 export function traceFile(root: string, session: string): string {
-  if (!SESSION_TOKEN.test(session)) throw new Error(`session "${session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
+  if (!SESSION_TOKEN.test(session)) throw new Error(sessionRefusal(session));
   return join(tracesDir(root), `${session}.jsonl`);
 }
 
