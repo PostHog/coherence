@@ -9,6 +9,7 @@
  */
 
 import manifest from "./plugin.json" with { type: "json" };
+import { escape } from "../../src/plugins/api.ts";
 
 /** Every extension a module file may have, TypeScript's first, in the order a resolution tries them. */
 export const MODULE_EXTENSIONS: readonly string[] = manifest.serverExtensions;
@@ -24,4 +25,4 @@ export const TYPESCRIPT_EXTENSIONS: ReadonlySet<string> = new Set(MODULE_EXTENSI
 export const INDEX_EXTENSIONS: readonly string[] = MODULE_EXTENSIONS.filter((e) => !/^\.[cm]/.test(e));
 
 /** A path ending in any module extension: what a path with its extension stripped is stripped of. */
-export const MODULE_EXTENSION = new RegExp(`(?:${MODULE_EXTENSIONS.map((e) => e.replace(/\./g, "\\.")).join("|")})$`);
+export const MODULE_EXTENSION = new RegExp(`(?:${MODULE_EXTENSIONS.map(escape).join("|")})$`);

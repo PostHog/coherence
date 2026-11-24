@@ -11,12 +11,12 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), "..");
 test("an applied proposal's decision text has one writer and one reading: the coverage and the maintenance read what apply writes", () => {
   const id = proposalIdOf({ target: "docs/lexicon.json", before: "b", after: "a", change: { action: "define", name: "spec", because: "b" }, humanRequired: false });
   assert.match(id, /^lp-[a-f0-9]{24}$/);
-  const applied = { change: { action: "reject", name: "spec", value: "contract" }, human: null };
+  const applied = { change: { action: "reject", name: "spec", value: "widget page" }, human: null };
   const chose = applyChose(id, applied);
   assert.match(chose, APPLY_CHOSE, "the reading matches what the writer writes");
   assert.ok(chose.includes(` apply ${id} `), "the proposal's id is found as apply wrote it");
   assert.deepEqual(JSON.parse(chose.replace(APPLY_CHOSE, "")), applied, "the change reads back as it was applied");
-  assert.match(`glossary apply ${id} {}`, APPLY_CHOSE, "a record written under the vocabulary's older name still reads as applied");
+  assert.match(`vocabulary apply ${id} {}`, APPLY_CHOSE, "a record written under an earlier name of the verb still reads as applied: the reading takes any lowercase word before apply");
   const spelled = readdirSync(SRC, { recursive: true })
     .map(String)
     .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts") && !file.includes("fixtures") && file !== join("lifecycle", "lexicon-coverage.ts"))
