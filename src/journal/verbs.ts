@@ -53,6 +53,7 @@ import {
 import { componentFolders, componentHolding, loadSpecModel, projectFile, projectPractices } from "../spec/model.ts";
 import { filesWritten } from "../economy/trace.ts";
 import { originFields } from "./defects.ts";
+import { ORIGIN_FIELDS, originText, type OriginField, type OriginGiven } from "./defect-states.ts";
 import { amendCommand, floorGaps, type ModelPractice } from "../spec/practices.ts";
 import { appendRecordTo, gitState, loadJournal, loadJournalAcrossWorktrees, type Loaded } from "./store.ts";
 import { describeBinding, loadWork } from "./work.ts";
@@ -305,11 +306,11 @@ export function conjecture(argv: string[], ctx: Context): Written {
   return write(ctx, record);
 }
 
-/** The --class, --introduced and --caught flags a defect, its classification and its close take. */
-const ORIGIN: Record<string, FlagShape> = { class: "one", introduced: "one", caught: "one" };
+/** The --class, --introduced and --caught flags a defect, its classification and its close take: one per origin field. */
+const ORIGIN: Record<OriginField, FlagShape> = Object.fromEntries(ORIGIN_FIELDS.map((field) => [field, "one"])) as Record<OriginField, FlagShape>;
 
-function originGiven(parsed: Parsed): { class?: string | undefined; introduced?: string | undefined; caught?: string | undefined } {
-  return { class: parsed.one.get("class"), introduced: parsed.one.get("introduced"), caught: parsed.one.get("caught") };
+function originGiven(parsed: Parsed): OriginGiven {
+  return Object.fromEntries(ORIGIN_FIELDS.map((field) => [field, parsed.one.get(field)])) as OriginGiven;
 }
 
 /**
@@ -388,9 +389,8 @@ export function classify(argv: string[], ctx: Context): Written {
   const because = required(parsed, "because", "a classification records the evidence it rests on");
   target(answerable(ctx.cwd), of, "defect", "classify");
   const fields = originFields(originGiven(parsed), ctx.cwd);
-  if (Object.keys(fields).length === 0) throw new JournalError("classify: give at least one of --class, --introduced, --caught");
-  const said = [fields.class === undefined ? "" : `class ${fields.class}`, fields.introduced === undefined ? "" : `introduced ${fields.introduced}`, fields.caught === undefined ? "" : `caught ${fields.caught}`].filter((s) => s !== "");
-  const chose = `classify ${of}: ${said.join(", ")}`;
+  if (Object.keys(fields).length === 0) throw new JournalError(`classify: give at least one of ${ORIGIN_FIELDS.map((field) => `--${field}`).join(", ")}`);
+  const chose = `classify ${of}: ${originText(fields)}`;
   const given = parsed.many.get("over") ?? [];
   const over: string[] | "none" = given.length === 1 && given[0]!.trim().toLowerCase() === "none" ? "none" : given;
   const record: Decision = { ...head("decision", who, ctx, chose), classifies: { of, ...fields }, chose, over, because, cites: [of] };

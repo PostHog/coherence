@@ -20,7 +20,8 @@
 
 import { JournalError } from "./args.ts";
 import type { Elsewhere } from "./branches.ts";
-import { GLYPH, enactmentTally, anySubjectOf, citedBy, citesOf, isKind, kindLabel, pointsAt, subjectOf, type AnyRecord, type DefectOrigin, type Escalation, type JournalRecord, type Kind } from "./record.ts";
+import { originText } from "./defect-states.ts";
+import { GLYPH, enactmentTally, anySubjectOf, citedBy, citesOf, isKind, kindLabel, pointsAt, subjectOf, type AnyRecord, type Escalation, type JournalRecord, type Kind } from "./record.ts";
 import { compareRecords, type Damaged, type Loaded } from "./store.ts";
 
 export interface Filters {
@@ -81,12 +82,6 @@ function verbPast(kind: Kind): string {
     default:
       return kind;
   }
-}
-
-/** A defect's class, origin and catch as given on one record, or "" when it gives none. */
-function originText(record: DefectOrigin): string {
-  const parts = [record.class === undefined ? "" : `class ${record.class}`, record.introduced === undefined ? "" : `introduced ${record.introduced}`, record.caught === undefined ? "" : `caught ${record.caught}`];
-  return parts.filter((p) => p !== "").join(", ");
 }
 
 function stamp(at: string): string {
