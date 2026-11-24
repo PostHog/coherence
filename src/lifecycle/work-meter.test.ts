@@ -769,7 +769,7 @@ test("an edit over torn or missing vocabulary buckets reads in full, says so, na
   }
 });
 
-test("a write no hook saw is caught at the next edit, which reads in full as main does", async () => {
+test("a write no hook saw is caught at the next edit, which reads again and names what main names", async () => {
   const project = sizedProject(1);
   try {
     const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
@@ -780,7 +780,8 @@ test("a write no hook saw is caught at the next edit, which reads in full as mai
     const file = join(project.root, "docs/note-0.md");
     writeFileSync(file, readFileSync(file, "utf8") + "A `rebate` is clawed back.\n");
     const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
-    assert.match(m.said, /Lexicon: read in full at this edit: the tree moved since its vocabulary was kept, beyond what this edit wrote \(docs\/note-1\.md\)/, "the unseen write is said");
+    assert.match(m.said, /Lexicon: read again at this edit: the tree moved since its vocabulary was kept, beyond what this edit wrote \(docs\/note-1\.md\)/, "the unseen write is said");
+    assert.deepEqual(m.work.reads.filter((r) => r.startsWith("corpus ")).sort(), ["corpus <top>/proj/docs/note-0.md", "corpus <top>/proj/docs/note-1.md"], "only the files that changed are read, each once");
     assert.ok(pendingCandidates(project.root, SESSION).terms.includes("rebate"), "and the term it made recur with this edit is held for the stop, as main finds it");
     assert.doesNotMatch(m.said, /recur without a definition/, "held, not said at the edit");
   } finally {
@@ -860,7 +861,31 @@ const HEAD_MOVES: [string, (project: SizedProject) => void, (project: SizedProje
   ],
 ];
 
-test("a checkout, a pull or a branch switch onto a clean tree moves the tree: the next edit and the next prompt read in full", async () => {
+test("an edited file put back with no hook to hear it is read again at the next edit, so later edits are judged against the tree as it is", async () => {
+  const project = sizedProject(1);
+  try {
+    const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+    start.commit?.();
+    const edited = join(project.root, "docs/note-0.md");
+    const original = readFileSync(edited, "utf8");
+    writeFileSync(edited, original + "A `rebate` is clawed back.\nEach `rebate` is paid.\n");
+    await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: edited } });
+    writeFileSync(edited, original);
+    const unseen = join(project.root, "docs/note-1.md");
+    writeFileSync(unseen, readFileSync(unseen, "utf8") + "A line no hook heard.\n");
+    const other = join(project.root, "docs/note-2.md");
+    writeFileSync(other, readFileSync(other, "utf8") + "Another line.\n");
+    await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: other } });
+    const last = join(project.root, "docs/note-3.md");
+    writeFileSync(last, readFileSync(last, "utf8") + "One `rebate` alone.\n");
+    await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: last } });
+    assert.ok(!pendingCandidates(project.root, SESSION).terms.includes("rebate"), "a term the put-back file no longer holds is not counted as recurring");
+  } finally {
+    rmSync(project.top, { recursive: true, force: true });
+  }
+});
+
+test("a checkout, a pull or a branch switch onto a clean tree moves the tree: the next edit and the next prompt read again from what changed", async () => {
   for (const [name, before, move] of HEAD_MOVES) {
     for (const next of ["edit", "prompt"] as const) {
       const project = sizedProject(1);
@@ -874,10 +899,12 @@ test("a checkout, a pull or a branch switch onto a clean tree moves the tree: th
           const file = join(project.root, "docs/note-0.md");
           writeFileSync(file, readFileSync(file, "utf8") + "A line.\n");
           const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
-          assert.match(m.said, /Lexicon: read in full at this edit: the tree moved since its vocabulary was kept, beyond what this edit wrote \(HEAD names another commit/, `${name}: the next edit reads in full and says why`);
+          assert.match(m.said, /Lexicon: read again at this edit: the tree moved since its vocabulary was kept, beyond what this edit wrote \(HEAD names another commit/, `${name}: the next edit reads again and says why`);
         } else {
           const m = await workOf(project, "UserPromptSubmit", { prompt: "second" });
           assert.equal(m.work.counts["coverage reading"], 1, `${name}: the next prompt takes the reading`);
+          const extent = readFileSync(join(project.root, ".coherence", "cache", "vocabulary-extents.jsonl"), "utf8").trim().split("\n").at(-1)!;
+          assert.match(extent, /"extent":"files"/, `${name}: the next prompt reads the files HEAD's move changed, from the kept index`);
         }
       } finally {
         rmSync(project.top, { recursive: true, force: true });

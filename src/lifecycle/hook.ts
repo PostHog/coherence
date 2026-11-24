@@ -77,10 +77,9 @@ import { writeAtomically } from "../readings/scope/shared-structure.ts";
 import { userCacheDir } from "./user-dir.ts";
 import { closeWork, execFile, openWork, readProjectText, spawn } from "./work-meter.ts";
 import { promisify } from "node:util";
-import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
+import type { CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
-import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
-import { recordedServers } from "../enforcement/server.ts";
+import type { withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
@@ -108,17 +107,14 @@ import { lastNamed } from "./lexicon-recency.ts";
 import { CONFIG_FILE, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
 import { keepStateFiles } from "./state-files.ts";
 
-import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
-import { currentReading, editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
+import type { Coverage } from "./lexicon-coverage.ts";
+import { cacheDir } from "./kept-parse.ts";
 import { mirrorBlock, refreshMirrorsInBackground } from "../readings/mirrors/recorded.ts";
-import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, structureRefreshSlot, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
-import { loadSpec } from "../readings/scope/build.ts";
-import { orientUndeclaredText, rankNow, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
-import { baselinePath, coverageChanges, deliverCandidates, heldCandidates, holdCandidates, introducedCandidates, pendingCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
+import type { GapState } from "../readings/scope/gaps.ts";
+import { refreshInBackground, refreshUnderWay, structureRefreshSlot } from "../readings/scope/background-refresh.ts";
+import type { coverageChanges } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 import { namesWrittenFiles, writtenNames } from "./host-tools.ts";
-import { keepMirrorIndex, mirrorAlarm } from "./mirrors.ts";
-import { specAlarm } from "./spec-at-edit.ts";
 import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
 import { cliArgs } from "./own-cli.ts";
 import { fileStemOf } from "../journal/session-token.ts";
@@ -229,6 +225,7 @@ function treeKeyPath(root: string, session: string): string {
  * onto a clean tree changes files the listings never name.
  */
 async function treeKey(root: string): Promise<string | undefined> {
+  const { headCommit } = await import("./vocabulary-state.ts");
   const head = headCommit(root);
   if (head === undefined) return undefined;
   const changed = await changedFiles(root);
@@ -244,6 +241,19 @@ async function treeKey(root: string): Promise<string | undefined> {
       }
     })
     .join("\n");
+}
+
+// The tree is keyed before the reading, so a write during it moves the key and the first prompt reads again.
+async function startVocabulary(root: string): Promise<{ reading: Coverage; keepBaseline: (session: string) => void }> {
+  const { saveBaseline } = await import("./lexicon-cli.ts");
+  const { currentReading } = await import("./vocabulary-state.ts");
+  const tree = await treeKey(root);
+  const reading = await currentReading(root, await loadProjectLexicons(root));
+  const keepBaseline = (session: string): void => {
+    saveBaseline(root, session, reading);
+    if (tree !== undefined) keepTreeKey(root, session, tree);
+  };
+  return { reading, keepBaseline };
 }
 
 function lastTreeKey(root: string, session: string): string | undefined {
@@ -562,8 +572,10 @@ export function specStopText(root: string, changed: readonly string[] = [], wall
  * recorded unable naming the file or the name; an unknown noun is a
  * nomination the tool cannot prove, so it is reported and never refused.
  */
-export function lexiconStopText(report: CheckReport | undefined, walls: readonly Unable[] = []): { text: string; owed: number } {
-  if (report === undefined || !hasFindings(report)) return { text: "", owed: 0 };
+export async function lexiconStopText(report: CheckReport | undefined, walls: readonly Unable[] = []): Promise<{ text: string; owed: number }> {
+  if (report === undefined) return { text: "", owed: 0 };
+  const { failingRejected, formatReport, hasFindings } = await import("./check.ts");
+  if (!hasFindings(report)) return { text: "", owed: 0 };
   const lines = formatReport(report).trimEnd().split("\n");
   const failing = failingRejected(report);
   let owed = 0;
@@ -635,7 +647,7 @@ export async function editContext(root: string, input: HookInput, options: HookO
   const files = written.filter((file) => own.has(file));
   if (files.length === 0) return "";
   const session = sessionOf(input);
-  const found = touchedInvariants(root, files);
+  const found = await touchedInvariants(root, files);
   if (!("model" in found) || found.touched.length === 0) return found.said;
   // Without a session no stop could make a check put off, so an edit with none waits on the server as before.
   // With one, an edit that finds no server starts it and waits what is left of the latency budget: tsgo loads inside
@@ -663,7 +675,8 @@ export async function editContext(root: string, input: HookInput, options: HookO
  * (chokepointIndex) and, when that cannot answer, from the whole spec model,
  * with what was said about the fallback; only what was said when neither reads.
  */
-function touchedInvariants(root: string, files: readonly string[]): { model: SpecModel; touched: string[]; said: string } | { said: string } {
+async function touchedInvariants(root: string, files: readonly string[]): Promise<{ model: SpecModel; touched: string[]; said: string } | { said: string }> {
+  const { mayTouch } = await import("../enforcement/run.ts");
   // A name in a file of none of the project's languages is prose, never a reference (a notes file that says "write"): only the
   // file's place in the latest run can tie it to an invariant. An unreadable config keeps every text, toward the slow path.
   const code = codeFiles(root);
@@ -817,7 +830,7 @@ async function checkDeferredAtStop(root: string, input: HookInput, options: Hook
   const files = stored.filter((file) => existsSync(join(root, file)));
   undeferEditCheck(root, session, stored.filter((file) => !files.includes(file)));
   if (files.length === 0) return "";
-  const found = touchedInvariants(root, files);
+  const found = await touchedInvariants(root, files);
   if (!("model" in found) || found.touched.length === 0) {
     undeferEditCheck(root, session, files);
     return found.said;
@@ -856,6 +869,7 @@ async function checkAtEdit(root: string, input: HookInput, options: HookOptions,
     return putOff.onNoServer?.(language) ?? "";
   };
   // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
+  const { performRun } = await import("../enforcement/run.ts");
   const outcome = await performRun(root, { session: session ?? "unknown-session", agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false, occasion: "edit", onNoServer, waitWarmMs: putOff.waitWarmMs, startServer: putOff.start });
   // A check made answers for every earlier edit of the same files that was put off, so a stop does not report it again.
   if (!wasPutOff && session !== undefined) undeferEditCheck(root, session, files);
@@ -931,6 +945,7 @@ export function mayHaveGaps(root: string, given?: SpecModel): boolean {
 export async function gapReading(root: string, options: { waitMs?: number } = {}): Promise<GapReading> {
   if (!mayHaveGaps(root)) return { fingerprint: undefined, now: undefined };
   try {
+    const { awaitRefresh, currentGaps, lastGaps, structureFingerprint } = await import("../readings/scope/gaps.ts");
     const model = loadedSpecModel(root);
     const fingerprint = structureFingerprint(root, model);
     const now = currentGaps(root, fingerprint, model) ?? (options.waitMs ? await awaitRefresh(root, fingerprint, options.waitMs) : undefined);
@@ -949,6 +964,8 @@ export async function gapReading(root: string, options: { waitMs?: number } = {}
 export async function gapBlock(root: string, reading?: GapReading): Promise<string> {
   const gaps = reading ?? (await gapReading(root));
   const cli = await cliName(root);
+  const { orientGapText, readGapBaseline, unreadGapText } = await import("../readings/scope/gaps.ts");
+  const { orientUndeclaredText, undeclaredNow } = await import("../readings/scope/undeclared.ts");
   let text = "";
   if (gaps.fingerprint === undefined) text = "";
   else if (gaps.now !== undefined) text = orientGapText(gaps.now, readGapBaseline(root), cli);
@@ -993,6 +1010,7 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   // What other sessions settled and left open, which this one did not see happen, rides after the work it owns.
   const carried = carryBlock(journal, loadOrders(root), sessionOf(input), commands);
   const head = escalationBlock(root) + pluginRefusalBlock(root) + specBlock(root) + languageNoticeBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input) + carried;
+  const { attentionText, lexiconCoverage } = await import("./lexicon-coverage.ts");
   const reading=report ?? await lexiconCoverage(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);
@@ -1090,6 +1108,7 @@ async function vocabularyAtEdit(root: string, changes: ReturnType<typeof coverag
  * stop marks delivered once the line reached the host.
  */
 async function vocabularyAtStop(root: string, reading: Coverage, prior: Record<string, string>): Promise<{ text: string; named: string[] }> {
+  const { coverageChanges, introducedCandidates } = await import("./lexicon-cli.ts");
   const cli = await cliName(root);
   const introduced = introducedCandidates(reading, prior).slice(0, 5);
   const risky = coverageChanges(reading, prior).filter((c) => c.state !== "unresolved").slice(0, 3);
@@ -1123,17 +1142,12 @@ export function feedContext(root: string, input: HookInput): { text: string; com
 async function checkChanged(root: string, paths: readonly string[]): Promise<CheckReport | undefined> {
   if (paths.length === 0) return undefined;
   const { coherence, project } = await loadProjectLexicons(root);
+  const { runCheck } = await import("./check.ts");
   return runCheck({ root, paths: [...paths], coherence, project });
 }
 
-/**
- * The one door to the warm instrument, as enforcement exports it. The hook
- * holds it as a value so a test can stand a fake in its place; production
- * never passes one and gets the real door.
- */
+/** The one door to the warm instrument, as enforcement exports it; a test stands a fake in its place, and production passes none. */
 export type WarmDoor = typeof withWarmAdapter;
-
-export const WARM_DOOR: WarmDoor = withWarmAdapter;
 
 export interface HookOptions {
   /** The folder the host runs in, which a tool's relative path is written from: the root unless the project is nested below it. */
@@ -1145,7 +1159,7 @@ export interface HookOptions {
    * stale or absent. The command line passes STRUCTURE_REFRESH; absent (a
    * test), nothing is started.
    */
-  refresh?: ((root: string, fingerprint: string) => void) | undefined;
+  refresh?: ((root: string, fingerprint: string) => void | Promise<unknown>) | undefined;
   /** The door to the warm instrument; enforcement's own by default. */
   door?: WarmDoor | undefined;
   /** How long a session start may wait for a nearly done refresh; START_WAIT_MS by default. */
@@ -1214,12 +1228,13 @@ export interface EditVerdict {
  * Only the session's own stop: a subagent stops while its session still
  * edits, and each stop would supersede the last one's reading.
  */
-export function refreshAtStop(root: string, options: HookOptions): void {
+export async function refreshAtStop(root: string, options: HookOptions): Promise<void> {
   if (options.refresh === undefined || !mayHaveGaps(root)) return;
   try {
+    const { currentGaps, structureFingerprint } = await import("../readings/scope/gaps.ts");
     const model = loadedSpecModel(root);
     const fingerprint = structureFingerprint(root, model);
-    if (currentGaps(root, fingerprint, model) === undefined) options.refresh(root, fingerprint);
+    if (currentGaps(root, fingerprint, model) === undefined) await options.refresh(root, fingerprint);
   } catch {
     // A refresh that cannot start only means the next session reads the last reading, labeled.
   }
@@ -1236,7 +1251,7 @@ async function snapshotAtStop(root: string, session: string, patch: readonly str
   }
   const model = loadedSpecModel(root);
   if (options.adapter === undefined) {
-    await snapshotSession(root, session, options.door ?? WARM_DOOR, model, patch);
+    await snapshotSession(root, session, options.door, model, patch);
     return;
   }
   await snapshotTrace(root, session, { adapter: options.adapter, changed: patch, model });
@@ -1280,10 +1295,14 @@ export const WARM_UP = (root: string, language?: string): boolean => {
   }
 };
 
+
 /** The refresh the command line starts: this checkout's query structure, warm-only so a refresh never starts a language server, which records the reading it takes. */
-export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
-  refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure", "--warm-only"], fingerprint, Date.now, structureRefreshSlot(root, () => recordedServers(root)));
-};
+// Settles once the refresh's mark is written, so the start that awaits it can say one is under way.
+export const STRUCTURE_REFRESH = (root: string, fingerprint: string): Promise<unknown> =>
+  import("../enforcement/server.ts").then(
+    ({ recordedServers }) => refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure", "--warm-only"], fingerprint, Date.now, structureRefreshSlot(root, () => recordedServers(root))),
+    () => false,
+  );
 
 /**
  * The snapshot the command line starts at a stop: this checkout's economy
@@ -1293,7 +1312,7 @@ export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
  */
 export const ECONOMY_SNAPSHOT = (root: string, session: string, fingerprint: string): void => {
   if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
-  snapshotInBackground(root, session, fingerprint, [process.execPath, ...cliArgs(OWN_CLI, "economy", "--snapshot", session)]);
+  void snapshotInBackground(root, session, fingerprint, [process.execPath, ...cliArgs(OWN_CLI, "economy", "--snapshot", session)]).catch(() => false);
 };
 
 /** The mirror refresh the command line starts: this checkout's query mirrors --refresh, which reads only when the kept reading is of another commit. */
@@ -1305,6 +1324,8 @@ export const MIRROR_REFRESH = (root: string): void => {
 export async function gapStopText(root: string, input: HookInput, changed: readonly string[]): Promise<string> {
   if (changed.length === 0 || !mayHaveGaps(root)) return "";
   try {
+    const { currentGaps, declaredThisSession, regulateGapText, sessionGaps } = await import("../readings/scope/gaps.ts");
+    const { loadSpec } = await import("../readings/scope/build.ts");
     const session = sessionOf(input);
     const model = loadedSpecModel(root);
     const now = currentGaps(root, undefined, model);
@@ -1320,6 +1341,7 @@ export async function gapStopText(root: string, input: HookInput, changed: reado
 /** Regulate's coverage line: the first-ranked undeclared entrance in the files this session changed, advisory, or nothing. */
 export async function undeclaredStopText(root: string, changed: readonly string[]): Promise<string> {
   if (changed.length === 0) return "";
+  const { rankNow, regulateUndeclaredText, undeclaredNow } = await import("../readings/scope/undeclared.ts");
   return regulateUndeclaredText(changed, undeclaredNow(root), await cliName(root), (candidates, detected) => rankNow(root, candidates, detected));
 }
 
@@ -1441,9 +1463,10 @@ function eventProject(event: HookEvent, input: HookInput, base: string, cwd: str
  * model this event already read: a start and a stop, so a mirror declared or
  * a closure grown by a change no hook saw is watched from then on.
  */
-function keepMirrorsFromModel(root: string): void {
+async function keepMirrorsFromModel(root: string): Promise<void> {
   const model = specModelOrNull(root);
   if ("error" in model) return;
+  const { keepMirrorIndex } = await import("./mirrors.ts");
   try {
     keepMirrorIndex(root, model.components.flatMap((c) => c.mirrors ?? []));
   } catch {
@@ -1541,9 +1564,11 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     const session = sessionOf(input);
     if (session === undefined || oriented(place.root, session)) return result;
     const root = place.root;
-    const reading = await keptReading(root, await loadProjectLexicons(root));
+    const vocabulary = await startVocabulary(root);
+    const reading = vocabulary.reading;
     const gaps = await gapReading(root);
     const start = await startReading(root, input, reading, gaps);
+    const { saveSessionGaps } = await import("../readings/scope/gaps.ts");
     const text = start.text;
     const answered = (result.stdout.trim() === "" ? {} : JSON.parse(result.stdout)) as { hookSpecificOutput?: { additionalContext?: string } };
     const before = answered.hookSpecificOutput?.additionalContext;
@@ -1553,7 +1578,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       result.commit?.();
       keepStateFiles(root);
       openFeed(root, session);
-      saveBaseline(root, session, reading);
+      vocabulary.keepBaseline(session);
       keepPlaced(root, session, start.journal);
       const found = gaps.now ?? gaps.last;
       if (found !== undefined) saveSessionGaps(root, session, found);
@@ -1574,18 +1599,20 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     switch (event) {
       case "SessionStart":
       case "SubagentStart": {
-        const reading=await keptReading(root, await loadProjectLexicons(root));
+        const vocabulary = await startVocabulary(root);
+        const reading = vocabulary.reading;
         // Only a session start waits, and only for a refresh of this tree that is nearly done; a subagent starts at once.
         let gaps = await gapReading(root, event === "SessionStart" ? { waitMs: options.startWaitMs ?? START_WAIT_MS } : {});
         // A stale or absent reading starts one in the background (a no-op while one of this tree runs), then orient reads the last one, labeled.
         // Only a session start: a subagent inherits the session's reading, and one refresh per tree is enough.
         if (event === "SessionStart" && gaps.now === undefined && gaps.fingerprint !== undefined) {
-          options.refresh?.(root, gaps.fingerprint);
+          await options.refresh?.(root, gaps.fingerprint);
           gaps = { ...gaps, refreshing: refreshUnderWay(root) !== undefined };
         }
         const start = await startReading(root, input, reading, gaps);
+        const { saveSessionGaps } = await import("../readings/scope/gaps.ts");
         const context = await voiced(root, input, start.text, voice);
-        keepMirrorsFromModel(root);
+        await keepMirrorsFromModel(root);
         const session = sessionOf(input);
         if (session !== undefined) openFeed(root, session);
         // A subagent's start is kept so its stop can find what it wrote under the coordinator's session.
@@ -1595,7 +1622,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const commit = (): void => {
           // A project that adopted an earlier release gets the attributes file its records merge by at its first session after the upgrade.
           if (event === "SessionStart") keepStateFiles(root);
-          saveBaseline(root, session!, reading);
+          vocabulary.keepBaseline(session!);
           // The decisions that name a part, kept for this session's edits to be told before they land (carry-over.ts).
           keepPlaced(root, session!, start.journal);
           // A project nested below the settings is oriented once per session; this start was it.
@@ -1633,16 +1660,17 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         }
         const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host, startedAt: began }) : "";
         // A hand list declared as a mirror, read again only when this edit wrote a file it watches: one lookup otherwise.
-        const mirror = event === "PostToolUse" ? mirrorAlarm(root, written, session) : { text: "", commit: () => {} };
+        const mirror = event === "PostToolUse" && written.length > 0 ? (await import("./mirrors.ts")).mirrorAlarm(root, written, session) : { text: "", commit: () => {} };
         // A spec or practice file this edit wrote is parsed again, alone, and its problems said now: never the whole model at an edit.
-        const specAtEdit = event === "PostToolUse" ? specAlarm(root, written, session, await cliName(root)) : { text: "", commit: () => {} };
+        const specAtEdit = event === "PostToolUse" && written.length > 0 ? (await import("./spec-at-edit.ts")).specAlarm(root, written, session, await cliName(root)) : { text: "", commit: () => {} };
         // The full reading walks the whole corpus (seconds on a real project), so it runs only at a prompt when the tree moved since this
         // session's last reading, and it keeps the vocabulary state an edit reads (vocabulary-state.ts). An edit reads the files it wrote
         // against that state, never the corpus; with no state valid for this code and lexicon, it takes the full reading once, which keeps one.
         // A write no command line shows is read at the stop, which always reads in full.
         const tree = event === "UserPromptSubmit" && session ? await treeKey(root) : undefined;
-        const baseline = session !== undefined && existsSync(baselinePath(root, session));
-        let reading: Coverage | undefined;
+        // A tool use that wrote nothing reads no vocabulary, so it loads none of the modules that do.
+        const lexiconCli = event === "UserPromptSubmit" || written.length > 0 ? await import("./lexicon-cli.ts") : undefined;
+        const baseline = session !== undefined && lexiconCli !== undefined && existsSync(lexiconCli.baselinePath(root, session));
         // What this event says: a sense at risk, and at a prompt the terms that came to recur without a definition since the last stop.
         let changes: { term: string; component: string; evidence: string; state: string; reason: string }[] = [];
         // The terms edits held for the stop that no stop named: a session that never stopped cleanly is told them at its next prompt.
@@ -1650,6 +1678,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         let keep = (): void => {};
         let vocabularyNote = "";
         if (baseline && event === "PostToolUse" && written.length > 0) {
+          const { coverageChanges, heldCandidates, holdCandidates, priorBaseline, saveBaseline } = lexiconCli;
+          const { currentReading, editVocabulary, keptReading } = await import("./vocabulary-state.ts");
           const layers = await loadProjectLexicons(root);
           const prior = priorBaseline(root, session!);
           // The kept vocabulary is an optimization: anything that keeps it from answering falls back to the full reading, which says why.
@@ -1667,25 +1697,30 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
             if (changes.length === 0) edited.keep();
             else keep = edited.keep;
           } else {
-            if (edited.unavailable !== undefined) vocabularyNote = `Lexicon: read in full at this edit: ${edited.unavailable}.`;
-            reading = await keptReading(root, layers);
-            const found = coverageChanges(reading, prior);
+            const treeMoved = "treeMoved" in edited && edited.treeMoved === true;
+            if (edited.unavailable !== undefined) vocabularyNote = `Lexicon: ${treeMoved ? "read again" : "read in full"} at this edit: ${edited.unavailable}.`;
+            const full = treeMoved ? await currentReading(root, layers) : await keptReading(root, layers);
+            const found = coverageChanges(full, prior);
             changes = found.filter((c) => c.state !== "unresolved");
             holdCandidates(root, session!, found.filter((c) => c.state === "unresolved").map((c) => c.term));
-            if (changes.length === 0) saveBaseline(root, session!, reading);
+            keep = () => saveBaseline(root, session!, full);
+            if (changes.length === 0) keep();
           }
         } else if (baseline && event === "UserPromptSubmit") {
+          const { coverageChanges, introducedCandidates, pendingCandidates, priorBaseline, saveBaseline } = lexiconCli;
+          const { currentReading } = await import("./vocabulary-state.ts");
           // A few names, read apart from the baseline: a prompt over an unchanged tree stays as cheap as it was.
           const held = pendingCandidates(root, session!);
           pending = held.terms;
           if (held.unreadable !== undefined) vocabularyNote = `Lexicon: the terms this session's edits held for the stop could not be read (${held.unreadable}); ${await cliName(root)} lexicon coverage names what recurs without a definition.`;
           if (tree === undefined || tree !== lastTreeKey(root, session!)) {
             const prior = priorBaseline(root, session!);
-            reading = await keptReading(root, await loadProjectLexicons(root));
+            const full = await currentReading(root, await loadProjectLexicons(root));
             if (tree !== undefined) keepTreeKey(root, session!, tree);
-            changes = coverageChanges(reading, prior);
+            keep = () => saveBaseline(root, session!, full);
+            changes = coverageChanges(full, prior);
             // A held term the session has since declared or stopped repeating is owed no more.
-            const owed = new Set(introducedCandidates(reading, prior));
+            const owed = new Set(introducedCandidates(full, prior));
             pending = pending.filter((term) => owed.has(term));
           }
         }
@@ -1701,13 +1736,13 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
         // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
         const delivered = voice.override === undefined && (feed.text !== "" || mirror.text !== "" || specAtEdit.text !== "" || changes.length > 0 || pending.length > 0 || lastStop !== "");
-        const commit=()=> { if(feed.text) feed.commit(); if(mirror.text) mirror.commit(); if(specAtEdit.text) specAtEdit.commit(); if(changes.length && session) { if (reading) saveBaseline(root,session,reading); else keep(); } if(pending.length && session) deliverCandidates(root,session,pending); if(lastStop && session) dropCarry(root,session); };
+        const commit=()=> { if(feed.text) feed.commit(); if(mirror.text) mirror.commit(); if(specAtEdit.text) specAtEdit.commit(); if(changes.length && session) keep(); if(pending.length && session) lexiconCli?.deliverCandidates(root,session,pending); if(lastStop && session) dropCarry(root,session); };
         return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
       }
       case "Stop":
       case "SubagentStop": {
         // The tree this session leaves is the one the next starts on: read it now, in the background, never waited on (df-84db9e4f).
-        if (event === "Stop") refreshAtStop(root, options);
+        if (event === "Stop") await refreshAtStop(root, options);
         const changed = await changedFiles(root);
         const report = await checkChanged(root, changed.files);
         const session=sessionOf(input);
@@ -1727,8 +1762,10 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         if (deferredText !== "") eventModels?.delete(root);
         const walls = unableWalls(root, input);
         const spec = specStopText(root, changed.files, walls);
-        const lexicon = lexiconStopText(report, walls);
+        const lexicon = await lexiconStopText(report, walls);
         const workText = workStopText(root, input);
+        const { baselinePath, deliverCandidates, priorBaseline } = await import("./lexicon-cli.ts");
+        const { currentReading } = await import("./vocabulary-state.ts");
         const reading=session && existsSync(baselinePath(root,session)) ? await currentReading(root, await loadProjectLexicons(root)) : undefined;
         const coverage=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : { text: "", named: [] };
         const coverageText=coverage.text;
@@ -1739,7 +1776,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const gapText = await gapStopText(root, input, changed.files);
         const undeclaredText = await undeclaredStopText(root, changed.files);
         const heldModel = specModelOrNull(root);
-        keepMirrorsFromModel(root);
+        await keepMirrorsFromModel(root);
         const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input), "error" in heldModel ? undefined : heldModel);
         const economyText = economyStopText(snapshot, fingerprint);
         const latencyText = hookLatencyStopText(root, session);
