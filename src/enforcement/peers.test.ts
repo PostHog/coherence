@@ -132,7 +132,7 @@ test("the config's peers are refused unless each names its repository, a relativ
   assert.deepEqual(readPeers("/p", undefined, "c.json"), []);
   const refused: [unknown, RegExp][] = [
     [["hoglake"], /maps each peer's name/],
-    [{ HogLake: { repository: "a/b", checkout: "../b" } }, /lower case letters/],
+    [{ HogLake: { repository: "a/b", checkout: "../b" } }, /lowercase letters, digits and hyphens/],
     [{ hoglake: { repository: "hoglake", checkout: "../b" } }, /repository is <owner>\/<name>/],
     [{ hoglake: { repository: "a/b", checkout: "/abs/b" } }, /checkout is a folder relative/],
     [{ hoglake: { repository: "a/b", checkout: "../b", env: "lower" } }, /env names an environment variable/],

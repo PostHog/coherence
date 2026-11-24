@@ -14,6 +14,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileS
 import { dirname, join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONFIG_FILE } from "../enforcement/config.ts";
+import { CONFIG_NAME } from "../enforcement/config-name.ts";
 import { MANIFEST } from "./plugin.ts";
 import { PACKAGE_SPECIFIER } from "./registry.ts";
 import { moduleSpecifiers } from "./specifiers.ts";
@@ -130,7 +131,7 @@ function valueEnd(text: string, start: number): number {
 
 export function ejectPlugin(root: string, name: string, to?: string): Ejected {
   const source = join(PLUGIN_SOURCES, name);
-  if (!/^[a-z][a-z0-9-]*$/.test(name) || !existsSync(join(source, MANIFEST))) {
+  if (!CONFIG_NAME.test(name) || !existsSync(join(source, MANIFEST))) {
     const bundled = existsSync(PLUGIN_SOURCES) ? readdirSync(PLUGIN_SOURCES).filter((n) => existsSync(join(PLUGIN_SOURCES, n, MANIFEST))) : [];
     throw new EjectError(`plugin eject: no bundled plugin is named ${JSON.stringify(name)}; the bundled plugins are ${bundled.join(", ")}`);
   }

@@ -24,6 +24,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "../lifecycle/work-meter.ts";
+import { CONFIG_NAME, CONFIG_NAME_FORM } from "./config-name.ts";
 
 export interface Peer {
   /** The name a bullet's peer: line uses. */
@@ -55,7 +56,6 @@ export interface PeerReading {
   blob: string;
 }
 
-const NAME = /^[a-z][a-z0-9-]*$/;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const ENV = /^[A-Z_][A-Z0-9_]*$/;
 
@@ -71,7 +71,7 @@ export function readPeers(root: string, value: unknown, path: string): Peer[] {
   const peers: Peer[] = [];
   const envs = new Map<string, string>();
   for (const [name, raw] of Object.entries(value as Record<string, unknown>)) {
-    if (!NAME.test(name)) throw new Error(`${path}: peers.${name}: a peer's name is lower case letters, digits and dashes, starting with a letter`);
+    if (!CONFIG_NAME.test(name)) throw new Error(`${path}: peers.${name}: a peer's name is ${CONFIG_NAME_FORM}`);
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(`${path}: peers.${name} is { "repository": "<owner/name>", "checkout": "<folder relative to the root>" }`);
     const record = raw as Record<string, unknown>;
     const repository = record["repository"];
@@ -90,9 +90,12 @@ export function readPeers(root: string, value: unknown, path: string): Peer[] {
   return peers;
 }
 
+/** A peer: line's value, `<name> <path>`: the peer's name, as the config keys it, then the path. */
+const PEER_FILE = new RegExp(`^(${CONFIG_NAME.source.slice(1, -1)})\\s+(\\S.*)$`);
+
 /** A peer: line's value, `<name> <path>`, or undefined when it is not that. */
 export function parsePeerFile(value: string): { peer: string; path: string } | undefined {
-  const match = /^([a-z][a-z0-9-]*)\s+(\S.*)$/.exec(value.trim());
+  const match = PEER_FILE.exec(value.trim());
   if (match === null) return undefined;
   const path = match[2]!.trim();
   if (isAbsolute(path) || path.split("/").includes("..")) return undefined;

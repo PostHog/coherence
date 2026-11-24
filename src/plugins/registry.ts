@@ -22,6 +22,7 @@ import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { createRequire, registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { CONFIG_NAME } from "../enforcement/config-name.ts";
 import { landsWithin } from "./within.ts";
 import { DERIVED_SLOTS, MANIFEST, OLDEST_PLUGIN_API, PLUGIN_API, SYNTAX_SLOTS, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
 
@@ -156,7 +157,7 @@ function handReadersRefused(who: string, name: string, raw: Record<string, unkno
 
 /** Whether a plugin by path carries a bundled plugin's name: a copy eject made, since eject keeps the manifest's name and the config's key must match it. */
 function bundledEjected(name: string): boolean {
-  return /^[a-z][a-z0-9-]*$/.test(name) && existsSync(join(BUNDLED_DIR, name, MANIFEST));
+  return CONFIG_NAME.test(name) && existsSync(join(BUNDLED_DIR, name, MANIFEST));
 }
 
 /**
