@@ -22,7 +22,20 @@ const PACKAGE_JSON = join(CODE_DIR, "..", "package.json");
  */
 const PLUGINS_DIR = join(CODE_DIR, "..", "plugins");
 const BUNDLED_OUTSIDE = !existsSync(join(CODE_DIR, "bundled")) && existsSync(PLUGINS_DIR);
-const CODE_FILE = /\.(ts|mts|cts|js|mjs|cjs|json)$/;
+/**
+ * A JavaScript or TypeScript module, JSX aside: what Coherence's own code is
+ * written in (its sources, the compiled modules), and so what the mirror
+ * reading parses of a project with the TypeScript compiler (mirrors.ts
+ * imports it).
+ */
+export const MODULE_FILE = /\.(ts|mts|cts|js|mjs|cjs)$/;
+/**
+ * A file of Coherence's own code: a module, or JSON (the plugins' manifests,
+ * the data a parse reads), which changes what the code does as much as a
+ * module does. The JSON is this set's alone, on purpose: the mirror reading
+ * parses modules and reads the one JSON file it needs, the config, apart.
+ */
+const isCodeFile = (name: string): boolean => MODULE_FILE.test(name) || name.endsWith(".json");
 
 /**
  * Mixed into the fingerprint when set: a test's way to make two processes
@@ -35,7 +48,7 @@ function codeFiles(dir: string, into: string[]): string[] {
     if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) codeFiles(path, into);
-    else if (entry.isFile() && CODE_FILE.test(entry.name) && !entry.name.includes(".test.")) into.push(path);
+    else if (entry.isFile() && isCodeFile(entry.name) && !entry.name.includes(".test.")) into.push(path);
   }
   return into;
 }
