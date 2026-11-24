@@ -54,7 +54,7 @@ import {
 import type { ServerLocation } from "../../src/plugins/api.ts";
 import { locateRustAnalyzer } from "./rust-analyzer.ts";
 import manifest from "./plugin.json" with { type: "json" };
-import { JsonRpcClient, RpcError } from "../../src/plugins/api.ts";
+import { COHERENCE_ENFORCER, JsonRpcClient, RpcError } from "../../src/plugins/api.ts";
 import { hintedFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/plugins/api.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control when the server is quiescent. */
@@ -75,7 +75,6 @@ const SERVER_BIN = "rust-analyzer";
 const QUIESCENCE_TIMEOUT_MS = 10 * 60 * 1000;
 /** How long an overlay change is given to flip the server out of quiescence before it is taken as already applied. */
 const SETTLE_MS = 750;
-const COHERENCE_ENFORCER = "Coherence's check at the edit and in CI";
 const COMPILER = "the compiler (rustc)";
 
 /**

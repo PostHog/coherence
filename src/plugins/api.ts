@@ -21,6 +21,7 @@ export {
   statementStartLine,
   withinFolder,
   type AdapterBounds,
+  COHERENCE_ENFORCER,
   type CheckerBoundary,
   type Definition,
   type Ladder,

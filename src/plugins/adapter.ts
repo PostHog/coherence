@@ -8,7 +8,7 @@
  * chokepoint it was asked about reads not run, never a pass.
  */
 
-import type { Definition, LanguageAdapter, Ladder, Occasion, Refutation, ReferenceSite, Resolved, ResolveHint, Visibility } from "../adapters/adapter.ts";
+import { COHERENCE_ENFORCER, type Definition, type LanguageAdapter, type Ladder, type Occasion, type Refutation, type ReferenceSite, type Resolved, type ResolveHint, type Visibility } from "../adapters/adapter.ts";
 import type { LoadedPlugin, PluginTag } from "./plugin.ts";
 import { tagOf } from "./plugin.ts";
 import { moduleSyncOf } from "./registry.ts";
@@ -18,7 +18,7 @@ function referenceLadder(plugin: LoadedPlugin, language: string): Ladder {
   return {
     top: "reference-choked",
     because: `plugin ${plugin.name} declares no visibility rules for ${language}, so no compiler or checker is credited`,
-    rungs: [{ grade: "reference-choked", enforcer: "Coherence's check at the edit and in CI", fact: `plugin ${plugin.name}'s adapter reports every reference, and every one in the project is inside the chokepoint` }],
+    rungs: [{ grade: "reference-choked", enforcer: COHERENCE_ENFORCER, fact: `plugin ${plugin.name}'s adapter reports every reference, and every one in the project is inside the chokepoint` }],
   };
 }
 
