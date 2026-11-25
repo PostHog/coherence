@@ -796,7 +796,7 @@ function readCode(ctx: Context, file: string, text: string): void {
         const elementType = elementTypeOf(ts, node);
         add({ line: lineOf(node), name: declName(ts, node), form: isSet ? "set" : "array", members: strings as string[], origin: `${file}:${node.pos}`, checked: false, ...(elementType === undefined ? {} : { elementType }) });
         // A list bound at module scope is a predicate too, by membership: a chain of === tests over its members is the same rule.
-        if (atModuleScope(ts, node)) ctx.predicates.push({ file, line: lineOf(node), form: "set", text: (strings as string[]).join(", "), members: strings as string[], bound: declName(ts, node) });
+        if (atModuleScope(ts, node)) ctx.predicates.push({ file, line: lineOf(node), form: "set", text: (strings as string[]).join(", "), members: strings as string[], bound: declName(ts, node), topLevel: true, exported: exportedNames.has(declName(ts, node)) });
       }
       // Columns: an array of tuples, or of records, holding a string in the same place.
       const rows = node.elements;
@@ -1336,7 +1336,7 @@ function adviceIndexOf(a: { commit: string; ctx: Context; testFolders: readonly 
   const regexFiles = new Map<string, string[]>();
   for (const p of ctx.predicates) if (p.form === "regex") regexFiles.set(p.text, [...(regexFiles.get(p.text) ?? []), p.file]);
   for (const p of ctx.predicates) {
-    if (p.form !== "regex" || p.topLevel !== true || p.bound === undefined || p.test === true || !live(p.file)) continue;
+    if ((p.form !== "regex" && p.form !== "set") || p.topLevel !== true || p.bound === undefined || p.test === true || !live(p.file)) continue;
     const pred = predicateOf(p);
     if (pred === undefined || pred.atoms.length === 0 || rarity.shared(pred.atoms, 2) < RARITY_MIN) continue;
     rules.push({ site: p, atoms: pred.atoms, name: p.bound, file: p.file, line: p.line, exported: p.exported === true, copies: [...new Set((regexFiles.get(p.text) ?? []).filter((f) => f !== p.file))] });

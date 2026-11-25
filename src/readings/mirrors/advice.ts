@@ -167,6 +167,7 @@ const QUOTED = /(["'`])((?:\\.|(?!\1)[^\\\n])*)\1/g;
 const LIST = /\[\s*((?:(["'])(?:\\.|(?!\2)[^\\\n])*\2\s*,\s*){2,}(["'])(?:\\.|(?!\3)[^\\\n])*\3\s*,?)\s*\]/g;
 const REGEX_LITERAL = /(?:^|[=(,:!&|?{;[]|return|\n)\s*\/((?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n[])+)\/([dgimsuy]*)/g;
 const CHAIN_LEAF = /([\w$.]+)\.(startsWith|endsWith|includes)\(\s*(["'])((?:\\.|(?!\3)[^\\\n])*)\3\s*\)/g;
+const EQUALS_LEAF = /([\w$.]+)\s*(===|!==)\s*(["'])((?:\\.|(?!\3)[^\\\n])*)\3/g;
 
 /** The advice for one write: what it copies, in the classes the advice speaks for, each family once. */
 export function adviceFor(loaded: Loaded, file: string, text: string, existing = ""): Advice[] {
@@ -246,6 +247,7 @@ function chainsIn(text: string): { join: "or" | "and"; leaves: ChainLeaf[] }[] {
         const negated = before.endsWith("!");
         byReceiver.set(m[1]!, [...(byReceiver.get(m[1]!) ?? []), { op: m[2] as ChainLeaf["op"], value: m[4]!, negated }]);
       }
+      for (const m of line.matchAll(EQUALS_LEAF)) byReceiver.set(m[1]!, [...(byReceiver.get(m[1]!) ?? []), { op: "equals", value: m[4]!, negated: m[2] === "!==" }]);
       for (const leaves of byReceiver.values()) if (leaves.length >= 2) out.push({ join, leaves });
     }
   }

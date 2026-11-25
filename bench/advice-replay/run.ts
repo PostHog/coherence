@@ -157,7 +157,9 @@ const writes = values.transcripts === undefined ? [] : transcriptWrites(values.t
 for (const c of cases) {
   const parent = git(repo, "rev-parse", `${c.birth}^`).trim();
   const tree = treeAt(parent);
-  const match = writes.find((w) => relativeOf(w.path) === c.file && textOf(w).includes(c.copy.trim()));
+  // The write that made the copy: one of this file, holding it, made within two days before the birth commit.
+  const born = Date.parse(git(repo, "show", "-s", "--format=%cI", c.birth).trim());
+  const match = writes.find((w) => relativeOf(w.path) === c.file && textOf(w).includes(c.copy.trim()) && Date.parse(w.at) <= born + 3_600_000 && Date.parse(w.at) >= born - 2 * 86_400_000);
   let source: string;
   let input: Record<string, unknown>;
   if (match !== undefined) {
