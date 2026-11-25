@@ -325,11 +325,12 @@ test("a value written in two files is a restatement when what its copies share i
     assert.equal(valueOf(reading, ".zqmts")?.kind, "constant", "a short value counts when it is rare");
     assert.deepEqual(reading.restatements.map((r) => r.kind).sort(), ["constant", "constant", "drift", "literal", "rule"], "and nothing else");
     for (const left of ["the-long-mode-name", "some prose that is not a name", "https://example.com/one/two", "only-a-test-repeats-this", "name", "WWW-Authenticate", "Internal Server Error", "ls-files", "^[0-9a-f]{8}$"]) assert.equal(valueOf(reading, left), undefined, `${left} is left out`);
+    assert.deepEqual(reading.excluded.map((r) => [r.value, r.by?.entry]).sort(), [["Internal Server Error", "HTTP"], ["WWW-Authenticate", "HTTP"], ["https://example.com/one/two", "a URL, MIME type or protocol method"], ["ls-files", "git"]], "another party's values are counted as excluded, by their owner");
 
     let out = "";
     const io = { out: (text: string): void => { out += text; }, err: (text: string): void => { out += text; } };
     assert.equal(await mirrorsCommand(root, ["--no-history"], io), 0);
-    assert.match(out, /^Restatements: 5 unheld, 0 excluded by config, 0 excluded as derived, 0 held, 0 held by a test not yet refuted, 0 declared different \(one value written in two or more files;/m, "the default answer says the counts");
+    assert.match(out, /^Restatements: 5 unheld, 0 excluded by config, 4 excluded as derived \(owned: 4\), 0 held, 0 held by a test not yet refuted, 0 declared different \(one value written in two or more files;/m, "the default answer says the counts");
     out = "";
     assert.equal(await mirrorsCommand(root, ["--no-history", "--restatements"], io), 0);
     assert.match(out, /1\. drift {2}3 members: alpha, beta, gamma\n {5}src\/a\/kinds\.ts:1 KINDS\n {5}src\/b\/use\.ts:1 SOME_KINDS\n {5}src\/b\/use\.ts:1 lacks delta\n {5}source: /);
@@ -365,15 +366,15 @@ test("a copy held by an import of the list's name, a type or a declared mirror i
     "src/a/value.ts": 'export const A_PATTERN = "held-by-a-test-value";\n',
     "src/b/value.ts": 'export const B_PATTERN = "held-by-a-test-value";\n',
     "src/b/value.test.ts": 'import { B_PATTERN } from "./value.ts";\nexport const same = B_PATTERN === "held-by-a-test-value";\n',
-    "src/a/loose.ts": 'export const SHAPES = ["circle", "square", "triangle"];\nexport const LOOSE = "nothing-holds-this-value";\n',
-    "src/b/loose.ts": 'export const MY_SHAPES = ["circle", "square", "triangle"];\nexport const LOOSE = "nothing-holds-this-value";\n',
+    "src/a/loose.ts": 'export const SHAPES = ["zqcircle", "zqsquare", "zqtriangle"];\nexport const LOOSE = "nothing-holds-this-value";\n',
+    "src/b/loose.ts": 'export const MY_SHAPES = ["zqcircle", "zqsquare", "zqtriangle"];\nexport const LOOSE = "nothing-holds-this-value";\n',
     "src/a/home.ts": 'export const PHASES = ["sowing", "growing", "reaping"];\n',
     "src/b/copy.ts": 'export const MY_PHASES = ["sowing", "growing", "reaping"];\n',
     "src/a/home.test.ts": 'import { PHASES } from "./home.ts";\nexport const three = PHASES.length === 3;\n',
   });
   try {
     const reading = await readMirrors(root, { history: false });
-    assert.deepEqual(reading.restatements.map((r) => r.value).sort(), ["circle, square, triangle", "nothing-holds-this-value", "sowing, growing, reaping"], "only what nothing holds is restated, and a test that reads one side alone holds nothing");
+    assert.deepEqual(reading.restatements.map((r) => r.value).sort(), ["nothing-holds-this-value", "sowing, growing, reaping", "zqcircle, zqsquare, zqtriangle"], "only what nothing holds is restated, and a test that reads one side alone holds nothing");
     assert.equal(reading.held, 2, "the type import and the declared mirror each hold one");
     assert.deepEqual(reading.unrefuted.map((r) => r.value).sort(), ["held-by-a-test-value", "small, medium, large"], "a copy a test names is held, not yet refuted, until the test has gone red with the copy changed");
     assert.deepEqual(reading.unrefuted.map((r) => r.hold?.test).sort(), ["src/b/sizes.test.ts", "src/b/value.test.ts"]);

@@ -386,12 +386,16 @@ test("a copy in a generated file, a numbered migration or an example app is left
 
 /* ------------------------------------------------------- families */
 
-test("one family counted once: a list, the rule written over its members and a subset of it in the same files are listed under the strongest, never counted again", async () => {
+test("one family counted once: a list at any number of sites, the rule written over its members and a subset of it in the same files are listed under the strongest, never counted again", async () => {
   const root = repositoryOf({
     "plugin/source.ts": 'export const KEYWORDS = ["zqfunc", "zqstruct", "zqclass", "zqactor", "zqenum"];\nexport const isDecl = (w: string): boolean => /\\b(?:zqfunc|zqstruct|zqclass|zqactor|zqenum)\\b/.test(w);\n',
     "plugin/entrances.ts": 'export const DECLS = ["zqfunc", "zqstruct", "zqclass", "zqactor"];\nexport const isDef = (w: string): boolean => /\\b(?:zqfunc|zqstruct|zqclass|zqactor|zqenum)\\b/.test(w);\n',
     "src/other.ts": 'export const OTHER = ["zqalpha", "zqbeta", "zqgamma"];\n',
     "src/again.ts": 'export const AGAIN = ["zqalpha", "zqbeta", "zqgamma"];\n',
+    "src/journal/store.ts": 'export const STDIO = ["zqpipe", "zqignore", "zqinherit"];\n',
+    "src/a/one.ts": 'export const A = ["zqpipe", "zqignore", "zqinherit"];\n',
+    "src/b/two.ts": 'export const B = ["zqpipe", "zqignore", "zqinherit"];\n',
+    "src/c/three.ts": 'export const C = ["zqpipe", "zqignore", "zqinherit"];\n',
   });
   try {
     const reading = await readMirrors(root, { history: false });
@@ -399,6 +403,9 @@ test("one family counted once: a list, the rule written over its members and a s
     assert.equal(family.length, 1, family.map((r) => `${r.kind} ${r.value}`).join("; "));
     assert.ok((family[0]!.forms ?? []).length >= 1, "its other forms are listed under it");
     assert.ok(valueOf(reading.restatements, "zqalpha, zqbeta, zqgamma") !== undefined, "another family in other files stays its own");
+    const stdio = reading.restatements.filter((r) => r.members?.includes("zqpipe"));
+    assert.equal(stdio.length, 1, "one list at four sites is one family on its sites, not three pairs");
+    assert.deepEqual(filesOf(stdio[0]), ["src/a/one.ts", "src/b/two.ts", "src/c/three.ts", "src/journal/store.ts"]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -409,6 +416,8 @@ test("one family counted once: a list, the rule written over its members and a s
 test("what another party names is not the project's fact: package names its package.json files name, CSS keywords and locale tags are left out, a list a pattern embeds among words of its own pairs only with the same words, and build configs rank last", async () => {
   const root = repositoryOf({
     "package.json": '{ "name": "zq-root", "dependencies": { "zq-left-pad": "1.0.0" } }\n',
+    "src/stdio-a.ts": 'export const STDIO = ["no-store", "no-cache", "force-cache"];\n',
+    "src/stdio-b.ts": 'export const STDIO = ["no-store", "no-cache", "force-cache"];\n',
     "src/a.ts": 'export const PKG = "zq-left-pad";\nexport const WRAP = "break-word";\nexport const LOCALE = "en-US";\nexport const ROUTE = /(^|\\/)zqapp\\/(.+\\/)?zqroute\\.(zqts|zqtsx|zqjs)$/;\nexport const KEPT = "zq-kept-value";\n',
     "src/b.ts": 'export const PKG = "zq-left-pad";\nexport const WRAP = "break-word";\nexport const LOCALE = "en-US";\nexport const EXTENSIONS = ["zqts", "zqtsx", "zqjs", "zqmjs"];\nexport const KEPT = "zq-kept-value";\n',
     "pkg-a/rollup.config.mjs": 'export default { extensions: ["zqone", "zqtwo", "zqthree"] };\nexport const ext = ["zqone", "zqtwo", "zqthree"];\n',
@@ -417,6 +426,7 @@ test("what another party names is not the project's fact: package names its pack
   try {
     const reading = await readMirrors(root, { history: false });
     for (const left of ["zq-left-pad", "break-word", "en-US"]) assert.equal(valueOf(reading.restatements, left), undefined, `${left} is another party's`);
+    assert.deepEqual(reading.excluded.filter((r) => r.by?.key === "owned").map((r) => [r.value, r.by?.entry]).sort(), [["break-word", "CSS"], ["en-US", "a locale tag"], ["no-store, no-cache, force-cache", "the platform's typings"], ["zq-left-pad", "the npm registry"]], "each is counted as excluded, by its owner");
     assert.ok(!reading.restatements.some((r) => r.members?.includes("zqtsx")), "the route pattern's extensions are the route's, not the list's");
     const last = reading.restatements[reading.restatements.length - 1];
     assert.equal(last?.buildConfig, true, reading.restatements.map((r) => r.value).join("; "));
@@ -425,3 +435,4 @@ test("what another party names is not the project's fact: package names its pack
     rmSync(root, { recursive: true, force: true });
   }
 });
+

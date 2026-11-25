@@ -138,10 +138,10 @@ export interface RestatementConfig {
 
 /** The config's keys, and the classes the reading derives itself: a generated file (its generator holds it), a migration (frozen on purpose), an example app (it states its own copy). */
 export type ConfigExclusionKey = keyof RestatementConfig;
-export type DerivedExclusionKey = "generated" | "migrations" | "examples";
+export type DerivedExclusionKey = "generated" | "migrations" | "examples" | "owned";
 export type ExclusionKey = ConfigExclusionKey | DerivedExclusionKey;
 export const EXCLUSION_KEYS: readonly ConfigExclusionKey[] = ["data", "scripts", "values"] as const satisfies readonly ConfigExclusionKey[];
-export const DERIVED_EXCLUSION_KEYS: readonly DerivedExclusionKey[] = ["generated", "migrations", "examples"] as const satisfies readonly DerivedExclusionKey[];
+export const DERIVED_EXCLUSION_KEYS: readonly DerivedExclusionKey[] = ["generated", "migrations", "examples", "owned"] as const satisfies readonly DerivedExclusionKey[];
 
 /** The config entry that excluded a restatement: its key, and the glob or pattern as the config writes it. */
 export interface Exclusion {
@@ -199,6 +199,8 @@ export interface Restatement {
   declared?: string;
   /** Every site is a build tool's config (rollup, jest, webpack…), where each package states its own: ranked last, never excluded. */
   buildConfig?: boolean;
+  /** A regular expression with no word or extension of its own (a camelCase split, a trailing-parentheses strip): ranked last within its standing. */
+  idiom?: boolean;
   /** The other forms of the same family (a list, its rule, its subset), listed under the strongest and counted once. */
   forms?: Pick<Restatement, "kind" | "value" | "sites">[];
 }

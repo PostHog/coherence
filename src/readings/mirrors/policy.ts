@@ -226,7 +226,7 @@ export function restatementCountsPhrase(reading: Counted): string {
 
 /** The count line: every count apart, and what each means. */
 export function restatementCountText(reading: Counted): string {
-  return `Restatements: ${restatementCountsPhrase(reading)} (one value written in two or more files; unheld is the count to lower, by a fix; excluded by config is what the config's restatements key names, and excluded as derived what the reading itself finds generated, a migration, or an example app; held is what an import, a type, a declared mirror or a test that went red holds; not yet refuted waits on query mirrors --witness; declared different is a comment at the copy). --restatements lists them.`;
+  return `Restatements: ${restatementCountsPhrase(reading)} (one value written in two or more files; unheld is the count to lower, by a fix; excluded by config is what the config's restatements key names, and excluded as derived what the reading itself finds generated, a migration, an example app, or another party's (owned); held is what an import, a type, a declared mirror or a test that went red holds; not yet refuted waits on query mirrors --witness; declared different is a comment at the copy). --restatements lists them.`;
 }
 
 /** A base and a head read under the same rules, and the base's count under earlier rules when one was kept: what the code changed, apart from what the rules changed. */

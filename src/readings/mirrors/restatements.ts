@@ -125,6 +125,8 @@ export interface RestatementInput {
   derived?: (file: string) => Exclusion | undefined;
   /** Every package name the project's package.json files name: the registry's vocabulary. */
   packages?: ReadonlySet<string>;
+  /** Every string the platform's typings write (TypeScript's library, @types/node): the platform's vocabulary. */
+  platform?: ReadonlySet<string>;
   /** Where history places the copies: 2 changed apart, 3 changed together, 4 never changed; none without history. */
   standingOf?: (needles: readonly string[], files: readonly string[]) => number;
 }
@@ -187,11 +189,23 @@ const CSS_VOCABULARY: ReadonlySet<string> = new Set([
   "row-reverse", "column-reverse", "wrap-reverse", "translate(-50%, -50%)", "100%", "100vh", "100vw", "auto", "inherit", "initial", "unset",
 ]);
 
-/** Whether another party owns the string: HTTP (a header name, a method, a status reason phrase), git (a subcommand, a file of its layout), ARIA (an aria- attribute), or HTML (a character reference). */
-export function ownedOutside(value: string, packages?: ReadonlySet<string>): boolean {
-  if (packages?.has(value) === true || /^[a-z]{2,3}(?:-[A-Z][a-z]{3})?-[A-Z]{2}$/.test(value) || CSS_VOCABULARY.has(value)) return true;
+/** The party that owns a string, when another does: HTTP (a header name, a method, a status reason phrase), git (a subcommand, a file of its layout), ARIA, HTML (a character reference), CSS, a locale tag, the npm registry (a package name a package.json names), the platform (a string the TypeScript library or @types/node typings write), or a URL, MIME type or protocol method; none for the project's own. */
+export function ownerOf(value: string, packages?: ReadonlySet<string>, platform?: ReadonlySet<string>): string | undefined {
+  if (packages?.has(value) === true) return "the npm registry";
+  if (/^[a-z]{2,3}(?:-[A-Z][a-z]{3})?-[A-Z]{2}$/.test(value)) return "a locale tag";
+  if (CSS_VOCABULARY.has(value)) return "CSS";
   const lower = value.toLowerCase();
-  return HTTP_VOCABULARY.has(lower) || GIT_VOCABULARY.has(lower) || /^aria-[a-z]+$/.test(lower) || /^&(?:[a-z]+|#\d+|#x[0-9a-f]+);$/.test(lower);
+  if (HTTP_VOCABULARY.has(lower)) return "HTTP";
+  if (GIT_VOCABULARY.has(lower)) return "git";
+  if (/^aria-[a-z]+$/.test(lower)) return "ARIA";
+  if (/^&(?:[a-z]+|#\d+|#x[0-9a-f]+);$/.test(lower)) return "HTML";
+  if (VOCABULARY.test(value)) return "a URL, MIME type or protocol method";
+  if (platform?.has(value) === true) return "the platform's typings";
+  return undefined;
+}
+
+export function ownedOutside(value: string, packages?: ReadonlySet<string>, platform?: ReadonlySet<string>): boolean {
+  return ownerOf(value, packages, platform) !== undefined;
 }
 
 /** Prose: four or more spaces between words. */
@@ -202,9 +216,9 @@ const VOCABULARY = /^(?:[a-z][a-z0-9+.-]*:\/\/|(?:https?|node|data|file|mailto):
 const EXTENSION = /^\.[a-z0-9]{1,6}$/;
 const IDENTIFIER = /^[A-Za-z_$][\w$]*/;
 
-/** Whether a value is excluded before any site is weighed: the compiler holds it, or another party defines it (a package name the project's package.json files name among them). */
-export function excludedValue(value: string, typed: ReadonlySet<string>, packages?: ReadonlySet<string>): boolean {
-  return typed.has(value) || VOCABULARY.test(value) || ownedOutside(value, packages);
+/** Whether a value is left out before any site is weighed: the compiler holds it (a member of a string-literal type), or another party defines it. */
+export function excludedValue(value: string, typed: ReadonlySet<string>, packages?: ReadonlySet<string>, platform?: ReadonlySet<string>): boolean {
+  return typed.has(value) || ownedOutside(value, packages, platform);
 }
 
 /** Utility types whose object is keyed by its members (`Record<Kind, …>`), never a record of fields. */
@@ -473,6 +487,7 @@ function leftAsItIs(by: Exclusion, files: readonly string[]): string {
   if (by.key === "data") return `left as it is: ${listed} ${files.length === 1 ? "is data" : "are data"} that restates the list on purpose (restatements.data ${by.entry})`;
   if (by.key === "generated") return `held by its generator: ${listed} ${files.length === 1 ? "is" : "are"} generated (${by.entry})`;
   if (by.key === "migrations") return `left as it is: ${listed} ${files.length === 1 ? "is a migration" : "are migrations"}, frozen on purpose, which must not follow (${by.entry})`;
+  if (by.key === "owned") return `left as it is: ${by.entry} owns it, not the project`;
   if (by.key === "examples") return `left as it is: ${listed} ${files.length === 1 ? "is an example app, which states" : "are example apps, which state"} its own copy (${by.entry})`;
   return `left as it is: the config names it deliberate shared vocabulary (restatements.values ${by.entry})`;
 }
@@ -499,6 +514,10 @@ interface Candidate {
   source?: string;
   /** What the witness pass alters at the copy, when it is not the value as written: a rule's longest word. */
   mutate?: string;
+  /** An exclusion the candidate carries from what it is, not where it is: a value another party owns. */
+  by?: Exclusion;
+  /** A regular expression with no word or extension of its own: an idiom, ranked last within its standing. */
+  idiom?: boolean;
 }
 
 /** The comment at a copy that declares it different on purpose: `// differs on purpose from <home>: <how its behavior differs>`. */
@@ -548,7 +567,7 @@ export function restatementsOf(input: RestatementInput): Restatements {
       return;
     }
     const live = files.filter((file) => fileExclusion(input, file) === undefined);
-    const by = valueExclusion(input, c.value) ?? (live.length < 2 ? fileExclusion(input, files.find((file) => !live.includes(file))!) : undefined);
+    const by = c.by ?? valueExclusion(input, c.value) ?? (live.length < 2 ? fileExclusion(input, files.find((file) => !live.includes(file))!) : undefined);
     if (by !== undefined) {
       excluded.push({ ...shape(c, files, leftAsItIs(by, by.key === "values" ? [] : files.filter((file) => fileExclusion(input, file)?.key === by.key))), by });
       return;
@@ -585,6 +604,7 @@ export function restatementsOf(input: RestatementInput): Restatements {
       standing,
       ...(crossPackage ? { crossPackage } : {}),
       ...(sites.every((s) => BUILD_CONFIG.test(s.file)) ? { buildConfig: true } : {}),
+      ...(c.idiom === true ? { idiom: true } : {}),
     };
   };
 
@@ -609,7 +629,10 @@ export function restatementsOf(input: RestatementInput): Restatements {
     if (seen.has(key)) continue;
     seen.add(key);
     // One type holds both objects' keys; and a set of HTTP's own names is the protocol's, not the project's.
-    if (typedRecord(input, f) || f.shared.every((m) => ownedOutside(m, input.packages))) continue;
+    if (typedRecord(input, f)) continue;
+    const owners = [...new Set(f.shared.map((m) => ownerOf(m, input.packages, input.platform)))];
+    // A list every member of which another party owns is theirs: the platform's stdio names, a protocol's methods.
+    const owned = owners.every((o) => o !== undefined) ? owners.join(" and ") : undefined;
     // A list a pattern embeds among words of its own (a route's path, a specifier's stem) is that pattern's, not the list's: only the same words around it make one fact.
     if ((a.context ?? []).join("|") !== (b.context ?? []).join("|")) continue;
     // A part typed against the whole's member type is held by the compiler: a member the whole lacks is a compile error.
@@ -638,6 +661,7 @@ export function restatementsOf(input: RestatementInput): Restatements {
       preferred: kind === "subset" ? [whole.file] : [a, b].filter((s) => listName(s) !== undefined).map((s) => s.file),
       needles: f.shared,
       ...(hold === undefined ? {} : { hold }),
+      ...(owned === undefined ? {} : { by: { key: "owned" as const, entry: owned } }),
       ...(kind === "subset" && wholeName !== undefined ? { source: `type ${listName(part) ?? "the part"} against ${wholeName}'s members (${whole.file}:${whole.line}), so the compiler holds it to them${odd === undefined ? "" : `; it holds ${odd.member}, which ${wholeName} lacks`}: ` } : {}),
     });
   }
@@ -704,7 +728,8 @@ export function restatementsOf(input: RestatementInput): Restatements {
   /* Values: one literal written in two or more files. */
   for (const [value, sites] of input.values) {
     const files = [...new Set(sites.map((s) => s.file))];
-    if (files.length < 2 || excludedValue(value, input.typed, input.packages) || ruled.has(value)) continue;
+    if (files.length < 2 || input.typed.has(value) || ruled.has(value)) continue;
+    const owner = ownerOf(value, input.packages, input.platform);
     // A value must say enough to be one fact: "id" in forty files is the language's word, `PostInvocation` in two is the project's. A pattern says what its literal words say; its syntax says little.
     // Two of its copies are left out of its background: a pair never vouches for its own rarity, and a value written in forty files is still common.
     const bits = sites.some((s) => s.regex === true) ? patternBits(input.rarity, value, OWN) : input.rarity.value(value, OWN);
@@ -721,7 +746,8 @@ export function restatementsOf(input: RestatementInput): Restatements {
     const preferred = [...sites.filter((s) => s.exported && s.bound !== undefined), ...sites.filter((s) => s.bound !== undefined)].map((s) => s.file);
     const hold = valueHold(w, value, sites);
     // One regular expression written in two files is one rule written twice, whatever binds it.
-    weigh({ kind: sites.some((s) => s.regex === true) ? "rule" : boundFiles.size >= 2 ? "constant" : "literal", value, sites: shown, bits, preferred, needles: [value], ...(hold === undefined ? {} : { hold }) });
+    const idiom = sites.some((s) => s.regex === true) && !/[A-Za-z]{2}|\\\.[a-z]/.test(value.replace(/\\[a-zA-Z]|\[[^\]]*\]/g, ""));
+    weigh({ kind: sites.some((s) => s.regex === true) ? "rule" : boundFiles.size >= 2 ? "constant" : "literal", value, sites: shown, bits, preferred, needles: [value], ...(hold === undefined ? {} : { hold }), ...(owner === undefined ? {} : { by: { key: "owned" as const, entry: owner } }), ...(idiom ? { idiom } : {}) });
   }
 
   out.sort(byRank);
@@ -743,7 +769,22 @@ export function restatementsOf(input: RestatementInput): Restatements {
 /** The kinds whose value is a list of members, in one form or another: a family is made of these, never of single values. */
 const LIST_FORMS: ReadonlySet<RestatementKind> = new Set<RestatementKind>(["copy", "drift", "subset", "rule", "derivation"]);
 
-function families(ranked: readonly Restatement[]): Restatement[] {
+function families(input: readonly Restatement[]): Restatement[] {
+  // One value set at N sites is one family on its sites, not N-1 pairs: equal copies of the same members merge first, wherever they lie.
+  const ranked: Restatement[] = [];
+  const byMembers = new Map<string, Restatement>();
+  for (const r of input) {
+    const key = r.kind === "copy" && r.members !== undefined ? [...r.members].sort().join("\u0000") : undefined;
+    const into = key === undefined ? undefined : byMembers.get(key);
+    if (into === undefined) {
+      const copy = { ...r, sites: [...r.sites] };
+      ranked.push(copy);
+      if (key !== undefined) byMembers.set(key, copy);
+      continue;
+    }
+    for (const site of r.sites) if (!into.sites.some((s) => s.file === site.file && s.line === site.line)) into.sites.push(site);
+    into.score = Math.max(into.score, r.score);
+  }
   const wordsOf = (r: Restatement): Set<string> => new Set(r.members ?? wordsIn([r.value]));
   const centers: { r: Restatement; files: Set<string>; words: Set<string>; forms: Restatement[] }[] = [];
   for (const r of ranked) {
@@ -784,5 +825,5 @@ const BUILD_CONFIG = /(?:^|\/)(?:rollup|jest|webpack|vite|vitest|tsup|babel|esbu
 
 /** Rank: what has already diverged, then what history shows changed apart, then what changed together, then what never changed; within each, copies across parts of the project before copies within one, then the most bits. */
 function byRank(x: Restatement, y: Restatement): number {
-  return Number(x.buildConfig === true) - Number(y.buildConfig === true) || (x.standing ?? 4) - (y.standing ?? 4) || Number(y.crossPackage === true) - Number(x.crossPackage === true) || y.score - x.score || x.value.localeCompare(y.value);
+  return Number(x.buildConfig === true) - Number(y.buildConfig === true) || (x.standing ?? 4) - (y.standing ?? 4) || Number(x.idiom === true) - Number(y.idiom === true) || Number(y.crossPackage === true) - Number(x.crossPackage === true) || y.score - x.score || x.value.localeCompare(y.value);
 }

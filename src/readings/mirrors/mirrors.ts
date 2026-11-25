@@ -149,6 +149,51 @@ export const RULES: string = (() => {
   return hash.digest("hex").slice(0, 12);
 })();
 
+/**
+ * The platform's own strings: every string a declaration file of TypeScript's
+ * library or of the project's @types/node writes (`"pipe" | "ignore"`, a
+ * RequestCache's `"no-store"`). A value the platform's typings name is the
+ * platform's, not the project's. Read once per process and project.
+ */
+const PLATFORM = new Map<string, Set<string>>();
+function platformOf(root: string): Set<string> {
+  const kept = PLATFORM.get(root);
+  if (kept !== undefined) return kept;
+  const out = new Set<string>();
+  const scan = (dir: string, depth: number): void => {
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const path = join(dir, name);
+      if (name.endsWith(".d.ts") && (dir !== libDir() || /^lib\./.test(name))) {
+        try {
+          for (const m of readFileSync(path, "utf8").matchAll(/"([^"\\\n]{1,60})"/g)) out.add(m[1]!);
+        } catch {
+          // An unreadable typing names nothing.
+        }
+      } else if (depth > 0 && !name.includes(".") && name !== "node_modules") scan(path, depth - 1);
+    }
+  };
+  const lib = libDir();
+  if (lib !== undefined) scan(lib, 0);
+  scan(join(root, "node_modules", "@types", "node"), 2);
+  PLATFORM.set(root, out);
+  return out;
+}
+
+/** The compiler's library folder, where its lib.*.d.ts files are. */
+function libDir(): string | undefined {
+  try {
+    return dirname(createRequire(import.meta.url).resolve("typescript"));
+  } catch {
+    return undefined;
+  }
+}
+
 /** The prior: the identifiers TypeScript's library typings use, read once per process from the compiler the reading loaded. */
 let PRIOR: Counts | undefined;
 function priorOf(): Counts {
@@ -1619,6 +1664,7 @@ export async function readMirrors(root: string, options: MirrorOptions = {}): Pr
     witnessed: (key) => witnessed.get(key)?.verdict,
     derived,
     packages,
+    platform: platformOf(root),
     ...(commits === undefined ? {} : { standingOf: standingBy(commits) }),
   });
   phase("restatements");
