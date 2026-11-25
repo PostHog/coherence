@@ -19,7 +19,7 @@ import { spawn } from "../../lifecycle/work-meter.ts";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Finding, Group, MirrorReading } from "./model.ts";
-import { alarmsOf, alarmText, PARSED_LANGUAGES, surfaced, unreadText } from "./policy.ts";
+import { alarmsOf, alarmText, PARSED_LANGUAGES, surfaced, unreadText, type RestatementCounts } from "./policy.ts";
 
 /** Where the kept reading and the refresh mark live: transient, never committed. */
 export const MIRRORS_DIR = join(".coherence", "mirrors");
@@ -74,6 +74,43 @@ export function recordMirrors(root: string, reading: MirrorReading, now: () => D
   };
   writeAtomically(readingPath(root), JSON.stringify(recorded));
   return recorded;
+}
+
+/** Where each reading's restatement counts are kept, by commit, with the rules that counted them. */
+const COUNTS_FILE = "counts.json";
+/** How many commits' counts are kept: enough for a branch's base, never a history. */
+const COUNTS_KEPT = 200;
+
+export interface KeptCounts {
+  rules: string;
+  at: string;
+  counts: RestatementCounts;
+}
+
+/** Keep a reading's counts under its commit and its rules, so a later reading under other rules can say what the rules changed. */
+export function recordCounts(root: string, commit: string, kept: KeptCounts): void {
+  const path = join(root, MIRRORS_DIR, COUNTS_FILE);
+  let all: Record<string, KeptCounts[]> = {};
+  try {
+    all = JSON.parse(readFileSync(path, "utf8")) as Record<string, KeptCounts[]>;
+  } catch {
+    all = {};
+  }
+  const here = (all[commit] ?? []).filter((k) => k.rules !== kept.rules);
+  all[commit] = [...here, kept];
+  const commits = Object.keys(all);
+  for (const c of commits.slice(0, Math.max(0, commits.length - COUNTS_KEPT))) delete all[c];
+  writeAtomically(path, JSON.stringify(all));
+}
+
+/** The counts kept for a commit under rules other than these, the latest first. */
+export function earlierCounts(root: string, commit: string, rules: string): KeptCounts | undefined {
+  try {
+    const all = JSON.parse(readFileSync(join(root, MIRRORS_DIR, COUNTS_FILE), "utf8")) as Record<string, KeptCounts[]>;
+    return (all[commit] ?? []).filter((k) => k.rules !== rules).sort((x, y) => y.at.localeCompare(x.at))[0];
+  } catch {
+    return undefined;
+  }
 }
 
 /** The last reading kept, or undefined when none was or it cannot be read. */

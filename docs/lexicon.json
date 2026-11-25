@@ -622,7 +622,7 @@
         "family audience": "A reader is told the wrong thing for that reader, or not told what it needs: a message naming the wrong subject, guidance missing from what ships or from a practice. A family: too broad for one guard, so each defect closes with its own guard or a decision, and a later one is no guard failure.",
         "family hand-list": "A list kept by hand that must mirror something defined elsewhere (files, imports, events, tools, keys), so the two drift and nothing fails: a module, an event or a tool silently left out. A family: each list is removed by deriving it from what it mirrors, one guard per list.",
         "family silent-skip": "A reading, walk or command leaves part of what it was given out and says nothing about it. A family: every reader and command can skip in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure.",
-        "mirror reading": "The reading that finds hand lists: literal collections of names matched by overlap against each other and against what code derives (a folder's files, the import closure of a list of files, a module's exports, the keys a file reads), from git objects at one revision, with history naming the commit that grew one side alone (query mirrors). Advisory and never taken in a hook: orient names the groups worth a look from the last reading kept, and the reading proposes pairs for the edit-time alarm to watch.",
+        "mirror reading": "The reading that finds hand lists: literal collections of names matched by overlap against each other and against what code derives (a folder's files, the import closure of a list of files, a module's exports, the keys a file reads), from git objects at one revision, with history naming the commit that grew one side alone (query mirrors), and that counts the restatements nothing holds equal, each with the one source it would come from (query mirrors --restatements). Advisory and never taken in a hook: orient names the groups worth a look from the last reading kept, and the reading proposes pairs for the edit-time alarm to watch.",
         "family version-skew": "The Coherence that runs is not the one the adopter installed or meant: another copy shadows it, a package manager resolved an older release than the project needs, or a plugin's import reaches another copy than the running one, and nothing says which version answers. A family: every place that picks a copy (which launches, which installs, which a plugin imports) picks it in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure.",
         "family parse-gap": "A reader of source, shell or spec text misses a shape its language allows. A family: every hand-written reader (entrance rules, the shell reader, a plugin's import reader) misses shapes in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure; a reader moved onto a parser leaves it for that parser's guards.",
         "family cost": "Work out of proportion to the answer: a hook or reading that reads far more than it needs, past the latency budget. A family: every hook, reading and store pays its own way (the dead-trigger check's triggers, a parse store kept per leaf of a registry), so each defect closes with its own guard or a decision, and a later one is no guard failure.",
@@ -1622,6 +1622,23 @@
       "provenance": {
         "defined_by": "session 8fbd39e1, 2026-11-12, with peer repository, in the first slice of services that span repositories (d-f014e590)",
         "owner_words": "build the first slice"
+      }
+    },
+    {
+      "name": "restatement",
+      "definition": "One fact written at live sites in two or more files, where no site imports it from another and no import, type, declared mirror or test that went red with the copy changed holds the copies equal: a literal, two lists that are equal, a member apart, or one a plain-string part of the other, one rule written as a regular expression, a chain of string tests or a set, or one parser of a type written twice, counted when what the copies share is rare enough. The mirror reading counts the restatements nothing holds (query mirrors --restatements), each with the one source it would come from, and counts apart those the config excludes, those held, and those declared different on purpose; the count is the complexity a project removes by consolidating, so it only goes down (d-fc099227).",
+      "status": "proposed",
+      "aliases": [
+        "unenforced restatement"
+      ],
+      "related": [
+        "reading",
+        "defect",
+        "invariant"
+      ],
+      "provenance": {
+        "defined_by": "agent proposal from conjecture c-74956e4e and its resolution rs-a454912d, 2026-11-24",
+        "because": "the mirror reading counts restatements and query mirrors, the spec and the code name them; hand list names lists alone, not a literal or a constant written in two files"
       }
     }
   ],

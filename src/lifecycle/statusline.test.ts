@@ -9,7 +9,8 @@ import { JOURNAL_DIR } from "../journal/store.ts";
 import { DEFAULT_LATENCY_BUDGET, HOOK_TIMES_DIR } from "./hook-latency.ts";
 import { PRACTICES_DIR } from "./practice-delivery.ts";
 import { serverPaths } from "../enforcement/server.ts";
-import { readStatus, STATUS_DEFAULT_BUDGET, STATUS_SOURCES, STATUS_TOOL_HOOKS, statusText } from "./statusline.ts";
+import { readStatus, STATUS_DEFAULT_BUDGET, STATUS_SOURCES, STATUS_TOOL_HOOKS, statusShard, statusText } from "./statusline.ts";
+import { SHARD_SUFFIX } from "../journal/stores.ts";
 import { TOOL_HOOKS } from "./hook-events.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -37,6 +38,10 @@ test("the status line reads where the hooks keep the session's records, by the h
   assert.deepEqual(STATUS_SOURCES, { hookTimes: HOOK_TIMES_DIR, firings: PRACTICES_DIR, journal: JOURNAL_DIR, server: serverPaths("/p").pointer.slice("/p/".length) });
   assert.equal(STATUS_DEFAULT_BUDGET, DEFAULT_LATENCY_BUDGET);
   assert.deepEqual([...STATUS_TOOL_HOOKS], [...TOOL_HOOKS], "the status line counts the tool hooks hook-events.ts declares");
+  // The status line's copy of a shard's name, held equal to SHARD_SUFFIX, which journal/stores.ts declares.
+  for (const name of ["s.0123abcd.jsonl", "s.0123abcd.jsonseq", "s.0123abcd.json", "s.0123abc.jsonl", "s.0123ABCD.jsonl", "s.0123abcde.jsonl", "s.0123abcd.jsonseqs"]) {
+    assert.equal(statusShard("s").test(name), SHARD_SUFFIX.test(name.slice(1)) && name.slice(1).replace(SHARD_SUFFIX, "") === "", `${name}: the status line reads the shards the journal writes`);
+  }
 });
 
 test("the status line names the session's tool hook time against the budget and the practices it owes, from every leaf of a registry", () => {

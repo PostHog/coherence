@@ -124,7 +124,7 @@ export interface CheckReport {
 const PROSE_EXTENSIONS = new Set([".md", ".markdown", ".mdx", ".rst", ".txt"]);
 const CODE_EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts",
-  ".py", ".rb", ".go", ".rs", ".java", ".kt", ".kts", ".swift", ".m", ".mm",
+  ".py", ".pyi", ".rb", ".go", ".rs", ".java", ".kt", ".kts", ".swift", ".m", ".mm",
   ".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".php", ".scala", ".lua",
   ".sh", ".bash", ".zsh", ".fish", ".sql", ".css", ".scss", ".less", ".vue", ".svelte",
 ]);

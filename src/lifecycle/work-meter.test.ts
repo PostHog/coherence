@@ -40,6 +40,7 @@ import { appendRecord } from "../journal/store.ts";
 import type { JournalRecord } from "../journal/record.ts";
 import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
+import { SHARD_SUFFIX } from "../journal/stores.ts";
 
 const SESSION = "sized";
 
@@ -117,7 +118,7 @@ function family(key: string): string {
     .replace(/note-\d+/g, "note-N")
     .replace(/part-\d+/g, "part-N")
     .replace(/\/h\d+\.jsonl/g, "/hN.jsonl")
-    .replace(/\.[0-9a-f]{8}\.(jsonl|jsonseq)\b/g, ".<token>.$1");
+    .replace(new RegExp(SHARD_SUFFIX.source, "g"), ".<token>.$1");
 }
 
 /** A call's work as weights by family: what the budget is judged on. */

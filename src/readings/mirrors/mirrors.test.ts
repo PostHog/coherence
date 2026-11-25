@@ -8,8 +8,10 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { mirrorsCommand } from "./cli.ts";
 import { readMirrors } from "./mirrors.ts";
-import type { Finding, Group, MirrorReading, SetRef } from "./model.ts";
+import type { Finding, Group, MirrorReading, Restatement, SetRef } from "./model.ts";
 import { alarmsOf, isAlarm, proposalsOf, readingText, surfaced } from "./policy.ts";
+import { Counts, Rarity } from "./rarity.ts";
+import { NO_EXCLUSIONS, sourceOf, type RestatementInput } from "./restatements.ts";
 import { lastMirrors, MIRRORS_DIR, ORIENT_LINE_LIMIT, orientMirrorText, recordMirrors } from "./recorded.ts";
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -81,7 +83,7 @@ function finding(a: SetRef, b: SetRef, extra: Partial<Finding> = {}): Finding {
 const group = (rank: number, score: number, findings: Finding[]): Group => ({ rank, score, overlapScore: score, historyScore: 0, findings });
 
 function readingOf(groups: Group[]): MirrorReading {
-  return { rev: "HEAD", commit: "0123456789abcdef0123456789abcdef01234567", ms: 1, phases: {}, sets: 10, read: 10, unread: {}, groups };
+  return { rev: "HEAD", commit: "0123456789abcdef0123456789abcdef01234567", ms: 1, phases: {}, sets: 10, read: 10, unread: {}, groups, restatements: [], held: 0, excluded: [], unrefuted: [], declared: [], rules: "test", holds: [] };
 }
 
 /* ---------------------------------------------------- the invariants */
@@ -140,6 +142,12 @@ test("no hook loads the mirror reading: the hooks' import closure never reaches 
   const reached = [...files].map((f) => relative(SRC, f));
   assert.ok(reached.includes("readings/mirrors/recorded.ts"), "the hooks do load the kept reading's module, so the closure is the real one");
   assert.ok(!reached.includes("readings/mirrors/mirrors.ts"), "the reading itself is never among the modules a hook loads");
+  // Write-time advice, which a hook loads when a tool writes, reaches neither: it only looks a write up in the kept index.
+  const advice = runtimeClosure(["readings/mirrors/advice.ts"]);
+  const adviceReached = [...advice.files].map((f) => relative(SRC, f));
+  assert.ok(adviceReached.includes("readings/mirrors/advice.ts"));
+  assert.ok(!adviceReached.includes("readings/mirrors/mirrors.ts") && !adviceReached.includes("readings/mirrors/restatements.ts"), "write-time advice loads neither the reading nor its rules");
+  assert.ok(!advice.packages.has("typescript"), "nor the compiler");
   assert.ok(!reached.includes("readings/mirrors/cli.ts"), "query mirrors is loaded on demand");
   assert.ok(!packages.has("typescript"), "nor is the compiler's parser");
 
@@ -281,4 +289,145 @@ test("files in a language the reading does not parse are counted by extension, s
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+/* ------------------------------------------------------- restatements */
+
+/** A repository at one commit, its files as given. */
+function repositoryOf(files: Record<string, string>): string {
+  const root = scratch();
+  const git = gitIn(root);
+  git("init", "-q", "-b", "main");
+  for (const [path, text] of Object.entries(files)) write(root, path, text);
+  git("add", "-A");
+  git("commit", "-q", "-m", "the files");
+  return root;
+}
+
+const valueOf = (reading: MirrorReading, value: string): Restatement | undefined => reading.restatements.find((r) => r.value === value);
+
+test("a value written in two files is a restatement when what its copies share is rare enough, ranked by what has diverged and what history changed apart, and tests, literal types, prose and other parties' vocabulary are left out", async () => {
+  const root = repositoryOf({
+    "src/a/kinds.ts": 'export const KINDS = ["alpha", "beta", "gamma", "delta"];\n',
+    "src/b/use.ts": 'export const SOME_KINDS = ["alpha", "beta", "gamma"];\n',
+    "src/a/rule.ts": "export const NAME_RULE = /^zqname-[a-z][a-z0-9-]*$/;\nexport const NOTE = \"the note that two modules keep\";\n",
+    "src/b/rule.ts": "const NAME_RULE = /^zqname-[a-z][a-z0-9-]*$/;\nconst NOTE = \"the note that two modules keep\";\nexport const ok = (s: string): boolean => NAME_RULE.test(s) && s !== NOTE;\n",
+    "src/a/words.ts": 'export type Mode = "the-long-mode-name" | "the-other-mode-name";\nexport const one = (): string => "written-in-two-files";\nexport const say = (): string => "some prose that is not a name";\nexport const url = "https://example.com/one/two";\nexport const seen = "only-a-test-repeats-this";\nexport const mode = "the-long-mode-name";\nexport const ext = ".zqmts";\nexport const word = "name";\nexport const header = "WWW-Authenticate";\nexport const status = "Internal Server Error";\nexport const sub = "ls-files";\nexport const bare = /^[0-9a-f]{8}$/;\n',
+    "src/b/words.ts": 'export const two = (): string => "written-in-two-files";\nexport const say = (): string => "some prose that is not a name";\nexport const url = "https://example.com/one/two";\nexport const mode = "the-long-mode-name";\nexport const ext = ".zqmts";\nexport const word = "name";\nexport const header = "WWW-Authenticate";\nexport const status = "Internal Server Error";\nexport const sub = "ls-files";\nexport const bare = /^[0-9a-f]{8}$/;\n',
+    "src/b/words.test.ts": 'export const seen = "only-a-test-repeats-this";\n',
+    "src/b/fixture-words.ts": 'export const seen = "only-a-test-repeats-this";\n',
+  });
+  try {
+    const reading = await readMirrors(root, { history: false });
+    const drift = reading.restatements.find((r) => r.kind === "drift");
+    assert.ok(drift !== undefined, reading.restatements.map((r) => r.value).join("; "));
+    assert.deepEqual(drift.members, ["alpha", "beta", "gamma"]);
+    assert.deepEqual(drift.odd, { member: "delta", lacks: "src/b/use.ts:1" }, "the side that lacks the one member is named");
+    assert.equal(reading.restatements[0], drift, "what has already diverged ranks first");
+    assert.equal(valueOf(reading, "^zqname-[a-z][a-z0-9-]*$")?.kind, "rule", "a regular expression written in two files is one rule, weighed by its words");
+    assert.equal(valueOf(reading, "the note that two modules keep")?.kind, "constant", "prose bound to a named constant in two files is kept");
+    assert.equal(valueOf(reading, "written-in-two-files")?.kind, "literal");
+    assert.deepEqual(valueOf(reading, "written-in-two-files")?.sites.map((s) => s.file), ["src/a/words.ts", "src/b/words.ts"]);
+    assert.equal(valueOf(reading, ".zqmts")?.kind, "constant", "a short value counts when it is rare");
+    assert.deepEqual(reading.restatements.map((r) => r.kind).sort(), ["constant", "constant", "drift", "literal", "rule"], "and nothing else");
+    for (const left of ["the-long-mode-name", "some prose that is not a name", "https://example.com/one/two", "only-a-test-repeats-this", "name", "WWW-Authenticate", "Internal Server Error", "ls-files", "^[0-9a-f]{8}$"]) assert.equal(valueOf(reading, left), undefined, `${left} is left out`);
+    assert.deepEqual(reading.excluded.map((r) => [r.value, r.by?.entry]).sort(), [["Internal Server Error", "HTTP"], ["WWW-Authenticate", "HTTP"], ["https://example.com/one/two", "a URL, MIME type or protocol method"], ["ls-files", "git"]], "another party's values are counted as excluded, by their owner");
+
+    let out = "";
+    const io = { out: (text: string): void => { out += text; }, err: (text: string): void => { out += text; } };
+    assert.equal(await mirrorsCommand(root, ["--no-history"], io), 0);
+    assert.match(out, /^Restatements: 5 unheld, 0 excluded by config, 4 excluded as derived \(owned: 4\), 0 held, 0 held by a test not yet refuted, 0 declared different \(one value written in two or more files;/m, "the default answer says the counts");
+    out = "";
+    assert.equal(await mirrorsCommand(root, ["--no-history", "--restatements"], io), 0);
+    assert.match(out, /1\. drift {2}3 members: alpha, beta, gamma\n {5}src\/a\/kinds\.ts:1 KINDS\n {5}src\/b\/use\.ts:1 SOME_KINDS\n {5}src\/b\/use\.ts:1 lacks delta\n {5}source: /);
+    out = "";
+    assert.equal(await mirrorsCommand(root, ["--no-history", "--json"], io), 0);
+    assert.equal(JSON.parse(out).restatements.length, 5);
+
+    // History ranks, never alarms: a copy one commit changed apart from the other ranks above one that never changed.
+    const git = gitIn(root);
+    write(root, "src/a/rule.ts", "export const NAME_RULE = /^zqname-[a-z][a-z0-9-]*$/; // kept here\nexport const NOTE = \"the note that two modules keep\";\n");
+    git("commit", "-qam", "touch one copy");
+    const later = await readMirrors(root);
+    const apart = valueOf(later, "^zqname-[a-z][a-z0-9-]*$");
+    const still = valueOf(later, "the note that two modules keep");
+    assert.equal(apart?.standing, 2, "changed apart");
+    assert.equal(still?.standing, 4, "never changed");
+    assert.ok(later.restatements.indexOf(apart!) < later.restatements.indexOf(still!), "changed apart ranks above never changed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a copy held by an import of the list's name, a type or a declared mirror is counted held, and one a test reading every copy names is held only once that test went red, until then counted apart", async () => {
+  const root = repositoryOf({
+    "src/a/levels.ts": 'export const LEVELS = ["low", "middle", "high"] as const;\n',
+    "src/b/levels.ts": 'import type { LEVELS } from "../a/levels.ts";\nexport const MY_LEVELS = ["low", "middle", "high"] as const satisfies readonly (typeof LEVELS)[number][];\n',
+    "src/a/sizes.ts": 'export const SIZES = ["small", "medium", "large"];\n',
+    "src/b/sizes.ts": 'export const SIZE_COPY = ["small", "medium", "large"];\n',
+    "src/b/sizes.test.ts": 'import { SIZE_COPY } from "./sizes.ts";\nimport { SIZES } from "../a/sizes.ts";\nexport const same = SIZE_COPY.join() === SIZES.join();\n',
+    "src/a/colors.ts": 'export const COLORS = ["red", "green", "blue"];\n',
+    "src/b/colors.ts": 'export const PAINTS = ["red", "green", "blue"];\n',
+    "src/b/B.spec.md": "# B\n\nThe b side.\n\n## mirrors\n- PAINTS in colors.ts: the paints there are\n  mirrors: COLORS in src/a/colors.ts\n",
+    "src/a/value.ts": 'export const A_PATTERN = "held-by-a-test-value";\n',
+    "src/b/value.ts": 'export const B_PATTERN = "held-by-a-test-value";\n',
+    "src/b/value.test.ts": 'import { B_PATTERN } from "./value.ts";\nexport const same = B_PATTERN === "held-by-a-test-value";\n',
+    "src/a/loose.ts": 'export const SHAPES = ["zqcircle", "zqsquare", "zqtriangle"];\nexport const LOOSE = "nothing-holds-this-value";\n',
+    "src/b/loose.ts": 'export const MY_SHAPES = ["zqcircle", "zqsquare", "zqtriangle"];\nexport const LOOSE = "nothing-holds-this-value";\n',
+    "src/a/home.ts": 'export const PHASES = ["sowing", "growing", "reaping"];\n',
+    "src/b/copy.ts": 'export const MY_PHASES = ["sowing", "growing", "reaping"];\n',
+    "src/a/home.test.ts": 'import { PHASES } from "./home.ts";\nexport const three = PHASES.length === 3;\n',
+  });
+  try {
+    const reading = await readMirrors(root, { history: false });
+    assert.deepEqual(reading.restatements.map((r) => r.value).sort(), ["nothing-holds-this-value", "sowing, growing, reaping", "zqcircle, zqsquare, zqtriangle"], "only what nothing holds is restated, and a test that reads one side alone holds nothing");
+    assert.equal(reading.held, 2, "the type import and the declared mirror each hold one");
+    assert.deepEqual(reading.unrefuted.map((r) => r.value).sort(), ["held-by-a-test-value", "small, medium, large"], "a copy a test names is held, not yet refuted, until the test has gone red with the copy changed");
+    assert.deepEqual(reading.unrefuted.map((r) => r.hold?.test).sort(), ["src/b/sizes.test.ts", "src/b/value.test.ts"]);
+    assert.equal(reading.holds.length, 2, "both are offered to the witness pass");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/** A restatement input over these files, each importing what is given. */
+function sourceInput(imports: Record<string, string[]>, extra: Partial<RestatementInput> = {}): RestatementInput {
+  return {
+    pairs: [],
+    values: new Map(),
+    typed: new Set(),
+    tests: new Map(),
+    imports: new Map(Object.entries(imports).map(([file, to]) => [file, to.map((t) => ({ to: t.startsWith("node:") ? undefined : t, names: [], typeOnly: false }))])),
+    untyped: new Set(),
+    plugins: [],
+    manifests: new Set(),
+    declared: [],
+    shapes: new Map(),
+    exclusions: NO_EXCLUSIONS,
+    rarity: new Rarity(new Counts(), new Counts()),
+    predicates: [],
+    parsers: [],
+    literals: [],
+    declarations: new Map(),
+    blobs: new Map(),
+    witnessed: () => undefined,
+    ...extra,
+  };
+}
+
+test("a restatement names its one source: a module every site can import, a plugin's manifest for a language's fact, or a test where a site cannot import it", () => {
+  const core = { "src/a/one.ts": ["src/a/util.ts"], "src/b/two.ts": ["src/a/util.ts"], "src/a/util.ts": [] };
+  assert.equal(sourceOf(sourceInput(core), ["src/a/one.ts", "src/b/two.ts"], ["src/b/two.ts"]), "one module, src/b/two.ts, imported by the rest", "the site that binds the value to a name, when every other site can import it");
+
+  const plugin = { ...core, "plugins/lang/lang.ts": ["src/plugins/api.ts"], "plugins/lang/plugin.json": [], "src/plugins/api.ts": ["src/a/util.ts"] };
+  const withPlugin = sourceInput(plugin, { plugins: ["plugins/lang"], manifests: new Set(["plugins/lang/plugin.json"]) });
+  assert.equal(sourceOf(withPlugin, ["src/a/one.ts", "plugins/lang/lang.ts"], ["src/a/one.ts"]), "one module, src/a/one.ts, imported by the rest (plugins/lang/lang.ts through src/plugins/api.ts)", "a plugin reaches the core through the one module it already imports");
+  assert.match(sourceOf(withPlugin, ["src/a/one.ts", "plugins/lang/lang.ts"], [], [".ab", ".cd", ".ef"]), /^the owning plugin's manifest \(plugins\/lang\/plugin\.json\), read through the registry: the core names no language$/, "file extensions in the core and a plugin belong to the plugin's manifest");
+  assert.match(sourceOf(withPlugin, ["plugins/lang/lang.ts", "plugins/lang/plugin.json"], []), /^the plugin's manifest \(plugins\/lang\/plugin\.json\)/, "a value the manifest already holds lives there");
+
+  const apart = sourceInput({ ...core, "pkg/hooks/answer.ts": ["pkg/hooks/tree.ts"], "pkg/hooks/tree.ts": [], "src/status.ts": ["node:fs"], "src/line.ts": ["node:path"], "bench/run.ts": ["src/a/util.ts"] }, { untyped: new Set(["src/a/scene.ts"]) });
+  assert.equal(sourceOf(apart, ["pkg/hooks/answer.ts", "src/a/one.ts"], ["pkg/hooks/answer.ts"]), "one source, src/a/one.ts, and a test that holds the other copies equal to it: pkg/hooks/answer.ts imports nothing from src/", "a part that imports nothing from the home's is held by a test, and the home is where others already import from");
+  assert.equal(sourceOf(apart, ["src/status.ts", "src/a/one.ts"], ["src/a/one.ts"]), "one module, src/status.ts, imported by the rest", "a file kept self-contained imports nothing, so it is the home the rest import");
+  assert.match(sourceOf(apart, ["src/status.ts", "src/line.ts"], []), /a test that holds the other copies equal to it: src\/(line|status)\.ts imports nothing of the project's$/, "two files kept self-contained are held by a test");
+  assert.equal(sourceOf(apart, ["src/a/scene.ts", "src/a/one.ts"], []), "hold the copies equal by a test: src/a/scene.ts is not type-checked");
 });

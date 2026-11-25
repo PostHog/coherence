@@ -29,7 +29,7 @@ import { effectiveConfig, registryForLeaf } from "../adapters/project-config.ts"
 import { projectFiles } from "../adapters/project-files.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel } from "../spec/model.ts";
-import { HOOK_TIMES_DIR, type HookTime } from "./hook-latency.ts";
+import { HOOK_TIMES_DIR, parseHookTimes, type HookTime } from "./hook-latency.ts";
 import { TELEMETRY_TARGET, TELEMETRY_TIMEOUT_MS, type TelemetryTarget } from "./telemetry-config.ts";
 import { HOOK_EVENTS } from "./hook-events.ts";
 import { HOSTS as AGENT_HOSTS } from "./hosts.ts";
@@ -493,14 +493,7 @@ export function pendingSessions(root: string, current: string | undefined, env: 
 
 function readTimes(path: string): HookTime[] {
   try {
-    return readFileSync(path, "utf8").split("\n").flatMap((line) => {
-      try {
-        const t = JSON.parse(line) as Partial<HookTime>;
-        return typeof t.at === "string" && typeof t.event === "string" && typeof t.ms === "number" ? [t as HookTime] : [];
-      } catch {
-        return [];
-      }
-    });
+    return parseHookTimes(readFileSync(path, "utf8"));
   } catch {
     return [];
   }

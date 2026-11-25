@@ -66,6 +66,14 @@ export const LINE_EXTENSION = ".jsonl";
  */
 export const PACKED_EXTENSION = ".jsonseq";
 
+/**
+ * A shard's name past its session: the token, eight lowercase hex
+ * characters, and the extension, a line shard's or a packed one's. The status
+ * line, which imports node alone, keeps its own copy, held equal by
+ * statusline.test.ts.
+ */
+export const SHARD_SUFFIX = /\.[0-9a-f]{8}\.(jsonl|jsonseq)\b/;
+
 /** What ends a record in a packed shard, as the newline does in a line shard: U+001E, RFC 7464's separator. */
 export const RECORD_SEPARATOR = "\u001e";
 

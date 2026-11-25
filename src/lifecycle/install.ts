@@ -53,7 +53,7 @@ import { mkdir, readFile, rmdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
-import { ANTIGRAVITY_EVENTS } from "./hook-events.ts";
+import { ANTIGRAVITY_EVENTS, START_EVENTS, type AntigravityEvent } from "./hook-events.ts";
 import { modelStep, userStep } from "./antigravity.ts";
 import { DURABLE_FOLDERS, HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, SIBLING, isHost, type Host } from "./project.ts";
 import { nestedFolder, repositoryTop } from "../adapters/project-files.ts";
@@ -86,7 +86,6 @@ const TIMEOUT_SECONDS = 60;
 const CODEX_CONTEXT_LIMIT = 4000;
 
 /** The events whose output is context for the model rather than a verdict. */
-const START_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "SubagentStart"]);
 
 /**
  * A command is Coherence's when the program it runs is this tool's binary
@@ -108,8 +107,16 @@ export function eventsOf(host: Host): readonly string[] {
 /** The hook name Coherence's handlers sit under in Antigravity's .agents/hooks.json, which keys every tool's hooks by a name. */
 export const ANTIGRAVITY_HOOK_NAME = "coherence";
 
-/** Antigravity's events whose handlers are listed flat, with no matcher group around them. */
-const ANTIGRAVITY_FLAT_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "PreInvocation", "PostInvocation", "Stop"]);
+/**
+ * Antigravity's events whose handlers are listed flat, with no matcher group
+ * around them: typed against the events Coherence installs, so the compiler
+ * holds those three to ANTIGRAVITY_EVENTS, and PostInvocation named apart: an
+ * event of Antigravity's file Coherence installs no handler for, listed so a
+ * project's own PostInvocation handlers keep their flat shape when install
+ * rewrites the file (f023d73e).
+ */
+const ANTIGRAVITY_FLAT_EVENTS: ReadonlySet<AntigravityEvent | "PostInvocation"> = new Set(["SessionStart", "PreInvocation", "PostInvocation", "Stop"]);
+const isFlatEvent = (event: string): boolean => (ANTIGRAVITY_FLAT_EVENTS as ReadonlySet<string>).has(event);
 
 interface HookCommand {
   type: "command";
@@ -308,7 +315,7 @@ function antigravityHooksOf(settings: Record<string, unknown>): HooksByEvent {
   const out: HooksByEvent = {};
   for (const [event, entries] of Object.entries(named)) {
     if (!Array.isArray(entries)) continue;
-    out[event] = ANTIGRAVITY_FLAT_EVENTS.has(event) ? entries.map((handler) => ({ hooks: [handler as HookCommand] })) : (entries as HookEntry[]);
+    out[event] = isFlatEvent(event) ? entries.map((handler) => ({ hooks: [handler as HookCommand] })) : (entries as HookEntry[]);
   }
   return out;
 }
@@ -330,7 +337,7 @@ function isDisabling(field: string, value: unknown): boolean {
 
 function antigravityShaped(named: unknown, hooks: HooksByEvent): Record<string, unknown> {
   const fields = isRecord(named) ? Object.fromEntries(Object.entries(named).filter(([field, value]) => !Array.isArray(value) && !isDisabling(field, value))) : {};
-  const events = Object.fromEntries(Object.entries(hooks).map(([event, entries]) => [event, ANTIGRAVITY_FLAT_EVENTS.has(event) ? entries.flatMap((entry) => entry.hooks) : entries]));
+  const events = Object.fromEntries(Object.entries(hooks).map(([event, entries]) => [event, isFlatEvent(event) ? entries.flatMap((entry) => entry.hooks) : entries]));
   return { ...fields, ...events };
 }
 

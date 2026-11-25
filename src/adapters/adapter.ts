@@ -343,11 +343,11 @@ export function outsideOfFolder(folder: string): string | undefined {
   return parent === "." ? "" : `${parent}/`;
 }
 
-/** Whether a project-relative path lies in a test folder (the config's, or a language plugin's own: SwiftPM's `Tests`) or is a test file by name (`.test.ts`, `.spec.ts`, or a language plugin's own naming: pytest's `test_*.py` and `*_test.py`). */
+/** Whether a project-relative path lies in a test folder (the config's, or a language plugin's own: SwiftPM's `Tests`) or is a test file by name (`.test.ts`, `.spec.ts`, an end-to-end test's `.e2e.ts` or `.e2e-spec.ts`, or a language plugin's own naming: pytest's `test_*.py` and `*_test.py`). */
 export function isTestPath(file: string, testFolders: readonly string[]): boolean {
   const parts = file.split("/");
   if (parts.some((part) => testFolders.includes(part))) return true;
   if (parts.slice(0, -1).some(testByLanguageFolder)) return true;
   const base = parts[parts.length - 1] ?? "";
-  return /\.(test|spec)\.[a-z]+$/.test(base) || testByLanguageName(base);
+  return /\.(test|spec|e2e|e2e-spec)\.[a-z]+$/.test(base) || testByLanguageName(base);
 }

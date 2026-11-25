@@ -81,7 +81,7 @@ import type { CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import type { withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
-import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
+import { HOOK_EVENTS, START_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { keepSaid, saidIn, toolOf } from "./hook-said.ts";
 import { carryBlock, decisionsNear, keepPlaced } from "./carry-over.ts";
@@ -114,7 +114,7 @@ import type { GapState } from "../readings/scope/gaps.ts";
 import { refreshInBackground, refreshUnderWay, structureRefreshSlot } from "../readings/scope/background-refresh.ts";
 import type { coverageChanges } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
-import { namesWrittenFiles, writtenNames } from "./host-tools.ts";
+import { namesWrittenFiles, writerNaming, writtenNames, writtenTexts } from "./host-tools.ts";
 import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
 import { cliArgs } from "./own-cli.ts";
 import { fileStemOf } from "../journal/session-token.ts";
@@ -600,6 +600,52 @@ export async function lexiconStopText(report: CheckReport | undefined, walls: re
  * relative path is written from: the root, unless the project is nested below
  * the folder holding the host's settings.
  */
+/** Write-time advice before a writing tool's write lands: its text, and the file's text now, looked up in the kept index; silent when none is kept. */
+async function adviceBeforeWrite(root: string, session: string | undefined, input: HookInput, host: string): Promise<{ text: string; commit: () => void }> {
+  const none = { text: "", commit: () => {} };
+  const { loadAdvice, sessionAdvice } = await import("../readings/mirrors/advice.ts");
+  if (session === undefined || loadAdvice(root) === undefined) return none;
+  const writes = writtenTexts(input).flatMap(({ name, text }) => {
+    const absolute = resolve(host, name);
+    if (!within(root, absolute)) return [];
+    const file = relative(realSpelling(root), realSpelling(absolute)).split(sep).join("/");
+    let existing = "";
+    try {
+      existing = readFileSync(absolute, "utf8");
+    } catch {
+      existing = "";
+    }
+    return [{ file, text, existing }];
+  });
+  return sessionAdvice(root, session, writes);
+}
+
+/** Fold the homes these written files define into the session's advice overlay; a no-op when no index is kept. */
+async function foldAfterWrite(root: string, session: string | undefined, files: readonly string[]): Promise<void> {
+  const { foldWrites, loadAdvice } = await import("../readings/mirrors/advice.ts");
+  if (session === undefined || loadAdvice(root) === undefined) return;
+  const texts = files.flatMap((file) => {
+    try {
+      return [{ file, text: readFileSync(resolve(root, file), "utf8") }];
+    } catch {
+      return [];
+    }
+  });
+  foldWrites(root, session, texts);
+}
+
+/** Write-time advice after a shell command: the project's code files it changed since this session last looked, looked up whole; silent when no index is kept. */
+async function adviceAfterShell(root: string, session: string | undefined): Promise<{ text: string; commit: () => void }> {
+  const none = { text: "", commit: () => {} };
+  const { changedSince, foldWrites, loadAdvice, sessionAdvice } = await import("../readings/mirrors/advice.ts");
+  if (session === undefined || loadAdvice(root) === undefined) return none;
+  const changed = await changedFiles(root);
+  const files = changedSince(root, session, changed.files);
+  const said = sessionAdvice(root, session, files.map((f) => ({ ...f, existing: f.text })));
+  foldWrites(root, session, files);
+  return said;
+}
+
 export function writtenFiles(root: string, input: HookInput, host: string = root): string[] {
   return writtenPaths(input, host).flatMap((absolute) => {
     if (!within(root, absolute)) return [];
@@ -1503,14 +1549,14 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
 
   /** A session start above a project it has not entered names the project in one line; every other event says nothing. Nothing is read or written. */
   function pointer(root: string): HookResult {
-    if (event !== "SessionStart" && event !== "SubagentStart") return { stdout: "", stderr: "", exit: 0 };
+    if (!START_EVENTS.has(event)) return { stdout: "", stderr: "", exit: 0 };
     const context = `Coherence is adopted in ${relative(given, root) || "."} below this folder; its orient arrives with the first edit or command inside it, and work elsewhere hears nothing from it.`;
     return { stdout: JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n", stderr: "", exit: 0 };
   }
 
   /** An event outside every project is ignored: nothing read, nothing written, nothing said; a session start above several says so in one line. */
   function quiet(where: Exclude<HookProject, { kind: "project" }>): HookResult {
-    if (where.kind === "several" && (event === "SessionStart" || event === "SubagentStart")) {
+    if (where.kind === "several" && START_EVENTS.has(event)) {
       const context = `Coherence: this folder holds ${where.projects.length} projects (${where.projects.map((p) => relative(given, p) || ".").join(", ")}); its hooks answer for one at a time, so they say nothing here. Start the session in one of them, or edit a file inside one.`;
       return { stdout: JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n", stderr: "", exit: 0 };
     }
@@ -1642,11 +1688,13 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         // Before an edit lands in a part, what other sessions decided about that part, once a session (carry-over.ts): read
         // from what this session's start kept, never the journal, so an edit pays nothing for the project's history.
         const near = decisionsNear(root, session, writes, cli);
-        const context = await voiced(root, input, [practice.text, near.text].filter((t) => t !== "").join("\n"), voice);
+        // Before a write lands: a copy of a fact the project already names is told its home, looked up in the kept advice index, never the reading (advice.ts).
+        const advised = writes.length > 0 ? await adviceBeforeWrite(root, session, input, host) : { text: "", commit: () => {} };
+        const context = await voiced(root, input, [practice.text, near.text, advised.text].filter((t) => t !== "").join("\n"), voice);
         if (context === "") return { stdout: "", stderr: "", exit: 0 };
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
-        const told = voice.override === undefined && (practice.text !== "" || near.text !== "");
-        return { stdout, stderr: "", exit: 0, ...(told ? { commit: () => { if (practice.text !== "") practice.commit(); near.commit(); } } : {}) };
+        const told = voice.override === undefined && (practice.text !== "" || near.text !== "" || advised.text !== "");
+        return { stdout, stderr: "", exit: 0, ...(told ? { commit: () => { if (practice.text !== "") practice.commit(); near.commit(); if (advised.text !== "") advised.commit(); } } : {}) };
       }
       case "UserPromptSubmit":
       case "PostToolUse": {
@@ -1728,15 +1776,19 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         // What the last stop said reached only the user; the prompt that follows it is where the agent reads it.
         const fromStop = event === "UserPromptSubmit" && session ? carried(root, session) : undefined;
         const lastStop = fromStop === undefined ? "" : `At your last stop (shown to the user, not to you), ${fromStop.replace(/^Regulate \(Stop\):\n/, "regulate said:\n")}`;
-        const context = await voiced(root, input, [lastStop,feed.text,edit,specAtEdit.text,mirror.text,vocabularyNote,vocabulary].filter(Boolean).join("\n"), voice);
+        // A shell command writes what no tool input shows: the files it changed are looked up after it, as an edit's are before.
+        const shellAdvice = event === "PostToolUse" && writerNaming(input.tool_name) === "command" ? await adviceAfterShell(root, session) : { text: "", commit: () => {} };
+        // What a writing tool wrote is folded into the session's overlay, so a home it defines is known to the session's later writes.
+        if (event === "PostToolUse" && written.length > 0 && writerNaming(input.tool_name) !== "command") await foldAfterWrite(root, session, written);
+        const context = await voiced(root, input, [lastStop,feed.text,edit,specAtEdit.text,mirror.text,shellAdvice.text,vocabularyNote,vocabulary].filter(Boolean).join("\n"), voice);
         // A mirror that agrees again is forgotten at once: nothing was said that must first reach the host.
         if (mirror.text === "") mirror.commit();
         if (specAtEdit.text === "") specAtEdit.commit();
         if (context === "") return { stdout: "", stderr: "", exit: 0 };
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
         // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
-        const delivered = voice.override === undefined && (feed.text !== "" || mirror.text !== "" || specAtEdit.text !== "" || changes.length > 0 || pending.length > 0 || lastStop !== "");
-        const commit=()=> { if(feed.text) feed.commit(); if(mirror.text) mirror.commit(); if(specAtEdit.text) specAtEdit.commit(); if(changes.length && session) keep(); if(pending.length && session) lexiconCli?.deliverCandidates(root,session,pending); if(lastStop && session) dropCarry(root,session); };
+        const delivered = voice.override === undefined && (feed.text !== "" || mirror.text !== "" || specAtEdit.text !== "" || shellAdvice.text !== "" || changes.length > 0 || pending.length > 0 || lastStop !== "");
+        const commit=()=> { if(feed.text) feed.commit(); if(mirror.text) mirror.commit(); if(shellAdvice.text) shellAdvice.commit(); if(specAtEdit.text) specAtEdit.commit(); if(changes.length && session) keep(); if(pending.length && session) lexiconCli?.deliverCandidates(root,session,pending); if(lastStop && session) dropCarry(root,session); };
         return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
       }
       case "Stop":
@@ -1780,6 +1832,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input), "error" in heldModel ? undefined : heldModel);
         const economyText = economyStopText(snapshot, fingerprint);
         const latencyText = hookLatencyStopText(root, session);
+        // The facts this session wrote more than once, from its own advice state: one line, nothing waited on.
+        const adviceText = session === undefined ? "" : (await import("../readings/mirrors/advice.ts")).adviceStopText(root, session);
         const parts: string[] = [];
         if (changedText !== "") parts.push(changedText);
         if (deferredText !== "") parts.push(deferredText.trimEnd());
@@ -1792,6 +1846,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         if (practiceText !== "") parts.push(practiceText);
         if (economyText !== "") parts.push(economyText);
         if (latencyText !== "") parts.push(latencyText);
+        if (adviceText !== "") parts.push(adviceText);
         const text = parts.join("\n");
         // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
         // A spec gap is not among them: no traced control is not a demonstrated bypass, so gapText never counts toward the refusal; nor does an undeclared entrance.

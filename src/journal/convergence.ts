@@ -29,6 +29,7 @@ import { HOOK_TIMES_DIR, parseHookTimes } from "../lifecycle/hook-latency.ts";
 import { defectStates, type DefectFloor, type DefectState } from "./defects.ts";
 import { DEAD_END, deadEndLine, readDeadEnds, readingScope, windowOf, type DeadEndReading } from "./dead-ends.ts";
 import { loadJournal } from "./store.ts";
+import { LINE_EXTENSION } from "./stores.ts";
 
 /** The window's default length: the dead-end reading's, since both read one window (windowOf). */
 export const DEFAULT_WINDOW_DAYS: number = DEAD_END.days;
@@ -277,7 +278,7 @@ export function convergence(root: string, options: ConvergenceOptions = {}): Con
   const groups = new Map<string, number[]>();
   let names: string[] = [];
   try {
-    names = readdirSync(join(root, HOOK_TIMES_DIR)).filter((n) => n.endsWith(".jsonl"));
+    names = readdirSync(join(root, HOOK_TIMES_DIR)).filter((n) => n.endsWith(LINE_EXTENSION));
   } catch {
     names = [];
   }
