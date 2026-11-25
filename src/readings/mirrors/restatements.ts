@@ -419,12 +419,13 @@ export function sourceOf(input: RestatementInput, files: readonly string[], pref
 /** How many of a fact's own occurrences its rarity leaves out: the two copies that make it a restatement. */
 const OWN = 2;
 
-/** What a pattern says: its literal words' bits, and a few bits for its shape. An escape class or `^\\s*$` says almost nothing. */
-const SHAPE_BITS = 4;
+/** What a pattern says: its literal words' bits, and a bit and a quarter for each character of its shape. `^\\s*$` or a bare `[0-9a-f]{8}` says too little to be one fact; a whole pattern of seventeen characters written twice does not happen by chance. */
+const SHAPE_BITS_PER_CHAR = 1.25;
 export function patternBits(rarity: Rarity, source: string, own = 0): number {
   const node = parseRegex(source);
   const atoms = node === undefined ? (source.match(/[A-Za-z]{2,}/g) ?? []) : regexAtoms(node);
-  return rarity.shared(atoms, own) + SHAPE_BITS;
+  const shape = source.length - atoms.reduce((n, w) => n + w.length, 0);
+  return rarity.shared(atoms, own) + SHAPE_BITS_PER_CHAR * Math.max(0, shape);
 }
 
 /* --------------------------------------------------------------- finding */
