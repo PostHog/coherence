@@ -10,10 +10,10 @@ The mirror reading: the lists a project keeps by hand that must mirror something
   crossing: project-source -> reading
   refuted: made readAll take each file's text from the working tree instead of the object at the revision -> the totality oracle went red; restored, green (2026-10-12)
   kinds: none
-- never computed in a hook: No hook takes the mirror reading: no module the hooks load at run time reaches the reading or the compiler's parser, orient names hand lists only from the last reading kept, labeled with the commit and time it read, and the session start and stop start a new one detached, never waiting on it.
+- never computed in a hook: No hook takes the mirror reading: no module the hooks load at run time reaches the reading or the compiler's parser; orient names hand lists only from the last reading kept, labeled with the commit and time it read; write-time advice only looks a write up in the advice index that reading kept (advice.ts, which parses nothing); and the session start and stop start a new reading detached, never waiting on it.
   over: every module the command line and the hook module import at run time, followed to the end, and orient over a kept reading and over none
   via: no hook loads the mirror reading: the hooks' import closure never reaches it or the compiler, and orient reads only the kept reading, labeled with its commit
-  because: a tool hook's latency budget is 3 s and the start injection has a fixed budget; the reading takes about a second on Coherence and grows with the project and its history, so a hook that took it would spend its budget on advice (d-520846aa). The label keeps a reading of an older commit from being taken for a reading of the tree now
+  because: a tool hook's latency budget is 3 s and the start injection has a fixed budget; the reading takes about a second on Coherence and grows with the project and its history, so a hook that took it would spend its budget on advice (d-520846aa). The label keeps a reading of an older commit from being taken for a reading of the tree now. Write-time advice was asked for by the owner (reversing d-bb20df40): it reads the kept index, a lookup of milliseconds, so the full reading still never runs in a hook
   crossing: record -> reading
   refuted: imported readMirrors statically into recorded.ts, the module the hooks load for orient -> the totality oracle went red; restored, green (2026-10-12)
   kinds: none
@@ -169,4 +169,40 @@ The mirror reading: the lists a project keeps by hand that must mirror something
   crossing: project-source -> reading
   refuted: stopped reading a package name the project's package.json files name, or a locale tag, as another party's -> "what another party names is not the project's fact: package names its package.json files name, CSS keywords and locale tags are left out, a list a pattern embeds among words of its own pairs only with the same words, and build configs rank last" went red in restatements.test.ts on its own assertion (zq-left-pad was restated); restored byte for byte, green (2026-11-25)
   refuted: stopped reading a string the platform's typings write as the platform's -> "what another party names is not the project's fact: package names its package.json files name, CSS keywords and locale tags are left out, a list a pattern embeds among words of its own pairs only with the same words, and build configs rank last" went red in restatements.test.ts on its own assertion (the RequestCache values were restated); restored byte for byte, green (2026-11-25)
+  kinds: none
+- write-time advice never blocks: Write-time advice, before a writing tool's write lands (Claude Code's Write, Edit and MultiEdit, a Codex patch, Antigravity's write_file) and after a shell command, only adds context to the hook's answer: it exits 0 and never answers with a decision, a block or a denial, on any host.
+  over: the same copy written through Write, Edit, apply_patch and write_file
+  via: write-time advice never blocks or denies: on every host's writing tool it exits 0 and adds context, never a decision
+  because: the owner's ruling for #193: advice informs the agent, which decides; a hook that denied a write on an advisory reading would make the reading's misses the agent's failures
+  crossing: harness -> record
+  kinds: none
+- write-time advice is silent when cold: With no advice index kept, or one that cannot be read or is of another version, write-time advice says nothing and reads nothing else.
+  over: a write with the index removed, and with the index file unreadable
+  via: write-time advice is silent when no advice index is kept, or the kept one cannot be read
+  because: the index is kept by the detached reading a session start or stop begins; a hook that found none must not take the reading itself (never computed in a hook), and silence is the only answer that costs nothing
+  crossing: harness -> record
+  kinds: none
+- write-time advice speaks once: A session is told a family (one class and one home) once; a later write of the same family declines it, a `differs on purpose` comment that names the home declines it at once, and a declined family is never said again in that session.
+  over: three writes of one constant's copy, then a rule's copy behind a differs on purpose comment, then the rule's copy again
+  via: write-time advice says a family once a session, and nothing more once the session declined it: a second write after being told, or a differs on purpose comment
+  because: the agent-behavior report: a channel that repeats itself or argues with a decision is the channel agents learn to ignore
+  crossing: harness -> record
+  kinds: none
+- write-time advice speaks only where it is sure: Write-time advice names a home only for a copy of a named constant bound at a module's top level, a list within one member of a named list used as a set, a regular expression or chain of string tests that accepts what a named rule accepts, and a parser of a type a named function parses with the same checks, naming the home's file and line and the exact import, with the export step when the home is private; it says nothing for a bare literal with no named home, a value with a space in it, another party's value, a generated file, a migration, an example app, a file the config's restatements key names, a test, the home's own file, a file the reading already knows as a copy, or content that already imports the home; and a shell command's changed files are looked up by the same classes.
+  over: a list one member short of a named set, a template-built copy of a named rule, a chain that accepts more than the rule, a private parser's copy, a bare literal, prose, an HTTP header name, a generated file, a test file, content that imports the home, and a file a shell command wrote
+  via: write-time advice speaks only for a named constant, a list within one member of a named list used as a set, a pattern that accepts what a named rule accepts, and a parser of a type a named function parses with the same checks, and never for a bare literal, prose, another party's value, a generated file, a test, or content that already imports the home
+  because: the owner's strict version: in both real cases the agent had already read the home (readTimes copied an unexported parse; the shard pattern was spelled four ways in one commit, two through a shell), so only a precise name of the home, at the moment of the write, changes what is written; anything less certain belongs to CI
+  crossing: harness -> record
+  kinds: none
+- write-time advice stays in budget: A write is looked up against the kept index in a few milliseconds: a 400-line write against an index of 7,500 homes takes under 250 ms at the 95th percentile, and an ordinary edit under 20 ms, well inside a tool hook's 3 s latency budget.
+  over: thirty lookups of a 400-line write against a synthetic index of 5,000 constants, 2,000 lists and 500 rules, and one ordinary edit
+  via: write-time advice looks a write up within the hook latency budget: a few milliseconds against an index of thousands of homes
+  because: a tool hook that feels slow is switched off; the index is loaded once per process and kept by its file's time, and every lookup is a map or a prefilter by a shared word
+  crossing: harness -> record
+  kinds: none
+- the stop sweep never waits: At a stop, one advisory line names each fact the session wrote more than once, read from the session's own advice state alone, synchronously, with nothing awaited, spawned or read from the index; a session that copied nothing hears nothing.
+  over: a session that wrote one constant's copy twice, then its stop with the index removed, and another session's stop
+  via: the stop sweep names each fact the session wrote more than once, in one line, from the session's own advice state alone, never waiting
+  because: the stop has its own budget and a detached refresh it never waits on (df-84db9e4f); the facts born in a session and spelled more than once get one ask, and a copy a merge brings is CI's to count
+  crossing: harness -> record
   kinds: none

@@ -142,6 +142,12 @@ test("no hook loads the mirror reading: the hooks' import closure never reaches 
   const reached = [...files].map((f) => relative(SRC, f));
   assert.ok(reached.includes("readings/mirrors/recorded.ts"), "the hooks do load the kept reading's module, so the closure is the real one");
   assert.ok(!reached.includes("readings/mirrors/mirrors.ts"), "the reading itself is never among the modules a hook loads");
+  // Write-time advice, which a hook loads when a tool writes, reaches neither: it only looks a write up in the kept index.
+  const advice = runtimeClosure(["readings/mirrors/advice.ts"]);
+  const adviceReached = [...advice.files].map((f) => relative(SRC, f));
+  assert.ok(adviceReached.includes("readings/mirrors/advice.ts"));
+  assert.ok(!adviceReached.includes("readings/mirrors/mirrors.ts") && !adviceReached.includes("readings/mirrors/restatements.ts"), "write-time advice loads neither the reading nor its rules");
+  assert.ok(!advice.packages.has("typescript"), "nor the compiler");
   assert.ok(!reached.includes("readings/mirrors/cli.ts"), "query mirrors is loaded on demand");
   assert.ok(!packages.has("typescript"), "nor is the compiler's parser");
 
