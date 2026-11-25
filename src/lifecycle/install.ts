@@ -359,7 +359,8 @@ export function mergeHooks(settings: Record<string, unknown>, options: Pick<Inst
     const owns = isWired ? isMine : isLauncherHook;
     let removed = false;
     const kept = existing.flatMap((entry) => {
-      const theirs = entry.hooks.filter((h) => !owns(h.command));
+      if (!isRecord(entry) || !Array.isArray(entry.hooks)) return [entry];
+      const theirs = entry.hooks.filter((h) => !isRecord(h) || !owns(h.command));
       if (theirs.length === entry.hooks.length) return [entry];
       removed = true;
       return theirs.length === 0 ? [] : [{ ...entry, hooks: theirs }];

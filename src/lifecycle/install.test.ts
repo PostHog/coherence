@@ -698,6 +698,14 @@ test("the 0.x launcher hooks (coherence-hook <Event>) are Coherence's own: the c
   }
 });
 
+test("0.x launcher migration preserves malformed entries and handlers under unwired events", () => {
+  const malformed = { matcher: "x" };
+  const launcher = { type: "command", command: '"$CLAUDE_PROJECT_DIR/.claude/coherence-hook" Notification' };
+  const settings = { hooks: { Notification: [malformed, { hooks: [null, launcher] }] } };
+  const merged = mergeHooks(settings, { command: LOCATED_PREFIX, host: "claude" });
+  assert.deepEqual((merged["hooks"] as Record<string, unknown>)["Notification"], [malformed, { hooks: [null] }]);
+});
+
 test("the session start names the 0.x launcher hooks of Claude Code and Codex with the reinstall, and a reinstall clears it", async () => {
   const project = await mkdtemp(join(tmpdir(), "coherence-launcher-start-"));
   try {
