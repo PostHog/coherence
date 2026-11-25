@@ -1,0 +1,289 @@
+[
+ {
+  "name": "readTimes copies parse(), later parseHookTimes",
+  "file": "src/lifecycle/telemetry.ts",
+  "birth": "d027e38f",
+  "copy": "JSON.parse(line) as Partial<HookTime>",
+  "home": "src/lifecycle/hook-latency.ts",
+  "homeName": "parse"
+ },
+ {
+  "name": "shard pattern in the status line",
+  "file": "src/lifecycle/statusline.ts",
+  "birth": "6a2b5bd8",
+  "copy": "(jsonl|jsonseq)",
+  "home": "src/journal/stores.ts"
+ },
+ {
+  "name": "shard pattern in the status line, through a shell",
+  "file": "src/lifecycle/statusline.ts",
+  "birth": "6a2b5bd8",
+  "copy": "(jsonl|jsonseq)",
+  "home": "src/journal/stores.ts",
+  "shell": true
+ },
+ {
+  "name": "START_EVENTS as an === chain in hook.ts",
+  "file": "src/lifecycle/hook.ts",
+  "birth": "2d1ea4d5",
+  "copy": "event === \"SubagentStart\"",
+  "home": "src/lifecycle/install.ts",
+  "homeName": "START_EVENTS"
+ },
+ {
+  "name": "ANTIGRAVITY_FLAT_EVENTS beside ANTIGRAVITY_EVENTS",
+  "file": "src/lifecycle/install.ts",
+  "birth": "f023d73e",
+  "copy": "\"PostInvocation\"",
+  "home": "src/lifecycle/hook-events.ts",
+  "homeName": "ANTIGRAVITY_EVENTS"
+ },
+ {
+  "name": ".jsonl in hook-latency.ts against LINE_EXTENSION",
+  "file": "src/lifecycle/hook-latency.ts",
+  "birth": "fe235d4c",
+  "copy": ".jsonl",
+  "home": "src/journal/stores.ts",
+  "homeName": "LINE_EXTENSION"
+ },
+ {
+  "name": ".jsonl in convergence.ts against LINE_EXTENSION",
+  "file": "src/journal/convergence.ts",
+  "birth": "0562b470",
+  "copy": ".jsonl",
+  "home": "src/journal/stores.ts",
+  "homeName": "LINE_EXTENSION"
+ },
+ {
+  "name": "b72f11d2: \"PostToolUse\" in bench/scale/run.ts",
+  "file": "bench/scale/run.ts",
+  "birth": "c3780852",
+  "copy": "const TOOL_HOOKS = new Set([\"PreToolUse\", \"PostToolUse\"]);",
+  "home": "src/lifecycle/hook-events.ts",
+  "homeName": "TOOL_HOOKS"
+ },
+ {
+  "name": "b72f11d2: \"OPTIONS\" in src/adapters/entrance-candidates.ts",
+  "file": "src/adapters/entrance-candidates.ts",
+  "birth": "280235b7",
+  "copy": "const TS_METHODS = new Set([\"GET\", \"POST\", \"PUT\", \"PATCH\", \"DELETE\", \"HEAD\", \"OPTIONS\"]);",
+  "home": "src/lifecycle/hook-events.ts",
+  "homeName": "TOOL_HOOKS"
+ },
+ {
+  "name": "b72f11d2: \"entryDir\" in src/adapters/project-config.ts",
+  "file": "src/adapters/project-config.ts",
+  "birth": "1c8e77bb",
+  "copy": "const OWN_KEYS: ReadonlySet<string> = new Set([\"name\", \"entryDir\", \"lexicon\", \"projects\"]);",
+  "home": "src/lifecycle/hook-events.ts",
+  "homeName": "TOOL_HOOKS"
+ },
+ {
+  "name": "75b08521: \").join(\" in src/journal/read.ts",
+  "file": "src/journal/read.ts",
+  "birth": "0562b470",
+  "copy": "return parts.filter((p) => p !== \"\").join(\", \");",
+  "home": "src/journal/defect-states.ts",
+  "homeName": "CLASS_NAME"
+ },
+ {
+  "name": "86bcf1a2: \"retraction\" in src/journal/record.ts",
+  "file": "src/journal/record.ts",
+  "birth": "6653194a",
+  "copy": "case \"retraction\":",
+  "home": "src/journal/kinds.ts",
+  "homeName": "KINDS"
+ },
+ {
+  "name": "86bcf1a2: \"resolution\" in src/journal/record.ts",
+  "file": "src/journal/record.ts",
+  "birth": "6653194a",
+  "copy": "case \"resolution\":",
+  "home": "src/journal/kinds.ts",
+  "homeName": "KINDS"
+ },
+ {
+  "name": "cd3756eb: `not JSON (${error instanceof Error ? error.messag in src/journal/store.ts",
+  "file": "src/journal/store.ts",
+  "birth": "6653194a",
+  "copy": "return `not JSON (${error instanceof Error ? error.message : String(error)})`;",
+  "home": "src/journal/record.ts",
+  "homeName": "isKind"
+ },
+ {
+  "name": "cd3756eb: \"not a record object\" in src/journal/store.ts",
+  "file": "src/journal/store.ts",
+  "birth": "6653194a",
+  "copy": "if (typeof value !== \"object\" || value === null || Array.isArray(value)) return \"not a record object\";",
+  "home": "src/journal/record.ts",
+  "homeName": "isKind"
+ },
+ {
+  "name": "cd3756eb: \"session\" in src/journal/store.ts",
+  "file": "src/journal/store.ts",
+  "birth": "6653194a",
+  "copy": "for (const field of [\"id\", \"kind\", \"at\", \"session\", \"agent\"]) {",
+  "home": "src/journal/record.ts",
+  "homeName": "isKind"
+ },
+ {
+  "name": "3540221b: \"lexicon\" in src/readings/scope/page.ts",
+  "file": "src/readings/scope/page.ts",
+  "birth": "5896b7a8",
+  "copy": "case \"lexicon\":",
+  "home": "src/readings/scope/model.ts",
+  "homeName": "ComponentsFilter"
+ },
+ {
+  "name": "3540221b: \"components\" in src/readings/scope/page.ts",
+  "file": "src/readings/scope/page.ts",
+  "birth": "0000d7d1",
+  "copy": "case \"components\":",
+  "home": "src/readings/scope/model.ts",
+  "homeName": "ComponentsFilter"
+ },
+ {
+  "name": "04e4e97d: \"apply\" in src/lifecycle/lexicon-coverage.ts",
+  "file": "src/lifecycle/lexicon-coverage.ts",
+  "birth": "5896b7a8",
+  "copy": "/** The same for an applied proposal: the verb, \"apply\", the proposal id. */",
+  "home": "src/lifecycle/lexicon-coverage.ts",
+  "homeName": "APPLY_CHOSE"
+ },
+ {
+  "name": "04e4e97d: \"chose\" in src/lifecycle/lexicon-coverage.ts",
+  "file": "src/lifecycle/lexicon-coverage.ts",
+  "birth": "5896b7a8",
+  "copy": "(REVIEW.test(record[\"chose\"]) || APPLY.test(record[\"chose\"]) || BASELINE_CHOSE.test(record[\"chose\"]))",
+  "home": "src/lifecycle/lexicon-coverage.ts",
+  "homeName": "APPLY_CHOSE"
+ },
+ {
+  "name": "1500b0e9: `${where}: a declared language's name is lowercase in src/adapters/declared-config.ts",
+  "file": "src/adapters/declared-config.ts",
+  "birth": "f61dd4ad",
+  "copy": "if (!NAME.test(name)) throw new Error(`${where}: a declared language's name is lowercase letters, digits and hyphens, starting with a letter`);",
+  "home": "src/enforcement/config-name.ts",
+  "homeName": "CONFIG_NAME"
+ },
+ {
+  "name": "82d82b85: \".test.\" in src/enforcement/code-fingerprint.ts",
+  "file": "src/enforcement/code-fingerprint.ts",
+  "birth": "b0a45222",
+  "copy": "else if (entry.isFile() && CODE_FILE.test(entry.name) && !entry.name.includes(\".test.\")) into.push(path);",
+  "home": "src/enforcement/code-fingerprint.ts",
+  "homeName": "MODULE_FILE"
+ },
+ {
+  "name": "9f05f364: `${session.replace(/[^\\w.-]/g, \"_\")}.pending` in src/lifecycle/antigravity.ts",
+  "file": "src/lifecycle/antigravity.ts",
+  "birth": "f023d73e",
+  "copy": "return join(holder, \".coherence\", \"antigravity\", `${session.replace(/[^\\w.-]/g, \"_\")}.pending`);",
+  "home": "src/journal/session-token.ts",
+  "homeName": "fileStemOf"
+ },
+ {
+  "name": "9f05f364: `${session.replace(/[^\\w.-]/g, \"_\")}.json` in src/lifecycle/carry-over.ts",
+  "file": "src/lifecycle/carry-over.ts",
+  "birth": "ae7479d6",
+  "copy": "return join(root, TOLD_DIR, `${session.replace(/[^\\w.-]/g, \"_\")}.json`);",
+  "home": "src/journal/session-token.ts",
+  "homeName": "fileStemOf"
+ },
+ {
+  "name": "9f05f364: `${session.replace(/[^\\w.-]/g, \"_\")}.jsonl` in src/lifecycle/hook-latency.ts",
+  "file": "src/lifecycle/hook-latency.ts",
+  "birth": "fe235d4c",
+  "copy": "return join(root, HOOK_TIMES_DIR, `${session.replace(/[^\\w.-]/g, \"_\")}.jsonl`);",
+  "home": "src/journal/session-token.ts",
+  "homeName": "fileStemOf"
+ },
+ {
+  "name": "eae5c1d2: `cli${extname(fileURLToPath(import.meta.url))}` in src/enforcement/server.ts",
+  "file": "src/enforcement/server.ts",
+  "birth": "a9eeadbe",
+  "copy": "const CLI = join(CODE_DIR, `cli${extname(fileURLToPath(import.meta.url))}`);",
+  "home": "src/lifecycle/own-cli.ts",
+  "homeName": "CLI_BESIDE"
+ },
+ {
+  "name": "eae5c1d2: \"--disable-warning=ExperimentalWarning\" in src/lifecycle/hook.ts",
+  "file": "src/lifecycle/hook.ts",
+  "birth": "12aaa34e",
+  "copy": "snapshotInBackground(root, session, fingerprint, [process.execPath, \"--disable-warning=ExperimentalWarning\", OWN_CLI, \"economy\", \"--snapshot\", session]);",
+  "home": "src/lifecycle/own-cli.ts",
+  "homeName": "CLI_BESIDE"
+ },
+ {
+  "name": "eae5c1d2: \"--disable-warning=ExperimentalWarning\" in src/lifecycle/hook.ts",
+  "file": "src/lifecycle/hook.ts",
+  "birth": "12aaa34e",
+  "copy": "refreshMirrorsInBackground(root, [process.execPath, \"--disable-warning=ExperimentalWarning\", OWN_CLI, \"query\", \"mirrors\", \"--refresh\"]);",
+  "home": "src/lifecycle/own-cli.ts",
+  "homeName": "CLI_BESIDE"
+ },
+ {
+  "name": "a583abd1: \"Coherence's check at the edit and in CI\" in plugins/go/go.ts",
+  "file": "plugins/go/go.ts",
+  "birth": "93b05002",
+  "copy": "const COHERENCE_ENFORCER = \"Coherence's check at the edit and in CI\";",
+  "home": "src/plugins/api.ts",
+  "homeName": "COHERENCE_ENFORCER"
+ },
+ {
+  "name": "a583abd1: \"Coherence's check at the edit and in CI\" in plugins/python/python.ts",
+  "file": "plugins/python/python.ts",
+  "birth": "f61dd4ad",
+  "copy": "const COHERENCE_ENFORCER = \"Coherence's check at the edit and in CI\";",
+  "home": "src/plugins/api.ts",
+  "homeName": "COHERENCE_ENFORCER"
+ },
+ {
+  "name": "a583abd1: \"Coherence's check at the edit and in CI\" in plugins/rust/rust.ts",
+  "file": "plugins/rust/rust.ts",
+  "birth": "f61dd4ad",
+  "copy": "const COHERENCE_ENFORCER = \"Coherence's check at the edit and in CI\";",
+  "home": "src/plugins/api.ts",
+  "homeName": "COHERENCE_ENFORCER"
+ },
+ {
+  "name": "296b5670: \"bullets in the component's spec\" in src/readings/scope/relief/scene.ts",
+  "file": "src/readings/scope/relief/scene.ts",
+  "birth": "183e295e",
+  "copy": "{ key: \"invariants\", label: \"Invariants\", unit: \"bullets\", how: \"bullets in the component's spec\" },",
+  "home": "src/readings/scope/relief/layout.ts",
+  "homeName": "FOOT_KEYS"
+ },
+ {
+  "name": "296b5670: \"refuted: entries under the component's bullets\" in src/readings/scope/relief/scene.ts",
+  "file": "src/readings/scope/relief/scene.ts",
+  "birth": "183e295e",
+  "copy": "{ key: \"refutations\", label: \"Refutations\", unit: \"refutations\", how: \"refuted: entries under the component's bullets\" },",
+  "home": "src/readings/scope/relief/layout.ts",
+  "homeName": "FOOT_KEYS"
+ },
+ {
+  "name": "296b5670: \"bullets that carry a crossing\" in src/readings/scope/relief/scene.ts",
+  "file": "src/readings/scope/relief/scene.ts",
+  "birth": "183e295e",
+  "copy": "{ key: \"crossings\", label: \"Crossings\", unit: \"crossing bullets\", how: \"bullets that carry a crossing\" },",
+  "home": "src/readings/scope/relief/layout.ts",
+  "homeName": "FOOT_KEYS"
+ },
+ {
+  "name": "4626b905: `session \"${session}\" cannot name a file; use lett in src/economy/trace.ts",
+  "file": "src/economy/trace.ts",
+  "birth": "a13bc4fe",
+  "copy": "if (!SESSION_TOKEN.test(session)) throw new Error(`session \"${session}\" cannot name a file; use letters, digits, dot, dash, or underscore`);",
+  "home": "src/journal/session-token.ts",
+  "homeName": "SESSION_TOKEN"
+ },
+ {
+  "name": "d50225f7: \").split(\" in plugins/convex/convex-api.ts",
+  "file": "plugins/convex/convex-api.ts",
+  "birth": "4b828c01",
+  "copy": "return { folder, path: below.replace(/\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/, \"\").split(\"/\") };",
+  "home": "src/plugins/api.ts",
+  "homeName": "serverExtensions"
+ }
+]
