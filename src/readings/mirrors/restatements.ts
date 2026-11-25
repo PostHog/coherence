@@ -280,9 +280,11 @@ function importsNamed(w: Weigher, side: SetRef, other: SetRef): boolean {
   return (w.input.imports.get(side.file) ?? []).some((i) => i.to === other.file && i.names.includes(name));
 }
 
-/** The test that names a file and a word: the first, in a stable order. */
-function testNaming(w: Weigher, file: string, has: (text: string) => boolean): string | undefined {
-  return w.testsNaming(file).sort().find((t) => has(w.input.tests.get(t)!));
+/** The test that names every one of the files and passes the check on its text: the first, in a stable order. A test that names one copy's file alone reads one side, and holds nothing equal. */
+function testNaming(w: Weigher, files: readonly string[], has: (text: string) => boolean): string | undefined {
+  const [first, ...rest] = [...new Set(files)];
+  if (first === undefined) return undefined;
+  return w.testsNaming(first).filter((t) => rest.every((f) => w.testsNaming(f).includes(t))).sort().find((t) => has(w.input.tests.get(t)!));
 }
 
 function declaredHeld(w: Weigher, a: SetRef, b: SetRef): boolean {
@@ -298,11 +300,12 @@ function declaredHeld(w: Weigher, a: SetRef, b: SetRef): boolean {
 export function setHold(w: Weigher, a: SetRef, b: SetRef): Hold | undefined {
   if (importsNamed(w, a, b) || importsNamed(w, b, a)) return { by: "import" };
   if (declaredHeld(w, a, b)) return { by: "declared" };
-  for (const [copy, home] of [[a, b], [b, a]] as const) {
+  // A test that reads both sides: it names both files, and the list it would notice changing.
+  for (const [copy, home] of [[b, a], [a, b]] as const) {
     const name = listName(copy);
     if (name === undefined) continue;
     const re = word(name);
-    const test = testNaming(w, copy.file, (text) => re.test(text));
+    const test = testNaming(w, [a.file, b.file], (text) => re.test(text));
     if (test !== undefined) return { by: "test", test, copy: siteOfSet(copy), home: siteOfSet(home) };
   }
   return undefined;
@@ -310,8 +313,10 @@ export function setHold(w: Weigher, a: SetRef, b: SetRef): Hold | undefined {
 
 /** The test that holds a value: one naming a site's file and either the constant the value is bound to there or the value itself. */
 function valueHold(w: Weigher, value: string, sites: readonly { file: string; line: number; bound?: string }[]): Hold | undefined {
-  for (const s of sites) {
-    const test = testNaming(w, s.file, (text) => text.includes(value) || (s.bound !== undefined && word(s.bound).test(text)));
+  // A test that reads every copy: it names each site's file, and the value or the constant it would notice changing.
+  const files = sites.map((s) => s.file);
+  for (const s of [...sites].reverse()) {
+    const test = testNaming(w, files, (text) => text.includes(value) || (s.bound !== undefined && word(s.bound).test(text)));
     const home = sites.find((o) => o.file !== s.file);
     if (test !== undefined && home !== undefined) return { by: "test", test, copy: siteOf(s), home: siteOf(home) };
   }

@@ -352,7 +352,7 @@ test("a value written in two files is a restatement when what its copies share i
   }
 });
 
-test("a copy held by an import of the list's name, a type or a declared mirror is counted held, and one a test names is held only once that test went red, until then counted apart", async () => {
+test("a copy held by an import of the list's name, a type or a declared mirror is counted held, and one a test reading every copy names is held only once that test went red, until then counted apart", async () => {
   const root = repositoryOf({
     "src/a/levels.ts": 'export const LEVELS = ["low", "middle", "high"] as const;\n',
     "src/b/levels.ts": 'import type { LEVELS } from "../a/levels.ts";\nexport const MY_LEVELS = ["low", "middle", "high"] as const satisfies readonly (typeof LEVELS)[number][];\n',
@@ -367,10 +367,13 @@ test("a copy held by an import of the list's name, a type or a declared mirror i
     "src/b/value.test.ts": 'import { B_PATTERN } from "./value.ts";\nexport const same = B_PATTERN === "held-by-a-test-value";\n',
     "src/a/loose.ts": 'export const SHAPES = ["circle", "square", "triangle"];\nexport const LOOSE = "nothing-holds-this-value";\n',
     "src/b/loose.ts": 'export const MY_SHAPES = ["circle", "square", "triangle"];\nexport const LOOSE = "nothing-holds-this-value";\n',
+    "src/a/home.ts": 'export const PHASES = ["sowing", "growing", "reaping"];\n',
+    "src/b/copy.ts": 'export const MY_PHASES = ["sowing", "growing", "reaping"];\n',
+    "src/a/home.test.ts": 'import { PHASES } from "./home.ts";\nexport const three = PHASES.length === 3;\n',
   });
   try {
     const reading = await readMirrors(root, { history: false });
-    assert.deepEqual(reading.restatements.map((r) => r.value).sort(), ["circle, square, triangle", "nothing-holds-this-value"], "only what nothing holds is restated");
+    assert.deepEqual(reading.restatements.map((r) => r.value).sort(), ["circle, square, triangle", "nothing-holds-this-value", "sowing, growing, reaping"], "only what nothing holds is restated, and a test that reads one side alone holds nothing");
     assert.equal(reading.held, 2, "the type import and the declared mirror each hold one");
     assert.deepEqual(reading.unrefuted.map((r) => r.value).sort(), ["held-by-a-test-value", "small, medium, large"], "a copy a test names is held, not yet refuted, until the test has gone red with the copy changed");
     assert.deepEqual(reading.unrefuted.map((r) => r.hold?.test).sort(), ["src/b/sizes.test.ts", "src/b/value.test.ts"]);

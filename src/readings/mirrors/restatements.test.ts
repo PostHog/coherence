@@ -143,7 +143,7 @@ test("the project's test files are tests by the rule every reading shares: the c
     "src/a.ts": 'export const ZQ_ONLY = "zq-only-in-tests";\nexport const ZQ_TWO = "zq-in-two-files";\n',
     "src/c.ts": 'export const ZQ_TWO = "zq-in-two-files";\n',
     "checks/helper.ts": 'export const v = "zq-only-in-tests";\n',
-    "src/b.spec.ts": 'import { ZQ_TWO } from "./a.ts";\nexport const v = "zq-only-in-tests";\nexport const same = ZQ_TWO === "zq-in-two-files";\n',
+    "src/b.spec.ts": 'import { ZQ_TWO } from "./a.ts";\nimport { ZQ_TWO as C_TWO } from "./c.ts";\nexport const v = "zq-only-in-tests";\nexport const same = ZQ_TWO === C_TWO;\n',
     "e2e/flow.e2e-spec.ts": 'export const v = "zq-only-in-tests";\n',
     "src/__tests__/d.ts": 'export const v = "zq-only-in-tests";\n',
   });
