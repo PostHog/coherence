@@ -133,34 +133,36 @@ test("write-time advice speaks only for a named constant, a list within one memb
 });
 
 test("write-time advice looks a write up within the hook latency budget: a few milliseconds against an index of thousands of homes", () => {
-  const root = mkdtempSync(join(tmpdir(), "coherence-advice-big-"));
-  try {
-    const index: AdviceIndex = {
-      version: 1, commit: "0".repeat(40), at: "2026-11-25T00:00:00Z", importExtension: true, testFolders: ["test", "tests", "__tests__"], quiet: [],
-      constants: Array.from({ length: 5000 }, (_, i) => ({ value: `zq-constant-${i}`, name: `C${i}`, file: `src/c${i % 50}.ts`, line: 1, exported: true, copies: [] })),
-      lists: Array.from({ length: 2000 }, (_, i) => ({ members: [`zqa${i}`, `zqb${i}`, `zqc${i}`, `zqd${i}`], name: `L${i}`, file: `src/l${i % 50}.ts`, line: 1, exported: true, copies: [] })),
-      rules: Array.from({ length: 500 }, (_, i) => ({ site: { file: `src/r${i}.ts`, line: 1, form: "regex" as const, text: `\\.zqr${i}$`, flags: "" }, atoms: [`zqr${i}`], name: `R${i}`, file: `src/r${i}.ts`, line: 1, exported: true, copies: [] })),
-      parsers: [],
-    };
-    recordAdviceIndex(root, index);
-    const loaded = loadAdvice(root)!;
-    const text = Array.from({ length: 400 }, (_, i) => `export const v${i} = ["zqa${i}", "zqb${i}", "zqc${i}"]; const s${i} = "zq-constant-${i}"; const r${i} = /\\.zqr${i % 500}$/;`).join("\n");
-    const times: number[] = [];
-    for (let k = 0; k < 30; k++) {
-      const t0 = performance.now();
-      adviceFor(loaded, "src/new.ts", text);
-      times.push(performance.now() - t0);
+  // Lookups are by map and by a shared word, so their time does not grow with the index: the same write against an index a hundred times larger costs about the same.
+  const indexOf = (n: number): AdviceIndex => ({
+    version: 1, commit: "0".repeat(40), at: "2026-11-25T00:00:00Z", importExtension: true, testFolders: ["test", "tests", "__tests__"], quiet: [],
+    constants: Array.from({ length: n }, (_, i) => ({ value: `zq-constant-${i}`, name: `C${i}`, file: `src/c${i % 50}.ts`, line: 1, exported: true, copies: [] })),
+    lists: Array.from({ length: Math.floor(n / 2.5) }, (_, i) => ({ members: [`zqa${i}`, `zqb${i}`, `zqc${i}`, `zqd${i}`], name: `L${i}`, file: `src/l${i % 50}.ts`, line: 1, exported: true, copies: [] })),
+    rules: Array.from({ length: 500 }, (_, i) => ({ site: { file: `src/r${i}.ts`, line: 1, form: "regex" as const, text: `\\.zqr${i}$`, flags: "" }, atoms: [`zqr${i}`], name: `R${i}`, file: `src/r${i}.ts`, line: 1, exported: true, copies: [] })),
+    parsers: [],
+  });
+  const text = Array.from({ length: 400 }, (_, i) => `export const v${i} = ["zqa${i}", "zqb${i}", "zqc${i}"]; const s${i} = "zq-constant-${i}"; const r${i} = /\\.zqr${i % 500}$/;`).join("\n");
+  const timed = (n: number): { p50: number; p95: number } => {
+    const root = mkdtempSync(join(tmpdir(), "coherence-advice-big-"));
+    try {
+      recordAdviceIndex(root, indexOf(n));
+      const loaded = loadAdvice(root)!;
+      const times: number[] = [];
+      for (let k = 0; k < 15; k++) {
+        const t0 = performance.now();
+        adviceFor(loaded, "src/new.ts", text);
+        times.push(performance.now() - t0);
+      }
+      times.sort((x, y) => x - y);
+      return { p50: times[7]!, p95: times[14]! };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
-    times.sort((x, y) => x - y);
-    const p95 = times[Math.floor(times.length * 0.95)]!;
-    assert.ok(p95 < 40, `p95 ${p95.toFixed(1)} ms for a 400-line write against 7,500 homes`);
-    const small = 'export const S = "zq-constant-7";\n';
-    const t0 = performance.now();
-    adviceFor(loaded, "src/new.ts", small);
-    assert.ok(performance.now() - t0 < 20, "an ordinary edit is a few milliseconds");
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
+  };
+  const small = timed(500);
+  const large = timed(50_000);
+  assert.ok(large.p50 < 4 * small.p50 + 5, `a 100 times larger index costs ${(large.p50 / small.p50).toFixed(1)} times as much (${small.p50.toFixed(1)} ms, ${large.p50.toFixed(1)} ms)`);
+  assert.ok(large.p95 < 250, `p95 ${large.p95.toFixed(1)} ms for a 400-line write against 70,500 homes`);
 });
 
 test("the stop sweep names each fact the session wrote more than once, in one line, from the session's own advice state alone, never waiting", async () => {

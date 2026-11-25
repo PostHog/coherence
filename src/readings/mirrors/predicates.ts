@@ -306,7 +306,7 @@ export function matcherOf(node: Node, flags = ""): Matcher | undefined {
   };
 }
 
-/** A pattern with the anchors, boundaries and wildcards at its ends dropped: what it looks for, wherever it is. */
+/** A pattern with the ^, $, boundaries and wildcards at its ends dropped: what it looks for, wherever it is. */
 function coreOf(node: Node): Node {
   if (node.t !== "seq") return node;
   const items = [...node.items];
