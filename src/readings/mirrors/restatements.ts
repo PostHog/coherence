@@ -402,6 +402,9 @@ export function sourceOf(input: RestatementInput, files: readonly string[], pref
   return `one source, ${best?.source ?? unique[0]}, and a test that holds the other copies equal to it: ${unreachable.join("; ")}`;
 }
 
+/** How many of a fact's own occurrences its rarity leaves out: the two copies that make it a restatement. */
+const OWN = 2;
+
 /** What a pattern says: its literal words' bits, and a few bits for its shape. An escape class or `^\\s*$` says almost nothing. */
 const SHAPE_BITS = 4;
 export function patternBits(rarity: Rarity, source: string, own = 0): number {
@@ -576,7 +579,7 @@ export function restatementsOf(input: RestatementInput): Restatements {
     if (a.file === b.file || !sideOk(input, a) || !sideOk(input, b)) continue;
     if (a.checked && b.checked) continue;
     // What the two sets share must say enough: three common names do not, two rare ones may.
-    const bits = input.rarity.shared(f.shared, 2);
+    const bits = input.rarity.shared(f.shared, OWN);
     if (bits < RARITY_MIN) continue;
     const kind = setKind(f);
     if (kind === undefined) continue;
@@ -676,7 +679,8 @@ export function restatementsOf(input: RestatementInput): Restatements {
     const files = [...new Set(sites.map((s) => s.file))];
     if (files.length < 2 || excludedValue(value, input.typed) || ruled.has(value)) continue;
     // A value must say enough to be one fact: "id" in forty files is the language's word, `PostInvocation` in two is the project's. A pattern says what its literal words say; its syntax says little.
-    const bits = sites.some((s) => s.regex === true) ? patternBits(input.rarity, value, sites.length) : input.rarity.value(value, sites.length);
+    // Two of its copies are left out of its background: a pair never vouches for its own rarity, and a value written in forty files is still common.
+    const bits = sites.some((s) => s.regex === true) ? patternBits(input.rarity, value, OWN) : input.rarity.value(value, OWN);
     if (bits < RARITY_MIN) continue;
     const boundFiles = new Set(sites.filter((s) => s.bound !== undefined).map((s) => s.file));
     if (PROSE.test(value) && boundFiles.size < 2) continue;
