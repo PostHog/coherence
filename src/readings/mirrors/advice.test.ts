@@ -150,7 +150,7 @@ test("write-time advice looks a write up within the hook latency budget: a few m
     }
     times.sort((x, y) => x - y);
     const p95 = times[Math.floor(times.length * 0.95)]!;
-    assert.ok(p95 < 250, `p95 ${p95.toFixed(1)} ms for a 400-line write against 7,500 homes`);
+    assert.ok(p95 < 40, `p95 ${p95.toFixed(1)} ms for a 400-line write against 7,500 homes`);
     const small = 'export const S = "zq-constant-7";\n';
     const t0 = performance.now();
     adviceFor(loaded, "src/new.ts", small);

@@ -194,7 +194,7 @@ The mirror reading: the lists a project keeps by hand that must mirror something
   because: the owner's strict version: in both real cases the agent had already read the home (readTimes copied an unexported parse; the shard pattern was spelled four ways in one commit, two through a shell), so only a precise name of the home, at the moment of the write, changes what is written; anything less certain belongs to CI
   crossing: harness -> record
   kinds: none
-- write-time advice stays in budget: A write is looked up against the kept index in a few milliseconds: a 400-line write against an index of 7,500 homes takes under 250 ms at the 95th percentile, and an ordinary edit under 20 ms, well inside a tool hook's 3 s latency budget.
+- write-time advice stays in budget: A write is looked up against the kept index in a few milliseconds: a 400-line write against an index of 7,500 homes takes under 40 ms at the 95th percentile (13 to 14 ms measured), and an ordinary edit under 20 ms, well inside a tool hook's 3 s latency budget.
   over: thirty lookups of a 400-line write against a synthetic index of 5,000 constants, 2,000 lists and 500 rules, and one ordinary edit
   via: write-time advice looks a write up within the hook latency budget: a few milliseconds against an index of thousands of homes
   because: a tool hook that feels slow is switched off; the index is loaded once per process and kept by its file's time, and every lookup is a map or a prefilter by a shared word
