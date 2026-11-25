@@ -1226,7 +1226,7 @@ function readCommits(root: string, rev: string, ignored: readonly string[]): Com
 }
 
 /** A generated file, by its name (`*.gen.ts`, `generated.ts`) or a header that says so. */
-const GENERATED_NAME = /(?:\.gen|(?:^|[/._-])generated)\.[cm]?[jt]sx?$/;
+const GENERATED_NAME = /(?:\.gen|(?:^|[/._-])generated)\.[^/.]+$/;
 const GENERATED_HEAD = /@generated|auto-?generated|do not (?:edit|modify)|automatically generated|(?:is|was|has been) generated|generated (?:by|using|with|from) /i;
 /** A file's leading comment, where a generator says what it wrote: the comment lines before the first line of code. */
 function leadingComment(text: string): string {

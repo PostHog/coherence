@@ -779,7 +779,7 @@ function ruleHold(w: Weigher, input: RestatementInput, sites: readonly Predicate
 }
 
 /** A build tool's config, where each package states its own: ranked last. */
-const BUILD_CONFIG = /(?:^|\/)(?:rollup|jest|webpack|vite|vitest|tsup|babel|esbuild|eslint|prettier|postcss|tailwind|next|nuxt|svelte|astro|playwright|karma|metro|rspack|turbo)\.config\.[cm]?[jt]s$/;
+const BUILD_CONFIG = /(?:^|\/)(?:rollup|jest|webpack|vite|vitest|tsup|babel|esbuild|eslint|prettier|postcss|tailwind|next|nuxt|svelte|astro|playwright|karma|metro|rspack|turbo)\.config\.[^/.]+$/;
 
 /** Rank: what has already diverged, then what history shows changed apart, then what changed together, then what never changed; within each, copies across parts of the project before copies within one, then the most bits. */
 function byRank(x: Restatement, y: Restatement): number {
