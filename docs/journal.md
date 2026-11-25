@@ -105,7 +105,7 @@ per release, the share closed with a guard, repeats per class, dead ends,
 bullets at each day and release tag, the files most often changed, and hook
 latency p50 and p95 per event and Coherence version.
 
-`query mirrors [--all] [--rev <rev>] [--json | --proposals | --restatements]` is the mirror
+`query mirrors [--all] [--rev <rev>] [--json | --proposals | --restatements] [--base <rev>] [--witness]` is the mirror
 reading: the lists kept by hand that must mirror another list, a folder or the
 import closure of a list of files (the hand-list family), read from git
 objects at one revision, with history naming the commit that grew one side
@@ -115,15 +115,24 @@ list of files drifted from the import closure of its own files, with the
 commit named, is listed first wherever it ranks. `--proposals` prints the
 pairs it proposes for declaration, each as the list's file, line and name and
 one universe recipe: `closure of files`, `keys of <file>:<name>` or
-`literal at <file>:<line>`. The default answer also counts the restatements
-nothing holds equal: one value written at live sites in two or more files, a
-literal of 16 or more characters or two sets sharing three or more members
-that differ by at most one, where no site imports it and no test, type or
-declared mirror holds the copies. `--restatements` lists them, two sets that
-differ by one member first, then a value bound to a named constant in two or
-more files, each with the one source it would come from. No hook takes the reading: the session start and
-the stop start one in the background, and orient names the last one kept,
-labeled with its commit.
+`literal at <file>:<line>`. The default answer also counts the restatements:
+one fact written at live sites in two or more files, weighed by the rarity of
+what the copies share rather than its length. A fact is a literal, two lists
+that are equal, a member apart, or one a plain-string part of the other, one
+rule written as a regular expression, a chain of string tests or a set, or one
+parser of a type written twice. The counts are said apart: unheld (the count
+to lower), excluded by the config's `restatements` key by entry, held (an
+import, a type or a declared mirror, or a test that went red with the copy
+changed), held by a test not yet refuted, and declared different by a
+`// differs on purpose from <home>: <how>` comment at the copy.
+`--restatements` lists them, what has diverged first, then what history shows
+changed apart, each with the one source it would come from. `--witness`
+changes each copy a test names in a scratch worktree and runs that test,
+keeping whether it went red; it belongs where tests already run. `--base`
+reads another revision under the same rules and says what the code changed
+apart from what config reclassified and what the rules changed. No hook takes
+the reading: the session start and the stop start one in the background, and
+orient names the last one kept, labeled with its commit.
 
 ## Work orders
 

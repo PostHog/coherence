@@ -700,10 +700,10 @@ function readCode(ctx: Context, file: string, text: string): void {
       const value = ts.isRegularExpressionLiteral(node) ? node.text.slice(1, node.text.lastIndexOf("/")) : node.text;
       const p = node.parent;
       const specifier = ts.isLiteralTypeNode(p) || ts.isImportDeclaration(p) || ts.isExportDeclaration(p) || ts.isExternalModuleReference(p) || (ts.isCallExpression(p) && p.expression.kind === ts.SyntaxKind.ImportKeyword);
-      // A key (an object's property name, an element read by name, a switch's label) and a list's member are read as sets, never as values; a class name is the stylesheet's vocabulary.
+      // A key (an object's property name, an element read by name, a switch's label) and a list's member are read as sets, never as values; a JSX attribute's value is markup's (a class name, alt text, a label), the page's copy rather than a fact the code keeps.
       const keyed = (ts.isPropertyAssignment(p) && p.name === node) || (ts.isElementAccessExpression(p) && p.argumentExpression === node) || ts.isCaseClause(p) || ts.isComputedPropertyName(p);
       const member = ts.isArrayLiteralExpression(p) && p.elements.filter((e) => ts.isStringLiteralLike(e)).length >= 2;
-      const styling = ts.isJsxAttribute(p) && /^(?:className|class|style)$/.test(p.name.getText());
+      const styling = ts.isJsxAttribute(p);
       if (value !== "" && !specifier && !keyed && !member && !styling && !value.includes("\n") && !/^\.\.?\//.test(value)) {
         const top = outer(ts, node);
         const decl = top.parent;

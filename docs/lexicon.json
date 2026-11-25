@@ -1626,7 +1626,7 @@
     },
     {
       "name": "restatement",
-      "definition": "One value written at live sites in two or more files, a literal of 16 or more characters or a set of three or more members in any form (an array, a Set, a regular-expression alternation, a union, an object's keys, a manifest's data), where no site imports it from another and no test, type or declared mirror holds the copies equal. The mirror reading counts the restatements nothing holds (query mirrors --restatements), each with the one source it would come from; the count is the complexity a project removes by consolidating, so it only goes down (d-fc099227).",
+      "definition": "One fact written at live sites in two or more files, where no site imports it from another and no import, type, declared mirror or test that went red with the copy changed holds the copies equal: a literal, two lists that are equal, a member apart, or one a plain-string part of the other, one rule written as a regular expression, a chain of string tests or a set, or one parser of a type written twice, counted when what the copies share is rare enough. The mirror reading counts the restatements nothing holds (query mirrors --restatements), each with the one source it would come from, and counts apart those the config excludes, those held, and those declared different on purpose; the count is the complexity a project removes by consolidating, so it only goes down (d-fc099227).",
       "status": "proposed",
       "aliases": [
         "unenforced restatement"

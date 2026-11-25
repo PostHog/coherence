@@ -161,6 +161,18 @@ jobs:
       - name: Chokepoints
         run: node --disable-warning=ExperimentalWarning src/cli.ts run --form chokepoint --no-server --session "ci-${{ github.run_id }}" --agent ci
 
+      # The restatements, counted apart and against the base under one set of rules, and each copy a test names
+      # witnessed where the tests run. Advisory: it writes the job summary and never fails the job.
+      - name: Restatements
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        timeout-minutes: 15
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node --disable-warning=ExperimentalWarning src/cli.ts query mirrors --witness --base "$BASE" --restatements --limit 20 > "$RUNNER_TEMP/restatements.txt" 2>&1 || true
+          { echo '### Restatements'; echo; echo '```'; cat "$RUNNER_TEMP/restatements.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
   # One check that stands for the rest: green only when every shard, the checks and the parsers' build are.
   verify:
     if: always()
