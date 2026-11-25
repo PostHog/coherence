@@ -404,10 +404,10 @@ export function sourceOf(input: RestatementInput, files: readonly string[], pref
 
 /** What a pattern says: its literal words' bits, and a few bits for its shape. An escape class or `^\\s*$` says almost nothing. */
 const SHAPE_BITS = 4;
-export function patternBits(rarity: Rarity, source: string): number {
+export function patternBits(rarity: Rarity, source: string, own = 0): number {
   const node = parseRegex(source);
   const atoms = node === undefined ? (source.match(/[A-Za-z]{2,}/g) ?? []) : regexAtoms(node);
-  return rarity.shared(atoms) + SHAPE_BITS;
+  return rarity.shared(atoms, own) + SHAPE_BITS;
 }
 
 /* --------------------------------------------------------------- finding */
@@ -566,13 +566,17 @@ export function restatementsOf(input: RestatementInput): Restatements {
   /* Sets: copies, drift, and subsets nothing types. Strongest first, and each list is the copy in one restatement at most: a group forms around its center, never by chaining pairs. */
   const seen = new Set<string>();
   const copied = new Set<string>();
-  const pairs = [...input.pairs].sort((x, y) => input.rarity.shared(y.shared) - input.rarity.shared(x.shared));
+  // Among equal pairs, the one whose other side more files import first: a copy pairs with its home before another copy.
+  const importedBy = new Map<string, number>();
+  for (const imports of input.imports.values()) for (const i of imports) if (i.to !== undefined) importedBy.set(i.to, (importedBy.get(i.to) ?? 0) + 1);
+  const reachOf = (p: SetPair): number => Math.max(importedBy.get(p.a.file) ?? 0, importedBy.get(p.b.file) ?? 0);
+  const pairs = [...input.pairs].sort((x, y) => input.rarity.shared(y.shared) - input.rarity.shared(x.shared) || reachOf(y) - reachOf(x));
   for (const f of pairs) {
     const { a, b } = f;
     if (a.file === b.file || !sideOk(input, a) || !sideOk(input, b)) continue;
     if (a.checked && b.checked) continue;
     // What the two sets share must say enough: three common names do not, two rare ones may.
-    const bits = input.rarity.shared(f.shared);
+    const bits = input.rarity.shared(f.shared, 2);
     if (bits < RARITY_MIN) continue;
     const kind = setKind(f);
     if (kind === undefined) continue;
@@ -583,7 +587,7 @@ export function restatementsOf(input: RestatementInput): Restatements {
     if (typedRecord(input, f) || f.shared.every(ownedOutside)) continue;
     // A part typed against the whole's member type is held by the compiler: a member the whole lacks is a compile error.
     const [part, whole] = f.onlyA.length <= f.onlyB.length ? [a, b] : [b, a];
-    const copy = kind === "subset" ? part : listName(a) === undefined ? a : b;
+    const copy = kind === "subset" ? part : listName(a) === undefined ? a : listName(b) === undefined ? b : (importedBy.get(a.file) ?? 0) < (importedBy.get(b.file) ?? 0) ? a : b;
     const copyKey = `${copy.file}:${copy.line}:${copy.name}`;
     if (copied.has(copyKey)) continue;
     copied.add(copyKey);
@@ -672,7 +676,7 @@ export function restatementsOf(input: RestatementInput): Restatements {
     const files = [...new Set(sites.map((s) => s.file))];
     if (files.length < 2 || excludedValue(value, input.typed) || ruled.has(value)) continue;
     // A value must say enough to be one fact: "id" in forty files is the language's word, `PostInvocation` in two is the project's. A pattern says what its literal words say; its syntax says little.
-    const bits = sites.some((s) => s.regex === true) ? patternBits(input.rarity, value) : input.rarity.value(value);
+    const bits = sites.some((s) => s.regex === true) ? patternBits(input.rarity, value, sites.length) : input.rarity.value(value, sites.length);
     if (bits < RARITY_MIN) continue;
     const boundFiles = new Set(sites.filter((s) => s.bound !== undefined).map((s) => s.file));
     if (PROSE.test(value) && boundFiles.size < 2) continue;

@@ -75,28 +75,29 @@ export class Rarity {
     this.denominator = project.total + prior.total + SMOOTHING * Math.max(unique, 1);
   }
 
-  /** One token's bits. */
-  token(token: string): number {
+  /** One token's bits. `own` is how many of the project's occurrences are the copies being weighed: they are left out, so copies never vouch for their own rarity, and a token only they write is as rare as the background allows. */
+  token(token: string, own = 0): number {
     if (!WORD.test(token)) return /^\d/.test(token) ? DIGITS_BITS : MARK_BITS;
-    let bits = this.cache.get(token);
+    const key = own === 0 ? token : `${own}\u0000${token}`;
+    let bits = this.cache.get(key);
     if (bits === undefined) {
-      bits = -Math.log2((this.project.get(token) + this.prior.get(token) + SMOOTHING) / this.denominator);
-      this.cache.set(token, bits);
+      bits = -Math.log2((Math.max(0, this.project.get(token) - own) + this.prior.get(token) + SMOOTHING) / this.denominator);
+      this.cache.set(key, bits);
     }
     return bits;
   }
 
-  /** A value's bits: the sum over its tokens. */
-  value(value: string): number {
+  /** A value's bits: the sum over its tokens, written `own` times by the copies being weighed. */
+  value(value: string, own = 0): number {
     let bits = 0;
-    for (const t of tokensOf(value)) bits += this.token(t);
+    for (const t of tokensOf(value)) bits += this.token(t, own);
     return bits;
   }
 
   /** What several values say together: the sum of each one's bits. */
-  shared(values: readonly string[]): number {
+  shared(values: readonly string[], own = 0): number {
     let bits = 0;
-    for (const v of values) bits += this.value(v);
+    for (const v of values) bits += this.value(v, own);
     return bits;
   }
 }
