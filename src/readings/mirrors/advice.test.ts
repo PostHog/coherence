@@ -71,6 +71,9 @@ test("write-time advice never blocks or denies: on every host's writing tool it 
 test("write-time advice is silent when no advice index is kept, or the kept one cannot be read", async () => {
   const root = await warmed();
   try {
+    // A warm process has the index loaded; once the kept index is gone, it says nothing from what it loaded.
+    assert.match((await preToolUse(root, "Write", { file_path: join(root, "src/a/zero.ts"), content: COPY })).context, /LINE_EXTENSION/);
+    rmSync(join(root, ".coherence", "mirrors", "advised"), { recursive: true, force: true });
     rmSync(join(root, ".coherence", "mirrors", "advice.json"));
     assert.equal((await preToolUse(root, "Write", { file_path: join(root, "src/a/one.ts"), content: COPY })).context, "", "no index, no word");
     writeFileSync(join(root, ".coherence", "mirrors", "advice.json"), "{ not json");
