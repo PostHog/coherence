@@ -17,6 +17,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, describe, it } from "node:test";
 import { cli, type CliResult } from "./lifecycle/cli-fixture.ts";
+import { SHARD_SUFFIX } from "./journal/stores.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "cli.ts");
 const made: string[] = [];
@@ -64,7 +65,7 @@ interface Step {
 }
 
 /** A shard's random token (journal/shards.ts), which differs between two copies. */
-const SHARD_TOKEN = /\.[0-9a-f]{8}\.(jsonl|jsonseq)\b/g;
+const SHARD_TOKEN = new RegExp(SHARD_SUFFIX.source, "g");
 
 /** Every file Coherence keeps under the project's .coherence, relative, sorted; a shard's token as <token>. */
 function records(root: string): string[] {

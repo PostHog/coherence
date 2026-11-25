@@ -94,8 +94,13 @@ function journalOf(dir: string, session: string): unknown[] {
     return [];
   }
   const legacy = fileName(session);
-  const shard = new RegExp(`^${session.replace(/[^\w-]/g, (c) => `\\${c}`)}\\.[0-9a-f]{8}\\.(jsonl|jsonseq)$`);
+  const shard = statusShard(session);
   return names.filter((n) => n === legacy || shard.test(n)).flatMap((n) => lines(join(dir, n)));
+}
+
+/** A shard's whole name for a session: the session, then SHARD_SUFFIX in journal/stores.ts, which this file cannot import; statusline.test.ts holds the two equal. */
+export function statusShard(session: string): RegExp {
+  return new RegExp(`^${session.replace(/[^\w-]/g, (c) => `\\${c}`)}\\.[0-9a-f]{8}\\.(jsonl|jsonseq)$`);
 }
 
 function config(dir: string): Record<string, unknown> | undefined {
@@ -204,6 +209,7 @@ export function readStatus(input: StatusInput): StatusReading | undefined {
   const name = fileName(session);
   for (const dir of folders) {
     for (const t of lines(join(dir, STATUS_SOURCES.hookTimes, name))) {
+      // differs on purpose from src/lifecycle/hook-latency.ts:parseHookTimes: reads only event and ms, the two the status line sums, and imports node alone
       const time = t as { event?: unknown; ms?: unknown };
       if (typeof time.event !== "string" || typeof time.ms !== "number" || !STATUS_TOOL_HOOKS.has(time.event)) continue;
       calls += 1;

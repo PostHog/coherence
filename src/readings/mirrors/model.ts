@@ -28,6 +28,12 @@ export interface SetRef {
   of?: string[];
   /** For the import closure of a list of files: where that list is, as file:line. */
   list?: string;
+  /** For an object's keys: the named type the object is declared as or satisfies (`Command` in `const x: Command = {…}`), a utility type such as Record aside. */
+  type?: string;
+  /** For an object's keys: read only by property access where it is declared, never iterated or keyed: a record's attributes, not a set's members. */
+  record?: boolean;
+  /** For a list: the member type it is declared with (`HookEvent` in `ReadonlySet<HookEvent>` or `new Set<HookEvent>(…)`), when it names one. */
+  elementType?: string;
 }
 
 export interface Missed {
@@ -95,15 +101,60 @@ export interface MirrorReading {
   restatements: Restatement[];
   /** How many restatements a test, an import or a declared mirror holds: found, and not counted. */
   held: number;
+  /** The restatements the config's restatements key excludes, each naming the entry that excluded it: never counted, never lost. */
+  excluded: Restatement[];
+  /** Held by a test that has not yet gone red when its copy changed. */
+  unrefuted: Restatement[];
+  /** Declared different on purpose by a comment at the copy. */
+  declared: Restatement[];
+  /** The rules the reading applied, as a digest: a count is compared with another only under the same rules. */
+  rules: string;
+  /** Every copy a test names, witnessed or not: what query mirrors --witness changes and runs. */
+  holds: HeldCopy[];
+}
+
+/** A copy a test names, to be witnessed: change the copy, and the test must go red. Keyed by the blobs of the home, the copy and the test. */
+export interface HeldCopy {
+  key: string;
+  test: string;
+  copy: RestatementSite;
+  home: RestatementSite;
+  /** The value or the members the copy writes, for the change. */
+  value: string;
+  members?: string[];
+}
+
+/** The config's restatements key: the project facts the reading cannot derive. */
+export interface RestatementConfig {
+  /** Globs of seed, demo and example files whose literals restate lists on purpose; still code for every other reading. */
+  data: string[];
+  /** Globs of standalone scripts, which run alone: a copy there is left as it is. */
+  scripts: string[];
+  /** Regular expressions a deliberate shared value matches. */
+  values: string[];
+}
+
+export type ExclusionKey = keyof RestatementConfig;
+export const EXCLUSION_KEYS: readonly ExclusionKey[] = ["data", "scripts", "values"] as const satisfies readonly ExclusionKey[];
+
+/** The config entry that excluded a restatement: its key, and the glob or pattern as the config writes it. */
+export interface Exclusion {
+  key: ExclusionKey;
+  entry: string;
 }
 
 /**
- * The kinds of restatement, in the order they are ranked: two sets that
- * differ by one member (live drift), one value bound to a named constant in
- * two or more files, two equal sets, and one literal written in two or more
- * files.
+ * The kinds of restatement: two sets that differ by one member (live
+ * drift); a list that is a strict part of another, typed as plain strings
+ * (a derivation nothing types); one rule written as two predicates (a
+ * regular expression, a chain of string tests, a set tested for
+ * membership) that accept the same strings; a predicate whose accepted
+ * strings are a strict part of another's (a derived rule); two functions
+ * that parse text into one type checking the same fields (a parser); one
+ * value bound to a named constant in two or more files; two equal sets; and
+ * one literal written in two or more files.
  */
-export type RestatementKind = "drift" | "constant" | "copy" | "literal";
+export type RestatementKind = "drift" | "subset" | "rule" | "derivation" | "parser" | "constant" | "copy" | "literal";
 
 export interface RestatementSite {
   file: string;
@@ -127,7 +178,17 @@ export interface Restatement {
   /** For drift: the one member only one side holds, and the side that lacks it as file:line. */
   odd?: { member: string; lacks: string };
   sites: RestatementSite[];
-  /** Where the value would live once: one module the rest import, a plugin's manifest, or a test that holds the copies equal. */
+  /** Where the value would live once: one module the rest import, a plugin's manifest, or a test that holds the copies equal; for an excluded one, why it is left as it is. */
   source: string;
   score: number;
+  /** Set on an excluded restatement alone: the config entry that excluded it. */
+  by?: Exclusion;
+  /** History's standing: 1 already diverged, 2 changed apart, 3 changed together, 4 never changed (or no history read). */
+  standing?: number;
+  /** Its sites lie in different parts of the project (a plugin, a package, a top folder). */
+  crossPackage?: boolean;
+  /** Held by a test not yet refuted: the test, and the key its verdict is kept under. */
+  hold?: { test: string; key: string };
+  /** Declared different on purpose by a comment at the copy: how its behavior differs. */
+  declared?: string;
 }

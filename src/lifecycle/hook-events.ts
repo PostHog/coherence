@@ -21,6 +21,9 @@ export function isHookEvent(name: string): name is HookEvent {
   return (HOOK_EVENTS as readonly string[]).includes(name);
 }
 
+/** The events that start a session or a subagent: where orient speaks, and where Codex's context limit applies. */
+export const START_EVENTS: ReadonlySet<string> = new Set<HookEvent>(["SessionStart", "SubagentStart"]);
+
 /** The events that run around every tool call, which the latency budget holds. */
 export const TOOL_HOOKS: ReadonlySet<string> = new Set<HookEvent>(["PreToolUse", "PostToolUse"]);
 

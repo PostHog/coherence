@@ -42,8 +42,8 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: instrument -> reading
   refuted: exempted import specifiers from the classification, as the adapter did before -> "every site the language server reports is a reference: a bypass beneath a semicolon-less bare import is a bypass, and an import outside the chokepoint is one too" went red in enforcement.test.ts with the bypass graded pass; restored, green (2026-09-18)
   kinds: none
-- test paths: A path is a test when a configured folder is one of its segments or the file is named .test or .spec.
-  over: every configured test folder and every file named .test or .spec
+- test paths: A path is a test when a configured folder is one of its segments or the file is named .test or .spec, or .e2e or .e2e-spec for an end-to-end test.
+  over: every configured test folder and every file named .test, .spec, .e2e or .e2e-spec
   via: a path is a test when a configured folder is a segment or the file is named .test or .spec
   because: a test may reference a protected thing to check it and is reported rather than counted as a bypass; the rule is the config's folders plus the file naming both runners use, so a test in an unexpected folder is still a test
   crossing: project-source -> reading

@@ -81,7 +81,7 @@ import type { CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import type { withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
-import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
+import { HOOK_EVENTS, START_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { keepSaid, saidIn, toolOf } from "./hook-said.ts";
 import { carryBlock, decisionsNear, keepPlaced } from "./carry-over.ts";
@@ -1503,14 +1503,14 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
 
   /** A session start above a project it has not entered names the project in one line; every other event says nothing. Nothing is read or written. */
   function pointer(root: string): HookResult {
-    if (event !== "SessionStart" && event !== "SubagentStart") return { stdout: "", stderr: "", exit: 0 };
+    if (!START_EVENTS.has(event)) return { stdout: "", stderr: "", exit: 0 };
     const context = `Coherence is adopted in ${relative(given, root) || "."} below this folder; its orient arrives with the first edit or command inside it, and work elsewhere hears nothing from it.`;
     return { stdout: JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n", stderr: "", exit: 0 };
   }
 
   /** An event outside every project is ignored: nothing read, nothing written, nothing said; a session start above several says so in one line. */
   function quiet(where: Exclude<HookProject, { kind: "project" }>): HookResult {
-    if (where.kind === "several" && (event === "SessionStart" || event === "SubagentStart")) {
+    if (where.kind === "several" && START_EVENTS.has(event)) {
       const context = `Coherence: this folder holds ${where.projects.length} projects (${where.projects.map((p) => relative(given, p) || ".").join(", ")}); its hooks answer for one at a time, so they say nothing here. Start the session in one of them, or edit a file inside one.`;
       return { stdout: JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n", stderr: "", exit: 0 };
     }

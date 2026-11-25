@@ -10,7 +10,8 @@ import { mirrorsCommand } from "./cli.ts";
 import { readMirrors } from "./mirrors.ts";
 import type { Finding, Group, MirrorReading, Restatement, SetRef } from "./model.ts";
 import { alarmsOf, isAlarm, proposalsOf, readingText, surfaced } from "./policy.ts";
-import { sourceOf, type RestatementInput } from "./restatements.ts";
+import { Counts, Rarity } from "./rarity.ts";
+import { NO_EXCLUSIONS, sourceOf, type RestatementInput } from "./restatements.ts";
 import { lastMirrors, MIRRORS_DIR, ORIENT_LINE_LIMIT, orientMirrorText, recordMirrors } from "./recorded.ts";
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -82,7 +83,7 @@ function finding(a: SetRef, b: SetRef, extra: Partial<Finding> = {}): Finding {
 const group = (rank: number, score: number, findings: Finding[]): Group => ({ rank, score, overlapScore: score, historyScore: 0, findings });
 
 function readingOf(groups: Group[]): MirrorReading {
-  return { rev: "HEAD", commit: "0123456789abcdef0123456789abcdef01234567", ms: 1, phases: {}, sets: 10, read: 10, unread: {}, groups, restatements: [], held: 0 };
+  return { rev: "HEAD", commit: "0123456789abcdef0123456789abcdef01234567", ms: 1, phases: {}, sets: 10, read: 10, unread: {}, groups, restatements: [], held: 0, excluded: [], unrefuted: [], declared: [], rules: "test", holds: [] };
 }
 
 /* ---------------------------------------------------- the invariants */
@@ -299,14 +300,14 @@ function repositoryOf(files: Record<string, string>): string {
 
 const valueOf = (reading: MirrorReading, value: string): Restatement | undefined => reading.restatements.find((r) => r.value === value);
 
-test("a value written in two files is a restatement, ranked drift then constant then the rest, and tests, literal types, prose and vocabulary are left out", async () => {
+test("a value written in two files is a restatement when what its copies share is rare enough, ranked by what has diverged and what history changed apart, and tests, literal types, prose and other parties' vocabulary are left out", async () => {
   const root = repositoryOf({
     "src/a/kinds.ts": 'export const KINDS = ["alpha", "beta", "gamma", "delta"];\n',
     "src/b/use.ts": 'export const SOME_KINDS = ["alpha", "beta", "gamma"];\n',
-    "src/a/rule.ts": "export const NAME_RULE = /^[a-z][a-z0-9-]*$/;\nexport const NOTE = \"the note that two modules keep\";\n",
-    "src/b/rule.ts": "const NAME_RULE = /^[a-z][a-z0-9-]*$/;\nconst NOTE = \"the note that two modules keep\";\nexport const ok = (s: string): boolean => NAME_RULE.test(s) && s !== NOTE;\n",
-    "src/a/words.ts": 'export type Mode = "the-long-mode-name" | "the-other-mode-name";\nexport const one = (): string => "written-in-two-files";\nexport const say = (): string => "some prose that is not a name";\nexport const url = "https://example.com/one/two";\nexport const seen = "only-a-test-repeats-this";\nexport const mode = "the-long-mode-name";\n',
-    "src/b/words.ts": 'export const two = (): string => "written-in-two-files";\nexport const say = (): string => "some prose that is not a name";\nexport const url = "https://example.com/one/two";\nexport const mode = "the-long-mode-name";\n',
+    "src/a/rule.ts": "export const NAME_RULE = /^zqname-[a-z][a-z0-9-]*$/;\nexport const NOTE = \"the note that two modules keep\";\n",
+    "src/b/rule.ts": "const NAME_RULE = /^zqname-[a-z][a-z0-9-]*$/;\nconst NOTE = \"the note that two modules keep\";\nexport const ok = (s: string): boolean => NAME_RULE.test(s) && s !== NOTE;\n",
+    "src/a/words.ts": 'export type Mode = "the-long-mode-name" | "the-other-mode-name";\nexport const one = (): string => "written-in-two-files";\nexport const say = (): string => "some prose that is not a name";\nexport const url = "https://example.com/one/two";\nexport const seen = "only-a-test-repeats-this";\nexport const mode = "the-long-mode-name";\nexport const ext = ".zqmts";\nexport const word = "name";\nexport const header = "WWW-Authenticate";\nexport const status = "Internal Server Error";\nexport const sub = "ls-files";\nexport const bare = /^[0-9a-f]{8}$/;\n',
+    "src/b/words.ts": 'export const two = (): string => "written-in-two-files";\nexport const say = (): string => "some prose that is not a name";\nexport const url = "https://example.com/one/two";\nexport const mode = "the-long-mode-name";\nexport const ext = ".zqmts";\nexport const word = "name";\nexport const header = "WWW-Authenticate";\nexport const status = "Internal Server Error";\nexport const sub = "ls-files";\nexport const bare = /^[0-9a-f]{8}$/;\n',
     "src/b/words.test.ts": 'export const seen = "only-a-test-repeats-this";\n',
     "src/b/fixture-words.ts": 'export const seen = "only-a-test-repeats-this";\n',
   });
@@ -316,29 +317,42 @@ test("a value written in two files is a restatement, ranked drift then constant 
     assert.ok(drift !== undefined, reading.restatements.map((r) => r.value).join("; "));
     assert.deepEqual(drift.members, ["alpha", "beta", "gamma"]);
     assert.deepEqual(drift.odd, { member: "delta", lacks: "src/b/use.ts:1" }, "the side that lacks the one member is named");
-    assert.equal(valueOf(reading, "^[a-z][a-z0-9-]*$")?.kind, "constant", "a regular expression bound to a constant in two files");
+    assert.equal(reading.restatements[0], drift, "what has already diverged ranks first");
+    assert.equal(valueOf(reading, "^zqname-[a-z][a-z0-9-]*$")?.kind, "constant", "a regular expression bound to a constant in two files, weighed by its words");
     assert.equal(valueOf(reading, "the note that two modules keep")?.kind, "constant", "prose bound to a named constant in two files is kept");
     assert.equal(valueOf(reading, "written-in-two-files")?.kind, "literal");
     assert.deepEqual(valueOf(reading, "written-in-two-files")?.sites.map((s) => s.file), ["src/a/words.ts", "src/b/words.ts"]);
-    assert.deepEqual(reading.restatements.map((r) => r.kind), ["drift", "constant", "constant", "literal"], "drift first, then constants, then the rest, and nothing else");
-    for (const left of ["the-long-mode-name", "some prose that is not a name", "https://example.com/one/two", "only-a-test-repeats-this"]) assert.equal(valueOf(reading, left), undefined, `${left} is left out`);
+    assert.equal(valueOf(reading, ".zqmts")?.kind, "constant", "a short value counts when it is rare");
+    assert.deepEqual(reading.restatements.map((r) => r.kind).sort(), ["constant", "constant", "constant", "drift", "literal"], "and nothing else");
+    for (const left of ["the-long-mode-name", "some prose that is not a name", "https://example.com/one/two", "only-a-test-repeats-this", "name", "WWW-Authenticate", "Internal Server Error", "ls-files", "^[0-9a-f]{8}$"]) assert.equal(valueOf(reading, left), undefined, `${left} is left out`);
 
     let out = "";
     const io = { out: (text: string): void => { out += text; }, err: (text: string): void => { out += text; } };
     assert.equal(await mirrorsCommand(root, ["--no-history"], io), 0);
-    assert.match(out, /^4 restatements nothing holds equal \(one value written in two or more files; 0 more held/m, "the default answer says the count");
+    assert.match(out, /^Restatements: 5 unheld, 0 excluded by config, 0 held, 0 held by a test not yet refuted, 0 declared different \(one value written in two or more files;/m, "the default answer says the counts");
     out = "";
     assert.equal(await mirrorsCommand(root, ["--no-history", "--restatements"], io), 0);
     assert.match(out, /1\. drift {2}3 members: alpha, beta, gamma\n {5}src\/a\/kinds\.ts:1 KINDS\n {5}src\/b\/use\.ts:1 SOME_KINDS\n {5}src\/b\/use\.ts:1 lacks delta\n {5}source: /);
     out = "";
     assert.equal(await mirrorsCommand(root, ["--no-history", "--json"], io), 0);
-    assert.equal(JSON.parse(out).restatements.length, 4);
+    assert.equal(JSON.parse(out).restatements.length, 5);
+
+    // History ranks, never alarms: a copy one commit changed apart from the other ranks above one that never changed.
+    const git = gitIn(root);
+    write(root, "src/a/rule.ts", "export const NAME_RULE = /^zqname-[a-z][a-z0-9-]*$/; // kept here\nexport const NOTE = \"the note that two modules keep\";\n");
+    git("commit", "-qam", "touch one copy");
+    const later = await readMirrors(root);
+    const apart = valueOf(later, "^zqname-[a-z][a-z0-9-]*$");
+    const still = valueOf(later, "the note that two modules keep");
+    assert.equal(apart?.standing, 2, "changed apart");
+    assert.equal(still?.standing, 4, "never changed");
+    assert.ok(later.restatements.indexOf(apart!) < later.restatements.indexOf(still!), "changed apart ranks above never changed");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("a copy held by a test, by an import of the list's name or by a declared mirror is counted held, not restated", async () => {
+test("a copy held by an import of the list's name, a type or a declared mirror is counted held, and one a test names is held only once that test went red, until then counted apart", async () => {
   const root = repositoryOf({
     "src/a/levels.ts": 'export const LEVELS = ["low", "middle", "high"] as const;\n',
     "src/b/levels.ts": 'import type { LEVELS } from "../a/levels.ts";\nexport const MY_LEVELS = ["low", "middle", "high"] as const satisfies readonly (typeof LEVELS)[number][];\n',
@@ -357,7 +371,10 @@ test("a copy held by a test, by an import of the list's name or by a declared mi
   try {
     const reading = await readMirrors(root, { history: false });
     assert.deepEqual(reading.restatements.map((r) => r.value).sort(), ["circle, square, triangle", "nothing-holds-this-value"], "only what nothing holds is restated");
-    assert.equal(reading.held, 4, "the type import, the test of the list, the declared mirror and the test of the value each hold one");
+    assert.equal(reading.held, 2, "the type import and the declared mirror each hold one");
+    assert.deepEqual(reading.unrefuted.map((r) => r.value).sort(), ["held-by-a-test-value", "small, medium, large"], "a copy a test names is held, not yet refuted, until the test has gone red with the copy changed");
+    assert.deepEqual(reading.unrefuted.map((r) => r.hold?.test).sort(), ["src/b/sizes.test.ts", "src/b/value.test.ts"]);
+    assert.equal(reading.holds.length, 2, "both are offered to the witness pass");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -375,6 +392,15 @@ function sourceInput(imports: Record<string, string[]>, extra: Partial<Restateme
     plugins: [],
     manifests: new Set(),
     declared: [],
+    shapes: new Map(),
+    exclusions: NO_EXCLUSIONS,
+    rarity: new Rarity(new Counts(), new Counts()),
+    predicates: [],
+    parsers: [],
+    literals: [],
+    declarations: new Map(),
+    blobs: new Map(),
+    witnessed: () => undefined,
     ...extra,
   };
 }

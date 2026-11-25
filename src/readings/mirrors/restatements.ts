@@ -11,10 +11,17 @@
  * Pure over what the reading collected: no file, no git, no parser. The
  * lessons of the prototype that produced the rated ten, each measured:
  *
- *   Excluded: test files and frozen fixtures (never collected), values the
- *     compiler holds (a member of a string-literal type), prose (four or more
- *     spaces) unless bound to a named constant in two or more files, and
- *     protocol or vocabulary strings (URLs, MIME types, LSP methods).
+ *   Excluded: the project's test files (by the rule every reading shares)
+ *     and frozen fixtures (never collected), values the compiler holds (a
+ *     member of a string-literal type), prose (four or more spaces) unless
+ *     bound to a named constant in two or more files, protocol or vocabulary
+ *     strings (URLs, MIME types, LSP methods, HTTP header names and status
+ *     reason phrases), and the keys of two objects one named type holds (the
+ *     same type, or a shape they differ from only in its optional fields).
+ *   Excluded by config: what the project's restatements key names (data
+ *     files, standalone scripts, deliberate shared values) is counted apart,
+ *     by the entry that excluded it, so the count it lowers never reads as a
+ *     fix.
  *   Held: a site's file imports the other's list by name from it, a test
  *     names a site's file and its list (or its value), or a spec declares the
  *     pair a mirror.
@@ -28,12 +35,10 @@
 
 import { basename, posix } from "node:path";
 import { MANIFEST } from "../../plugins/plugin.ts";
-import { DERIVED, DOC_FORMS, type Finding, type Restatement, type RestatementKind, type RestatementSite, type SetRef } from "./model.ts";
+import { parseRegex, predicateOf, regexAtoms, rulesOf, type PredicateSite } from "./predicates.ts";
+import { RARITY_MIN, type Rarity } from "./rarity.ts";
+import { DERIVED, DOC_FORMS, type Exclusion, type Finding, type HeldCopy, type Restatement, type RestatementKind, type RestatementSite, type SetRef } from "./model.ts";
 
-/** A literal this long or longer is a value worth one source. */
-export const VALUE_MIN = 16;
-/** A set restates when this many members are shared: two-member sets were noise. */
-export const SET_SHARED_MIN = 3;
 
 /** One place a literal value is written. */
 export interface ValueSite {
@@ -42,6 +47,8 @@ export interface ValueSite {
   /** The variable the literal initializes, when it initializes one. */
   bound?: string;
   exported: boolean;
+  /** Written as a regular expression's source. */
+  regex?: boolean;
 }
 
 /** One import of a module, resolved: `to` is the project file it names, undefined for a package or a built-in. */
@@ -57,6 +64,26 @@ export interface DeclaredPair {
   list: string;
   partner: string;
 }
+
+/** A type's fields as its declarations write them: an interface, or a type alias of an object type. */
+export interface Shape {
+  fields: string[];
+  /** The fields written with `?`. */
+  optional: string[];
+  /** An index signature: the type is a set keyed by its members, not a record of fields. */
+  indexed: boolean;
+  /** The named types it extends or intersects, whose fields it has too. */
+  bases: string[];
+}
+
+/** The config's restatements key, each entry matched: a glob as a file test, a pattern as a value test. */
+export interface Exclusions {
+  data: readonly { entry: string; test: (file: string) => boolean }[];
+  scripts: readonly { entry: string; test: (file: string) => boolean }[];
+  values: readonly { entry: string; test: (value: string) => boolean }[];
+}
+
+export const NO_EXCLUSIONS: Exclusions = { data: [], scripts: [], values: [] };
 
 /** Two sets the matching paired, as a finding names them. */
 export type SetPair = Pick<Finding, "a" | "b" | "shared" | "onlyA" | "onlyB" | "jaccard">;
@@ -77,6 +104,80 @@ export interface RestatementInput {
   plugins: readonly string[];
   manifests: ReadonlySet<string>;
   declared: readonly DeclaredPair[];
+  /** The fields of each type the project declares, by name. */
+  shapes: ReadonlyMap<string, readonly Shape[]>;
+  exclusions: Exclusions;
+  /** What a value says, in bits, under the project's background and the prior. */
+  rarity: Rarity;
+  /** Every predicate the parse found. */
+  predicates: readonly PredicateSite[];
+  /** Every function that reads text into a named type, with the fields its guard checks. */
+  parsers: readonly ParserSite[];
+  /** The project's own string literals: probes for its rules. */
+  literals: readonly string[];
+  /** The comments that declare a copy different on purpose, by file. */
+  declarations: ReadonlyMap<string, readonly { line: number; home: string; why: string }[]>;
+  /** Each tracked file's blob at the revision: what a witnessed hold is keyed by. */
+  blobs: ReadonlyMap<string, string>;
+  /** A witnessed hold's verdict by its key: red (the test held the copy), green (it did not), none yet. */
+  witnessed: (key: string) => "red" | "green" | undefined;
+  /** Where history places the copies: 2 changed apart, 3 changed together, 4 never changed; none without history. */
+  standingOf?: (needles: readonly string[], files: readonly string[]) => number;
+}
+
+/** A function that reads text into a named type: the type, and the fields its guard checks. */
+export interface ParserSite {
+  file: string;
+  line: number;
+  name: string;
+  exported: boolean;
+  type: string;
+  fields: string[];
+}
+
+/**
+ * HTTP's own vocabulary, which RFC 9110 and the registries define, not the
+ * project: the header names and the status codes' reason phrases, compared
+ * without case. A project that writes `WWW-Authenticate` or "Internal Server
+ * Error" in two files is speaking the protocol, not keeping a value by hand.
+ */
+const HTTP_VOCABULARY: ReadonlySet<string> = new Set([
+  "accept", "accept-charset", "accept-encoding", "accept-language", "accept-patch", "accept-post", "accept-ranges",
+  "access-control-allow-credentials", "access-control-allow-headers", "access-control-allow-methods", "access-control-allow-origin",
+  "access-control-expose-headers", "access-control-max-age", "access-control-request-headers", "access-control-request-method",
+  "age", "allow", "alt-svc", "authorization", "cache-control", "clear-site-data", "connection", "content-disposition", "content-encoding",
+  "content-language", "content-length", "content-location", "content-range", "content-security-policy", "content-security-policy-report-only",
+  "content-type", "cookie", "cross-origin-embedder-policy", "cross-origin-opener-policy", "cross-origin-resource-policy", "date", "etag",
+  "expect", "expires", "forwarded", "from", "host", "if-match", "if-modified-since", "if-none-match", "if-range", "if-unmodified-since",
+  "keep-alive", "last-modified", "link", "location", "max-forwards", "origin", "permissions-policy", "pragma", "proxy-authenticate",
+  "proxy-authorization", "range", "referer", "referrer-policy", "retry-after", "sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site",
+  "sec-fetch-user", "sec-websocket-accept", "sec-websocket-extensions", "sec-websocket-key", "sec-websocket-protocol", "sec-websocket-version",
+  "server", "server-timing", "set-cookie", "strict-transport-security", "te", "timing-allow-origin", "trailer", "transfer-encoding", "upgrade",
+  "upgrade-insecure-requests", "user-agent", "vary", "via", "www-authenticate", "x-content-type-options", "x-forwarded-for", "x-forwarded-host",
+  "x-forwarded-proto", "x-frame-options", "x-requested-with", "x-xss-protection",
+  "continue", "switching protocols", "processing", "early hints", "ok", "created", "accepted", "non-authoritative information", "no content",
+  "reset content", "partial content", "multi-status", "already reported", "im used", "multiple choices", "moved permanently", "found",
+  "see other", "not modified", "use proxy", "temporary redirect", "permanent redirect", "bad request", "unauthorized", "payment required",
+  "forbidden", "not found", "method not allowed", "not acceptable", "proxy authentication required", "request timeout", "conflict", "gone",
+  "length required", "precondition failed", "content too large", "payload too large", "uri too long", "unsupported media type",
+  "range not satisfiable", "expectation failed", "i'm a teapot", "misdirected request", "unprocessable content", "unprocessable entity",
+  "locked", "failed dependency", "too early", "upgrade required", "precondition required", "too many requests",
+  "request header fields too large", "unavailable for legal reasons", "internal server error", "not implemented", "bad gateway",
+  "service unavailable", "gateway timeout", "http version not supported", "variant also negotiates", "insufficient storage",
+  "loop detected", "not extended", "network authentication required",
+  "get", "head", "post", "put", "delete", "connect", "options", "trace", "patch",
+]);
+
+/** Git's own names a program passes it: subcommands and the files of a repository's layout. */
+const GIT_VOCABULARY: ReadonlySet<string> = new Set([
+  "ls-files", "ls-tree", "cat-file", "rev-parse", "rev-list", "for-each-ref", "merge-base", "show-ref", "symbolic-ref", "update-index",
+  "diff-tree", "diff-index", "name-rev", "hash-object", "worktree", "packed-refs", "check-ignore", "update-ref", "read-tree", "write-tree",
+]);
+
+/** Whether another party owns the string: HTTP (a header name, a method, a status reason phrase), git (a subcommand, a file of its layout), ARIA (an aria- attribute), or HTML (a character reference). */
+export function ownedOutside(value: string): boolean {
+  const lower = value.toLowerCase();
+  return HTTP_VOCABULARY.has(lower) || GIT_VOCABULARY.has(lower) || /^aria-[a-z]+$/.test(lower) || /^&(?:[a-z]+|#\d+|#x[0-9a-f]+);$/.test(lower);
 }
 
 /** Prose: four or more spaces between words. */
@@ -89,7 +190,55 @@ const IDENTIFIER = /^[A-Za-z_$][\w$]*/;
 
 /** Whether a value is excluded before any site is weighed: the compiler holds it, or another party defines it. */
 export function excludedValue(value: string, typed: ReadonlySet<string>): boolean {
-  return typed.has(value) || VOCABULARY.test(value);
+  return typed.has(value) || VOCABULARY.test(value) || ownedOutside(value);
+}
+
+/** Utility types whose object is keyed by its members (`Record<Kind, …>`), never a record of fields. */
+const KEYED = new Set(["Record", "Partial", "Required", "Readonly", "Pick", "Omit"]);
+
+/** A named type's fields, with the fields of every type it extends that the project declares; undefined for a type the project does not declare. */
+function fieldsOf(input: RestatementInput, name: string, seen: Set<string> = new Set()): { fields: Set<string>; optional: Set<string>; indexed: boolean } | undefined {
+  const shapes = input.shapes.get(name);
+  if (shapes === undefined || seen.has(name)) return undefined;
+  seen.add(name);
+  const out = { fields: new Set<string>(), optional: new Set<string>(), indexed: false };
+  for (const s of shapes) {
+    for (const f of s.fields) out.fields.add(f);
+    for (const f of s.optional) out.optional.add(f);
+    out.indexed ||= s.indexed;
+    for (const b of s.bases) {
+      const base = fieldsOf(input, b, seen);
+      if (base === undefined) continue;
+      for (const f of base.fields) out.fields.add(f);
+      for (const f of base.optional) out.optional.add(f);
+      out.indexed ||= base.indexed;
+    }
+  }
+  return out;
+}
+
+/**
+ * Whether two objects' keys are one type's fields, not a list kept twice:
+ * both are declared as (or satisfy) the same named type, which holds their
+ * key set; or one is, the project declares that type as a record of fields,
+ * and the two differ only in fields it marks optional. A type keyed by its
+ * members (Record, an index signature) is a set, and stays a candidate.
+ */
+export function typedRecord(input: RestatementInput, f: SetPair): boolean {
+  const { a, b } = f;
+  if (a.form !== "keys" || b.form !== "keys") return false;
+  // Both read only as `X.field`: two records' attributes, whatever their types say.
+  if (a.record === true && b.record === true) return true;
+  const named = [a.type, b.type].filter((t): t is string => t !== undefined && !KEYED.has(t));
+  if (named.length === 0) return false;
+  if (named.length === 2 && named[0] === named[1]) return fieldsOf(input, named[0]!)?.indexed !== true;
+  for (const t of new Set(named)) {
+    const shape = fieldsOf(input, t);
+    if (shape === undefined || shape.indexed) continue;
+    const odd = [...f.onlyA, ...f.onlyB];
+    if ([...f.shared, ...odd].every((m) => shape.fields.has(m)) && odd.every((m) => shape.optional.has(m))) return true;
+  }
+  return false;
 }
 
 /** The name a set is declared by, when a reader could import or name it: `FOOT_KEYS` for "FOOT_KEYS keys" or "FOOT[].key"; none for a literal inside a function or a switch's labels. */
@@ -98,7 +247,9 @@ export function listName(s: SetRef): string | undefined {
   return IDENTIFIER.exec(s.name)?.[0];
 }
 
-const word = (name: string): RegExp => new RegExp(`(^|[^\\w$])${name.replace(/[$]/g, "\\$")}($|[^\\w$])`);
+/** Every character a regular expression gives a meaning, escaped, backslash first. */
+const escaped = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|/-]/g, "\\$&");
+const word = (name: string): RegExp => new RegExp(`(^|[^\\w$])${escaped(name)}($|[^\\w$])`);
 
 interface Weigher {
   input: RestatementInput;
@@ -119,6 +270,9 @@ function weigher(input: RestatementInput): Weigher {
   return { input, testsNaming: (file) => byBase.get(basename(file)) ?? [] };
 }
 
+/** How a copy is held: an import, a type, a declared mirror, or a test that names it (which holds it only once it went red when the copy changed). */
+export type Hold = { by: "import" | "type" | "declared" } | { by: "test"; test: string; copy: RestatementSite; home: RestatementSite };
+
 /** Whether a site's file imports the other side's list by name from the other side's file. */
 function importsNamed(w: Weigher, side: SetRef, other: SetRef): boolean {
   const name = listName(other);
@@ -126,12 +280,9 @@ function importsNamed(w: Weigher, side: SetRef, other: SetRef): boolean {
   return (w.input.imports.get(side.file) ?? []).some((i) => i.to === other.file && i.names.includes(name));
 }
 
-/** Whether a test names the side's file and its list: the copy is held by that test. */
-function testHeld(w: Weigher, side: SetRef): boolean {
-  const name = listName(side);
-  if (name === undefined) return false;
-  const re = word(name);
-  return w.testsNaming(side.file).some((t) => re.test(w.input.tests.get(t)!));
+/** The test that names a file and a word: the first, in a stable order. */
+function testNaming(w: Weigher, file: string, has: (text: string) => boolean): string | undefined {
+  return w.testsNaming(file).sort().find((t) => has(w.input.tests.get(t)!));
 }
 
 function declaredHeld(w: Weigher, a: SetRef, b: SetRef): boolean {
@@ -143,18 +294,31 @@ function declaredHeld(w: Weigher, a: SetRef, b: SetRef): boolean {
   return w.input.declared.some((d) => (d.list === x && d.partner === y) || (d.list === y && d.partner === x));
 }
 
-/** Whether a set finding's copies are held equal: by an import of the list, by a test, or by a declared mirror. */
-export function setHeld(w: Weigher, a: SetRef, b: SetRef): boolean {
-  return importsNamed(w, a, b) || importsNamed(w, b, a) || testHeld(w, a) || testHeld(w, b) || declaredHeld(w, a, b);
+/** How a set finding's copies are held equal, if they are: an import of the list, a declared mirror, or a test that names one side's list. */
+export function setHold(w: Weigher, a: SetRef, b: SetRef): Hold | undefined {
+  if (importsNamed(w, a, b) || importsNamed(w, b, a)) return { by: "import" };
+  if (declaredHeld(w, a, b)) return { by: "declared" };
+  for (const [copy, home] of [[a, b], [b, a]] as const) {
+    const name = listName(copy);
+    if (name === undefined) continue;
+    const re = word(name);
+    const test = testNaming(w, copy.file, (text) => re.test(text));
+    if (test !== undefined) return { by: "test", test, copy: siteOfSet(copy), home: siteOfSet(home) };
+  }
+  return undefined;
 }
 
-/** Whether a test names a site's file and either the constant the value is bound to there or the value itself. */
-function valueHeld(w: Weigher, value: string, sites: readonly ValueSite[]): boolean {
-  return sites.some((s) => w.testsNaming(s.file).some((t) => {
-    const text = w.input.tests.get(t)!;
-    return text.includes(value) || (s.bound !== undefined && word(s.bound).test(text));
-  }));
+/** The test that holds a value: one naming a site's file and either the constant the value is bound to there or the value itself. */
+function valueHold(w: Weigher, value: string, sites: readonly { file: string; line: number; bound?: string }[]): Hold | undefined {
+  for (const s of sites) {
+    const test = testNaming(w, s.file, (text) => text.includes(value) || (s.bound !== undefined && word(s.bound).test(text)));
+    const home = sites.find((o) => o.file !== s.file);
+    if (test !== undefined && home !== undefined) return { by: "test", test, copy: siteOf(s), home: siteOf(home) };
+  }
+  return undefined;
 }
+
+const siteOf = (s: { file: string; line: number; bound?: string }): RestatementSite => ({ file: s.file, line: s.line, ...(s.bound === undefined ? {} : { name: s.bound }) });
 
 /* ------------------------------------------------------------------ source */
 
@@ -229,8 +393,16 @@ export function sourceOf(input: RestatementInput, files: readonly string[], pref
     }
     if (best === undefined || ok > best.ok || (ok === best.ok && reachBy(source) > reachBy(best.source))) best = { source, reaches, ok };
   }
-  const blocked = (best?.reaches ?? []).flatMap(([, r]) => (r.ok ? [] : [r.why]));
-  return `one source, ${best?.source ?? unique[0]}, and a test that holds the other copies equal to it: ${blocked.join("; ")}`;
+  const unreachable = (best?.reaches ?? []).flatMap(([, r]) => (r.ok ? [] : [r.why]));
+  return `one source, ${best?.source ?? unique[0]}, and a test that holds the other copies equal to it: ${unreachable.join("; ")}`;
+}
+
+/** What a pattern says: its literal words' bits, and a few bits for its shape. An escape class or `^\\s*$` says almost nothing. */
+const SHAPE_BITS = 4;
+export function patternBits(rarity: Rarity, source: string): number {
+  const node = parseRegex(source);
+  const atoms = node === undefined ? (source.match(/[A-Za-z]{2,}/g) ?? []) : regexAtoms(node);
+  return rarity.shared(atoms) + SHAPE_BITS;
 }
 
 /* --------------------------------------------------------------- finding */
@@ -243,67 +415,299 @@ function siteOfSet(s: SetRef): RestatementSite {
   return { file: s.file, line: s.line, ...(name === undefined ? {} : { name }) };
 }
 
+export type HoldCase = HeldCopy;
+
 export interface Restatements {
   restatements: Restatement[];
   held: number;
+  /** Held by a test that has not yet gone red when its copy changed: counted apart from held until it has. */
+  unrefuted: Restatement[];
+  excluded: Restatement[];
+  /** Copies a comment at the copy declares different on purpose, naming the home and how its behavior differs. */
+  declared: Restatement[];
+  /** Every copy a test names, witnessed or not, for the pass that witnesses them. */
+  holds: HoldCase[];
 }
 
-const ORDER: Record<RestatementKind, number> = { drift: 0, constant: 1, copy: 2, literal: 2 };
+/** The first entry of the config that excludes a file, data before scripts, in the order the config writes them. */
+function fileExclusion(input: RestatementInput, file: string): Exclusion | undefined {
+  for (const key of ["data", "scripts"] as const) {
+    const hit = input.exclusions[key].find((e) => e.test(file));
+    if (hit !== undefined) return { key, entry: hit.entry };
+  }
+  return undefined;
+}
 
-/** The restatements in a reading, ranked: the unheld ones, and how many were held. */
+function valueExclusion(input: RestatementInput, value: string): Exclusion | undefined {
+  const hit = input.exclusions.values.find((e) => e.test(value));
+  return hit === undefined ? undefined : { key: "values", entry: hit.entry };
+}
+
+/** Why an excluded restatement is left as it is, said for the key that excluded it: a script runs alone, so it is never told to hold its copy by a test. */
+function leftAsItIs(by: Exclusion, files: readonly string[]): string {
+  const listed = files.join(", ");
+  if (by.key === "scripts") return `left as it is: ${listed} ${files.length === 1 ? "is a standalone script, which runs alone" : "are standalone scripts, which run alone"} (restatements.scripts ${by.entry})`;
+  if (by.key === "data") return `left as it is: ${listed} ${files.length === 1 ? "is data" : "are data"} that restates the list on purpose (restatements.data ${by.entry})`;
+  return `left as it is: the config names it deliberate shared vocabulary (restatements.values ${by.entry})`;
+}
+
+/** The kinds whose copies are the same, which no comment can declare different: they need an import or a test. */
+const IDENTICAL: ReadonlySet<RestatementKind> = new Set<RestatementKind>(["copy", "rule", "constant", "literal"]);
+/** The kinds whose copies have already parted: a member one lacks, or a rule one widens. */
+const DIVERGED = (c: Pick<Candidate, "kind" | "odd">): boolean => c.kind === "drift" || (c.kind === "subset" && c.odd !== undefined);
+
+/** A candidate before it is weighed: what every kind shares. */
+interface Candidate {
+  kind: RestatementKind;
+  value: string;
+  members?: string[];
+  odd?: { member: string; lacks: string };
+  sites: (RestatementSite & { exported?: boolean })[];
+  bits: number;
+  /** The files whose site binds the value to a name, best first: where the source would be. */
+  preferred: string[];
+  /** What a line must name for history to count it as a change to the copy: the value, or two of the members or atoms. */
+  needles: string[];
+  hold?: Hold;
+  /** A source to name in place of the computed one. */
+  source?: string;
+  /** What the witness pass alters at the copy, when it is not the value as written: a rule's longest word. */
+  mutate?: string;
+}
+
+/** The comment at a copy that declares it different on purpose: `// differs on purpose from <home>: <how its behavior differs>`. */
+export const DIFFERS = /\/\/\s*differs on purpose from\s+(\S+?):?\s+(.+)$/;
+
+/**
+ * The restatements in a reading, ranked: the unheld ones, and those held,
+ * excluded, declared different, or held by a test not yet refuted, each
+ * counted apart, so that a count that falls says why it fell.
+ */
 export function restatementsOf(input: RestatementInput): Restatements {
   const w = weigher(input);
   const out: Restatement[] = [];
+  const excluded: Restatement[] = [];
+  const unrefuted: Restatement[] = [];
+  const declared: Restatement[] = [];
+  const holds: HoldCase[] = [];
   let held = 0;
 
+
+  const weigh = (c: Candidate): void => {
+    const files = [...new Set(c.sites.map((s) => s.file))];
+    if (files.length < 2) return;
+    if (c.hold !== undefined) {
+      if (c.hold.by !== "test") {
+        held++;
+        return;
+      }
+      const key = [c.hold.home.file, c.hold.copy.file, c.hold.test].map((f) => input.blobs.get(f) ?? f).join(":");
+      holds.push({ key, test: c.hold.test, copy: c.hold.copy, home: c.hold.home, value: c.mutate ?? c.value, ...(c.members === undefined ? {} : { members: c.members }) });
+      const verdict = input.witnessed(key);
+      if (verdict === "red") {
+        held++;
+        return;
+      }
+      if (verdict === undefined) {
+        unrefuted.push({ ...shape(c, files, `held by ${c.hold.test}, not yet refuted: query mirrors --witness changes ${c.hold.copy.file}:${c.hold.copy.line} and runs it`), hold: { test: c.hold.test, key } });
+        return;
+      }
+      // The test stayed green when the copy changed: it names the copy but does not hold it.
+      c.source = `${c.hold.test} names it but stayed green when ${c.hold.copy.file}:${c.hold.copy.line} changed, so it holds nothing: `;
+    }
+    // A comment at the copy that declares it different, for a copy that does differ.
+    const declaration = c.sites.map((s) => input.declarations.get(s.file)?.find((d) => d.line === s.line || d.line === s.line - 1)).find((d) => d !== undefined);
+    if (declaration !== undefined && !IDENTICAL.has(c.kind)) {
+      declared.push({ ...shape(c, files, `differs on purpose from ${declaration.home}: ${declaration.why}`), declared: declaration.why });
+      return;
+    }
+    const live = files.filter((file) => fileExclusion(input, file) === undefined);
+    const by = valueExclusion(input, c.value) ?? (live.length < 2 ? fileExclusion(input, files.find((file) => !live.includes(file))!) : undefined);
+    if (by !== undefined) {
+      excluded.push({ ...shape(c, files, leftAsItIs(by, by.key === "values" ? [] : files.filter((file) => fileExclusion(input, file)?.key === by.key))), by });
+      return;
+    }
+    const apart = files.filter((file) => !live.includes(file));
+    const note = apart.map((file) => (fileExclusion(input, file)!.key === "scripts" ? `${file} is a standalone script, which runs alone, so its copy is left as it is` : `${file} is data, so its copy is left as it is`));
+    const refused = declaration !== undefined ? ["a copy written the same cannot differ on purpose: import it, or hold it by a test"] : [];
+    const source = `${c.source ?? ""}${sourceOf(input, live, c.preferred, c.members ?? [])}${exportStep(c, live)}`;
+    out.push(shape(c, live, [source, ...note, ...refused].join("; ")));
+  };
+
+  /** The step that makes a private home importable: its name exported there, then imported by the rest. */
+  const exportStep = (c: Candidate, files: readonly string[]): string => {
+    const home = c.sites.find((s) => s.file === c.preferred.find((f) => files.includes(f)));
+    if (home === undefined || home.exported !== false || home.name === undefined) return "";
+    return `; ${home.name} is not exported: export it in ${home.file} first, then import { ${home.name} } from it`;
+  };
+
+  const shape = (c: Candidate, files: readonly string[], source: string): Restatement => {
+    const sites = c.sites.filter((s) => files.includes(s.file)).map(({ exported: _, ...s }) => s);
+    const crossPackage = new Set(sites.map((s) => regionOf(input, s.file))).size > 1;
+    const standing = DIVERGED(c) ? 1 : (input.standingOf?.(c.needles, sites.map((s) => s.file)) ?? 4);
+    return {
+      kind: c.kind,
+      value: c.value,
+      ...(c.members === undefined ? {} : { members: c.members }),
+      ...(c.odd === undefined ? {} : { odd: c.odd }),
+      sites,
+      source,
+      score: Math.round(c.bits * sites.length),
+      standing,
+      ...(crossPackage ? { crossPackage } : {}),
+    };
+  };
+
+  /* Sets: copies, drift, and subsets nothing types. Strongest first, and each list is the copy in one restatement at most: a group forms around its center, never by chaining pairs. */
   const seen = new Set<string>();
-  for (const f of input.pairs) {
+  const copied = new Set<string>();
+  const pairs = [...input.pairs].sort((x, y) => input.rarity.shared(y.shared) - input.rarity.shared(x.shared));
+  for (const f of pairs) {
     const { a, b } = f;
     if (a.file === b.file || !sideOk(input, a) || !sideOk(input, b)) continue;
     if (a.checked && b.checked) continue;
-    if (f.shared.length < SET_SHARED_MIN) continue;
-    const diff = f.onlyA.length + f.onlyB.length;
-    if (diff > 1 || (diff === 0 && f.jaccard < 1)) continue;
+    // What the two sets share must say enough: three common names do not, two rare ones may.
+    const bits = input.rarity.shared(f.shared);
+    if (bits < RARITY_MIN) continue;
+    const kind = setKind(f);
+    if (kind === undefined) continue;
     const key = `${[a.file, b.file].sort().join("|")}|${[...f.shared].sort().join("|")}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    if (setHeld(w, a, b)) {
-      held++;
-      continue;
-    }
-    const preferred = [a, b].filter((s) => listName(s) !== undefined).map((s) => s.file);
-    const source = sourceOf(input, [a.file, b.file], preferred, f.shared);
-    const sites = [siteOfSet(a), siteOfSet(b)];
-    if (diff === 1) {
-      const member = (f.onlyA[0] ?? f.onlyB[0])!;
-      const lacks = f.onlyA.length > 0 ? b : a;
-      out.push({ kind: "drift", value: f.shared.join(", "), members: f.shared, odd: { member, lacks: `${lacks.file}:${lacks.line}` }, sites, source, score: 2000 + f.shared.length });
-    } else {
-      out.push({ kind: "copy", value: f.shared.join(", "), members: f.shared, sites, source, score: 500 + 10 * f.shared.length });
-    }
+    // One type holds both objects' keys; and a set of HTTP's own names is the protocol's, not the project's.
+    if (typedRecord(input, f) || f.shared.every(ownedOutside)) continue;
+    // A part typed against the whole's member type is held by the compiler: a member the whole lacks is a compile error.
+    const [part, whole] = f.onlyA.length <= f.onlyB.length ? [a, b] : [b, a];
+    const copy = kind === "subset" ? part : listName(a) === undefined ? a : b;
+    const copyKey = `${copy.file}:${copy.line}:${copy.name}`;
+    if (copied.has(copyKey)) continue;
+    copied.add(copyKey);
+    const typed = (kind === "subset" || kind === "drift") && part.elementType !== undefined && !/^(?:string|String)$/.test(part.elementType);
+    const value = f.shared.join(", ");
+    const odd = kind === "drift" ? { member: (f.onlyA[0] ?? f.onlyB[0])!, lacks: `${(f.onlyA.length > 0 ? b : a).file}:${(f.onlyA.length > 0 ? b : a).line}` } : kind === "subset" && (part === a ? f.onlyA : f.onlyB).length === 1 ? { member: (part === a ? f.onlyA : f.onlyB)[0]!, lacks: `${whole.file}:${whole.line}` } : undefined;
+    // A part is held by its type alone: a file that imports the whole and still writes the part out keeps it by hand.
+    const found = typed ? ({ by: "type" } as const) : setHold(w, a, b);
+    const hold = kind === "subset" && found?.by === "import" ? undefined : found;
+    const wholeName = listName(whole);
+    weigh({
+      kind,
+      value,
+      members: f.shared,
+      ...(odd === undefined ? {} : { odd }),
+      sites: kind === "subset" ? [siteOfSet(whole), siteOfSet(part)] : [siteOfSet(a), siteOfSet(b)],
+      bits,
+      preferred: kind === "subset" ? [whole.file] : [a, b].filter((s) => listName(s) !== undefined).map((s) => s.file),
+      needles: f.shared,
+      ...(hold === undefined ? {} : { hold }),
+      ...(kind === "subset" && wholeName !== undefined ? { source: `type ${listName(part) ?? "the part"} against ${wholeName}'s members (${whole.file}:${whole.line}), so the compiler holds it to them${odd === undefined ? "" : `; it holds ${odd.member}, which ${wholeName} lacks`}: ` } : {}),
+    });
   }
 
+  /* Predicates: one rule written twice, and a rule derived from another. */
+  const { rules, derivations } = rulesOf(input.predicates, input.rarity, RARITY_MIN, input.literals);
+  const ruled = new Set<string>();
+  for (const r of rules) {
+    if (r.sites.every((s) => s.test === true)) continue;
+    for (const s of r.sites) if (s.form === "regex") ruled.add(s.text);
+    const production = r.sites.filter((s) => s.test !== true);
+    const hold = ruleHold(w, input, r.sites);
+    weigh({
+      kind: "rule",
+      value: r.center.text,
+      sites: r.sites.map((s) => ({ file: s.file, line: s.line, ...(s.bound === undefined ? {} : { name: s.bound }) })),
+      bits: r.bits,
+      preferred: [...production.filter((s) => s.bound !== undefined), ...production].map((s) => s.file),
+      needles: r.atoms,
+      mutate: [...r.atoms].sort((x, y) => y.length - x.length)[0]!,
+      ...(hold === undefined ? {} : { hold }),
+    });
+  }
+  for (const d of derivations) {
+    if (d.part.test === true || d.whole.test === true) continue;
+    // A derived rule says most of what its whole says: a pattern that shares one word with a long alternation is a different rule.
+    if (d.bits < 0.5 * input.rarity.shared([...new Set(predicateOf(d.whole)?.atoms ?? [])])) continue;
+    const hold = ruleHold(w, input, [d.part, d.whole]);
+    weigh({
+      kind: "derivation",
+      value: d.part.text,
+      sites: [d.whole, d.part].map((s) => ({ file: s.file, line: s.line, ...(s.bound === undefined ? {} : { name: s.bound }) })),
+      bits: d.bits,
+      preferred: [d.whole.file],
+      needles: d.atoms,
+      ...(hold === undefined ? {} : { hold }),
+      source: `${d.part.file}:${d.part.line} accepts a strict part of what ${d.whole.file}:${d.whole.line} accepts (${d.whole.text}): derive it from that one, `,
+    });
+  }
+
+  /* Parsers: two functions that read text into one type, checking the same fields. */
+  const byShape = new Map<string, ParserSite[]>();
+  for (const p of input.parsers) {
+    const key = `${p.type}|${[...p.fields].sort().join(",")}`;
+    byShape.set(key, [...(byShape.get(key) ?? []), p]);
+  }
+  for (const group of byShape.values()) {
+    const files = new Set(group.map((p) => p.file));
+    if (files.size < 2) continue;
+    const ordered = [...group].sort((x, y) => Number(y.exported) - Number(x.exported) || x.file.localeCompare(y.file));
+    const home = ordered[0]!;
+    const imported = group.some((p) => p !== home && (input.imports.get(p.file) ?? []).some((i) => i.to === home.file && i.names.includes(home.name)));
+    weigh({
+      kind: "parser",
+      value: `${home.type} from text, checking ${[...home.fields].sort().join(", ")}`,
+      sites: ordered.map((p) => ({ file: p.file, line: p.line, name: p.name, exported: p.exported })),
+      bits: input.rarity.shared([home.type, ...home.fields]),
+      preferred: [home.file],
+      needles: [home.name],
+      ...(imported ? { hold: { by: "import" } as const } : {}),
+    });
+  }
+
+  /* Values: one literal written in two or more files. */
   for (const [value, sites] of input.values) {
     const files = [...new Set(sites.map((s) => s.file))];
-    if (files.length < 2 || excludedValue(value, input.typed)) continue;
+    if (files.length < 2 || excludedValue(value, input.typed) || ruled.has(value)) continue;
+    // A value must say enough to be one fact: "id" in forty files is the language's word, `PostInvocation` in two is the project's. A pattern says what its literal words say; its syntax says little.
+    const bits = sites.some((s) => s.regex === true) ? patternBits(input.rarity, value) : input.rarity.value(value);
+    if (bits < RARITY_MIN) continue;
     const boundFiles = new Set(sites.filter((s) => s.bound !== undefined).map((s) => s.file));
     if (PROSE.test(value) && boundFiles.size < 2) continue;
-    if (valueHeld(w, value, sites)) {
-      held++;
-      continue;
-    }
     // One site per file, the first, named by its constant when any site there binds one.
     const shown = files.map((file) => {
       const here = sites.filter((s) => s.file === file);
       const bound = here.find((s) => s.bound !== undefined);
       const site = bound ?? here[0]!;
-      return { file, line: site.line, ...(bound?.bound === undefined ? {} : { name: bound.bound }) };
+      return { file, line: site.line, ...(bound?.bound === undefined ? {} : { name: bound.bound }), exported: site.exported };
     });
     const preferred = [...sites.filter((s) => s.exported && s.bound !== undefined), ...sites.filter((s) => s.bound !== undefined)].map((s) => s.file);
-    const constant = boundFiles.size >= 2;
-    out.push({ kind: constant ? "constant" : "literal", value, sites: shown, source: sourceOf(input, files, preferred), score: (constant ? 1000 : 0) + sites.length * Math.min(value.length, 60) });
+    const hold = valueHold(w, value, sites);
+    weigh({ kind: boundFiles.size >= 2 ? "constant" : "literal", value, sites: shown, bits, preferred, needles: [value], ...(hold === undefined ? {} : { hold }) });
   }
 
-  out.sort((x, y) => ORDER[x.kind] - ORDER[y.kind] || y.score - x.score || x.value.localeCompare(y.value));
-  return { restatements: out, held };
+  out.sort(byRank);
+  excluded.sort(byRank);
+  unrefuted.sort(byRank);
+  declared.sort(byRank);
+  return { restatements: out, held, unrefuted, excluded, declared, holds };
+}
+
+/** Which kind two paired sets are: equal (a copy), one member apart (drift), or one a strict part of the other with at most one member of its own (a subset); none otherwise. Three shared members at least for the last two: two members say too little about a whole. */
+function setKind(f: SetPair): RestatementKind | undefined {
+  const diff = f.onlyA.length + f.onlyB.length;
+  if (diff === 0) return f.jaccard === 1 ? "copy" : undefined;
+  if (f.shared.length < 3) return undefined;
+  if (diff === 1) return "drift";
+  const [own, other] = f.onlyA.length <= f.onlyB.length ? [f.onlyA, f.onlyB] : [f.onlyB, f.onlyA];
+  return own.length <= 1 && other.length >= 2 ? "subset" : undefined;
+}
+
+/** How copies of one rule are held: a site's file imports another site's bound name, or a test names a site's file and its name. */
+function ruleHold(w: Weigher, input: RestatementInput, sites: readonly PredicateSite[]): Hold | undefined {
+  for (const s of sites) for (const o of sites) if (s !== o && o.bound !== undefined && (input.imports.get(s.file) ?? []).some((i) => i.to === o.file && i.names.includes(o.bound!))) return { by: "import" };
+  const prod = sites.filter((s) => s.test !== true);
+  return valueHold(w, sites[0]!.text, prod);
+}
+
+/** Rank: what has already diverged, then what history shows changed apart, then what changed together, then what never changed; within each, copies across parts of the project before copies within one, then the most bits. */
+function byRank(x: Restatement, y: Restatement): number {
+  return (x.standing ?? 4) - (y.standing ?? 4) || Number(y.crossPackage === true) - Number(x.crossPackage === true) || y.score - x.score || x.value.localeCompare(y.value);
 }
