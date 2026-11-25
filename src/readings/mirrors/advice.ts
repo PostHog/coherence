@@ -173,7 +173,8 @@ const EQUALS_LEAF = /([\w$.]+)\s*(===|!==)\s*(["'])((?:\\.|(?!\3)[^\\\n])*)\3/g;
 export function adviceFor(loaded: Loaded, file: string, text: string, existing = ""): Advice[] {
   if (quietFile(loaded, file, existing === "" ? text : existing)) return [];
   const out = new Map<string, Advice>();
-  const imports = (name: string): boolean => new RegExp(`import[^;]*\\b${name.replace(/[$]/g, "\\$")}\\b[^;]*from`).test(text) || new RegExp(`import[^;]*\\b${name.replace(/[$]/g, "\\$")}\\b[^;]*from`).test(existing);
+  // Whether an import statement binds the name: the statements' words, compared as words, never a pattern built from the name.
+  const imports = (name: string): boolean => [text, existing].some((t) => [...t.matchAll(/\bimport\b([^;]*?)\bfrom\b/g)].some((m) => ((m[1]!.match(/[\w$]+/g) ?? []) as string[]).includes(name)));
   const skip = (home: Home & { copies: string[] }): boolean => home.file === file || home.copies.includes(file) || imports(home.name);
   const add = (cls: AdviceClass, home: Home & { copies: string[] }, body: string): void => {
     const family = `${cls}:${home.file}:${home.name}`;

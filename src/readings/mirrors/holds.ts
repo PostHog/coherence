@@ -79,7 +79,7 @@ export function titlesNaming(text: string, hold: Pick<HeldCopy, "copy" | "value"
   const opener = /(?:^|[^\w.])(?:test|it)\(\s*(["'`])((?:\\.|(?!\1).)*)\1\s*,/g;
   const starts = [...text.matchAll(opener)].map((m) => ({ at: m.index!, title: m[2]!.replace(/\\(.)/g, "$1") }));
   const name = hold.copy.name;
-  const named = name === undefined ? undefined : new RegExp(`(^|[^\\w$])${name.replace(/[$]/g, "\\$")}($|[^\\w$])`);
+  const named = name === undefined ? undefined : { test: (body: string): boolean => ((body.match(/[\w$]+/g) ?? []) as string[]).includes(name) };
   starts.forEach((s, i) => {
     const body = text.slice(s.at, starts[i + 1]?.at ?? text.length);
     if (body.includes(hold.value) || (named !== undefined && named.test(body))) out.push(s.title);

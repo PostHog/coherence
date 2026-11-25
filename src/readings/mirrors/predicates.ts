@@ -31,21 +31,23 @@ type Node =
   | { t: "seq"; items: Node[] }
   | { t: "alt"; options: Node[] }
   | { t: "char"; c: string }
-  | { t: "class"; chars: string[]; negated: boolean }
+  | { t: "class"; ranges: [number, number][]; kinds: string[]; negated: boolean; samples: string[] }
   | { t: "any" }
+  | { t: "assert"; a: "bol" | "eol" | "wb" | "nwb" }
   | { t: "repeat"; node: Node; min: number; max: number }
   | { t: "empty" };
 
-const CLASS_ESCAPES: Record<string, string[]> = {
-  d: ["0", "5", "9"],
-  w: ["a", "Z", "_", "7"],
-  s: [" "],
-  D: ["a"],
-  W: ["-"],
-  S: ["a"],
+/** The class escapes, by what they match and a few members to draw from. */
+const CLASS_KINDS: Record<string, { test: (c: string) => boolean; samples: string[] }> = {
+  d: { test: (c) => c >= "0" && c <= "9", samples: ["0", "5", "9"] },
+  w: { test: (c) => (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || (c >= "0" && c <= "9") || c === "_", samples: ["a", "Z", "_", "7"] },
+  s: { test: (c) => c === " " || c === "\t" || c === "\n" || c === "\r" || c === "\f" || c === "\v", samples: [" "] },
+  D: { test: (c) => !(c >= "0" && c <= "9"), samples: ["a"] },
+  W: { test: (c) => !CLASS_KINDS["w"]!.test(c), samples: ["-"] },
+  S: { test: (c) => !CLASS_KINDS["s"]!.test(c), samples: ["a"] },
 };
 
-/** A regular expression's syntax, as far as drawing strings from it needs; undefined for a back reference or anything else it cannot draw from. */
+/** A regular expression's syntax, as far as drawing strings from it and running it needs; undefined for a back reference or anything else it cannot. */
 export function parseRegex(source: string): Node | undefined {
   let i = 0;
   const fail = (): never => {
@@ -65,7 +67,10 @@ export function parseRegex(source: string): Node | undefined {
       let atom = term();
       if (atom === undefined) continue;
       const q = quantifier();
-      if (q !== undefined) atom = { t: "repeat", node: atom, ...q };
+      if (q !== undefined) {
+        if (atom.t === "assert") return fail();
+        atom = { t: "repeat", node: atom, ...q };
+      }
       items.push(atom);
     }
     return { t: "seq", items };
@@ -87,24 +92,22 @@ export function parseRegex(source: string): Node | undefined {
     if (source[i] === "?") i++;
     return q;
   };
-  const escape = (inClass: boolean): Node | undefined => {
+  const escape = (inClass: boolean): Node => {
     const c = source[i++];
     if (c === undefined) return fail();
-    if (CLASS_ESCAPES[c] !== undefined) return { t: "class", chars: CLASS_ESCAPES[c]!, negated: false };
-    if (c === "b" || c === "B") return inClass ? { t: "char", c: "\b" } : undefined;
-    if (/[1-9]/.test(c) || c === "k") return fail();
+    const kind = CLASS_KINDS[c];
+    if (kind !== undefined) return { t: "class", ranges: [], kinds: [c], negated: false, samples: kind.samples };
+    if (c === "b") return inClass ? { t: "char", c: "\b" } : { t: "assert", a: "wb" };
+    if (c === "B") return inClass ? fail() : { t: "assert", a: "nwb" };
+    if (/[1-9]/.test(c) || c === "k" || c === "p" || c === "P") return fail();
     if (c === "n") return { t: "char", c: "\n" };
     if (c === "t") return { t: "char", c: "\t" };
-    if (c === "u") {
-      const m = /^[0-9a-fA-F]{4}/.exec(source.slice(i));
+    if (c === "r") return { t: "char", c: "\r" };
+    if (c === "0") return { t: "char", c: "\0" };
+    if (c === "u" || c === "x") {
+      const m = (c === "u" ? /^[0-9a-fA-F]{4}/ : /^[0-9a-fA-F]{2}/).exec(source.slice(i));
       if (m === null) return fail();
-      i += 4;
-      return { t: "char", c: String.fromCharCode(parseInt(m[0], 16)) };
-    }
-    if (c === "x") {
-      const m = /^[0-9a-fA-F]{2}/.exec(source.slice(i));
-      if (m === null) return fail();
-      i += 2;
+      i += m[0].length;
       return { t: "char", c: String.fromCharCode(parseInt(m[0], 16)) };
     }
     return { t: "char", c };
@@ -113,38 +116,50 @@ export function parseRegex(source: string): Node | undefined {
     i++;
     const negated = source[i] === "^";
     if (negated) i++;
-    const chars: string[] = [];
-    let first = true;
-    while (i < source.length && (source[i] !== "]" || first)) {
-      first = false;
+    const ranges: [number, number][] = [];
+    const kinds: string[] = [];
+    const samples: string[] = [];
+    while (i < source.length && source[i] !== "]") {
       let lo: string;
       if (source[i] === "\\") {
         i++;
         const e = escape(true);
-        if (e === undefined || e.t !== "char") {
-          if (e !== undefined && e.t === "class") chars.push(...e.chars);
+        if (e.t === "class") {
+          kinds.push(...e.kinds);
+          samples.push(...e.samples);
           continue;
         }
+        if (e.t !== "char") return fail();
         lo = e.c;
       } else lo = source[i++]!;
       if (source[i] === "-" && source[i + 1] !== "]" && source[i + 1] !== undefined) {
         i++;
-        const hi = source[i] === "\\" ? source[(i += 2) - 1]! : source[i++]!;
+        let hi: string;
+        if (source[i] === "\\") {
+          i++;
+          const e = escape(true);
+          if (e.t !== "char") return fail();
+          hi = e.c;
+        } else hi = source[i++]!;
         const a = lo.charCodeAt(0);
         const b = hi.charCodeAt(0);
         if (b < a) return fail();
-        chars.push(lo, hi, String.fromCharCode(Math.floor((a + b) / 2)));
-      } else chars.push(lo);
+        ranges.push([a, b]);
+        samples.push(lo, hi, String.fromCharCode(Math.floor((a + b) / 2)));
+      } else {
+        ranges.push([lo.charCodeAt(0), lo.charCodeAt(0)]);
+        samples.push(lo);
+      }
     }
     if (source[i] !== "]") return fail();
     i++;
-    return { t: "class", chars: chars.length === 0 ? ["a"] : chars, negated };
+    return { t: "class", ranges, kinds, negated, samples: samples.length === 0 ? ["a"] : samples };
   };
   const term = (): Node | undefined => {
     const c = source[i];
     if (c === "^" || c === "$") {
       i++;
-      return undefined;
+      return { t: "assert", a: c === "^" ? "bol" : "eol" };
     }
     if (c === "\\") {
       i++;
@@ -160,17 +175,7 @@ export function parseRegex(source: string): Node | undefined {
       if (source[i] === "?") {
         const m = /^\?(?::|<[A-Za-z_]\w*>)/.exec(source.slice(i));
         if (m !== null) i += m[0].length;
-        else {
-          // A lookaround says where, not what: drawing ignores it.
-          let depth = 1;
-          while (i < source.length && depth > 0) {
-            if (source[i] === "\\") i++;
-            else if (source[i] === "(") depth++;
-            else if (source[i] === ")") depth--;
-            i++;
-          }
-          return undefined;
-        }
+        else return fail();
       }
       const inner = alt();
       if (source[i] !== ")") return fail();
@@ -188,6 +193,127 @@ export function parseRegex(source: string): Node | undefined {
   } catch {
     return undefined;
   }
+}
+
+/* ------------------------------------------------------------- matching */
+
+type State =
+  | { k: "char"; test: (c: string) => boolean; out: number }
+  | { k: "split"; outs: number[] }
+  | { k: "assert"; a: "bol" | "eol" | "wb" | "nwb"; out: number }
+  | { k: "match" };
+
+/** The most states a pattern compiles to before it is refused: a bound on the work a match does. */
+const STATE_LIMIT = 4000;
+
+/**
+ * A pattern compiled to a Thompson automaton, run over a string in time
+ * linear in the string and the pattern: no backtracking, so no pattern a
+ * project writes, or an agent is about to write, can make a hook run long.
+ */
+export interface Matcher {
+  test: (s: string) => boolean;
+}
+
+export function matcherOf(node: Node, flags = ""): Matcher | undefined {
+  const fold = flags.includes("i");
+  const states: State[] = [{ k: "match" }];
+  const add = (st: State): number => {
+    if (states.length >= STATE_LIMIT) throw new Error("too large");
+    states.push(st);
+    return states.length - 1;
+  };
+  const same = (a: string, b: string): boolean => a === b || (fold && a.toLowerCase() === b.toLowerCase());
+  const classTest = (n: Extract<Node, { t: "class" }>): ((c: string) => boolean) => (c) => {
+    const code = c.charCodeAt(0);
+    const variants = fold ? [code, c.toLowerCase().charCodeAt(0), c.toUpperCase().charCodeAt(0)] : [code];
+    const hit = variants.some((v) => n.ranges.some(([lo, hi]) => v >= lo && v <= hi)) || n.kinds.some((k) => CLASS_KINDS[k]!.test(c));
+    return n.negated ? !hit : hit;
+  };
+  // Built backwards: each node is compiled given the state it continues to.
+  const build = (n: Node, next: number): number => {
+    switch (n.t) {
+      case "seq": {
+        let at = next;
+        for (let k = n.items.length - 1; k >= 0; k--) at = build(n.items[k]!, at);
+        return at;
+      }
+      case "alt":
+        return add({ k: "split", outs: n.options.map((o) => build(o, next)) });
+      case "char":
+        return add({ k: "char", test: (c) => same(c, n.c), out: next });
+      case "class":
+        return add({ k: "char", test: classTest(n), out: next });
+      case "any":
+        return add({ k: "char", test: (c) => c !== "\n" && c !== "\r", out: next });
+      case "assert":
+        return add({ k: "assert", a: n.a, out: next });
+      case "empty":
+        return next;
+      case "repeat": {
+        let at = next;
+        if (n.max === Infinity) {
+          const loop = add({ k: "split", outs: [] });
+          const body = build(n.node, loop);
+          (states[loop] as Extract<State, { k: "split" }>).outs = [body, next];
+          at = loop;
+        } else {
+          for (let k = 0; k < n.max - n.min; k++) at = add({ k: "split", outs: [build(n.node, at), next] });
+        }
+        for (let k = 0; k < n.min; k++) at = build(n.node, at);
+        return at;
+      }
+    }
+  };
+  let start: number;
+  try {
+    start = build(node, 0);
+  } catch {
+    return undefined;
+  }
+  const word = (c: string | undefined): boolean => c !== undefined && CLASS_KINDS["w"]!.test(c);
+  return {
+    test: (s: string): boolean => {
+      // Every position may start a match: RegExp.prototype.test's search.
+      let current = new Set<number>();
+      const close = (into: Set<number>, from: number, pos: number): void => {
+        const stack = [from];
+        while (stack.length > 0) {
+          const id = stack.pop()!;
+          if (into.has(id)) continue;
+          into.add(id);
+          const st = states[id]!;
+          if (st.k === "split") stack.push(...st.outs);
+          else if (st.k === "assert") {
+            const ok = st.a === "bol" ? pos === 0 : st.a === "eol" ? pos === s.length : st.a === "wb" ? word(s[pos - 1]) !== word(s[pos]) : word(s[pos - 1]) === word(s[pos]);
+            if (ok) stack.push(st.out);
+          }
+        }
+      };
+      for (let pos = 0; pos <= s.length; pos++) {
+        close(current, start, pos);
+        if (current.has(0)) return true;
+        if (pos === s.length) break;
+        const next = new Set<number>();
+        for (const id of current) {
+          const st = states[id]!;
+          if (st.k === "char" && st.test(s[pos]!)) close(next, st.out, pos + 1);
+        }
+        current = next;
+      }
+      return current.has(0);
+    },
+  };
+}
+
+/** A pattern with the anchors, boundaries and wildcards at its ends dropped: what it looks for, wherever it is. */
+function coreOf(node: Node): Node {
+  if (node.t !== "seq") return node;
+  const items = [...node.items];
+  const loose = (n: Node | undefined): boolean => n !== undefined && (n.t === "assert" || (n.t === "repeat" && n.min === 0 && n.max === Infinity && n.node.t === "any"));
+  while (loose(items[0])) items.shift();
+  while (loose(items[items.length - 1])) items.pop();
+  return { t: "seq", items };
 }
 
 /** The literal words a pattern is made of: runs of characters it writes outright, outside classes and repetition. */
@@ -241,7 +367,9 @@ export function drawn(node: Node, count = 8): string[] {
         case "char":
           return n.c;
         case "class":
-          return n.negated ? "~" : n.chars[pick(n.chars.length)]!;
+          return n.negated ? "~" : n.samples[pick(n.samples.length)]!;
+        case "assert":
+          return "";
         case "any":
           return "xq"[pick(2)]!;
         case "repeat": {
@@ -315,11 +443,6 @@ export interface Predicate {
   samples: string[];
 }
 
-/** The ^, $, boundaries and wildcards at either end of a pattern, dropped: what it looks for, wherever it is. */
-function coreSource(source: string): string {
-  return source.replace(/^(?:\^|\\b|\.\*|\(\?:\.\*\))+/, "").replace(/(?:\$|\\b|\.\*)+$/, "");
-}
-
 function leafAccepts(leaf: ChainLeaf, s: string): boolean {
   const hit = leaf.op === "startsWith" ? s.startsWith(leaf.value) : leaf.op === "endsWith" ? s.endsWith(leaf.value) : leaf.op === "includes" ? s.includes(leaf.value) : s === leaf.value;
   return leaf.negated ? !hit : hit;
@@ -338,15 +461,11 @@ export function predicateOf(site: PredicateSite): Predicate | undefined {
   if (site.form === "regex") {
     const node = parseRegex(site.text);
     if (node === undefined) return undefined;
-    let re: RegExp;
-    let core: RegExp;
-    try {
-      const flags = (site.flags ?? "").replace(/[gy]/g, "");
-      re = new RegExp(site.text, flags);
-      core = new RegExp(coreSource(site.text), flags);
-    } catch {
-      return undefined;
-    }
+    // Run by the reading's own automaton, never compiled as a RegExp: a pattern is the project's text, or what an agent is about to write.
+    const flags = site.flags ?? "";
+    const re = matcherOf(node, flags);
+    const core = matcherOf(coreOf(node), flags);
+    if (re === undefined || core === undefined) return undefined;
     const samples = drawn(node);
     return { site, accepts: (s) => re.test(s), core: (s) => core.test(s), atoms: regexAtoms(node), samples };
   }
