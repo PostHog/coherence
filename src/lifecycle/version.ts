@@ -233,7 +233,7 @@ export const EARLIER_LAUNCHER = "written by Coherence 0.x, they run a coherence-
 
 /** The hosts whose settings at `dir` still hold the 0.x launcher (`coherence-hook <Event>`) as a hook. */
 export function earlierLauncherHooks(dir: string): { host: Host; file: string; local: boolean }[] {
-  return hostsWithHook(dir, (c) => isLauncherHook(c));
+  return hostsWithHook(dir, isLauncherHook);
 }
 
 /**

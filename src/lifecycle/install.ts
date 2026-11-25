@@ -58,9 +58,9 @@ import { modelStep, userStep } from "./antigravity.ts";
 import { DURABLE_FOLDERS, HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, SIBLING, isHost, type Host } from "./project.ts";
 import { nestedFolder, repositoryTop } from "../adapters/project-files.ts";
 import { registryOf } from "../adapters/project-config.ts";
-import { EARLIER_SEARCH, earlierMatcher, searchesCheckoutFirst } from "./version.ts";
+import { EARLIER_LAUNCHER, EARLIER_SEARCH, earlierMatcher, searchesCheckoutFirst } from "./version.ts";
 import { modInstalled } from "./mod-install.ts";
-import { isOwnHook } from "./hook-command.ts";
+import { isLauncherHook, isOwnHook } from "./hook-command.ts";
 import { ANTIGRAVITY_TRACED_MATCHER, ANTIGRAVITY_WRITER_MATCHER, CLAUDE_WRITER_MATCHER, writersUnmatched } from "./host-tools.ts";
 import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, IGNORE_FILE, IGNORE_TEXT, STATE_DIR, keepAttributes, keepIgnore, removeStateFiles, type AttributesAction, type IgnoreAction } from "./state-files.ts";
 export { DURABLE_FOLDERS, HOME_VAR, SIBLING };
@@ -97,7 +97,7 @@ const START_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "SubagentStar
  * "coherence", is never ours and is never touched.
  */
 function isMine(command: unknown): command is string {
-  return typeof command === "string" && [...HOOK_EVENTS, ...ANTIGRAVITY_EVENTS].some((event) => isOwnHook(command, event));
+  return typeof command === "string" && (isLauncherHook(command) || [...HOOK_EVENTS, ...ANTIGRAVITY_EVENTS].some((event) => isOwnHook(command, event)));
 }
 
 /** The events install wires for a host: Antigravity names its own. */
@@ -351,16 +351,22 @@ export function installedEntry(options: Pick<InstallOptions, "command" | "host">
 /** The merged settings: pure, so the merge can be tested without a disk. */
 export function mergeHooks(settings: Record<string, unknown>, options: Pick<InstallOptions, "command" | "host">): Record<string, unknown> {
   const hooks = hooksOf(settings, options.host);
-  for (const event of eventsOf(options.host)) {
-    const mine = installedEntry(options, event);
+  const wired: ReadonlySet<string> = new Set(eventsOf(options.host));
+  for (const event of new Set([...Object.keys(hooks), ...wired])) {
     const existing = hooks[event] ?? [];
-    // Our own command leaves every entry it is in; an entry that still holds another tool's hook stays, as it was, without ours.
+    const isWired = wired.has(event);
+    // Retired launchers can also sit under events that this release does not wire.
+    const owns = isWired ? isMine : isLauncherHook;
+    let removed = false;
     const kept = existing.flatMap((entry) => {
-      if (!isCoherenceEntry(entry)) return [entry];
-      const theirs = entry.hooks.filter((h) => !isMine(h.command));
+      const theirs = entry.hooks.filter((h) => !owns(h.command));
+      if (theirs.length === entry.hooks.length) return [entry];
+      removed = true;
       return theirs.length === 0 ? [] : [{ ...entry, hooks: theirs }];
     });
-    hooks[event] = [...kept, mine];
+    if (isWired) hooks[event] = [...kept, installedEntry(options, event)];
+    else if (kept.length > 0) hooks[event] = kept;
+    else if (removed) delete hooks[event];
   }
   return withHooks(settings, hooks, options.host);
 }
@@ -573,7 +579,7 @@ export function driftOf(settings: Record<string, unknown>, options: Pick<Install
     const exact = ours.findIndex((entry) => isDeepStrictEqual(entry, expected));
     const primary = exact === -1 ? 0 : exact;
     ours.forEach((entry, index) => {
-      const found = entry.hooks.find((h) => isMine(h.command))!.command;
+      const found = (entry.hooks.find((h) => isLauncherHook(h.command)) ?? entry.hooks.find((h) => isMine(h.command)))!.command;
       if (index !== primary) drift.push({ event, kind: "extra", found, reason: "a second entry of ours for this event" });
       else if (exact === -1) {
         // A matcher that leaves out a tool that writes is the drift that keeps a practice from arriving: named, so the check says why.
@@ -612,6 +618,7 @@ export function formatCheck(result: CheckResult): string {
     else lines.push(`  ${d.event}: extra Coherence entry (${d.reason}): ${d.found}`);
   }
   if (result.drift.some((d) => d.kind !== "missing" && searchesCheckoutFirst(d.found))) lines.push(`  these hooks were ${EARLIER_SEARCH}; reinstall them`);
+  if (result.drift.some((d) => d.kind !== "missing" && isLauncherHook(d.found))) lines.push(`  these hooks were ${EARLIER_LAUNCHER}; reinstall them`);
   const unmatched = result.drift.flatMap((d) => (d.kind === "stale" ? (d.unmatched ?? []) : []));
   if (unmatched.length > 0) lines.push(`  ${earlierMatcher(unmatched)}; reinstall them`);
   lines.push(`converge with: hooks install --host ${result.host}`);

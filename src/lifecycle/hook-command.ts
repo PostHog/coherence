@@ -11,13 +11,14 @@ import { PACKAGE_NAME, SIBLING } from "./project.ts";
 /** Whether a command is Coherence's hook for `event`: this tool's binary or its own src/cli.ts, followed by hook <event> (hook-antigravity <event> for Antigravity), or the 0.x launcher coherence-hook <event>, as install's ownership test reads it. */
 export function isOwnHook(command: unknown, event: string): boolean {
   if (typeof command !== "string") return false;
-  // The 0.x launcher (`<host dir>/coherence-hook <Event>`, from @danilocampos/coherence) is an earlier form of these hooks.
-  return new RegExp(`(?:^|[\\s"'/$])(?:(?:coherence|src/cli\\.ts)"?\\s+hook(?:-antigravity)?|coherence-hook"?)\\s+${event}\\s*$`).test(command);
+  return isLauncherHook(command, event) ||
+    new RegExp(`(?:^|[\\s"'/$])(?:coherence|src/cli\\.ts)"?\\s+hook(?:-antigravity)?\\s+${event}\\s*$`).test(command);
 }
 
-/** Whether a command is the 0.x launcher form, `<host dir>/coherence-hook <Event>`, for any event. */
-export function isLauncherHook(command: string): boolean {
-  return /(?:^|[\s"'/$])coherence-hook"?\s+[A-Za-z]+\s*$/.test(command);
+/** Whether a command runs the 0.x launcher in a host's settings directory. */
+export function isLauncherHook(command: string, event?: string): boolean {
+  const match = /(?:^|;)\s*(?:"[^"]*\/\.(?:claude|codex)\/coherence-hook"|'[^']*\/\.(?:claude|codex)\/coherence-hook'|[^\s"';]*\/\.(?:claude|codex)\/coherence-hook)\s+([A-Za-z]+)\s*$/.exec(command);
+  return match !== null && (event === undefined || match[1] === event);
 }
 
 /**

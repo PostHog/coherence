@@ -466,6 +466,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: the search order lives in the command written into the adopter's settings, so upgrading the package leaves the old order in place until the hooks are reinstalled; an adopter left on it would keep running whatever clone sits beside the project, and a bare "stale" in the check does not say that this drift is the one that runs the wrong Coherence
   refuted: made searchesCheckoutFirst answer false for every command -> "hooks an earlier Coherence wrote, which look beside the project first, are named by the check and at the session start with the reinstall" went red in install.test.ts on its own assertion (no line for the earlier hooks); restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
+- 0.x launcher hooks are named for reinstall: Coherence launchers under .claude or .codex are named at session start with the reinstall command for each settings file, and the hook check explains why they need reinstalling. Reinstall removes them even under events it no longer wires and keeps another tool's hook with the same program name.
+  over: Claude Code and Codex launcher commands, an unwired Notification event, and an unrelated coherence-hook command
+  via: the session start names the 0.x launcher hooks of Claude Code and Codex with the reinstall, and a reinstall clears it
+  because: the settings still run the retired launcher after a package upgrade, so it needs to be removed for the warning to clear and current hooks to answer
+  refuted: the earlier detector accepted /usr/local/bin/coherence-hook and ownership skipped Notification -> the launcher tests failed on both cases before tightening the detector and removing launchers under unwired events (2026-11-25)
+  kinds: none
 - Coherence's own repository runs its own source: In Coherence's own repository, hooks install writes a command that runs the tree's own src/cli.ts, which in its main checkout and in each of its git worktrees is that tree's own; never an installed package or the checkout $COHERENCE_HOME names.
   over: a repository whose package.json names the package, its main checkout and a worktree of it at ../coherence-practice, each running its committed SessionStart hook
   via: Coherence's own repository runs its own source, in its main checkout and in each of its worktrees

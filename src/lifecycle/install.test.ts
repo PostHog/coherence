@@ -674,17 +674,24 @@ test("the 0.x launcher hooks (coherence-hook <Event>) are Coherence's own: the c
   try {
     const path = join(project, ".claude", "settings.json");
     await mkdir(dirname(path), { recursive: true });
-    const hooks: Record<string, unknown> = {};
-    for (const event of ["SessionStart", "SubagentStart", "SubagentStop", "Stop", "PostToolUse"]) {
+    const hooks: Record<string, { hooks: { type: string; command: string }[] }[]> = {};
+    for (const event of ["SessionStart", "SubagentStart", "SubagentStop", "Stop", "PostToolUse", "Notification"]) {
       hooks[event] = [{ hooks: [{ type: "command", command: `"$CLAUDE_PROJECT_DIR/.claude/coherence-hook" ${event}` }] }];
     }
+    const foreign = { type: "command", command: "/usr/local/bin/coherence-hook Stop" };
+    hooks["Stop"]!.push({ hooks: [foreign] });
+    const stripped = stripHooks({ hooks });
+    assert.deepEqual(stripped.settings, { hooks: { Stop: [{ hooks: [foreign] }] } });
     await writeFile(path, JSON.stringify({ hooks }, null, 2) + "\n");
-    const before = driftOf({ hooks } as Record<string, unknown>, { command: LOCATED_PREFIX, host: "claude" });
+    const before = driftOf({ hooks }, { command: LOCATED_PREFIX, host: "claude" });
     assert.ok(before.some((d) => d.event === "Stop" && d.kind === "stale"), "the launcher form is drift, not a stranger's hook");
+    assert.ok(before.some((d) => d.event === "Notification" && d.kind === "extra"));
+    assert.match(formatCheck({ host: "claude", path, present: true, drift: before }), /written by Coherence 0\.x.*reinstall them/);
     await install({ root: project, host: "claude", command: LOCATED_PREFIX });
     const after = JSON.parse(await readFile(path, "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
     const commands = Object.values(after.hooks).flatMap((entries) => entries.flatMap((e) => e.hooks.map((h) => h.command)));
     assert.deepEqual(commands.filter((c) => c.includes("/.claude/coherence-hook")), [], "install replaced every launcher entry");
+    assert.ok(commands.includes(foreign.command), "install preserved the other tool's hook");
     assert.deepEqual(driftOf(after, { command: LOCATED_PREFIX, host: "claude" }), []);
   } finally {
     await rm(project, { recursive: true, force: true });
@@ -696,7 +703,9 @@ test("the session start names the 0.x launcher hooks of Claude Code and Codex wi
   try {
     const codexCommand = 'codex_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd -P); "$codex_root/.codex/coherence-hook" Stop';
     assert.equal(isLauncherHook(codexCommand), true);
+    assert.equal(isLauncherHook("$codex_root/.codex/coherence-hook Stop"), true);
     assert.equal(isLauncherHook("other-coherence-hook Stop"), false);
+    assert.equal(isLauncherHook("/usr/local/bin/coherence-hook Stop"), false);
     for (const [file, command] of [[join(".claude", "settings.json"), '"$CLAUDE_PROJECT_DIR/.claude/coherence-hook" Stop'], [join(".codex", "hooks.json"), codexCommand]] as const) {
       await mkdir(dirname(join(project, file)), { recursive: true });
       await writeFile(join(project, file), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command }] }] } }, null, 2) + "\n");
