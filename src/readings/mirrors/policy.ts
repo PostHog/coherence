@@ -13,7 +13,7 @@
  *     and every alarm, as a pair the edit-time alarm can watch.
  */
 
-import { DERIVED, EXCLUSION_KEYS, type ExclusionKey, type Finding, type Group, type MirrorReading, type Restatement, type SetRef, type Verdict } from "./model.ts";
+import { DERIVED, DERIVED_EXCLUSION_KEYS, EXCLUSION_KEYS, type ExclusionKey, type Finding, type Group, type MirrorReading, type Restatement, type SetRef, type Verdict } from "./model.ts";
 
 /** The question's usage line, in query's usage and in its own errors. */
 export const MIRRORS_USAGE = "  query mirrors [--all] [--limit <n>] [--rev <rev>] [--no-history] [--json | --proposals | --restatements] [--base <rev>] [--witness]   lists kept by hand that mirror another list, a folder or an import closure (hand lists), read from git objects at a revision; advisory: by default only cross-file groups sharing 3 or more names and scoring 20 or more; --proposals: the pairs proposed for declaration; --restatements: each value written in two or more files that nothing holds equal, ranked, with the one source each would come from; --base <rev>: what the code changed since that revision, apart from what the rules changed; --witness: change each copy a test names and run that test, keeping whether it went red";
@@ -183,7 +183,7 @@ export function readingText(reading: MirrorReading, options: { all?: boolean; li
 
 /** The excluded restatements counted by key, and by entry within it: what the config lowered the count by. */
 export function exclusionCounts(excluded: readonly Restatement[]): { key: ExclusionKey; count: number; entries: { entry: string; count: number }[] }[] {
-  return EXCLUSION_KEYS.map((key) => {
+  return [...EXCLUSION_KEYS, ...DERIVED_EXCLUSION_KEYS].map((key) => {
     const mine = excluded.filter((r) => r.by?.key === key);
     const entries = [...new Set(mine.map((r) => r.by!.entry))].map((entry) => ({ entry, count: mine.filter((r) => r.by!.entry === entry).length }));
     return { key, count: mine.length, entries };
@@ -214,16 +214,19 @@ export function restatementCounts(reading: Counted): RestatementCounts {
   return { unheld: reading.restatements.length, held: reading.held, unrefuted: (reading.unrefuted ?? []).length, excluded: excluded.length, excludedBy: exclusionCounts(excluded), declared: (reading.declared ?? []).length };
 }
 
-/** The counts as one phrase: "33 unheld, 6 excluded by config (data: 4, scripts: 2), 4 held, 2 held by a test not yet refuted, 1 declared different". */
+/** The counts as one phrase: "33 unheld, 6 excluded by config (data: 4, scripts: 2), 9 excluded as derived (generated: 9), 4 held, 2 held by a test not yet refuted, 1 declared different". */
 export function restatementCountsPhrase(reading: Counted): string {
   const c = restatementCounts(reading);
-  const by = c.excludedBy.map((k) => `${k.key}: ${k.count}`).join(", ");
-  return `${c.unheld} unheld, ${c.excluded} excluded by config${by === "" ? "" : ` (${by})`}, ${c.held} held, ${c.unrefuted} held by a test not yet refuted, ${c.declared} declared different`;
+  const config = c.excludedBy.filter((k) => (EXCLUSION_KEYS as readonly string[]).includes(k.key));
+  const derived = c.excludedBy.filter((k) => !(EXCLUSION_KEYS as readonly string[]).includes(k.key));
+  const sum = (ks: typeof config): number => ks.reduce((n, k) => n + k.count, 0);
+  const list = (ks: typeof config): string => (ks.length === 0 ? "" : ` (${ks.map((k) => `${k.key}: ${k.count}`).join(", ")})`);
+  return `${c.unheld} unheld, ${sum(config)} excluded by config${list(config)}, ${sum(derived)} excluded as derived${list(derived)}, ${c.held} held, ${c.unrefuted} held by a test not yet refuted, ${c.declared} declared different`;
 }
 
 /** The count line: every count apart, and what each means. */
 export function restatementCountText(reading: Counted): string {
-  return `Restatements: ${restatementCountsPhrase(reading)} (one value written in two or more files; unheld is the count to lower, by a fix; excluded is what the config's restatements key names; held is what an import, a type, a declared mirror or a test that went red holds; not yet refuted waits on query mirrors --witness; declared different is a comment at the copy). --restatements lists them.`;
+  return `Restatements: ${restatementCountsPhrase(reading)} (one value written in two or more files; unheld is the count to lower, by a fix; excluded by config is what the config's restatements key names, and excluded as derived what the reading itself finds generated, a migration, or an example app; held is what an import, a type, a declared mirror or a test that went red holds; not yet refuted waits on query mirrors --witness; declared different is a comment at the copy). --restatements lists them.`;
 }
 
 /** A base and a head read under the same rules, and the base's count under earlier rules when one was kept: what the code changed, apart from what the rules changed. */
@@ -280,6 +283,7 @@ export function restatementLines(r: Restatement, index: number): string[] {
   const lines = [`${index}. ${r.kind}  ${what}${r.by === undefined ? "" : `  (excluded by ${r.by.key} ${r.by.entry})`}`];
   for (const s of r.sites) lines.push(`     ${s.file}${s.line > 0 ? `:${s.line}` : ""}${s.name === undefined ? "" : ` ${s.name}`}`);
   if (r.odd !== undefined) lines.push(`     ${r.odd.lacks} lacks ${r.odd.member}`);
+  for (const f of r.forms ?? []) lines.push(`     also as ${f.kind}: ${quoted(f.value)} at ${f.sites.map((s) => `${s.file}:${s.line}`).join(", ")}`);
   lines.push(`     source: ${r.source}`);
   return lines;
 }

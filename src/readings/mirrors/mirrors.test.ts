@@ -318,18 +318,18 @@ test("a value written in two files is a restatement when what its copies share i
     assert.deepEqual(drift.members, ["alpha", "beta", "gamma"]);
     assert.deepEqual(drift.odd, { member: "delta", lacks: "src/b/use.ts:1" }, "the side that lacks the one member is named");
     assert.equal(reading.restatements[0], drift, "what has already diverged ranks first");
-    assert.equal(valueOf(reading, "^zqname-[a-z][a-z0-9-]*$")?.kind, "constant", "a regular expression bound to a constant in two files, weighed by its words");
+    assert.equal(valueOf(reading, "^zqname-[a-z][a-z0-9-]*$")?.kind, "rule", "a regular expression written in two files is one rule, weighed by its words");
     assert.equal(valueOf(reading, "the note that two modules keep")?.kind, "constant", "prose bound to a named constant in two files is kept");
     assert.equal(valueOf(reading, "written-in-two-files")?.kind, "literal");
     assert.deepEqual(valueOf(reading, "written-in-two-files")?.sites.map((s) => s.file), ["src/a/words.ts", "src/b/words.ts"]);
     assert.equal(valueOf(reading, ".zqmts")?.kind, "constant", "a short value counts when it is rare");
-    assert.deepEqual(reading.restatements.map((r) => r.kind).sort(), ["constant", "constant", "constant", "drift", "literal"], "and nothing else");
+    assert.deepEqual(reading.restatements.map((r) => r.kind).sort(), ["constant", "constant", "drift", "literal", "rule"], "and nothing else");
     for (const left of ["the-long-mode-name", "some prose that is not a name", "https://example.com/one/two", "only-a-test-repeats-this", "name", "WWW-Authenticate", "Internal Server Error", "ls-files", "^[0-9a-f]{8}$"]) assert.equal(valueOf(reading, left), undefined, `${left} is left out`);
 
     let out = "";
     const io = { out: (text: string): void => { out += text; }, err: (text: string): void => { out += text; } };
     assert.equal(await mirrorsCommand(root, ["--no-history"], io), 0);
-    assert.match(out, /^Restatements: 5 unheld, 0 excluded by config, 0 held, 0 held by a test not yet refuted, 0 declared different \(one value written in two or more files;/m, "the default answer says the counts");
+    assert.match(out, /^Restatements: 5 unheld, 0 excluded by config, 0 excluded as derived, 0 held, 0 held by a test not yet refuted, 0 declared different \(one value written in two or more files;/m, "the default answer says the counts");
     out = "";
     assert.equal(await mirrorsCommand(root, ["--no-history", "--restatements"], io), 0);
     assert.match(out, /1\. drift {2}3 members: alpha, beta, gamma\n {5}src\/a\/kinds\.ts:1 KINDS\n {5}src\/b\/use\.ts:1 SOME_KINDS\n {5}src\/b\/use\.ts:1 lacks delta\n {5}source: /);

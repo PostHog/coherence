@@ -34,6 +34,8 @@ export interface SetRef {
   record?: boolean;
   /** For a list: the member type it is declared with (`HookEvent` in `ReadonlySet<HookEvent>` or `new Set<HookEvent>(…)`), when it names one. */
   elementType?: string;
+  /** For an alternation in a pattern: the words the pattern writes besides the alternation (`app`, `route` around `ts|tsx|js`), sorted; the list is that pattern's. */
+  context?: string[];
 }
 
 export interface Missed {
@@ -134,8 +136,12 @@ export interface RestatementConfig {
   values: string[];
 }
 
-export type ExclusionKey = keyof RestatementConfig;
-export const EXCLUSION_KEYS: readonly ExclusionKey[] = ["data", "scripts", "values"] as const satisfies readonly ExclusionKey[];
+/** The config's keys, and the classes the reading derives itself: a generated file (its generator holds it), a migration (frozen on purpose), an example app (it states its own copy). */
+export type ConfigExclusionKey = keyof RestatementConfig;
+export type DerivedExclusionKey = "generated" | "migrations" | "examples";
+export type ExclusionKey = ConfigExclusionKey | DerivedExclusionKey;
+export const EXCLUSION_KEYS: readonly ConfigExclusionKey[] = ["data", "scripts", "values"] as const satisfies readonly ConfigExclusionKey[];
+export const DERIVED_EXCLUSION_KEYS: readonly DerivedExclusionKey[] = ["generated", "migrations", "examples"] as const satisfies readonly DerivedExclusionKey[];
 
 /** The config entry that excluded a restatement: its key, and the glob or pattern as the config writes it. */
 export interface Exclusion {
@@ -191,4 +197,8 @@ export interface Restatement {
   hold?: { test: string; key: string };
   /** Declared different on purpose by a comment at the copy: how its behavior differs. */
   declared?: string;
+  /** Every site is a build tool's config (rollup, jest, webpack…), where each package states its own: ranked last, never excluded. */
+  buildConfig?: boolean;
+  /** The other forms of the same family (a list, its rule, its subset), listed under the strongest and counted once. */
+  forms?: Pick<Restatement, "kind" | "value" | "sites">[];
 }
