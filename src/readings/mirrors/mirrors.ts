@@ -308,6 +308,13 @@ function shapeOf(ts: Ts, node: TS.InterfaceDeclaration | TS.TypeAliasDeclaration
   return shape;
 }
 
+/** An initializer without the wrappers that do not change it: `as const`, `satisfies`, parentheses. */
+function outerless(ts: Ts, node: TS.Expression): TS.Expression {
+  let at = node;
+  while (ts.isAsExpression(at) || ts.isSatisfiesExpression(at) || ts.isParenthesizedExpression(at) || ts.isTypeAssertionExpression(at)) at = at.expression;
+  return at;
+}
+
 /** Steps through wrappers that do not change what a literal is: `as const`, `satisfies`, parentheses, `new Set(…)`. */
 function outer(ts: Ts, node: TS.Node): TS.Node {
   let at = node;
@@ -392,7 +399,7 @@ const PRIMITIVE = /^(?:string|number|boolean|unknown|any|object|Record|Partial|A
 /** What a function reads text into: the named type its JSON.parse is cast to (or it returns), and the fields its guard checks with typeof, equality or `in`; undefined for a function that parses nothing or checks fewer than two fields. */
 function parserOf(ts: Ts, fn: TS.FunctionLikeDeclaration): { name: string; type: string; fields: string[] } | undefined {
   const name = fn.name !== undefined && ts.isIdentifier(fn.name) ? fn.name.text : ts.isVariableDeclaration(fn.parent) && ts.isIdentifier(fn.parent.name) ? fn.parent.name.text : undefined;
-  if (name === undefined || fn.body === undefined) return undefined;
+  if (name === undefined || fn.body === undefined || !fn.body.getText().includes("JSON.parse")) return undefined;
   let parses = false;
   const types = new Map<string, number>();
   const fields = new Set<string>();
@@ -584,6 +591,9 @@ function readCode(ctx: Context, file: string, text: string): void {
   const add = (s: Omit<NameSet, "id" | "members" | "file"> & { members: readonly string[] }): void => addSet(ctx, { ...s, file });
   /** How each module-scope name is used in its own file: by property access alone, or otherwise (iterated, keyed, passed, spread). */
   const uses = new Map<string, { prop: number; other: number }>();
+  // Only the names a module-scope object is bound to are worth following.
+  const objectNames = new Set<string>();
+  for (const st of sf.statements) if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name) && d.initializer !== undefined && ts.isObjectLiteralExpression(outerless(ts, d.initializer))) objectNames.add(d.name.text);
   const keySets: { index: number; name: string }[] = [];
   if (!isTest) {
     // A comment at a copy that declares it different on purpose, on its line or the line before it.
@@ -675,7 +685,7 @@ function readCode(ctx: Context, file: string, text: string): void {
     if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
       ctx.counts.add(node.text);
       const p = node.parent;
-      if (!(ts.isVariableDeclaration(p) && p.name === node) && !(ts.isPropertyAccessExpression(p) && p.name === node)) {
+      if (objectNames.has(node.text) && !(ts.isVariableDeclaration(p) && p.name === node) && !(ts.isPropertyAccessExpression(p) && p.name === node)) {
         const u = uses.get(node.text) ?? { prop: 0, other: 0 };
         if (ts.isPropertyAccessExpression(p) && p.expression === node) u.prop++;
         else u.other++;

@@ -423,8 +423,9 @@ export function rulesOf(sites: readonly PredicateSite[], rarity: Rarity, minBits
   // Literals that hold an atom are probes too: the project's own strings are what its rules are run on.
   const literalsByAtom = new Map<string, string[]>();
   for (const l of literals) {
-    for (const a of byAtom.keys()) {
-      if (!l.includes(a)) continue;
+    if (l.length > 200) continue;
+    for (const a of wordsIn([l])) {
+      if (!byAtom.has(a)) continue;
       const at = literalsByAtom.get(a) ?? [];
       if (at.length < 20) at.push(l);
       literalsByAtom.set(a, at);
