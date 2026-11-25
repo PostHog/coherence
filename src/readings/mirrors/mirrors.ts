@@ -1367,9 +1367,25 @@ function adviceIndexOf(a: { commit: string; ctx: Context; testFolders: readonly 
     if (/\.[cm]?[jt]sx?$/.test(i.spec)) withExtension++;
     else without++;
   }
+  // What each home's file imports, followed through the project: where a copy importing the home back would close a cycle.
+  const direct = new Map<string, string[]>();
+  for (const [from, facts] of ctx.modules) direct.set(from, facts.imports.filter((i) => !i.typeOnly).map((i) => resolveIn(new Set(a.paths), from, i.spec)).filter((t): t is string => t !== undefined));
+  const reaches: Record<string, string[]> = {};
+  for (const file of new Set([...constants, ...lists, ...rules, ...parsers].map((h) => h.file))) {
+    const seen = new Set<string>();
+    const stack = [...(direct.get(file) ?? [])];
+    while (stack.length > 0 && seen.size < 400) {
+      const next = stack.pop()!;
+      if (seen.has(next)) continue;
+      seen.add(next);
+      stack.push(...(direct.get(next) ?? []));
+    }
+    if (seen.size > 0) reaches[file] = [...seen];
+  }
   return {
     version: ADVICE_VERSION,
     commit: a.commit,
+    reaches,
     at: new Date().toISOString(),
     importExtension: withExtension >= without,
     testFolders: [...a.testFolders],

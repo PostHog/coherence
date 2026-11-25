@@ -12,7 +12,8 @@
   "file": "src/lifecycle/statusline.ts",
   "birth": "6a2b5bd8",
   "copy": "(jsonl|jsonseq)",
-  "home": "src/journal/stores.ts"
+  "home": "src/journal/stores.ts",
+  "sequence": true
  },
  {
   "name": "shard pattern in the status line, through a shell",
@@ -20,7 +21,8 @@
   "birth": "6a2b5bd8",
   "copy": "(jsonl|jsonseq)",
   "home": "src/journal/stores.ts",
-  "shell": true
+  "shell": true,
+  "sequence": true
  },
  {
   "name": "START_EVENTS as an === chain in hook.ts",
@@ -36,7 +38,8 @@
   "birth": "f023d73e",
   "copy": "\"PostInvocation\"",
   "home": "src/lifecycle/hook-events.ts",
-  "homeName": "ANTIGRAVITY_EVENTS"
+  "homeName": "ANTIGRAVITY_EVENTS",
+  "sequence": true
  },
  {
   "name": ".jsonl in hook-latency.ts against LINE_EXTENSION",

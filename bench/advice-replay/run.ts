@@ -46,6 +46,8 @@ interface Case {
   home?: string;
   homeName?: string;
   shell?: boolean;
+  /** The home was born in the same commit: replay that commit's writes in order, each landed and followed by the hook after it, so the session's overlay knows the home by the time the copy is written. */
+  sequence?: boolean;
 }
 
 /* --------------------------------------------------------- transcripts */
@@ -55,6 +57,9 @@ interface Written {
   path: string;
   input: Record<string, unknown>;
   at: string;
+  /** The transcript the write came from, and its place there: one session's writes, in the order it made them. */
+  transcript: string;
+  order: number;
 }
 
 function transcriptWrites(folder: string): Written[] {
@@ -75,7 +80,7 @@ function transcriptWrites(folder: string): Written[] {
         const record = JSON.parse(line) as { timestamp?: string; message?: { content?: { type?: string; name?: string; input?: Record<string, unknown> }[] } };
         for (const c of record.message?.content ?? []) {
           if (c.type !== "tool_use" || !["Edit", "Write", "MultiEdit"].includes(c.name ?? "") || typeof c.input?.["file_path"] !== "string") continue;
-          out.push({ tool: c.name!, path: c.input["file_path"] as string, input: c.input, at: record.timestamp ?? "" });
+          out.push({ tool: c.name!, path: c.input["file_path"] as string, input: c.input, at: record.timestamp ?? "", transcript: file, order: out.length });
         }
       } catch {
         continue;
@@ -122,6 +127,77 @@ function dropTrees(): void {
 /* ---------------------------------------------------------------- replay */
 
 let sessions = 0;
+function hook(tree: string, name: string, event: Record<string, unknown>): { context: string; ms: number; exit: number } {
+  const t0 = performance.now();
+  const r = spawnSync("node", ["--disable-warning=ExperimentalWarning", cli, "hook", name], { cwd: tree, env, input: JSON.stringify(event), encoding: "utf8" });
+  const ms = Math.round(performance.now() - t0);
+  let context = "";
+  try {
+    context = (JSON.parse(r.stdout || "{}") as { hookSpecificOutput?: { additionalContext?: string } }).hookSpecificOutput?.additionalContext ?? "";
+  } catch {
+    context = "";
+  }
+  return { context: context.split("\n").filter((l) => l.startsWith("Restatement:")).join("\n"), ms, exit: r.status ?? -1 };
+}
+
+/** One write as a session makes it: the hook before, the write landed, the hook after, which folds what it defines into the session's overlay. A write through a shell is landed first and looked at by the hook after it. */
+function landWrite(tree: string, session: string, tool: string, input: Record<string, unknown>, shell: boolean): { context: string; ms: number; exit: number } {
+  const path = String(input["file_path"]);
+  const current = existsSync(path) ? readFileSync(path, "utf8") : "";
+  const edits = tool === "Write" ? [] : Array.isArray(input["edits"]) ? (input["edits"] as Record<string, unknown>[]) : [input];
+  const next = tool === "Write" ? String(input["content"] ?? "") : edits.reduce((t, e) => (typeof e["old_string"] === "string" && e["old_string"] !== "" && t.includes(e["old_string"]) ? t.replace(e["old_string"], String(e["new_string"] ?? "")) : t), current);
+  const land = (): void => {
+    execFileSync("mkdir", ["-p", resolve(path, "..")]);
+    writeFileSync(path, next);
+  };
+  if (shell) {
+    land();
+    return hook(tree, "PostToolUse", { session_id: session, cwd: tree, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "python3 write.py" }, tool_response: {} });
+  }
+  const before = hook(tree, "PreToolUse", { session_id: session, cwd: tree, hook_event_name: "PreToolUse", tool_name: tool, tool_input: input });
+  land();
+  hook(tree, "PostToolUse", { session_id: session, cwd: tree, hook_event_name: "PostToolUse", tool_name: tool, tool_input: input, tool_response: {} });
+  return before;
+}
+
+/**
+ * The session's writes up to the copy, in order, as one session. From the
+ * transcript where the copy's write is found: every code write that
+ * transcript made in the two days before it. Otherwise from the commit's
+ * diff: each code file's new text written whole, in the order git lists
+ * the files.
+ */
+function replaySequence(tree: string, c: Case, match: Written | undefined): { source: string; copy: { context: string; ms: number; exit: number }; others: { file: string; context: string }[] } {
+  const session = `replay-${process.pid}-${sessions++}`;
+  const others: { file: string; context: string }[] = [];
+  let copy = { context: "", ms: 0, exit: 0 };
+  let source: string;
+  if (match !== undefined) {
+    source = "transcript, the session's writes in order";
+    const from = Date.parse(match.at) - 2 * 86_400_000;
+    const steps = writes.filter((w) => w.transcript === match.transcript && w.order <= match.order && Date.parse(w.at) >= from && relativeOf(w.path) !== undefined && /\.[cm]?[jt]sx?$/.test(w.path));
+    for (const w of steps) {
+      const file = relativeOf(w.path)!;
+      const input = { ...w.input, file_path: join(tree, file) };
+      const r = landWrite(tree, session, w.tool, input, w === match && c.shell === true);
+      if (w === match) copy = r;
+      else if (r.context !== "") others.push({ file, context: r.context });
+    }
+  } else {
+    source = "diff, the commit's files in the order git lists them";
+    const files = git(repo, "show", "--name-status", "--format=", c.birth).split("\n").filter((l) => /^[AM]\t/.test(l)).map((l) => l.slice(2)).filter((f) => /\.[cm]?[jt]sx?$/.test(f));
+    for (const file of files) {
+      const r = landWrite(tree, session, "Write", { file_path: join(tree, file), content: git(repo, "show", `${c.birth}:${file}`) }, file === c.file && c.shell === true);
+      if (file === c.file) copy = r;
+      else if (r.context !== "") others.push({ file, context: r.context });
+    }
+  }
+  if (c.shell === true) source += ", the copy through the shell re-check";
+  git(tree, "checkout", "--quiet", "--", ".");
+  git(tree, "clean", "-fdq", "--", "src", "plugins");
+  return { source, copy, others };
+}
+
 function replay(tree: string, tool: string, input: Record<string, unknown>, shellFile?: { file: string; text: string }): { context: string; ms: number; exit: number } {
   const session = `replay-${process.pid}-${sessions++}`;
   let event: Record<string, unknown>;
@@ -160,6 +236,12 @@ for (const c of cases) {
   // The write that made the copy: one of this file, holding it, made within two days before the birth commit.
   const born = Date.parse(git(repo, "show", "-s", "--format=%cI", c.birth).trim());
   const match = writes.find((w) => relativeOf(w.path) === c.file && textOf(w).includes(c.copy.trim()) && Date.parse(w.at) <= born + 3_600_000 && Date.parse(w.at) >= born - 2 * 86_400_000);
+  if (c.sequence === true) {
+    const { source, copy, others } = replaySequence(tree, c, match);
+    const homeMatched = c.home === undefined ? undefined : copy.context.includes(c.home) && (c.homeName === undefined || copy.context.includes(c.homeName));
+    say({ kind: "case", name: c.name, source, fired: copy.context !== "", homeMatched, ms: copy.ms, exit: copy.exit, message: copy.context, alongside: others });
+    continue;
+  }
   let source: string;
   let input: Record<string, unknown>;
   if (match !== undefined) {

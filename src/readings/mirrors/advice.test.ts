@@ -5,14 +5,15 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { runHook } from "../../lifecycle/hook.ts";
-import { adviceFor, adviceStopText, loadAdvice, recordAdviceIndex, type AdviceIndex } from "./advice.ts";
+import { adviceFor, adviceStopText, foldWrites, loadAdvice, recordAdviceIndex, withOverlay, type AdviceIndex } from "./advice.ts";
 import { mirrorsCommand } from "./cli.ts";
 
 /* ------------------------------------------------------------ fixtures */
 
 const HOMES: Record<string, string> = {
   "coherence.config.json": JSON.stringify({ name: "zqadvice" }),
-  "src/journal/stores.ts": 'export const LINE_EXTENSION = ".zqjsonl";\nexport const SHARD_SUFFIX = /\\.[0-9a-f]{8}\\.(zqjsonl|zqjsonseq)\\b/;\nconst STDIO = ["zqpipe", "zqignore", "zqinherit", "zqoverlapped"];\nexport const quiet = (s: string): boolean => STDIO.includes(s);\n',
+  "src/journal/stores.ts": 'export const LINE_EXTENSION = ".zqjsonl";\nexport const SHARD_SUFFIX = /\\.[0-9a-f]{8}\\.(zqjsonl|zqjsonseq)\\b/;\nconst STDIO = ["zqpipe", "zqignore", "zqinherit", "zqoverlapped"];\nexport const quiet = (s: string): boolean => STDIO.includes(s);\nimport { pad } from "./util.ts";\nexport const padded = pad;\n',
+  "src/journal/util.ts": "export const pad = (s: string): string => s.padStart(8);\n",
   "src/lifecycle/times.ts": 'export interface ZqTime { zqat: string; zqevent: string; zqms: number }\nfunction parseZqTimes(text: string): ZqTime[] {\n  return text.split("\\n").flatMap((line) => {\n    try {\n      const v = JSON.parse(line) as Partial<ZqTime>;\n      return typeof v.zqat === "string" && typeof v.zqevent === "string" && typeof v.zqms === "number" ? [v as ZqTime] : [];\n    } catch {\n      return [];\n    }\n  });\n}\nexport const times = parseZqTimes;\n',
   "src/main.ts": 'import { LINE_EXTENSION, SHARD_SUFFIX, quiet } from "./journal/stores.ts";\nimport { times } from "./lifecycle/times.ts";\nexport const all = [LINE_EXTENSION, SHARD_SUFFIX, quiet, times];\n',
 };
@@ -45,6 +46,18 @@ async function preToolUse(root: string, tool: string, toolInput: Record<string, 
 
 const COPY = 'export const SUFFIX = ".zqjsonl";\n';
 
+/** A Write as a session makes it: told before, written, then the hook after it, which folds what the write defines into the session's overlay. */
+async function land(root: string, file: string, content: string): Promise<string> {
+  const before = await preToolUse(root, "Write", { file_path: join(root, file), content });
+  mkdirSync(dirname(join(root, file)), { recursive: true });
+  writeFileSync(join(root, file), content);
+  const after = await runHook("PostToolUse", { session_id: SESSION, cwd: root, hook_event_name: "PostToolUse", tool_name: "Write", tool_input: { file_path: join(root, file), content }, tool_response: {} }, root, { refresh: async () => {}, mirrors: () => {} });
+  after.commit?.();
+  assert.equal(after.exit, 0);
+  assert.doesNotMatch(after.stdout, /permissionDecision|"decision"|"block"|"deny"/, "the hook after a write only adds context");
+  return before.context;
+}
+
 /* ---------------------------------------------------------- invariants */
 
 test("write-time advice never blocks or denies: on every host's writing tool it exits 0 and adds context, never a decision", async () => {
@@ -63,6 +76,13 @@ test("write-time advice never blocks or denies: on every host's writing tool it 
       assert.match(r.context, /Restatement: "\.zqjsonl" is `LINE_EXTENSION` in src\/journal\/stores\.ts:1\. Reuse it: import \{ LINE_EXTENSION \} from "\.\.\/journal\/stores\.ts"\./, tool);
       assert.doesNotMatch(r.stdout, /permissionDecision|"decision"|"block"|"deny"/, `${tool} only adds context`);
     }
+    // And through a home this session wrote, folded into its overlay.
+    rmSync(join(root, ".coherence", "mirrors", "advised"), { recursive: true, force: true });
+    await land(root, "src/fresh/home.ts", 'export const FRESH = "zq-fresh-home-value";\n');
+    const overlay = await preToolUse(root, "Write", { file_path: join(root, "src/fresh/copy.ts"), content: 'export const F = "zq-fresh-home-value";\n' });
+    assert.equal(overlay.exit, 0);
+    assert.match(overlay.context, /`FRESH` in src\/fresh\/home\.ts:1/);
+    assert.doesNotMatch(overlay.stdout, /permissionDecision|"decision"|"block"|"deny"/, "the overlay's advice only adds context");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -112,6 +132,7 @@ test("write-time advice speaks only for a named constant, a list within one memb
     assert.match(chain, /`LINE_EXTENSION`/, "the chain's own constant is named");
     assert.doesNotMatch(chain, /SHARD_SUFFIX/, "a chain that accepts more than the rule is no copy of it");
     assert.match(await say("src/a/parse.ts", 'import type { ZqTime } from "../lifecycle/times.ts";\nexport function readZq(text: string): ZqTime[] {\n  return text.split("\\n").flatMap((l) => { const t = JSON.parse(l) as Partial<ZqTime>; return typeof t.zqat === "string" && typeof t.zqevent === "string" && typeof t.zqms === "number" ? [t as ZqTime] : []; });\n}\n'), /parses ZqTime with the same zqat, zqevent, zqms checks as `parseZqTimes` in src\/lifecycle\/times\.ts:2\. Reuse it: export it there as `parseZqTimes` first, then import \{ parseZqTimes \}/);
+    assert.match(await say("src/journal/util.ts", `export const pad = (s: string): string => s.padStart(8);\n${COPY}`), /src\/journal\/stores\.ts imports src\/journal\/util\.ts, so importing back would make a cycle: move `LINE_EXTENSION` to a module both can import/, "a home whose file imports the copy's is never offered as an import");
     for (const [file, content, why] of [
       ["src/a/bare.ts", 'export const x = (): string => "zq-no-named-home";\n', "a bare literal with no named home"],
       ["src/a/prose.ts", 'export const m = "the .zqjsonl shard went missing";\n', "prose that holds a word of a home"],
@@ -127,12 +148,46 @@ test("write-time advice speaks only for a named constant, a list within one memb
     writeFileSync(join(root, "src", "c", "shell.ts"), COPY);
     const after = await runHook("PostToolUse", { session_id: SESSION, cwd: root, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "python3 write.py" }, tool_response: {} }, root, { refresh: async () => {}, mirrors: () => {} });
     assert.match(after.stdout, /LINE_EXTENSION/, "a file a shell command wrote is looked up after it");
+
+    // A file a writing tool wrote is not the shell's: an edit that copies nothing leaves the file's older copy unsaid, at the edit and after the next command.
+    rmSync(join(root, ".coherence", "mirrors", "advised"), { recursive: true, force: true });
+    rmSync(join(root, "src", "c", "shell.ts"));
+    const old = join(root, "src", "c", "old.ts");
+    writeFileSync(old, COPY);
+    const edit = { file_path: old, old_string: COPY, new_string: `${COPY}export const z = 1;\n` };
+    assert.equal((await preToolUse(root, "Edit", { ...edit, new_string: "export const z = 1;\n" })).context, "", "the edit copies nothing");
+    writeFileSync(old, `${COPY}export const z = 1;\n`);
+    (await runHook("PostToolUse", { session_id: SESSION, cwd: root, hook_event_name: "PostToolUse", tool_name: "Edit", tool_input: edit, tool_response: {} }, root, { refresh: async () => {}, mirrors: () => {} })).commit?.();
+    const next = await runHook("PostToolUse", { session_id: SESSION, cwd: root, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "ls" }, tool_response: {} }, root, { refresh: async () => {}, mirrors: () => {} });
+    assert.doesNotMatch(next.stdout, /Restatement/, "the command changed nothing, so the tool's file is not looked at again");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("write-time advice looks a write up within the hook latency budget: a few milliseconds against an index of thousands of homes", () => {
+test("a home this session wrote is advised against later in the session: what a write defines is folded into the session's overlay, by the same strict classes, once a family, and never without a kept index", async () => {
+  const root = await warmed();
+  try {
+    // The kept index knows nothing of these: they are written in this session.
+    assert.equal(await land(root, "src/journal/shards.ts", 'export const SHARD = /\\.[0-9a-f]{8}\\.(zqlogl|zqlogseq)$/;\nexport const EVENTS = ["ZqStart", "ZqPre", "ZqTool", "ZqStop"] as const;\nexport const NOTE = "a message, not a home";\n'), "", "the home itself is told nothing");
+    const rule = await land(root, "src/lifecycle/status.ts", 'export const isShard = (s: string, n: string): boolean => new RegExp(`^${s}\\\\.[0-9a-f]{8}\\\\.(zqlogl|zqlogseq)$`).test(n);\n');
+    assert.match(rule, /accepts what `SHARD` in src\/journal\/shards\.ts:1 accepts/, "a rule this session wrote is a home for its later copies");
+    const list = await land(root, "src/lifecycle/install.ts", 'const FLAT: ReadonlySet<string> = new Set(["ZqStart", "ZqPre", "ZqStop"]);\nexport const flat = (e: string): boolean => FLAT.has(e);\n');
+    assert.match(list, /this list is `EVENTS` in src\/journal\/shards\.ts:2; it lacks "ZqTool"/, "and so is a list");
+    assert.equal(await land(root, "src/lifecycle/again.ts", 'export const isShard2 = (n: string): boolean => /\\.[0-9a-f]{8}\\.(zqlogl|zqlogseq)$/.test(n);\n'), "", "a family told once is declined by its next copy");
+    assert.equal(await land(root, "src/lifecycle/note.ts", 'export const m = "a message, not a home";\n'), "", "prose defines no home");
+
+    // With no kept index, the overlay alone never speaks.
+    rmSync(join(root, ".coherence", "mirrors", "advice.json"));
+    rmSync(join(root, ".coherence", "mirrors", "advised"), { recursive: true, force: true });
+    assert.equal(await land(root, "src/other/home.ts", 'export const OTHER = "zq-other-home-value";\n'), "");
+    assert.equal(await land(root, "src/other/copy.ts", 'export const O = "zq-other-home-value";\n'), "", "cold: nothing folded, nothing said");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("write-time advice looks a write up within the hook latency budget: a few milliseconds against an index of thousands of homes", (t) => {
   // Lookups are by map and by a shared word, so their time does not grow with the index: the same write against an index a hundred times larger costs about the same.
   const indexOf = (n: number): AdviceIndex => ({
     version: 1, commit: "0".repeat(40), at: "2026-11-25T00:00:00Z", importExtension: true, testFolders: ["test", "tests", "__tests__"], quiet: [],
@@ -163,6 +218,30 @@ test("write-time advice looks a write up within the hook latency budget: a few m
   const large = timed(50_000);
   assert.ok(large.p50 < 4 * small.p50 + 5, `a 100 times larger index costs ${(large.p50 / small.p50).toFixed(1)} times as much (${small.p50.toFixed(1)} ms, ${large.p50.toFixed(1)} ms)`);
   assert.ok(large.p95 < 250, `p95 ${large.p95.toFixed(1)} ms for a 400-line write against 70,500 homes`);
+
+  // The overlay path: a session that wrote a thousand homes still looks a write up inside the budget.
+  const root = mkdtempSync(join(tmpdir(), "coherence-advice-overlay-"));
+  try {
+    recordAdviceIndex(root, indexOf(500));
+    const files = Array.from({ length: 50 }, (_, f) => ({ file: `src/written${f}.ts`, text: Array.from({ length: 20 }, (_, k) => `export const W${f}_${k} = "zq-written-${f}-${k}";`).join("\n") }));
+    foldWrites(root, "overlay-session", files);
+    // Each hook call reads the overlay and folds it in afresh, then looks the edit up: that whole path is what is timed.
+    const times: number[] = [];
+    let found: ReturnType<typeof adviceFor> = [];
+    for (let k = 0; k < 15; k++) {
+      const t0 = performance.now();
+      const merged = withOverlay(root, "overlay-session", loadAdvice(root)!);
+      found = adviceFor(merged, "src/new.ts", 'export const x = "zq-written-7-3";\n');
+      times.push(performance.now() - t0);
+      assert.equal(merged.index.constants.length, 1500, "the thousand homes are folded in");
+    }
+    times.sort((x, y) => x - y);
+    t.diagnostic(`lookup p50 ${small.p50.toFixed(1)} / ${large.p50.toFixed(1)} ms (700 / 70,500 homes); with an overlay of 1,000 homes p50 ${times[7]!.toFixed(1)} ms, p95 ${times[14]!.toFixed(1)} ms`);
+    assert.ok(times[14]! < 50, `an ordinary edit stays a few milliseconds with the overlay (p95 ${times[14]!.toFixed(1)} ms)`);
+    assert.match(found[0]?.text ?? "", /`W7_3` in src\/written7\.ts:4/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("the stop sweep names each fact the session wrote more than once, in one line, from the session's own advice state alone, never waiting", async () => {
@@ -180,5 +259,21 @@ test("the stop sweep names each fact the session wrote more than once, in one li
     assert.equal(adviceStopText(root, "another-session"), "", "a session that copied nothing hears nothing");
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a write that binds the home's own name is said at the stop, and only when the home still binds it: a move is told nothing", async () => {
+  for (const moved of [false, true]) {
+    const root = await warmed();
+    try {
+      const again = 'export const LINE_EXTENSION = ".zqjsonl";\n';
+      assert.equal(await land(root, "src/b/lines.ts", again), "", "the write alone cannot tell a move from a copy, so it is told nothing");
+      if (moved) writeFileSync(join(root, "src/journal/stores.ts"), 'export { LINE_EXTENSION } from "../b/lines.ts";\n');
+      const line = adviceStopText(root, SESSION);
+      if (moved) assert.equal(line, "", "the home moved: nothing to say");
+      else assert.match(line, /^Restatements: LINE_EXTENSION is defined in both src\/journal\/stores\.ts and src\/b\/lines\.ts\. Give each one home/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });

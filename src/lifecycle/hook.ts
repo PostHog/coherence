@@ -620,14 +620,30 @@ async function adviceBeforeWrite(root: string, session: string | undefined, inpu
   return sessionAdvice(root, session, writes);
 }
 
+/** Fold the homes these written files define into the session's advice overlay; a no-op when no index is kept. */
+async function foldAfterWrite(root: string, session: string | undefined, files: readonly string[]): Promise<void> {
+  const { foldWrites, loadAdvice } = await import("../readings/mirrors/advice.ts");
+  if (session === undefined || loadAdvice(root) === undefined) return;
+  const texts = files.flatMap((file) => {
+    try {
+      return [{ file, text: readFileSync(resolve(root, file), "utf8") }];
+    } catch {
+      return [];
+    }
+  });
+  foldWrites(root, session, texts);
+}
+
 /** Write-time advice after a shell command: the project's code files it changed since this session last looked, looked up whole; silent when no index is kept. */
 async function adviceAfterShell(root: string, session: string | undefined): Promise<{ text: string; commit: () => void }> {
   const none = { text: "", commit: () => {} };
-  const { changedSince, loadAdvice, sessionAdvice } = await import("../readings/mirrors/advice.ts");
+  const { changedSince, foldWrites, loadAdvice, sessionAdvice } = await import("../readings/mirrors/advice.ts");
   if (session === undefined || loadAdvice(root) === undefined) return none;
   const changed = await changedFiles(root);
   const files = changedSince(root, session, changed.files);
-  return sessionAdvice(root, session, files.map((f) => ({ ...f, existing: f.text })));
+  const said = sessionAdvice(root, session, files.map((f) => ({ ...f, existing: f.text })));
+  foldWrites(root, session, files);
+  return said;
 }
 
 export function writtenFiles(root: string, input: HookInput, host: string = root): string[] {
@@ -1762,6 +1778,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const lastStop = fromStop === undefined ? "" : `At your last stop (shown to the user, not to you), ${fromStop.replace(/^Regulate \(Stop\):\n/, "regulate said:\n")}`;
         // A shell command writes what no tool input shows: the files it changed are looked up after it, as an edit's are before.
         const shellAdvice = event === "PostToolUse" && writerNaming(input.tool_name) === "command" ? await adviceAfterShell(root, session) : { text: "", commit: () => {} };
+        // What a writing tool wrote is folded into the session's overlay, so a home it defines is known to the session's later writes.
+        if (event === "PostToolUse" && written.length > 0 && writerNaming(input.tool_name) !== "command") await foldAfterWrite(root, session, written);
         const context = await voiced(root, input, [lastStop,feed.text,edit,specAtEdit.text,mirror.text,shellAdvice.text,vocabularyNote,vocabulary].filter(Boolean).join("\n"), voice);
         // A mirror that agrees again is forgotten at once: nothing was said that must first reach the host.
         if (mirror.text === "") mirror.commit();

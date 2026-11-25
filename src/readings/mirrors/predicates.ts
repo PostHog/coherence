@@ -464,7 +464,8 @@ export function predicateOf(site: PredicateSite): Predicate | undefined {
     // Run by the reading's own automaton, never compiled as a RegExp: a pattern is the project's text, or what an agent is about to write.
     const flags = site.flags ?? "";
     const re = matcherOf(node, flags);
-    const core = matcherOf(coreOf(node), flags);
+    // The core is matched whole: two patterns look for the same thing when their cores accept the same whole strings, so a search and an anchored pattern can be one rule while two patterns anchored alike are compared as written.
+    const core = matcherOf({ t: "seq", items: [{ t: "assert", a: "bol" }, coreOf(node), { t: "assert", a: "eol" }] }, flags.replace(/m/g, ""));
     if (re === undefined || core === undefined) return undefined;
     const samples = drawn(node);
     return { site, accepts: (s) => re.test(s), core: (s) => core.test(s), atoms: regexAtoms(node), samples };

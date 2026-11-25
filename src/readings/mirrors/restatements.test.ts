@@ -171,15 +171,18 @@ test("one rule however it is written: a regular expression, one built from a tem
     "src/h/hook.ts": 'export const quiet = (e: string): boolean => e === "ZqSessionStart" || e === "ZqSubagentStart";\n',
     "src/i/id.ts": "export const ID = /^[0-9a-f]{8}$/;\n",
     "src/j/token.ts": "export const TOKEN = /^[0-9a-f]{8}$/;\n",
+    "src/k/exts.ts": "export const EXTS = /\\.(zqscript|zqmodule)$/;\n",
+    "src/l/wider.ts": "export const WIDER = /\\.(zqscript|zqscriptx|zqmodule)$/;\n",
   });
   try {
     const reading = await readMirrors(root, { history: false });
     const rules = reading.restatements.filter((r) => r.kind === "rule");
+    assert.ok(!rules.some((r) => filesOf(r).includes("src/k/exts.ts")), "two patterns anchored alike are compared as written: one that also accepts .zqscriptx is not the same rule, though each one's ends, dropped, find the other's strings");
     assert.deepEqual(rules.map(filesOf).sort(), [["src/a/shards.ts", "src/b/status.ts"], ["src/c/ends.ts", "src/d/logs.ts"], ["src/g/starts.ts", "src/h/hook.ts"]], "the template, the chain and the set each join their rule");
     const derivation = reading.restatements.find((r) => r.kind === "derivation");
     assert.deepEqual(filesOf(derivation), ["src/e/wide.ts", "src/f/narrow.ts"]);
     assert.equal(derivation?.sites[1]?.file, "src/f/narrow.ts", "the part is named after the whole");
-    assert.equal(reading.restatements.filter((r) => r.kind === "derivation").length, 1, "and nothing else derives");
+    assert.deepEqual(reading.restatements.filter((r) => r.kind === "derivation").map(filesOf).sort(), [["src/e/wide.ts", "src/f/narrow.ts"], ["src/k/exts.ts", "src/l/wider.ts"]].map((f) => [...f].sort()).sort(), "and nothing else derives");
     assert.ok(!reading.restatements.some((r) => filesOf(r).includes("src/i/id.ts")), "a pattern with no words of its own is the same text with different referents, and never groups");
   } finally {
     rmSync(root, { recursive: true, force: true });
