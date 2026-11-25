@@ -175,34 +175,40 @@ The mirror reading: the lists a project keeps by hand that must mirror something
   via: write-time advice never blocks or denies: on every host's writing tool it exits 0 and adds context, never a decision
   because: the owner's ruling for #193: advice informs the agent, which decides; a hook that denied a write on an advisory reading would make the reading's misses the agent's failures
   crossing: harness -> record
+  refuted: made write-time advice deny the write it advised on -> "write-time advice never blocks or denies: on every host's writing tool it exits 0 and adds context, never a decision" went red in advice.test.ts on its own assertion (the answer carried a permission decision); restored byte for byte, green (2026-11-25)
   kinds: none
 - write-time advice is silent when cold: With no advice index kept, or one that cannot be read or is of another version, write-time advice says nothing and reads nothing else.
   over: a write with the index removed, and with the index file unreadable
   via: write-time advice is silent when no advice index is kept, or the kept one cannot be read
   because: the index is kept by the detached reading a session start or stop begins; a hook that found none must not take the reading itself (never computed in a hook), and silence is the only answer that costs nothing
   crossing: harness -> record
+  refuted: kept answering from the index a process loaded after the kept index was gone -> "write-time advice is silent when no advice index is kept, or the kept one cannot be read" went red in advice.test.ts on its own assertion (the write after the index was removed was told its home); restored byte for byte, green (2026-11-25)
   kinds: none
 - write-time advice speaks once: A session is told a family (one class and one home) once; a later write of the same family declines it, a `differs on purpose` comment that names the home declines it at once, and a declined family is never said again in that session.
   over: three writes of one constant's copy, then a rule's copy behind a differs on purpose comment, then the rule's copy again
   via: write-time advice says a family once a session, and nothing more once the session declined it: a second write after being told, or a differs on purpose comment
   because: the agent-behavior report: a channel that repeats itself or argues with a decision is the channel agents learn to ignore
   crossing: harness -> record
+  refuted: never declined a family on a second write after it was told -> "write-time advice says a family once a session, and nothing more once the session declined it: a second write after being told, or a differs on purpose comment" went red in advice.test.ts on its own assertion (the second write was told again); restored byte for byte, green (2026-11-25)
   kinds: none
 - write-time advice speaks only where it is sure: Write-time advice names a home only for a copy of a named constant bound at a module's top level, a list within one member of a named list used as a set, a regular expression or chain of string tests that accepts what a named rule accepts, and a parser of a type a named function parses with the same checks, naming the home's file and line and the exact import, with the export step when the home is private; it says nothing for a bare literal with no named home, a value with a space in it, another party's value, a generated file, a migration, an example app, a file the config's restatements key names, a test, the home's own file, a file the reading already knows as a copy, or content that already imports the home; and a shell command's changed files are looked up by the same classes.
   over: a list one member short of a named set, a template-built copy of a named rule, a chain that accepts more than the rule, a private parser's copy, a bare literal, prose, an HTTP header name, a generated file, a test file, content that imports the home, and a file a shell command wrote
   via: write-time advice speaks only for a named constant, a list within one member of a named list used as a set, a pattern that accepts what a named rule accepts, and a parser of a type a named function parses with the same checks, and never for a bare literal, prose, another party's value, a generated file, a test, or content that already imports the home
   because: the owner's strict version: in both real cases the agent had already read the home (readTimes copied an unexported parse; the shard pattern was spelled four ways in one commit, two through a shell), so only a precise name of the home, at the moment of the write, changes what is written; anything less certain belongs to CI
   crossing: harness -> record
+  refuted: spoke for content that already imports the home -> "write-time advice speaks only for a named constant, a list within one member of a named list used as a set, a pattern that accepts what a named rule accepts, and a parser of a type a named function parses with the same checks, and never for a bare literal, prose, another party's value, a generated file, a test, or content that already imports the home" went red in advice.test.ts on its own assertion (the write that imports LINE_EXTENSION was told to import it); restored byte for byte, green (2026-11-25)
   kinds: none
 - write-time advice stays in budget: A write is looked up against the kept index in a few milliseconds: a 400-line write against an index of 7,500 homes takes under 40 ms at the 95th percentile (13 to 14 ms measured), and an ordinary edit under 20 ms, well inside a tool hook's 3 s latency budget.
   over: thirty lookups of a 400-line write against a synthetic index of 5,000 constants, 2,000 lists and 500 rules, and one ordinary edit
   via: write-time advice looks a write up within the hook latency budget: a few milliseconds against an index of thousands of homes
   because: a tool hook that feels slow is switched off; the index is loaded once per process and kept by its file's time, and every lookup is a map or a prefilter by a shared word
   crossing: harness -> record
+  refuted: looked every quoted string up by a scan of every named constant instead of the map -> "write-time advice looks a write up within the hook latency budget: a few milliseconds against an index of thousands of homes" went red in advice.test.ts on its own assertion (the 95th percentile rose to about 55 ms); restored byte for byte, green (2026-11-25)
   kinds: none
 - the stop sweep never waits: At a stop, one advisory line names each fact the session wrote more than once, read from the session's own advice state alone, synchronously, with nothing awaited, spawned or read from the index; a session that copied nothing hears nothing.
   over: a session that wrote one constant's copy twice, then its stop with the index removed, and another session's stop
   via: the stop sweep names each fact the session wrote more than once, in one line, from the session's own advice state alone, never waiting
   because: the stop has its own budget and a detached refresh it never waits on (df-84db9e4f); the facts born in a session and spelled more than once get one ask, and a copy a merge brings is CI's to count
   crossing: harness -> record
+  refuted: made the stop sweep read the advice index as well as the session's own state -> "the stop sweep names each fact the session wrote more than once, in one line, from the session's own advice state alone, never waiting" went red in advice.test.ts on its own assertion (the sweep said nothing once the index was gone); restored byte for byte, green (2026-11-25)
   kinds: none
