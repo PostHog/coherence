@@ -34,6 +34,7 @@ import type * as TS from "typescript";
 import { declaredLanguageOf, type DeclaredLanguage } from "../../adapters/declared-config.ts";
 import { languageOfFile } from "../../adapters/language-files.ts";
 import { isTestPath } from "../../adapters/adapter.ts";
+import { installedPackage, projectFrom } from "../../adapters/installed.ts";
 import { underIgnored } from "../../adapters/project-files.ts";
 import { MODULE_FILE } from "../../enforcement/code-fingerprint.ts";
 import { DEFAULT_TEST_FOLDERS, globPattern, readEnforcementConfig } from "../../enforcement/config.ts";
@@ -180,7 +181,8 @@ function platformOf(root: string): Set<string> {
   };
   const lib = libDir();
   if (lib !== undefined) scan(lib, 0);
-  scan(join(root, "node_modules", "@types", "node"), 2);
+  const node = installedPackage("@types/node", projectFrom(root));
+  if (node !== undefined) scan(node.dir, 2);
   PLATFORM.set(root, out);
   return out;
 }
