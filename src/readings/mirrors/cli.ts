@@ -24,6 +24,7 @@
 import { execFileSync } from "../../lifecycle/work-meter.ts";
 import type { Io } from "../../journal/cli.ts";
 import { MirrorUnable, readMirrors, type MirrorReading } from "./mirrors.ts";
+import { recordAdviceIndex } from "./advice.ts";
 import { witnessHolds } from "./holds.ts";
 import { alarmsOf, baseComparisonText, compareWithBase, MIRRORS_USAGE, proposalsOf, readingText, restatementCounts, restatementsText, surfaced } from "./policy.ts";
 import { earlierCounts, lastMirrors, recordCounts, recordMirrors } from "./recorded.ts";
@@ -99,8 +100,10 @@ export async function mirrorsCommand(root: string, argv: readonly string[], io: 
   if (keep) {
     try {
       recordMirrors(root, reading);
+      // The index write-time advice looks a hook's writes up against, kept beside the reading.
+      if (reading.advice !== undefined) recordAdviceIndex(root, reading.advice);
     } catch {
-      // A reading that cannot be kept only means orient reads the last one.
+      // A reading that cannot be kept only means orient reads the last one, and the advice the last index.
     }
   }
   const keepCounts = (r: typeof reading): void => {
@@ -140,7 +143,7 @@ export async function mirrorsCommand(root: string, argv: readonly string[], io: 
   if (comparison !== undefined && !parsed.json) io.out(`${baseComparisonText(comparison)}\n\n`);
   if (parsed.restatements) io.out(restatementsText(reading, parsed.limit === undefined ? {} : { limit: parsed.limit }));
   else if (parsed.proposals) io.out(JSON.stringify(proposalsOf(reading.groups), null, 2));
-  else if (parsed.json) io.out(JSON.stringify({ ...reading, counts: restatementCounts(reading), ...(comparison === undefined ? {} : { base: comparison }), surfaced: reading.groups.filter(surfaced).map((g) => g.rank), alarms: alarmsOf(reading.groups), proposals: proposalsOf(reading.groups) }, null, 2));
+  else if (parsed.json) io.out(JSON.stringify({ ...reading, advice: undefined, counts: restatementCounts(reading), ...(comparison === undefined ? {} : { base: comparison }), surfaced: reading.groups.filter(surfaced).map((g) => g.rank), alarms: alarmsOf(reading.groups), proposals: proposalsOf(reading.groups) }, null, 2));
   else io.out(readingText(reading, { all: parsed.all, ...(parsed.limit === undefined ? {} : { limit: parsed.limit }) }));
   return 0;
 }

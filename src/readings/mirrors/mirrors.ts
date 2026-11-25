@@ -40,10 +40,11 @@ import { MODULE_FILE } from "../../enforcement/code-fingerprint.ts";
 import { DEFAULT_TEST_FOLDERS, globPattern, readEnforcementConfig } from "../../enforcement/config.ts";
 import { MANIFEST } from "../../plugins/plugin.ts";
 import { parseSpec } from "../../spec/grammar.ts";
-import { parseRegex, regexAtoms, wordsIn, type Chain, type ChainLeaf, type PredicateSite } from "./predicates.ts";
-import { Counts, Rarity, wordsOf } from "./rarity.ts";
+import { parseRegex, predicateOf, regexAtoms, wordsIn, type Chain, type ChainLeaf, type PredicateSite } from "./predicates.ts";
+import { Counts, Rarity, RARITY_MIN, wordsOf } from "./rarity.ts";
+import { ADVICE_VERSION, type AdviceIndex } from "./advice.ts";
 import { readWitnessed } from "./holds.ts";
-import { DIFFERS, restatementsOf, type DeclaredPair, type Exclusions, type ImportFact, type ParserSite, type Shape, type ValueSite } from "./restatements.ts";
+import { ownerOf, DIFFERS, restatementsOf, type DeclaredPair, type Exclusions, type ImportFact, type ParserSite, type Shape, type ValueSite } from "./restatements.ts";
 import { DERIVED, DOC_FORMS, EXCLUSION_KEYS, type Finding, type Form, type Group, type MirrorHistory, type MirrorReading, type SetRef, type Verdict } from "./model.ts";
 
 export type { Finding, Group, MirrorReading, SetRef, Verdict };
@@ -84,6 +85,10 @@ interface NameSet {
   elementType?: string;
   /** An alternation's surrounding words in its pattern. */
   context?: string[];
+  /** A list bound at the module's top level, exported or not, and asked for membership, iterated or spread there (or exported). */
+  topLevel?: boolean;
+  exported?: boolean;
+  usedAsSet?: boolean;
 }
 
 /**
@@ -636,12 +641,22 @@ function readCode(ctx: Context, file: string, text: string): void {
   const exported: string[] = [];
   const reads = new Map<string, { keys: string[]; line: number }>();
   const isTest = ctx.isTest(file);
+  const firstSet = ctx.sets.length;
   if (scriptKind(ts, file) === ts.ScriptKind.JS || scriptKind(ts, file) === ts.ScriptKind.JSX || /^(?:\s*\/\/[^\n]*\n)*\s*\/\/\s*@ts-nocheck/.test(text)) ctx.untyped.add(file);
   const add = (s: Omit<NameSet, "id" | "members" | "file"> & { members: readonly string[] }): void => addSet(ctx, { ...s, file });
   /** How each module-scope name is used in its own file: by property access alone, or otherwise (iterated, keyed, passed, spread). */
   const uses = new Map<string, { prop: number; other: number }>();
-  // Only the names a module-scope object is bound to are worth following.
+  // Only the names a module-scope object is bound to are worth following; and the lists a module binds, to see which it uses as sets.
   const objectNames = new Set<string>();
+  const listNames = new Set<string>();
+  const usedAsSet = new Set<string>();
+  const exportedNames = new Set<string>();
+  for (const st of sf.statements) if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) {
+    if (!ts.isIdentifier(d.name) || d.initializer === undefined) continue;
+    const init = outerless(ts, d.initializer);
+    if (ts.isArrayLiteralExpression(init) || (ts.isNewExpression(init) && init.expression.getText() === "Set")) listNames.add(d.name.text);
+    if (ts.getModifiers(st)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) === true) exportedNames.add(d.name.text);
+  }
   for (const st of sf.statements) if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name) && d.initializer !== undefined && ts.isObjectLiteralExpression(outerless(ts, d.initializer))) objectNames.add(d.name.text);
   const keySets: { index: number; name: string }[] = [];
   if (!isTest) {
@@ -655,10 +670,14 @@ function readCode(ctx: Context, file: string, text: string): void {
   }
 
   /** The constant or function a predicate is bound to, by the nearest name that holds it. */
-  const boundOf = (node: TS.Node): { bound?: string } => {
+  const boundOf = (node: TS.Node): { bound?: string; topLevel?: boolean; exported?: boolean } => {
     const top = outer(ts, node);
     const p = top.parent;
-    if (p !== undefined && ts.isVariableDeclaration(p) && ts.isIdentifier(p.name)) return { bound: p.name.text };
+    if (p !== undefined && ts.isVariableDeclaration(p) && ts.isIdentifier(p.name)) {
+      const st = p.parent?.parent;
+      const top = st !== undefined && ts.isVariableStatement(st) && ts.isSourceFile(st.parent);
+      return { bound: p.name.text, ...(top ? { topLevel: true, exported: ts.getModifiers(st)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) === true } : {}) };
+    }
     const fn = enclosingFunction(ts, node);
     return fn === "module" ? {} : { bound: fn };
   };
@@ -734,6 +753,8 @@ function readCode(ctx: Context, file: string, text: string): void {
     if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
       ctx.counts.add(node.text);
       const p = node.parent;
+      // A list asked for membership, iterated or spread is used as a set.
+      if (listNames.has(node.text) && ((ts.isPropertyAccessExpression(p) && p.expression === node && /^(?:has|includes|indexOf|some|every|find|filter|map|forEach|flatMap)$/.test(p.name.text)) || (ts.isForOfStatement(p) && p.expression === node) || ts.isSpreadElement(p) || (ts.isCallExpression(p) && p.arguments.includes(node as TS.Expression)))) usedAsSet.add(node.text);
       if (objectNames.has(node.text) && !(ts.isVariableDeclaration(p) && p.name === node) && !(ts.isPropertyAccessExpression(p) && p.name === node)) {
         const u = uses.get(node.text) ?? { prop: 0, other: 0 };
         if (ts.isPropertyAccessExpression(p) && p.expression === node) u.prop++;
@@ -759,7 +780,8 @@ function readCode(ctx: Context, file: string, text: string): void {
         const bound = decl !== undefined && ts.isVariableDeclaration(decl) && decl.initializer === top && ts.isIdentifier(decl.name) ? decl.name.text : undefined;
         const stmt = bound === undefined ? undefined : decl!.parent?.parent;
         const exported = stmt !== undefined && ts.isVariableStatement(stmt) && (ts.getModifiers(stmt)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false);
-        addValue(ctx, value, { file, line: lineOf(node), ...(bound === undefined ? {} : { bound }), exported, ...(ts.isRegularExpressionLiteral(node) ? { regex: true } : {}) });
+        const topLevel = stmt !== undefined && ts.isVariableStatement(stmt) && ts.isSourceFile(stmt.parent);
+        addValue(ctx, value, { file, line: lineOf(node), ...(bound === undefined ? {} : { bound }), exported, ...(topLevel ? { topLevel } : {}), ...(ts.isRegularExpressionLiteral(node) ? { regex: true } : {}) });
       }
     }
 
@@ -873,6 +895,12 @@ function readCode(ctx: Context, file: string, text: string): void {
   };
   visit(sf);
 
+  // A list another file imports is used, as far as this file can tell: what the importer does with it is the importer's.
+  for (const s of ctx.sets.slice(firstSet)) if ((s.form === "array" || s.form === "set") && listNames.has(s.name)) {
+    s.topLevel = true;
+    s.exported = exportedNames.has(s.name);
+    if (usedAsSet.has(s.name) || exportedNames.has(s.name)) s.usedAsSet = true;
+  }
   // An object read only as `X.field` where it is declared, and not exported, is a record: its keys are attributes, not members.
   for (const { index, name } of keySets) {
     const u = uses.get(name);
@@ -1270,6 +1298,88 @@ function readCommits(root: string, rev: string, ignored: readonly string[]): Com
     else if (line.startsWith("-")) file.removed.push(line.slice(1));
   }
   return commits;
+}
+
+/**
+ * The advice index the hooks look writes up against: the project's named
+ * homes in the four classes write-time advice speaks for, each with the files
+ * that already copy it. Only a home a reader could import (bound at a
+ * module's top level), in production code no exclusion leaves out, rare
+ * enough to be one fact, and never prose or another party's value.
+ */
+function adviceIndexOf(a: { commit: string; ctx: Context; testFolders: readonly string[]; exclusions: Record<string, unknown>; derived: (file: string) => { key: string } | undefined; packages: ReadonlySet<string>; platform: ReadonlySet<string>; rarity: Rarity; holds: readonly { test: string }[]; paths: readonly string[] }): AdviceIndex {
+  const { ctx, derived, rarity } = a;
+  const excluded = (file: string): boolean => derived(file) !== undefined;
+  const live = (file: string): boolean => !ctx.isTest(file) && !excluded(file);
+  const constants: AdviceIndex["constants"] = [];
+  for (const [value, sites] of ctx.values) {
+    if (/\s/.test(value) || ctx.typed.has(value) || ownerOf(value, a.packages, a.platform) !== undefined) continue;
+    if (sites.some((s) => s.regex === true)) continue;
+    const homes = sites.filter((s) => s.topLevel === true && s.bound !== undefined && live(s.file));
+    if (homes.length === 0 || rarity.value(value, 2) < RARITY_MIN) continue;
+    const home = homes.find((s) => s.exported) ?? homes[0]!;
+    constants.push({ value, name: home.bound!, file: home.file, line: home.line, exported: home.exported, copies: [...new Set(sites.map((s) => s.file).filter((f) => f !== home.file))] });
+  }
+  const lists: AdviceIndex["lists"] = [];
+  const byMembers = new Map<string, string[]>();
+  for (const s of ctx.sets) if ((s.form === "array" || s.form === "set") && s.line > 0) {
+    const key = [...s.members].sort().join("\u0000");
+    byMembers.set(key, [...(byMembers.get(key) ?? []), s.file]);
+  }
+  for (const s of ctx.sets) {
+    if (s.usedAsSet !== true || s.topLevel !== true || s.members.length < 3 || !live(s.file)) continue;
+    if (s.members.every((m) => ownerOf(m, a.packages, a.platform) !== undefined) || rarity.shared(s.members, 2) < RARITY_MIN) continue;
+    const copies = (byMembers.get([...s.members].sort().join("\u0000")) ?? []).filter((f) => f !== s.file);
+    lists.push({ members: s.members, name: s.name, file: s.file, line: s.line, exported: s.exported === true, copies: [...new Set(copies)] });
+  }
+  const rules: AdviceIndex["rules"] = [];
+  const regexFiles = new Map<string, string[]>();
+  for (const p of ctx.predicates) if (p.form === "regex") regexFiles.set(p.text, [...(regexFiles.get(p.text) ?? []), p.file]);
+  for (const p of ctx.predicates) {
+    if (p.form !== "regex" || p.topLevel !== true || p.bound === undefined || p.test === true || !live(p.file)) continue;
+    const pred = predicateOf(p);
+    if (pred === undefined || pred.atoms.length === 0 || rarity.shared(pred.atoms, 2) < RARITY_MIN) continue;
+    rules.push({ site: p, atoms: pred.atoms, name: p.bound, file: p.file, line: p.line, exported: p.exported === true, copies: [...new Set((regexFiles.get(p.text) ?? []).filter((f) => f !== p.file))] });
+  }
+  const parsers: AdviceIndex["parsers"] = [];
+  for (const p of ctx.parsers) {
+    if (!live(p.file)) continue;
+    const same = ctx.parsers.filter((o) => o !== p && o.type === p.type && [...o.fields].sort().join() === [...p.fields].sort().join()).map((o) => o.file);
+    parsers.push({ type: p.type, fields: p.fields, name: p.name, file: p.file, line: p.line, exported: p.exported, copies: [...new Set(same)] });
+  }
+  // The config's data and scripts, and the example apps, as patterns over a path: where the advice stays silent.
+  const quiet: string[] = [];
+  const raw = a.exclusions["restatements"];
+  const entries = raw !== null && typeof raw === "object" ? [...((raw as Record<string, unknown>)["data"] as string[] | undefined ?? []), ...((raw as Record<string, unknown>)["scripts"] as string[] | undefined ?? [])] : [];
+  for (const entry of entries) {
+    if (typeof entry !== "string") continue;
+    const path = entry.replace(/^\.\//, "").replace(/\/+$/, "");
+    quiet.push(/[*?[]/.test(path) ? globPattern(path).source : `^${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:/|$)`);
+  }
+  for (const p of a.paths) if (derived(p)?.key === "examples") {
+    const folder = p.split("/").slice(0, -1).join("/");
+    const pattern = `^${folder.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`;
+    if (!quiet.includes(pattern)) quiet.push(pattern);
+  }
+  let withExtension = 0;
+  let without = 0;
+  for (const facts of ctx.modules.values()) for (const i of facts.imports) if (i.spec.startsWith(".")) {
+    if (/\.[cm]?[jt]sx?$/.test(i.spec)) withExtension++;
+    else without++;
+  }
+  return {
+    version: ADVICE_VERSION,
+    commit: a.commit,
+    at: new Date().toISOString(),
+    importExtension: withExtension >= without,
+    testFolders: [...a.testFolders],
+    quiet: quiet.slice(0, 200),
+    constants,
+    lists,
+    rules,
+    parsers,
+    ...(a.holds[0] === undefined ? {} : { precedent: a.holds[0].test }),
+  };
 }
 
 /** A generated file, by its name (`*.gen.ts`, `generated.ts`) or a header that says so. */
@@ -1670,5 +1780,7 @@ export async function readMirrors(root: string, options: MirrorOptions = {}): Pr
     ...(commits === undefined ? {} : { standingOf: standingBy(commits) }),
   });
   phase("restatements");
-  return { rev, commit, ms: Math.round(performance.now() - t0), phases, sets: ctx.sets.length, read: wanted.filter((p) => CODE_FILE.test(p)).length, unread, groups, restatements, held, excluded, unrefuted, declared: differ, rules: RULES, holds };
+  const advice = adviceIndexOf({ commit, ctx, testFolders, exclusions: config, derived, packages, platform: platformOf(root), rarity: new Rarity(ctx.counts, priorOf()), holds, paths });
+  phase("advice");
+  return { advice, rev, commit, ms: Math.round(performance.now() - t0), phases, sets: ctx.sets.length, read: wanted.filter((p) => CODE_FILE.test(p)).length, unread, groups, restatements, held, excluded, unrefuted, declared: differ, rules: RULES, holds };
 }

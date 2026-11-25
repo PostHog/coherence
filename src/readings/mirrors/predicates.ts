@@ -300,6 +300,9 @@ export interface PredicateSite {
   templated?: boolean;
   /** Written in a test: a copy that can import its source, never a rule's only production site. */
   test?: boolean;
+  /** Bound to a constant at the module's top level, and whether it is exported. */
+  topLevel?: boolean;
+  exported?: boolean;
 }
 
 /** A predicate made runnable, with what it is made of and what it accepts by construction. */

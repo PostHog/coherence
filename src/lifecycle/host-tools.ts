@@ -134,3 +134,39 @@ export function writtenNames(input: ToolEvent): { named: string[]; shell: string
   const command = shellCommandOf(record);
   return { named: [], shell: command === undefined ? [] : shellWrittenPaths(command) };
 }
+
+/**
+ * What a writing tool is about to write, as text, by the name it writes it
+ * under: Claude Code's Write content, Edit new_string and MultiEdit edits;
+ * the lines a Codex patch adds to each file; Antigravity's content fields.
+ * Words only, for write-time advice: nothing is read or stat'd.
+ */
+export function writtenTexts(input: ToolEvent): { name: string; text: string }[] {
+  const naming = writerNaming(input.tool_name);
+  const record = typeof input.tool_input === "object" && input.tool_input !== null ? (input.tool_input as Record<string, unknown>) : {};
+  if (naming === "patch") {
+    const patch = typeof input.tool_input === "string" ? input.tool_input : [record["patch"], record["input"], record["command"]].find((v): v is string => typeof v === "string");
+    if (patch === undefined) return [];
+    const out: { name: string; text: string }[] = [];
+    let current: { name: string; lines: string[] } | undefined;
+    for (const line of patch.split("\n")) {
+      const head = /^\*\*\* (?:Add File|Update File|Move to): (.+)$/.exec(line);
+      if (head !== null) {
+        if (current !== undefined) out.push({ name: current.name, text: current.lines.join("\n") });
+        current = { name: head[1]!.trim(), lines: [] };
+      } else if (current !== undefined && line.startsWith("+")) current.lines.push(line.slice(1));
+    }
+    if (current !== undefined) out.push({ name: current.name, text: current.lines.join("\n") });
+    return out.filter((w) => w.text !== "");
+  }
+  if (naming === undefined || naming === "command") return [];
+  const name = record[naming];
+  if (typeof name !== "string" || name === "") return [];
+  const texts: string[] = [];
+  for (const key of ["content", "new_string", "newString", "CodeContent", "ReplacementContent", "text"]) if (typeof record[key] === "string") texts.push(record[key] as string);
+  for (const key of ["edits", "ReplacementChunks"]) {
+    const edits = record[key];
+    if (Array.isArray(edits)) for (const e of edits) if (typeof e === "object" && e !== null) for (const k of ["new_string", "newString", "ReplacementContent"]) if (typeof (e as Record<string, unknown>)[k] === "string") texts.push((e as Record<string, unknown>)[k] as string);
+  }
+  return texts.length === 0 ? [] : [{ name, text: texts.join("\n") }];
+}

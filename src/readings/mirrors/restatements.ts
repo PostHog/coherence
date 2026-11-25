@@ -49,6 +49,8 @@ export interface ValueSite {
   exported: boolean;
   /** Written as a regular expression's source. */
   regex?: boolean;
+  /** Bound to a constant at the module's top level: a name another file could import. */
+  topLevel?: boolean;
 }
 
 /** One import of a module, resolved: `to` is the project file it names, undefined for a package or a built-in. */

@@ -113,6 +113,8 @@ export interface MirrorReading {
   rules: string;
   /** Every copy a test names, witnessed or not: what query mirrors --witness changes and runs. */
   holds: HeldCopy[];
+  /** The index write-time advice looks a hook's writes up against, kept beside the reading (advice.ts); left out of what query mirrors prints. */
+  advice?: import("./advice.ts").AdviceIndex;
 }
 
 /** A copy a test names, to be witnessed: change the copy, and the test must go red. Keyed by the blobs of the home, the copy and the test. */
